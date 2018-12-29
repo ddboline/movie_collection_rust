@@ -3,7 +3,7 @@ extern crate rayon;
 
 use failure::Error;
 use rayon::prelude::*;
-use std::env::{current_dir, var};
+use std::env::var;
 use std::io::BufRead;
 use std::io::BufReader;
 use std::path::Path;
@@ -179,5 +179,5 @@ fn make_list(do_here: Option<String>) -> Result<(), Error> {
 
 fn main() {
     make_list(None).unwrap();
-    make_list(Some(current_dir().unwrap().to_str().unwrap().to_string())).unwrap();
+    // make_list(Some(current_dir().unwrap().to_str().unwrap().to_string())).unwrap();
 }

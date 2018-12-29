@@ -14,6 +14,7 @@ r2d2 = "*"
 r2d2_postgres = "*"
 failure = "*"
 rayon = "1.0"
+clap = "*"
 
 [lib]
 name = "movie_collection_rust"
@@ -24,3 +25,7 @@ name = "make_list"
 path = "src/make_list.rs"
 doc = false
 
+[[bin]]
+name = "remcom"
+path = "src/remcom.rs"
+doc = false
