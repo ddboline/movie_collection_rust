@@ -1,3 +1,4 @@
+extern crate dotenv;
 extern crate failure;
 extern crate rayon;
 
@@ -57,31 +58,33 @@ fn walk_directory(path: &str, match_strs: &[String]) -> Result<Vec<String>, Erro
 }
 
 fn make_list(do_here: Option<String>) -> Result<(), Error> {
+    let home_dir = var("HOME").expect("No HOME directory...");
+
+    let env_file = format!("{}/.config/movie_collection_rust/config.env", home_dir);
+
+    if Path::new("config.env").exists() {
+        dotenv::from_filename("config.env").ok();
+    } else if Path::new(&env_file).exists() {
+        dotenv::from_path(&env_file).ok();
+    } else if Path::new("config.env").exists() {
+        dotenv::from_filename("config.env").ok();
+    } else {
+        dotenv::dotenv().ok();
+    }
+
     let suffixes = vec!["avi", "mp4", "mkv"];
 
-    let movie_dirs: Vec<String> = vec![
-        "/media/dileptonnas/Documents/movies",
-        "/media/dileptonnas/Documents/television",
-        "/media/dileptonnas/television/unwatched",
-        "/media/sabrent2000/Documents/movies",
-        "/media/sabrent2000/Documents/television",
-        "/media/sabrent2000/television/unwatched",
-        "/media/western2000/Documents/movies",
-        "/media/western2000/Documents/television",
-        "/media/western2000/television/unwatched",
-        "/media/seagate4000/Documents/movies",
-        "/media/seagate4000/Documents/television",
-        "/media/seagate4000/television/unwatched",
-    ]
-    .par_iter()
-    .filter_map(|d| {
-        if Path::new(d).exists() {
-            Some(d.to_string())
-        } else {
-            None
-        }
-    })
-    .collect();
+    let movie_dirs: Vec<String> = var("MOVIEDIRS")
+        .expect("MOVIEDIRS env variable not set")
+        .split(",")
+        .filter_map(|d| {
+            if Path::new(d).exists() {
+                Some(d.to_string())
+            } else {
+                None
+            }
+        })
+        .collect();
 
     let home_dir = var("HOME").unwrap_or_else(|_| "/tmp".to_string());
 
@@ -179,5 +182,4 @@ fn make_list(do_here: Option<String>) -> Result<(), Error> {
 
 fn main() {
     make_list(None).unwrap();
-    // make_list(Some(current_dir().unwrap().to_str().unwrap().to_string())).unwrap();
 }
