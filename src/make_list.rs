@@ -1,97 +1,21 @@
 extern crate dotenv;
 extern crate failure;
+extern crate movie_collection_rust;
 extern crate rayon;
 
 use failure::Error;
 use rayon::prelude::*;
-use std::env::var;
 use std::io::BufRead;
 use std::io::BufReader;
 use std::path::Path;
 use subprocess::Exec;
 
-pub fn map_result_vec<T, E>(input: Vec<Result<T, E>>) -> Result<Vec<T>, E> {
-    let mut output: Vec<T> = Vec::new();
-    for item in input {
-        output.push(item?);
-    }
-    Ok(output)
-}
+use movie_collection_rust::utils::{walk_directory, Config};
 
-fn walk_directory(path: &str, match_strs: &[String]) -> Result<Vec<String>, Error> {
-    Ok(Path::new(path)
-        .read_dir()?
-        .filter_map(|f| match f {
-            Ok(fpath) => match fpath.file_type() {
-                Ok(ftype) => {
-                    let path_name = fpath.path().to_str().unwrap().to_string();
+fn make_list() -> Result<(), Error> {
+    let config = Config::new().with_config();
 
-                    if ftype.is_dir() {
-                        Some(match walk_directory(&path_name, match_strs) {
-                            Ok(v) => v,
-                            Err(e) => panic!("{} {}", path_name, e),
-                        })
-                    } else {
-                        let path_names: Vec<_> = match_strs
-                            .iter()
-                            .filter_map(|m| {
-                                if path_name.contains(m) {
-                                    Some(path_name.clone())
-                                } else {
-                                    None
-                                }
-                            })
-                            .collect();
-                        if path_names.len() > 0 {
-                            Some(path_names)
-                        } else {
-                            None
-                        }
-                    }
-                }
-                Err(_) => None,
-            },
-            Err(_) => None,
-        })
-        .flatten()
-        .collect())
-}
-
-fn make_list(do_here: Option<String>) -> Result<(), Error> {
-    let home_dir = var("HOME").expect("No HOME directory...");
-
-    let env_file = format!("{}/.config/movie_collection_rust/config.env", home_dir);
-
-    if Path::new("config.env").exists() {
-        dotenv::from_filename("config.env").ok();
-    } else if Path::new(&env_file).exists() {
-        dotenv::from_path(&env_file).ok();
-    } else if Path::new("config.env").exists() {
-        dotenv::from_filename("config.env").ok();
-    } else {
-        dotenv::dotenv().ok();
-    }
-
-    let suffixes = vec!["avi", "mp4", "mkv"];
-
-    let movie_dirs: Vec<String> = var("MOVIEDIRS")
-        .expect("MOVIEDIRS env variable not set")
-        .split(",")
-        .filter_map(|d| {
-            if Path::new(d).exists() {
-                Some(d.to_string())
-            } else {
-                None
-            }
-        })
-        .collect();
-
-    let home_dir = var("HOME").unwrap_or_else(|_| "/tmp".to_string());
-
-    let movies_dir = match do_here {
-        Some(dir) => dir,
-        None => format!("{}/Documents/movies", home_dir),
-    };
+    let movies_dir = format!("{}/Documents/movies", config.home_dir);
 
     let path = Path::new(&movies_dir);
 
@@ -100,7 +24,7 @@ fn make_list(do_here: Option<String>) -> Result<(), Error> {
         .filter_map(|f| match f {
             Ok(fname) => {
                 let file_name = fname.file_name().into_string().unwrap();
-                for suffix in &suffixes {
+                for suffix in &config.suffixes {
                     if file_name.ends_with(suffix) {
                         return Some(file_name);
                     }
@@ -115,7 +39,8 @@ fn make_list(do_here: Option<String>) -> Result<(), Error> {
         return Ok(());
     }
 
-    let file_list: Vec<_> = movie_dirs
+    let file_list: Vec<_> = config
+        .movie_dirs
         .par_iter()
         .flat_map(|d| walk_directory(&d, &local_file_list))
         .flatten()
@@ -181,5 +106,5 @@ fn make_list(do_here: Option<String>) -> Result<(), Error> {
 }
 
 fn main() {
-    make_list(None).unwrap();
+    make_list().unwrap();
 }
