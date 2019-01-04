@@ -3,12 +3,11 @@ extern crate failure;
 extern crate movie_collection_rust;
 
 use clap::{App, Arg};
-use failure::{err_msg, Error};
-use std::fs::File;
-use std::io::Write;
 use std::path::Path;
 
-use movie_collection_rust::utils::{get_version_number, publish_transcode_job_to_queue, Config};
+use movie_collection_rust::utils::{
+    create_transcode_script, get_version_number, publish_transcode_job_to_queue, Config,
+};
 
 fn transcode_avi() {
     let config = Config::new().with_config();
@@ -51,28 +50,6 @@ fn transcode_avi() {
             }
             Err(e) => println!("error {}", e),
         }
-    }
-}
-
-pub fn create_transcode_script(config: &Config, path: &Path) -> Result<String, Error> {
-    let full_path = path.to_str().ok_or_else(|| err_msg("Bad path"))?;
-    let fstem = path
-        .file_stem()
-        .ok_or_else(|| err_msg("No stem"))?
-        .to_str()
-        .ok_or_else(|| err_msg("failure"))?;
-    let script_file = format!("{}/dvdrip/jobs/{}.sh", config.home_dir, fstem);
-    if Path::new(&script_file).exists() {
-        Err(err_msg("File exists"))
-    } else {
-        let output_file = format!("{}/dvdrip/avi/{}.mp4", config.home_dir, fstem);
-        let template_file = include_str!("../templates/transcode_script.sh")
-            .replace("INPUT_FILE", full_path)
-            .replace("OUTPUT_FILE", &output_file)
-            .replace("PREFIX", &fstem);
-        let mut file = File::create(script_file.clone())?;
-        file.write_all(&template_file.into_bytes())?;
-        Ok(script_file)
     }
 }
 
