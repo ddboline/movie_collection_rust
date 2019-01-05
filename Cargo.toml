@@ -41,3 +41,8 @@ doc = false
 name = "run-encoding"
 path = "src/run_encoding.rs"
 doc = false
+
+[[bin]]
+name = "parse-imdb"
+path = "src/parse_imdb.rs"
+doc = false

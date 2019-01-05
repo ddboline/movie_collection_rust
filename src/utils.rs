@@ -6,12 +6,15 @@ extern crate subprocess;
 use amqp::{protocol, Basic, Channel, Options, Session, Table};
 use failure::{err_msg, Error};
 use std::env::var;
+use std::fs::create_dir_all;
 use std::fs::rename;
 use std::fs::File;
 use std::io::Write;
 use std::io::{BufRead, BufReader};
 use std::path::Path;
 use subprocess::{Exec, Redirection};
+
+use crate::config::Config;
 
 pub fn map_result_vec<T, E>(input: Vec<Result<T, E>>) -> Result<Vec<T>, E> {
     let mut output: Vec<T> = Vec::new();
@@ -45,7 +48,7 @@ pub fn walk_directory(path: &str, match_strs: &[String]) -> Result<Vec<String>, 
                                 }
                             })
                             .collect();
-                        if path_names.len() > 0 {
+                        if path_names.is_empty() {
                             Some(path_names)
                         } else {
                             None
@@ -58,61 +61,6 @@ pub fn walk_directory(path: &str, match_strs: &[String]) -> Result<Vec<String>, 
         })
         .flatten()
         .collect())
-}
-
-#[derive(Debug, Default)]
-pub struct Config {
-    pub home_dir: String,
-    pub pgurl: String,
-    pub movie_dirs: Vec<String>,
-    pub suffixes: Vec<String>,
-    pub preferred_dir: String,
-}
-
-impl Config {
-    pub fn new() -> Config {
-        Config {
-            home_dir: "/tmp".to_string(),
-            pgurl: "".to_string(),
-            movie_dirs: Vec::new(),
-            suffixes: vec!["avi".to_string(), "mp4".to_string(), "mkv".to_string()],
-            preferred_dir: "".to_string(),
-        }
-    }
-
-    pub fn with_config(mut self) -> Config {
-        self.home_dir = var("HOME").expect("No HOME directory...");
-
-        let env_file = format!("{}/.config/movie_collection_rust/config.env", self.home_dir);
-
-        if Path::new("config.env").exists() {
-            dotenv::from_filename("config.env").ok();
-        } else if Path::new(&env_file).exists() {
-            dotenv::from_path(&env_file).ok();
-        } else if Path::new("config.env").exists() {
-            dotenv::from_filename("config.env").ok();
-        } else {
-            dotenv::dotenv().ok();
-        }
-
-        self.pgurl = var("PGURL").expect("No PGURL specified");
-
-        self.movie_dirs = var("MOVIEDIRS")
-            .expect("MOVIEDIRS env variable not set")
-            .split(",")
-            .filter_map(|d| {
-                if Path::new(d).exists() {
-                    Some(d.to_string())
-                } else {
-                    None
-                }
-            })
-            .collect();
-
-        self.preferred_dir = var("PREFERED_DISK").unwrap_or_else(|_| "/tmp".to_string());
-
-        self
-    }
 }
 
 pub fn get_version_number() -> String {
@@ -171,7 +119,7 @@ pub fn read_transcode_jobs_from_queue(queue: &str) -> Result<(), Error> {
 
             let path = Path::new(&script);
             let file_name = path.file_name().unwrap().to_str().unwrap();
-            let home_dir = var("HOME").unwrap_or("/tmp".to_string());
+            let home_dir = var("HOME").unwrap_or_else(|_| "/tmp".to_string());
             if path.exists() {
                 let command = format!("sh {}", script);
 
@@ -222,4 +170,72 @@ pub fn create_transcode_script(config: &Config, path: &Path) -> Result<String, E
         file.write_all(&template_file.into_bytes())?;
         Ok(script_file)
     }
+}
+
+pub fn create_move_script(
+    config: &Config,
+    directory: Option<String>,
+    unwatched: bool,
+    path: &Path,
+) -> Result<String, Error> {
+    let file = path.to_str().unwrap();
+    let file_name = path.file_name().unwrap().to_str().unwrap();
+    let prefix = path.file_stem().unwrap().to_str().unwrap();
+    let output_dir = if let Some(d) = directory {
+        let d = format!("{}/Documents/movies/{}", config.preferred_dir, d);
+        if !Path::new(&d).exists() {
+            return Err(err_msg(format!("Directory {} does not exist", d)));
+        }
+        d
+    } else if unwatched {
+        let d = format!("{}/television/unwatched", config.preferred_dir);
+        if !Path::new(&d).exists() {
+            return Err(err_msg(format!("Directory {} does not exist", d)));
+        }
+        d
+    } else {
+        let file_stem: Vec<_> = path
+            .file_stem()
+            .unwrap()
+            .to_str()
+            .unwrap()
+            .split('_')
+            .collect();
+        let show = file_stem[..(file_stem.len() - 2)].join("_");
+        let season: i64 = file_stem[(file_stem.len() - 2)]
+            .replace("s", "")
+            .parse()
+            .unwrap_or(-1);
+        let episode: i64 = file_stem[(file_stem.len() - 1)]
+            .replace("ep", "")
+            .parse()
+            .unwrap_or(-1);
+
+        if season == -1 || episode == -1 {
+            panic!("Failed to parse show season {} episode {}", season, episode);
+        }
+
+        let d = format!(
+            "{}/Documents/television/{}/season{}",
+            config.preferred_dir, show, season
+        );
+        if !Path::new(&d).exists() {
+            create_dir_all(&d)?;
+        }
+        d
+    };
+    let mp4_script = format!("{}/dvdrip/jobs/{}_copy.sh", config.home_dir, prefix);
+
+    let script_str = include_str!("../templates/move_script.sh")
+        .replace("SHOW", prefix)
+        .replace("OUTNAME", &format!("{}/{}", output_dir, prefix))
+        .replace("FNAME", file)
+        .replace("BNAME", file_name)
+        .replace("ONAME", &format!("{}/{}", output_dir, prefix));
+
+    let mut f = File::create(mp4_script.clone())?;
+    f.write_all(&script_str.into_bytes())?;
+
+    println!("dir {} file {}", output_dir, file);
+    Ok(mp4_script)
 }

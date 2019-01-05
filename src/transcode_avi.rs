@@ -5,12 +5,13 @@ extern crate movie_collection_rust;
 use clap::{App, Arg};
 use std::path::Path;
 
+use movie_collection_rust::config::Config;
 use movie_collection_rust::utils::{
-    create_transcode_script, get_version_number, publish_transcode_job_to_queue, Config,
+    create_transcode_script, get_version_number, publish_transcode_job_to_queue,
 };
 
 fn transcode_avi() {
-    let config = Config::new().with_config();
+    let config = Config::with_config();
 
     let env_file = format!(
         "{}/.config/movie_collection_rust/config.env",

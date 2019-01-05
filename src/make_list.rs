@@ -5,15 +5,17 @@ extern crate rayon;
 
 use failure::Error;
 use rayon::prelude::*;
+use std::collections::HashMap;
 use std::io::BufRead;
 use std::io::BufReader;
 use std::path::Path;
 use subprocess::Exec;
 
-use movie_collection_rust::utils::{walk_directory, Config};
+use movie_collection_rust::config::Config;
+use movie_collection_rust::utils::walk_directory;
 
 fn make_list() -> Result<(), Error> {
-    let config = Config::new().with_config();
+    let config = Config::with_config();
 
     let movies_dir = format!("{}/Documents/movies", config.home_dir);
 
@@ -46,11 +48,22 @@ fn make_list() -> Result<(), Error> {
         .flatten()
         .collect();
 
-    file_list
+    let file_map: HashMap<String, String> = file_list
         .iter()
         .map(|f| {
-            let file_name = f.split("/").last().unwrap().to_string();
-            println!("{} {}", file_name, f);
+            let file_name = f.split('/').last().unwrap().to_string();
+            (file_name, f.clone())
+        })
+        .collect();
+
+    local_file_list
+        .iter()
+        .map(|f| {
+            let full_path = match file_map.get(f) {
+                Some(s) => s.clone(),
+                None => "".to_string(),
+            };
+            println!("{} {}", f, full_path);
         })
         .for_each(drop);
 
@@ -74,26 +87,24 @@ fn make_list() -> Result<(), Error> {
                         .split_whitespace()
                         .map(|s| s.to_string())
                         .collect();
-                    if items.len() > 5 {
-                        if items[1] == "V:" {
-                            let nsecs: u64 = items[5]
-                                .trim_start_matches("frames=")
-                                .trim_matches(',')
-                                .parse()
-                                .unwrap();
-                            let nmin = (nsecs as f64 / 60.) as u64;
-                            let nhour = (nmin as f64 / 60.) as u64;
-                            timeval = format!("{:02}:{:02}:{:02}", nhour, nmin, nsecs % 60);
-                        }
+                    if items.len() > 5 && items[1] == "V:" {
+                        let fps: f64 = items[2].parse().unwrap();
+                        let nframes: u64 = items[5]
+                            .trim_start_matches("frames=")
+                            .trim_matches(',')
+                            .parse()
+                            .unwrap();
+                        let nsecs: f64 = nframes as f64 / fps;
+                        let nmin = (nsecs / 60.) as u64;
+                        let nhour = (nmin as f64 / 60.) as u64;
+                        timeval = format!("{:02}:{:02}:{:02}", nhour, nmin, nsecs as u64 % 60);
                     }
-                    if items.len() > 1 {
-                        if items[0] == "Duration:" {
-                            let its: Vec<_> = items[1].trim_matches(',').split(":").collect();
-                            let nhour: u64 = its[0].parse().unwrap();
-                            let nmin: u64 = its[1].parse().unwrap();
-                            let nsecs: f64 = its[2].parse().unwrap();
-                            timeval = format!("{:02}:{:02}:{:02}", nhour, nmin, nsecs as u64);
-                        }
+                    if items.len() > 1 && items[0] == "Duration:" {
+                        let its: Vec<_> = items[1].trim_matches(',').split(':').collect();
+                        let nhour: u64 = its[0].parse().unwrap();
+                        let nmin: u64 = its[1].parse().unwrap();
+                        let nsecs: f64 = its[2].parse().unwrap();
+                        timeval = format!("{:02}:{:02}:{:02}", nhour, nmin, nsecs as u64);
                     }
                 })
                 .for_each(drop);
