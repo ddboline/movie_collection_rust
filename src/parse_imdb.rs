@@ -50,6 +50,13 @@ fn parse_imdb_parser() -> Result<(), Error> {
                 .help("Do update"),
         )
         .arg(
+            Arg::with_name("imdblink")
+                .short("i")
+                .long("imdblink")
+                .takes_value(true)
+                .help("Manually override imdb link"),
+        )
+        .arg(
             Arg::with_name("database")
                 .short("d")
                 .long("database")
@@ -62,6 +69,7 @@ fn parse_imdb_parser() -> Result<(), Error> {
 
     let show = matches.value_of("show").unwrap_or("");
     let tv = matches.is_present("tv");
+    let imdb_link = matches.value_of("imdblink").map(|s| s.to_string());
 
     let all_seasons = matches.is_present("all_seasons");
 
@@ -76,14 +84,23 @@ fn parse_imdb_parser() -> Result<(), Error> {
 
     let mq = MovieCollection::new();
 
-    let shows: HashMap<String, _> = mq
-        .print_imdb_shows(show, tv)?
-        .into_iter()
-        .filter_map(|s| match &s.link {
-            Some(l) => Some((l.clone(), s.clone())),
-            None => None,
-        })
-        .collect();
+    let shows: HashMap<String, _> = if let Some(ilink) = &imdb_link {
+        mq.print_imdb_shows(show, tv)?
+            .into_iter()
+            .filter_map(|s| match &s.link {
+                Some(l) if l == ilink => Some((l.clone(), s.clone())),
+                _ => None,
+            })
+            .collect()
+    } else {
+        mq.print_imdb_shows(show, tv)?
+            .into_iter()
+            .filter_map(|s| match &s.link {
+                Some(l) => Some((l.clone(), s.clone())),
+                None => None,
+            })
+            .collect()
+    };
 
     let episodes: Option<HashMap<(i32, i32), _>> = if tv {
         if all_seasons {
@@ -103,6 +120,11 @@ fn parse_imdb_parser() -> Result<(), Error> {
 
     if do_update {
         let results = parse_imdb(&show.replace("_", " "))?;
+        let results = if let Some(ilink) = imdb_link {
+            results.into_iter().filter(|r| r.link == ilink).collect()
+        } else {
+            results
+        };
 
         if !tv {
             if update_database {
@@ -165,6 +187,7 @@ fn parse_imdb_parser() -> Result<(), Error> {
                                         .unwrap_or_else(|| NaiveDate::from_ymd(1970, 1, 1)),
                                     rating: episode.rating.unwrap_or(-1.0),
                                     eptitle: episode.eptitle.unwrap_or_else(|| "".to_string()),
+                                    epurl: episode.epurl.unwrap_or_else(|| "".to_string()),
                                 })?;
                             }
                         }

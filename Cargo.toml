@@ -49,3 +49,15 @@ doc = false
 name = "parse-imdb"
 path = "src/parse_imdb.rs"
 doc = false
+
+[[bin]]
+name = "make-collection"
+path = "src/make_collection.rs"
+doc = false
+
+[[bin]]
+name = "make-queue"
+path = "src/make_queue.rs"
+doc = false
+
+

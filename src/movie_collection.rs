@@ -7,17 +7,19 @@ extern crate reqwest;
 extern crate select;
 
 use chrono::NaiveDate;
-use failure::Error;
+use failure::{err_msg, Error};
 use r2d2::Pool;
 use r2d2_postgres::{PostgresConnectionManager, TlsMode};
 use rayon::prelude::*;
 use reqwest::Url;
 use select::document::Document;
 use select::predicate::{Class, Name};
+use std::collections::{HashMap, HashSet};
 use std::fmt;
+use std::path::Path;
 
 use crate::config::Config;
-use crate::utils::map_result_vec;
+use crate::utils::{map_result_vec, parse_file_stem, walk_directory};
 
 pub type PgPool = Pool<PostgresConnectionManager>;
 
@@ -63,13 +65,14 @@ pub struct ImdbEpisodes {
     pub airdate: NaiveDate,
     pub rating: f64,
     pub eptitle: String,
+    pub epurl: String,
 }
 
 impl fmt::Display for ImdbEpisodes {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         write!(
             f,
-            "{} {} {} {} {} {} {} ",
+            "{} {} {} {} {} {} {} {}",
             self.show,
             self.title,
             self.season,
@@ -77,6 +80,7 @@ impl fmt::Display for ImdbEpisodes {
             self.airdate,
             self.rating,
             self.eptitle,
+            self.epurl,
         )
     }
 }
@@ -134,9 +138,9 @@ impl MovieCollection {
     pub fn insert_imdb_episode(&self, input: &ImdbEpisodes) -> Result<(), Error> {
         let query = r#"
             INSERT INTO imdb_episodes
-            (show, season, episode, airdate, rating, eptitle)
+            (show, season, episode, airdate, rating, eptitle, epurl)
             VALUES
-            ($1, $2, $3, $4, RATING, $5)
+            ($1, $2, $3, $4, RATING, $5, $6)
         "#;
         let query = query.replace("RATING", &input.rating.to_string());
 
@@ -149,6 +153,7 @@ impl MovieCollection {
                 &input.episode,
                 &input.airdate,
                 &input.eptitle,
+                &input.epurl,
             ],
         )?;
         Ok(())
@@ -156,14 +161,20 @@ impl MovieCollection {
 
     pub fn update_imdb_episodes(&self, input: &ImdbEpisodes) -> Result<(), Error> {
         let query = r#"
-            UPDATE imdb_episodes SET rating=RATING,eptitle=$1 WHERE show=$2 AND season=$3 AND episode=$4
+            UPDATE imdb_episodes SET rating=RATING,eptitle=$1,epurl=$2 WHERE show=$3 AND season=$4 AND episode=$5
         "#;
         let query = query.replace("RATING", &input.rating.to_string());
 
         let conn = self.pool.get()?;
         conn.execute(
             &query,
-            &[&input.eptitle, &input.show, &input.season, &input.episode],
+            &[
+                &input.eptitle,
+                &input.epurl,
+                &input.show,
+                &input.season,
+                &input.episode,
+            ],
         )?;
         Ok(())
     }
@@ -237,7 +248,7 @@ impl MovieCollection {
             SELECT a.show, b.title, a.season, a.episode,
                    a.airdate,
                    cast(a.rating as double precision),
-                   a.eptitle
+                   a.eptitle, a.epurl
             FROM imdb_episodes a
             JOIN imdb_ratings b ON a.show=b.show"#;
         let query = format!("{} WHERE a.show = '{}'", query, show);
@@ -259,10 +270,11 @@ impl MovieCollection {
                 let airdate: NaiveDate = row.get(4);
                 let rating: f64 = row.get(5);
                 let eptitle: String = row.get(6);
+                let epurl: String = row.get(7);
 
                 println!(
-                    "{} {} {} {} {} {} {}",
-                    show, title, season, episode, airdate, rating, eptitle
+                    "{} {} {} {} {} {} {} {}",
+                    show, title, season, episode, airdate, rating, eptitle, epurl
                 );
                 ImdbEpisodes {
                     show,
@@ -272,6 +284,7 @@ impl MovieCollection {
                     airdate,
                     rating,
                     eptitle,
+                    epurl,
                 }
             })
             .collect();
@@ -297,6 +310,305 @@ impl MovieCollection {
             println!("{} {} {} {}", show, title, season, nepisodes);
         }
         Ok(())
+    }
+
+    pub fn search_movie_collection(
+        &self,
+        search_strs: &[String],
+    ) -> Result<Vec<MovieCollectionResult>, Error> {
+        let query = r#"
+            SELECT a.path, a.show,
+            COALESCE(b.rating, -1),
+            COALESCE(b.title, ''),
+            COALESCE(b.istv, FALSE)
+            FROM movie_collection a
+            LEFT JOIN imdb_ratings b ON a.show_id = b.index
+        "#;
+        let query = if !search_strs.is_empty() {
+            let search_strs: Vec<_> = search_strs
+                .iter()
+                .map(|s| format!("a.path like '%{}%'", s))
+                .collect();
+            format!("{} WHERE {}", query, search_strs.join(" OR "))
+        } else {
+            query.to_string()
+        };
+
+        let results: Vec<_> = self
+            .pool
+            .get()?
+            .query(&query, &[])?
+            .iter()
+            .map(|row| {
+                let mut result = MovieCollectionResult::default();
+                result.path = row.get(0);
+                result.show = row.get(1);
+                result.rating = row.get(2);
+                result.title = row.get(3);
+                let istv: Option<bool> = row.get(4);
+                result.istv = istv.unwrap_or(false);
+                result
+            })
+            .collect();
+
+        let results: Vec<Result<_, Error>> = results
+            .into_par_iter()
+            .map(|mut result| {
+                let file_stem = Path::new(&result.path)
+                    .file_stem()
+                    .unwrap()
+                    .to_str()
+                    .unwrap();
+                let (show, season, episode) = parse_file_stem(&file_stem);
+
+                if season != -1 && episode != -1 && show == result.show {
+                    let query = r#"
+                        SELECT cast(rating as double precision), eptitle, epurl
+                        FROM imdb_episodes
+                        WHERE show = $1 AND season = $2 AND episode = $3
+                    "#;
+                    for row in self
+                        .pool
+                        .get()?
+                        .query(query, &[&show, &season, &episode])?
+                        .iter()
+                    {
+                        result.season = Some(season);
+                        result.episode = Some(episode);
+                        result.eprating = row.get(0);
+                        result.eptitle = row.get(1);
+                        result.epurl = row.get(2);
+                    }
+                }
+                Ok(result)
+            })
+            .collect();
+        let mut results = map_result_vec(results)?;
+        results.sort_by_key(|r| (r.season, r.episode));
+        Ok(results)
+    }
+
+    pub fn remove_from_queue(&self, idx: i32) -> Result<(), Error> {
+        let query = r#"
+            DELETE FROM movie_queue
+            WHERE idx = $1
+        "#;
+        self.pool.get()?.execute(query, &[&idx])?;
+        Ok(())
+    }
+
+    pub fn remove_from_collection(&self, path: &str) -> Result<(), Error> {
+        let query = r#"
+            DELETE FROM movie_collection
+            WHERE path = $1
+        "#;
+        self.pool.get()?.execute(query, &[&path.to_string()])?;
+        Ok(())
+    }
+
+    pub fn insert_into_collection(&self, path: &str) -> Result<(), Error> {
+        if !Path::new(&path).exists() {
+            return Err(err_msg("No such file"));
+        }
+        let file_stem = Path::new(&path).file_stem().unwrap().to_str().unwrap();
+        let (show, _, _) = parse_file_stem(&file_stem);
+        let query = r#"
+            INSERT INTO movie_collection (idx, path, show)
+            VALUES ((SELECT max(idx)+1 FROM movie_collection), $1, $2)
+        "#;
+        self.pool
+            .get()?
+            .execute(query, &[&path.to_string(), &show])?;
+        Ok(())
+    }
+
+    pub fn fix_collection_show_id(&self) -> Result<u64, Error> {
+        let query = r#"
+            WITH a AS (
+                SELECT a.idx, a.show, b.index
+                FROM movie_collection a
+                JOIN imdb_ratings b ON a.show = b.show
+                WHERE a.show_id is null
+            )
+            UPDATE movie_collection b set show_id=(SELECT c.index FROM imdb_ratings c WHERE b.show=c.show)
+            WHERE idx in (SELECT a.idx FROM a)
+        "#;
+        let rows = self.pool.get()?.execute(query, &[])?;
+        Ok(rows)
+    }
+
+    pub fn make_collection(&self) -> Result<(), Error> {
+        let file_list: Vec<_> = self
+            .config
+            .movie_dirs
+            .par_iter()
+            .map(|d| walk_directory(&d, &self.config.suffixes))
+            .collect();
+
+        let file_list: HashSet<_> = map_result_vec(file_list)?.into_iter().flatten().collect();
+
+        let episode_list: HashSet<_> = file_list
+            .par_iter()
+            .filter_map(|f| {
+                let file_stem = Path::new(f).file_stem().unwrap().to_str().unwrap();
+                let (show, season, episode) = parse_file_stem(&file_stem);
+                if season == -1 || episode == -1 {
+                    None
+                } else {
+                    Some((show, season, episode, f))
+                }
+            })
+            .collect();
+
+        let query = r#"
+            SELECT b.path, a.idx
+            FROM movie_queue a
+            JOIN movie_collection b ON a.collection_idx=b.idx
+        "#;
+        let movie_queue: HashMap<String, i32> = self
+            .pool
+            .get()?
+            .query(query, &[])?
+            .iter()
+            .map(|row| {
+                let path: String = row.get(0);
+                let idx: i32 = row.get(1);
+                (path, idx)
+            })
+            .collect();
+
+        let query = "SELECT path, show FROM movie_collection";
+        let collection_map: HashMap<String, String> = self
+            .pool
+            .get()?
+            .query(query, &[])?
+            .iter()
+            .map(|row| {
+                let path: String = row.get(0);
+                let show: String = row.get(1);
+                (path, show)
+            })
+            .collect();
+        let query = "SELECT show, index FROM imdb_ratings";
+        let ratings_map: HashMap<String, i32> = self
+            .pool
+            .get()?
+            .query(query, &[])?
+            .iter()
+            .map(|row| {
+                let show: String = row.get(0);
+                let show_id: i32 = row.get(1);
+                (show, show_id)
+            })
+            .collect();
+        let query = "SELECT show, season, episode from imdb_episodes";
+        let episodes_set: HashSet<(String, i32, i32)> = self
+            .pool
+            .get()?
+            .query(query, &[])?
+            .iter()
+            .map(|row| {
+                let show: String = row.get(0);
+                let season: i32 = row.get(1);
+                let episode: i32 = row.get(2);
+                (show, season, episode)
+            })
+            .collect();
+
+        for e in &file_list {
+            if collection_map.get(e).is_none() {
+                let ext = Path::new(&e)
+                    .extension()
+                    .unwrap()
+                    .to_str()
+                    .unwrap()
+                    .to_string();
+                if !self.config.suffixes.contains(&ext) {
+                    continue;
+                }
+                println!("not in collection {}", e);
+                self.insert_into_collection(e)?;
+            }
+        }
+        let results = collection_map
+            .par_iter()
+            .map(|(key, val)| {
+                if !file_list.contains(key) {
+                    match movie_queue.get(key) {
+                        Some(v) => {
+                            println!("in queue but not disk {} {}", key, v);
+                            self.remove_from_queue(*v)?;
+                            self.remove_from_collection(key)
+                        }
+                        None => {
+                            println!("not on disk {} {}", key, val);
+                            self.remove_from_collection(key)
+                        }
+                    }
+                } else {
+                    Ok(())
+                }
+            })
+            .collect();
+
+        map_result_vec(results)?;
+
+        for (key, val) in collection_map {
+            if !file_list.contains(&key) {
+                if movie_queue.contains_key(&key) {
+                    println!("in queue but not disk {}", key);
+                } else {
+                    println!("not on disk {} {}", key, val);
+                }
+            }
+        }
+        for (show, season, episode, path) in &episode_list {
+            let key = (show.clone(), *season, *episode);
+            if !episodes_set.contains(&key) {
+                println!("episode not in db {} {} {} {}", show, season, episode, path);
+            }
+        }
+        Ok(())
+    }
+}
+
+#[derive(Default)]
+pub struct MovieCollectionResult {
+    pub path: String,
+    pub show: String,
+    pub rating: f64,
+    pub title: String,
+    pub istv: bool,
+    pub eprating: Option<f64>,
+    pub season: Option<i32>,
+    pub episode: Option<i32>,
+    pub eptitle: Option<String>,
+    pub epurl: Option<String>,
+}
+
+impl fmt::Display for MovieCollectionResult {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        if !self.istv {
+            write!(
+                f,
+                "{} {} {:.1} {}",
+                self.path, self.show, self.rating, self.title
+            )
+        } else {
+            write!(
+                f,
+                "{} {} {:.1}/{:.1} s{:02} ep{:02} {} {} {}",
+                self.path,
+                self.show,
+                self.rating,
+                self.eprating.unwrap_or(-1.0),
+                self.season.unwrap_or(-1),
+                self.episode.unwrap_or(-1),
+                self.title,
+                self.eptitle.clone().unwrap_or_else(|| "".to_string()),
+                self.epurl.clone().unwrap_or_else(|| "".to_string()),
+            )
+        }
     }
 }
 
@@ -431,10 +743,9 @@ pub fn parse_imdb_episode_list(
                         continue;
                     }
                 }
-                let episodes_url =
-                    format!("http://www.imdb.com/title/{}/episodes/{}", imdb_id, link);
-
-                results.extend_from_slice(&parse_episodes_url(&episodes_url, season)?);
+                let episode_url = "http://www.imdb.com/title";
+                let episodes_url = format!("{}/{}/episodes/{}", episode_url, imdb_id, link);
+                results.extend_from_slice(&parse_episodes_url(&episodes_url, Some(season_))?);
             }
         }
     }
@@ -493,16 +804,3 @@ fn parse_episodes_url(
     }
     Ok(results)
 }
-
-/*
-def parse_imdb_episode_list(imdb_id='tt3230854', season=None, proxy=False):
-                                rating, nrating = parse_imdb_rating(epi_url, proxy=proxy)
-                            else:
-                                print('epi_url', epi_url)
-                                epi_url = ''
-                    if season != -1 and season_ >= 0 and episode >= 0 and airdate:
-                        yield season_, episode, airdate, rating, nrating, epi_title, epi_url
-            if season == -1:
-                yield season_, -1, None, number_of_episodes[season_], -1, 'season', None
-
-*/

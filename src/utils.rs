@@ -37,6 +37,8 @@ pub fn walk_directory(path: &str, match_strs: &[String]) -> Result<Vec<String>, 
                             Ok(v) => v,
                             Err(e) => panic!("{} {}", path_name, e),
                         })
+                    } else if match_strs.is_empty() {
+                        Some(vec![path_name])
                     } else {
                         let path_names: Vec<_> = match_strs
                             .iter()
@@ -194,22 +196,9 @@ pub fn create_move_script(
         }
         d
     } else {
-        let file_stem: Vec<_> = path
-            .file_stem()
-            .unwrap()
-            .to_str()
-            .unwrap()
-            .split('_')
-            .collect();
-        let show = file_stem[..(file_stem.len() - 2)].join("_");
-        let season: i64 = file_stem[(file_stem.len() - 2)]
-            .replace("s", "")
-            .parse()
-            .unwrap_or(-1);
-        let episode: i64 = file_stem[(file_stem.len() - 1)]
-            .replace("ep", "")
-            .parse()
-            .unwrap_or(-1);
+        let file_stem = path.file_stem().unwrap().to_str().unwrap();
+
+        let (show, season, episode) = parse_file_stem(file_stem);
 
         if season == -1 || episode == -1 {
             panic!("Failed to parse show season {} episode {}", season, episode);
@@ -238,4 +227,34 @@ pub fn create_move_script(
 
     println!("dir {} file {}", output_dir, file);
     Ok(mp4_script)
+}
+
+pub fn parse_file_stem(file_stem: &str) -> (String, i32, i32) {
+    let entries: Vec<_> = file_stem.split('_').collect();
+
+    if entries.len() < 3 {
+        return (file_stem.to_string(), -1, -1);
+    }
+
+    let show = entries[..(entries.len() - 2)].join("_");
+
+    let season = entries[(entries.len() - 2)];
+    let season: i32 = if season.starts_with("s") {
+        season.replace("s", "").parse().unwrap_or(-1)
+    } else {
+        -1
+    };
+
+    let episode = entries[(entries.len() - 1)];
+    let episode: i32 = if episode.starts_with("ep") {
+        episode.replace("ep", "").parse().unwrap_or(-1)
+    } else {
+        -1
+    };
+
+    if season == -1 || episode == -1 {
+        (file_stem.to_string(), -1, -1)
+    } else {
+        (show, season, episode)
+    }
 }
