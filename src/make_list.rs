@@ -12,7 +12,7 @@ use std::path::Path;
 use subprocess::Exec;
 
 use movie_collection_rust::config::Config;
-use movie_collection_rust::utils::walk_directory;
+use movie_collection_rust::utils::{map_result_vec, walk_directory};
 
 fn make_list() -> Result<(), Error> {
     let config = Config::with_config();
@@ -44,9 +44,10 @@ fn make_list() -> Result<(), Error> {
     let file_list: Vec<_> = config
         .movie_dirs
         .par_iter()
-        .flat_map(|d| walk_directory(&d, &local_file_list))
-        .flatten()
+        .map(|d| walk_directory(&d, &local_file_list))
         .collect();
+
+    let file_list: Vec<_> = map_result_vec(file_list)?.into_iter().flatten().collect();
 
     let file_map: HashMap<String, String> = file_list
         .iter()

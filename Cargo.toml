@@ -8,7 +8,7 @@ edition = "2018"
 serde = "1.0"
 serde_derive = "1.0"
 serde_json = "1.0"
-postgres = "0.15"
+postgres = {version = "0.15", features = ["with-chrono"]}
 subprocess = "0.1"
 r2d2 = "*"
 r2d2_postgres = "*"
@@ -17,6 +17,9 @@ rayon = "1.0"
 clap = "*"
 dotenv = "*"
 amqp = {version="*", default_features=false}
+select = "*"
+reqwest = "*"
+chrono = "*"
 
 [lib]
 name = "movie_collection_rust"

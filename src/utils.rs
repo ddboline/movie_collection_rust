@@ -48,7 +48,7 @@ pub fn walk_directory(path: &str, match_strs: &[String]) -> Result<Vec<String>, 
                                 }
                             })
                             .collect();
-                        if path_names.is_empty() {
+                        if !path_names.is_empty() {
                             Some(path_names)
                         } else {
                             None
