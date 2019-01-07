@@ -1,12 +1,14 @@
 extern crate failure;
 extern crate movie_collection_rust;
+extern crate rayon;
 
 use clap::{App, Arg};
 use failure::Error;
+use rayon::prelude::*;
 
 use movie_collection_rust::config::Config;
 use movie_collection_rust::movie_collection::MovieCollection;
-use movie_collection_rust::utils::get_version_number;
+use movie_collection_rust::utils::{get_version_number, get_video_runtime, map_result_vec};
 
 fn make_collection() -> Result<(), Error> {
     let matches = App::new("Collection Query/Parser")
@@ -44,13 +46,25 @@ fn make_collection() -> Result<(), Error> {
         .map(|s| s.map(|x| x.to_string()).collect())
         .unwrap_or_else(|| Vec::new());
 
-    println!("shows {:?} parse {} time {}", shows, do_parse, do_time);
-
     if !do_parse {
         let mq = MovieCollection::new();
         let shows = mq.search_movie_collection(&shows)?;
-        for show in shows {
-            println!("{}", show);
+        if do_time {
+            let shows: Vec<Result<_, Error>> = shows
+                .into_par_iter()
+                .map(|result| {
+                    let timeval = get_video_runtime(&result.path)?;
+                    Ok((timeval, result))
+                })
+                .collect();
+            let shows = map_result_vec(shows)?;
+            for (timeval, show) in shows {
+                println!("{} {}", timeval, show);
+            }
+        } else {
+            for show in shows {
+                println!("{}", show);
+            }
         }
     } else {
         let mq = MovieCollection::new();

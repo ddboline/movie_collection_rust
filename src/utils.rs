@@ -258,3 +258,42 @@ pub fn parse_file_stem(file_stem: &str) -> (String, i32, i32) {
         (show, season, episode)
     }
 }
+
+pub fn get_video_runtime(f: &str) -> Result<String, Error> {
+    let command = if f.ends_with(".avi") {
+        format!("aviindex -i {} -o /dev/null", f)
+    } else {
+        format!("ffprobe {} 2>&1", f)
+    };
+
+    let mut timeval = "".to_string();
+
+    let stream = Exec::shell(command).stream_stdout()?;
+    let results: Vec<Result<_, Error>> = BufReader::new(stream)
+        .lines()
+        .map(|l| {
+            let items: Vec<_> = l?.split_whitespace().map(|s| s.to_string()).collect();
+            if items.len() > 5 && items[1] == "V:" {
+                let fps: f64 = items[2].parse()?;
+                let nframes: u64 = items[5]
+                    .trim_start_matches("frames=")
+                    .trim_matches(',')
+                    .parse()?;
+                let nsecs: f64 = nframes as f64 / fps;
+                let nmin = (nsecs / 60.) as u64;
+                let nhour = (nmin as f64 / 60.) as u64;
+                timeval = format!("{:02}:{:02}:{:02}", nhour, nmin, nsecs as u64 % 60);
+            }
+            if items.len() > 1 && items[0] == "Duration:" {
+                let its: Vec<_> = items[1].trim_matches(',').split(':').collect();
+                let nhour: u64 = its[0].parse()?;
+                let nmin: u64 = its[1].parse()?;
+                let nsecs: f64 = its[2].parse()?;
+                timeval = format!("{:02}:{:02}:{:02}", nhour, nmin, nsecs as u64);
+            }
+            Ok(())
+        })
+        .collect();
+    map_result_vec(results)?;
+    Ok(timeval)
+}

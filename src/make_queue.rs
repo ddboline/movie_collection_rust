@@ -1,13 +1,14 @@
 extern crate clap;
 extern crate failure;
 extern crate movie_collection_rust;
+extern crate rayon;
 
 use clap::{App, Arg};
 use failure::Error;
-use std::path::Path;
+use rayon::prelude::*;
 
 use movie_collection_rust::movie_collection::MovieCollection;
-use movie_collection_rust::utils::get_version_number;
+use movie_collection_rust::utils::{get_version_number, get_video_runtime, map_result_vec};
 
 fn make_queue() -> Result<(), Error> {
     let matches = App::new("Parse IMDB")
@@ -56,8 +57,6 @@ fn make_queue() -> Result<(), Error> {
         .values_of("patterns")
         .map(|v| v.map(|s| s.to_string()).collect());
 
-    println!("{:?} {:?} {:?}", add_files, del_files, patterns);
-
     let mq = MovieCollection::new();
 
     if let Some(files) = del_files {
@@ -90,8 +89,24 @@ fn make_queue() -> Result<(), Error> {
         }
     } else {
         let results = mq.print_movie_queue(&patterns.unwrap_or_else(|| Vec::new()))?;
-        for result in results {
-            println!("{}", result);
+        if do_time {
+            let results: Vec<Result<_, Error>> = results
+                .into_par_iter()
+                .map(|result| {
+                    let timeval = get_video_runtime(&result.path)?;
+                    Ok((timeval, result))
+                })
+                .collect();
+
+            let results = map_result_vec(results)?;
+
+            for (timeval, result) in results {
+                println!("{} {}", result, timeval);
+            }
+        } else {
+            for result in results {
+                println!("{}", result);
+            }
         }
     }
     Ok(())
