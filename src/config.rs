@@ -12,6 +12,7 @@ pub struct Config {
     pub collection_table: String,
     pub ratings_table: String,
     pub episode_table: String,
+    pub port: u32,
 }
 
 impl Config {
@@ -26,6 +27,7 @@ impl Config {
             collection_table: "".to_string(),
             ratings_table: "".to_string(),
             episode_table: "".to_string(),
+            port: 8042,
         }
     }
 
@@ -69,6 +71,9 @@ impl Config {
             var("COLLECTION_TABLE").unwrap_or_else(|_| "movie_collection".to_string());
         config.ratings_table = var("RATINGS_TABLE").unwrap_or_else(|_| "imdb_ratings".to_string());
         config.episode_table = var("EPISODE_TABLE").unwrap_or_else(|_| "imdb_episodes".to_string());
+        if let Ok(port) = var("PORT") {
+            config.port = port.parse().unwrap_or(8042);
+        }
 
         config
     }

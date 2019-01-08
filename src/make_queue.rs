@@ -41,6 +41,13 @@ fn make_queue() -> Result<(), Error> {
                 .help("Get runtime of file"),
         )
         .arg(
+            Arg::with_name("shows")
+                .short("s")
+                .long("shows")
+                .takes_value(false)
+                .help("List TV Shows"),
+        )
+        .arg(
             Arg::with_name("patterns")
                 .value_name("PATTERNS")
                 .help("Patterns"),
@@ -56,10 +63,15 @@ fn make_queue() -> Result<(), Error> {
     let patterns: Option<Vec<_>> = matches
         .values_of("patterns")
         .map(|v| v.map(|s| s.to_string()).collect());
+    let do_shows = matches.is_present("shows");
 
     let mq = MovieCollection::new();
 
-    if let Some(files) = del_files {
+    if do_shows {
+        for show in mq.print_tv_shows()? {
+            println!("{}", show);
+        }
+    } else if let Some(files) = del_files {
         for file in files {
             if let Ok(idx) = file.parse::<i32>() {
                 mq.remove_from_queue_by_idx(idx)?;

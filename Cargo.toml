@@ -20,6 +20,9 @@ amqp = {version="*", default_features=false}
 select = "*"
 reqwest = "*"
 chrono = "*"
+actix = "*"
+actix-web = "*"
+rust_auth_server = {git = "https://github.com/ddboline/rust-auth-server.git", tag="0.1.2"}
 
 [lib]
 name = "movie_collection_rust"
@@ -60,4 +63,8 @@ name = "make-queue"
 path = "src/make_queue.rs"
 doc = false
 
+[[bin]]
+name = "movie-queue-http"
+path = "src/movie_queue_http.rs"
+doc = false
 

@@ -297,3 +297,29 @@ pub fn get_video_runtime(f: &str) -> Result<String, Error> {
     map_result_vec(results)?;
     Ok(timeval)
 }
+
+pub fn remcom_single_file(file: &str, directory: &Option<String>, unwatched: bool) {
+    let config = Config::with_config();
+    let path = Path::new(&file);
+    let ext = path.extension().unwrap().to_str().unwrap();
+
+    if ext != "mp4" {
+        match create_transcode_script(&config, &path) {
+            Ok(s) => {
+                println!("script {}", s);
+                publish_transcode_job_to_queue(&s, "transcode_work_queue", "transcode_work_queue")
+                    .expect("Publish to queue failed");
+            }
+            Err(e) => println!("error {}", e),
+        }
+    }
+
+    match create_move_script(&config, directory.clone(), unwatched, &path) {
+        Ok(s) => {
+            println!("script {}", s);
+            publish_transcode_job_to_queue(&s, "transcode_work_queue", "transcode_work_queue")
+                .expect("Publish to queue failed");
+        }
+        Err(e) => println!("error {}", e),
+    }
+}

@@ -120,10 +120,18 @@ fn parse_imdb_parser() -> Result<(), Error> {
 
     if do_update {
         let results = parse_imdb(&show.replace("_", " "))?;
-        let results = if let Some(ilink) = imdb_link {
-            results.into_iter().filter(|r| r.link == ilink).collect()
+        let results = if let Some(ilink) = &imdb_link {
+            results.into_iter().filter(|r| &r.link == ilink).collect()
         } else {
             results
+        };
+
+        let link = if let Some(link) = imdb_link {
+            Some(link)
+        } else if let Some(result) = results.get(0) {
+            Some(result.link.clone())
+        } else {
+            None
         };
 
         if !tv {
@@ -159,36 +167,42 @@ fn parse_imdb_parser() -> Result<(), Error> {
             for result in &results {
                 println!("{}", result);
             }
-        } else if let Some(result) = results.get(0) {
-            for episode in parse_imdb_episode_list(&result.link, season)? {
-                println!("{} {}", result, episode);
-                if update_database {
-                    let key = (episode.season, episode.episode);
-                    if let Some(episodes) = &episodes {
-                        match episodes.get(&key) {
-                            Some(e) => {
-                                if (e.rating - episode.rating.unwrap_or(-1.0)).abs() > 0.1 {
-                                    println!("exists {} {} {}", result, episode, e.rating);
-                                    let mut new = e.clone();
-                                    new.eptitle = episode.eptitle.unwrap_or_else(|| "".to_string());
-                                    new.rating = episode.rating.unwrap_or(-1.0);
-                                    mq.update_imdb_episodes(&new)?;
+        } else if let Some(link) = link {
+            if let Some(result) = shows.get(&link) {
+                for episode in parse_imdb_episode_list(&link, season)? {
+                    println!("{} {}", result, episode);
+                    if update_database {
+                        let key = (episode.season, episode.episode);
+                        if let Some(episodes) = &episodes {
+                            match episodes.get(&key) {
+                                Some(e) => {
+                                    if (e.rating - episode.rating.unwrap_or(-1.0)).abs() > 0.1 {
+                                        println!("exists {} {} {}", result, episode, e.rating);
+                                        let mut new = e.clone();
+                                        new.eptitle =
+                                            episode.eptitle.unwrap_or_else(|| "".to_string());
+                                        new.rating = episode.rating.unwrap_or(-1.0);
+                                        mq.update_imdb_episodes(&new)?;
+                                    }
                                 }
-                            }
-                            None => {
-                                println!("not exists {} {}", result, episode);
-                                mq.insert_imdb_episode(&ImdbEpisodes {
-                                    show: show.to_string(),
-                                    title: result.title.clone(),
-                                    season: episode.season,
-                                    episode: episode.episode,
-                                    airdate: episode
-                                        .airdate
-                                        .unwrap_or_else(|| NaiveDate::from_ymd(1970, 1, 1)),
-                                    rating: episode.rating.unwrap_or(-1.0),
-                                    eptitle: episode.eptitle.unwrap_or_else(|| "".to_string()),
-                                    epurl: episode.epurl.unwrap_or_else(|| "".to_string()),
-                                })?;
+                                None => {
+                                    println!("not exists {} {}", result, episode);
+                                    mq.insert_imdb_episode(&ImdbEpisodes {
+                                        show: show.to_string(),
+                                        title: result
+                                            .title
+                                            .clone()
+                                            .unwrap_or_else(|| "".to_string()),
+                                        season: episode.season,
+                                        episode: episode.episode,
+                                        airdate: episode
+                                            .airdate
+                                            .unwrap_or_else(|| NaiveDate::from_ymd(1970, 1, 1)),
+                                        rating: episode.rating.unwrap_or(-1.0),
+                                        eptitle: episode.eptitle.unwrap_or_else(|| "".to_string()),
+                                        epurl: episode.epurl.unwrap_or_else(|| "".to_string()),
+                                    })?;
+                                }
                             }
                         }
                     }

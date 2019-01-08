@@ -390,6 +390,9 @@ impl MovieCollection {
 
     pub fn remove_from_queue_by_idx(&self, idx: i32) -> Result<(), Error> {
         let max_idx = self.get_max_queue_index()?;
+        if idx > max_idx || idx < 0 {
+            return Ok(());
+        }
         let diff = max_idx - idx;
 
         let conn = self.pool.get()?;
@@ -407,8 +410,8 @@ impl MovieCollection {
 
     pub fn remove_from_queue_by_collection_idx(&self, collection_idx: i32) -> Result<(), Error> {
         let query = r#"SELECT idx FROM movie_queue WHERE collection_idx=$1"#;
-        for row in self.pool.get()?.query(query, &[&collection_idx])?.iter() {
-            let idx: i32 = row.get(0);
+        if let Some(row) = self.pool.get()?.query(query, &[&collection_idx])?.iter().nth(0) {
+            let idx = row.get(0);
             self.remove_from_queue_by_idx(idx)?;
         }
         Ok(())
@@ -421,6 +424,16 @@ impl MovieCollection {
 
     pub fn insert_into_queue(&self, idx: i32, path: &str) -> Result<(), Error> {
         let collection_idx = self.get_collection_index(&path)?;
+
+        let query = r#"SELECT idx FROM movie_queue WHERE collection_idx = $1"#;
+        let mut current_idx: i32 = -1;
+        for row in self.pool.get()?.query(query, &[&collection_idx])?.iter() {
+            current_idx = row.get(0);
+        }
+
+        if current_idx != -1 {
+            self.remove_from_queue_by_idx(current_idx)?;
+        }
 
         let max_idx = self.get_max_queue_index()?;
         let diff = max_idx - idx + 1;
@@ -465,6 +478,22 @@ impl MovieCollection {
             .pool
             .get()?
             .query(query, &[&path])?
+            .iter()
+            .map(|row| row.get(0))
+            .nth(0)
+            .ok_or_else(|| err_msg("No path found"))?;
+        Ok(result)
+    }
+
+    pub fn get_collection_index_match(&self, path: &str) -> Result<i32, Error> {
+        let query = format!(
+            "SELECT idx FROM movie_collection WHERE path like '%{}%'",
+            path
+        );
+        let result = self
+            .pool
+            .get()?
+            .query(&query, &[])?
             .iter()
             .map(|row| row.get(0))
             .nth(0)
@@ -703,6 +732,51 @@ impl MovieCollection {
         let mut results = map_result_vec(results)?;
         results.sort_by_key(|r| r.idx);
         Ok(results)
+    }
+
+    pub fn print_tv_shows(&self) -> Result<Vec<TvShowsResult>, Error> {
+        let query = r#"
+            SELECT b.show, c.link, c.title, count(*)
+            FROM movie_queue a
+            JOIN movie_collection b ON a.collection_idx=b.idx
+            JOIN imdb_ratings c ON b.show_id=c.index
+            WHERE c.istv
+            GROUP BY 1,2,3
+            ORDER BY 1,2,3
+        "#;
+        let results: Vec<_> = self
+            .pool
+            .get()?
+            .query(query, &[])?
+            .iter()
+            .map(|row| {
+                let show: String = row.get(0);
+                let link: String = row.get(1);
+                let title: String = row.get(2);
+                let count: i64 = row.get(3);
+                TvShowsResult {
+                    show,
+                    link,
+                    title,
+                    count,
+                }
+            })
+            .collect();
+        Ok(results)
+    }
+}
+
+#[derive(Default)]
+pub struct TvShowsResult {
+    pub show: String,
+    pub link: String,
+    pub count: i64,
+    pub title: String,
+}
+
+impl fmt::Display for TvShowsResult {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        write!(f, "{} {} {}", self.show, self.link, self.count,)
     }
 }
 

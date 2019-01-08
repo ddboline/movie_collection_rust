@@ -13,5 +13,5 @@ if [ -e ~/Documents/movies/BNAME.old ]; then
 fi
 mv ONAME.mp4.new ONAME.mp4
 
-make-queue rm FNAME
-make-queue add ONAME.mp4
+make-queue -r FNAME
+make-queue -a ONAME.mp4
