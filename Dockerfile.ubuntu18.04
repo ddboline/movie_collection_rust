@@ -16,4 +16,5 @@ ADD Cargo.toml /movie_collection_rust
 ADD src /movie_collection_rust/src
 ADD scripts /movie_collection_rust/scripts
 ADD Makefile /movie_collection_rust
+ADD templates /movie_collection_rust/templates
 # ADD python /movie_collection_rust/python
