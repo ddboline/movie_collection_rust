@@ -396,21 +396,22 @@ impl MovieCollection {
         let diff = max_idx - idx;
 
         let conn = self.pool.get()?;
+        let tran = conn.transaction()?;
         let query = r#"DELETE FROM movie_queue WHERE idx = $1"#;
-        conn.execute(query, &[&idx])?;
+        tran.execute(query, &[&idx])?;
 
         let query = r#"UPDATE movie_queue SET idx = idx + $1 WHERE idx > $2"#;
-        conn.execute(query, &[&diff, &idx])?;
+        tran.execute(query, &[&diff, &idx])?;
 
         let query = r#"UPDATE movie_queue SET idx = idx - $1 - 1 WHERE idx > $2"#;
-        conn.execute(query, &[&diff, &idx])?;
+        tran.execute(query, &[&diff, &idx])?;
 
-        Ok(())
+        tran.commit().map_err(err_msg)
     }
 
     pub fn remove_from_queue_by_collection_idx(&self, collection_idx: i32) -> Result<(), Error> {
         let query = r#"SELECT idx FROM movie_queue WHERE collection_idx=$1"#;
-        if let Some(row) = self.pool.get()?.query(query, &[&collection_idx])?.iter().nth(0) {
+        for row in self.pool.get()?.query(query, &[&collection_idx])?.iter() {
             let idx = row.get(0);
             self.remove_from_queue_by_idx(idx)?;
         }
@@ -423,6 +424,9 @@ impl MovieCollection {
     }
 
     pub fn insert_into_queue(&self, idx: i32, path: &str) -> Result<(), Error> {
+        if !Path::new(&path).exists() {
+            return Err(err_msg("File doesn't exist"));
+        }
         let collection_idx = self.get_collection_index(&path)?;
 
         let query = r#"SELECT idx FROM movie_queue WHERE collection_idx = $1"#;
@@ -439,16 +443,17 @@ impl MovieCollection {
         let diff = max_idx - idx + 1;
 
         let conn = self.pool.get()?;
+        let tran = conn.transaction()?;
         let query = r#"UPDATE movie_queue SET idx = idx + $1 WHERE idx >= $2"#;
-        conn.execute(query, &[&diff, &idx])?;
+        tran.execute(query, &[&diff, &idx])?;
 
         let query = r#"INSERT INTO movie_queue (idx, collection_idx) VALUES ($1, $2)"#;
-        conn.execute(query, &[&idx, &collection_idx])?;
+        tran.execute(query, &[&idx, &collection_idx])?;
 
         let query = r#"UPDATE movie_queue SET idx = idx - $1 + 1 WHERE idx > $2"#;
-        conn.execute(query, &[&diff, &idx])?;
+        tran.execute(query, &[&diff, &idx])?;
 
-        Ok(())
+        tran.commit().map_err(err_msg)
     }
 
     pub fn get_max_queue_index(&self) -> Result<i32, Error> {
@@ -470,9 +475,6 @@ impl MovieCollection {
     }
 
     pub fn get_collection_index(&self, path: &str) -> Result<i32, Error> {
-        if !Path::new(&path).exists() {
-            return Err(err_msg("File doesn't exist"));
-        }
         let query = r#"SELECT idx FROM movie_collection WHERE path = $1"#;
         let result = self
             .pool
@@ -485,9 +487,22 @@ impl MovieCollection {
         Ok(result)
     }
 
+    pub fn get_collection_path(&self, idx: i32) -> Result<String, Error> {
+        let query = "SELECT path FROM movie_collection WHERE idx = $1";
+        let path: String = self
+            .pool
+            .get()?
+            .query(query, &[&idx])?
+            .iter()
+            .nth(0)
+            .ok_or_else(|| err_msg("Index not found"))?
+            .get(0);
+        Ok(path)
+    }
+
     pub fn get_collection_index_match(&self, path: &str) -> Result<i32, Error> {
         let query = format!(
-            "SELECT idx FROM movie_collection WHERE path like '%{}%'",
+            r#"SELECT idx FROM movie_collection WHERE path like '%{}%'"#,
             path
         );
         let result = self
@@ -632,7 +647,7 @@ impl MovieCollection {
                     match movie_queue.get(key) {
                         Some(v) => {
                             println!("in queue but not disk {} {}", key, v);
-                            self.remove_from_queue_by_collection_idx(*v)?;
+                            self.remove_from_queue_by_path(key)?;
                             self.remove_from_collection(key)
                         }
                         None => {

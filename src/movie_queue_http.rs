@@ -17,7 +17,7 @@ use subprocess::Exec;
 
 use movie_collection_rust::config::Config;
 use movie_collection_rust::movie_collection::MovieCollection;
-use movie_collection_rust::utils::{map_result_vec, remcom_single_file};
+use movie_collection_rust::utils::{map_result_vec, parse_file_stem, remcom_single_file};
 
 fn tvshows(user: LoggedUser) -> Result<HttpResponse, Error> {
     if user.email != "ddboline@gmail.com" {
@@ -48,12 +48,10 @@ fn tvshows(user: LoggedUser) -> Result<HttpResponse, Error> {
 }
 
 fn movie_queue_base(patterns: &[String]) -> Result<String, Error> {
-    let command = "rm -f /var/www/html/videos/partial/*";
-    Exec::shell(command).join()?;
-
     let body = include_str!("../templates/queue_list.html");
 
-    let queue = MovieCollection::new().print_movie_queue(&patterns)?;
+    let mq = MovieCollection::new();
+    let queue = mq.print_movie_queue(&patterns)?;
 
     let button = r#"<td><button type="submit" id="ID" onclick="delete_show('SHOW');"> remove </button></td>"#;
 
@@ -67,18 +65,25 @@ fn movie_queue_base(patterns: &[String]) -> Result<String, Error> {
                 .unwrap()
                 .to_str()
                 .unwrap();
-            let entry = format!(
-                "<tr>\n<td><a href={}>{}</a></td>\n<td><a href={}>imdb</a></td>",
-                &format!(
-                    r#""{}/{}""#,
-                    "/videos/partial", file_name
-                ),
-                file_name,
-                &format!(
-                    "https://www.imdb.com/title/{}",
-                    row.link.clone().unwrap_or_else(|| "".to_string())
+            let file_stem = path.file_stem().unwrap().to_str().unwrap();
+            let (show, season, episode) = parse_file_stem(&file_stem);
+
+            let entry = if ext == "mp4" {
+                let collection_idx = mq.get_collection_index(&row.path).unwrap_or(-1);
+                format!(
+                    "<a href={}>{}</a>",
+                    &format!(
+                        r#""{}/{}""#,
+                        "/list/play", collection_idx
+                    ), file_name
                 )
-            );
+            } else {
+                file_name.to_string()
+            };
+            let entry = format!("<tr>\n<td>{}</td>\n<td><a href={}>imdb</a></td>",
+                entry, &format!(
+                    "https://www.imdb.com/title/{}",
+                    row.link.clone().unwrap_or_else(|| "".to_string())));
             let entry = format!(
                 "{}\n{}",
                 entry,
@@ -86,18 +91,20 @@ fn movie_queue_base(patterns: &[String]) -> Result<String, Error> {
             );
 
             let entry = if ext != "mp4" {
-                format!(
-                    r#"{}<td><button type="submit" id="{}" onclick="transcode('{}');"> transcode </button></td>"#,
-                    entry, file_name, file_name)
+                if season != -1 && episode != -1 {
+                    format!(
+                        r#"{}<td><button type="submit" id="{}" onclick="transcode('{}');"> transcode </button></td>"#,
+                        entry, file_name, file_name)
+                } else {
+                    let entries: Vec<_> = row.path.split("/").collect();
+                    let len_entries = entries.len();
+                    let directory = entries.iter().nth(len_entries-2).unwrap();
+                    format!(
+                        r#"{}<td><button type="submit" id="{}" onclick="transcode_directory('{}', '{}');"> transcode </button></td>"#,
+                        entry, file_name, file_name, directory)
+                }
             } else {entry};
 
-            let command = format!("rm -f /var/www/html/videos/partial/{}", file_name);
-            Exec::shell(&command).join()?;
-            let command = format!(
-                "ln -s {} /var/www/html/videos/partial/{}",
-                row.path, file_name
-            );
-            Exec::shell(&command).join()?;
             Ok(entry)
         })
         .collect();
@@ -170,8 +177,61 @@ fn movie_queue_transcode(path: Path<String>, user: LoggedUser) -> Result<HttpRes
     Ok(resp)
 }
 
+fn movie_queue_transcode_directory(
+    path: Path<(String, String)>,
+    user: LoggedUser,
+) -> Result<HttpResponse, Error> {
+    if user.email != "ddboline@gmail.com" {
+        return Ok(HttpResponse::Unauthorized().json("Unauthorized"));
+    }
+    let (directory, file) = path.into_inner();
+
+    let mq = MovieCollection::new();
+    println!("{}", file);
+    for entry in mq.print_movie_queue(&[file])? {
+        println!("{}", entry);
+        remcom_single_file(&entry.path, &Some(directory.clone()), false);
+    }
+
+    let resp = HttpResponse::build(StatusCode::OK)
+        .content_type("text/html; charset=utf-8")
+        .body("".to_string());
+    Ok(resp)
+}
+
+fn movie_queue_play(idx: Path<i32>, user: LoggedUser) -> Result<HttpResponse, Error> {
+    if user.email != "ddboline@gmail.com" {
+        return Ok(HttpResponse::Unauthorized().json("Unauthorized"));
+    }
+
+    let mq = MovieCollection::new();
+    let full_path = mq.get_collection_path(idx.into_inner())?;
+
+    let path = path::Path::new(&full_path);
+    let file_name = path.file_name().unwrap().to_str().unwrap();
+    let url = format!("/videos/partial/{}", file_name);
+
+    let body = include_str!("../templates/video_template.html").replace("VIDEO", &url);
+
+    let command = format!("rm -f /var/www/html/videos/partial/{}", file_name);
+    Exec::shell(&command).join()?;
+    let command = format!(
+        "ln -s {} /var/www/html/videos/partial/{}",
+        full_path, file_name
+    );
+    Exec::shell(&command).join()?;
+
+    let resp = HttpResponse::build(StatusCode::OK)
+        .content_type("text/html; charset=utf-8")
+        .body(body);
+    Ok(resp)
+}
+
 fn main() {
     let config = Config::with_config();
+    let command = "rm -f /var/www/html/videos/partial/*";
+    Exec::shell(command).join().unwrap();
+
     let sys = actix::System::new("movie_queue");
     let secret: String = std::env::var("SECRET_KEY").unwrap_or_else(|_| "0123".repeat(8));
     let domain = env::var("DOMAIN").unwrap_or_else(|_| "localhost".to_string());
@@ -187,16 +247,22 @@ fn main() {
                     .secure(false), // this can only be true if you have https
             ))
             .resource("/tvshows", |r| r.method(Method::GET).with(tvshows))
-            .resource("/list", |r| r.method(Method::GET).with(movie_queue))
             .resource("/list/{show}", |r| {
                 r.method(Method::GET).with(movie_queue_show)
             })
-            .resource("/delete/{path}", |r| {
+            .resource("/list/delete/{path}", |r| {
                 r.method(Method::GET).with(movie_queue_delete)
             })
-            .resource("/transcode/{path}", |r| {
+            .resource("/list/transcode/{file}", |r| {
                 r.method(Method::GET).with(movie_queue_transcode)
             })
+            .resource("/list/transcode/{directory}/{file}", |r| {
+                r.method(Method::GET).with(movie_queue_transcode_directory)
+            })
+            .resource("/list/play/{index}", |r| {
+                r.method(Method::GET).with(movie_queue_play)
+            })
+            .resource("/list", |r| r.method(Method::GET).with(movie_queue))
     })
     .bind(&format!("127.0.0.1:{}", config.port))
     .unwrap_or_else(|_| panic!("Failed to bind to port {}", config.port))

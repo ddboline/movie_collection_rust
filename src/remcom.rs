@@ -3,7 +3,6 @@ extern crate movie_collection_rust;
 
 use clap::{App, Arg};
 use failure::Error;
-use std::path::Path;
 
 use movie_collection_rust::config::Config;
 use movie_collection_rust::utils::{

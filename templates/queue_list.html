@@ -13,7 +13,17 @@ BODY
 
         <script language="JavaScript" type="text/javascript">
             function transcode(index) {
-                var ostr = "../transcode/" + index
+                var ostr = "/list/transcode/" + index
+                var xmlhttp = new XMLHttpRequest();
+                xmlhttp.open("GET", ostr, true);
+                xmlhttp.onload = function nothing() {
+                }
+                xmlhttp.send(null);
+                var out = "requested " + index
+                document.getElementById("remcomoutput").innerHTML = out;
+            }
+            function transcode_directory(index, directory) {
+                var ostr = "/list/transcode/" + directory + "/" + index
                 var xmlhttp = new XMLHttpRequest();
                 xmlhttp.open("GET", ostr, true);
                 xmlhttp.onload = function nothing() {
@@ -24,7 +34,7 @@ BODY
             }
 
             function delete_show(index) {
-                var ostr = "../delete/" + index
+                var ostr = "/list/delete/" + index
                 var xmlhttp = new XMLHttpRequest();
                 xmlhttp.open("GET", ostr, true);
                 xmlhttp.onload = function nothing() {
