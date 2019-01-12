@@ -68,3 +68,7 @@ name = "movie-queue-http"
 path = "src/movie_queue_http.rs"
 doc = false
 
+[[bin]]
+name = "find-new-episodes"
+path = "src/find_new_episodes.rs"
+doc = false

@@ -234,7 +234,8 @@ fn main() {
 
     let sys = actix::System::new("movie_queue");
     let secret: String = std::env::var("SECRET_KEY").unwrap_or_else(|_| "0123".repeat(8));
-    let domain = env::var("DOMAIN").unwrap_or_else(|_| "localhost".to_string());
+    let domain = config.domain.clone();
+    let port = config.port;
 
     server::new(move || {
         App::new()
@@ -264,8 +265,8 @@ fn main() {
             })
             .resource("/list", |r| r.method(Method::GET).with(movie_queue))
     })
-    .bind(&format!("127.0.0.1:{}", config.port))
-    .unwrap_or_else(|_| panic!("Failed to bind to port {}", config.port))
+    .bind(&format!("127.0.0.1:{}", port))
+    .unwrap_or_else(|_| panic!("Failed to bind to port {}", port))
     .start();
 
     let _ = sys.run();

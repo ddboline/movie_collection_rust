@@ -1,7 +1,7 @@
 use std::env::var;
 use std::path::Path;
 
-#[derive(Debug, Default)]
+#[derive(Debug, Default, Clone)]
 pub struct Config {
     pub home_dir: String,
     pub pgurl: String,
@@ -13,6 +13,7 @@ pub struct Config {
     pub ratings_table: String,
     pub episode_table: String,
     pub port: u32,
+    pub domain: String,
 }
 
 impl Config {
@@ -28,6 +29,7 @@ impl Config {
             ratings_table: "".to_string(),
             episode_table: "".to_string(),
             port: 8042,
+            domain: "localhost".to_string(),
         }
     }
 
@@ -73,6 +75,9 @@ impl Config {
         config.episode_table = var("EPISODE_TABLE").unwrap_or_else(|_| "imdb_episodes".to_string());
         if let Ok(port) = var("PORT") {
             config.port = port.parse().unwrap_or(8042);
+        }
+        if let Ok(domain) = var("DOMAIN") {
+            config.domain = domain;
         }
 
         config

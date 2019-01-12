@@ -3,7 +3,7 @@ extern crate failure;
 extern crate movie_collection_rust;
 
 use clap::{App, Arg};
-use std::path::Path;
+use std::path::{Path, PathBuf};
 
 use movie_collection_rust::config::Config;
 use movie_collection_rust::utils::{
@@ -41,7 +41,17 @@ fn transcode_avi() {
         .get_matches();
 
     for f in matches.values_of("files").unwrap() {
-        let path = Path::new(f);
+        let mut path = PathBuf::from(f);
+
+        let movie_path = format!("{}/Documents/movies", config.home_dir);
+
+        if !path.exists() {
+            path = Path::new(&movie_path).join(f);
+        }
+
+        if !path.exists() {
+            panic!("file doesn't exist {}", f);
+        }
 
         match create_transcode_script(&config, &path) {
             Ok(s) => {

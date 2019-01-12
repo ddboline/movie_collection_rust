@@ -29,7 +29,7 @@ pub struct MovieCollection {
     pub pool: PgPool,
 }
 
-#[derive(Default, Clone)]
+#[derive(Default, Clone, Debug)]
 pub struct ImdbRatings {
     pub index: i32,
     pub show: String,
@@ -476,14 +476,26 @@ impl MovieCollection {
 
     pub fn get_collection_index(&self, path: &str) -> Result<i32, Error> {
         let query = r#"SELECT idx FROM movie_collection WHERE path = $1"#;
-        let result = self
+        let result = match self
             .pool
             .get()?
             .query(query, &[&path])?
             .iter()
             .map(|row| row.get(0))
             .nth(0)
-            .ok_or_else(|| err_msg("No path found"))?;
+        {
+            Some(r) => r,
+            None => {
+                if Path::new(path).exists() {
+                    let max_idx = self.get_max_queue_index()?;
+                    self.insert_into_queue(max_idx, &path)?;
+                    Some(self.get_collection_index(&path)?)
+                } else {
+                    None
+                }
+            }
+        }
+        .ok_or_else(|| err_msg("No path found"))?;
         Ok(result)
     }
 
@@ -712,6 +724,7 @@ impl MovieCollection {
                     path,
                     link,
                     istv: istv.unwrap_or(false),
+                    ..Default::default()
                 }
             })
             .collect();
@@ -738,7 +751,10 @@ impl MovieCollection {
                         .iter()
                     {
                         let epurl: String = row.get(0);
-                        result.link = Some(epurl);
+                        result.eplink = Some(epurl);
+                        result.show = Some(show.clone());
+                        result.season = Some(season);
+                        result.episode = Some(episode);
                     }
                 }
                 Ok(result)
@@ -746,6 +762,42 @@ impl MovieCollection {
             .collect();
         let mut results = map_result_vec(results)?;
         results.sort_by_key(|r| r.idx);
+        Ok(results)
+    }
+
+    pub fn get_imdb_show_map(&self) -> Result<HashMap<String, ImdbRatings>, Error> {
+        let query = r#"
+            SELECT link, show, title, rating, istv, source
+            FROM imdb_ratings
+            WHERE link IS NOT null AND rating IS NOT null
+        "#;
+        let results: HashMap<String, ImdbRatings> = self
+            .pool
+            .get()?
+            .query(query, &[])?
+            .iter()
+            .map(|row| {
+                let link: String = row.get(0);
+                let show: String = row.get(1);
+                let title: String = row.get(2);
+                let rating: f64 = row.get(3);
+                let istv: bool = row.get(4);
+                let source: Option<String> = row.get(5);
+
+                (
+                    link.clone(),
+                    ImdbRatings {
+                        show,
+                        title: Some(title),
+                        link: Some(link),
+                        rating: Some(rating),
+                        istv: Some(istv),
+                        source,
+                        ..Default::default()
+                    },
+                )
+            })
+            .collect();
         Ok(results)
     }
 
@@ -801,6 +853,10 @@ pub struct MovieQueueResult {
     pub path: String,
     pub link: Option<String>,
     pub istv: bool,
+    pub show: Option<String>,
+    pub eplink: Option<String>,
+    pub season: Option<i32>,
+    pub episode: Option<i32>,
 }
 
 impl fmt::Display for MovieQueueResult {
@@ -810,7 +866,9 @@ impl fmt::Display for MovieQueueResult {
             "{} {} {}",
             self.idx,
             self.path,
-            self.link.clone().unwrap_or_else(|| "".to_string())
+            self.eplink
+                .clone()
+                .unwrap_or_else(|| self.link.clone().unwrap_or_else(|| "".to_string())),
         )
     }
 }
@@ -855,6 +913,7 @@ impl fmt::Display for MovieCollectionResult {
     }
 }
 
+#[derive(Default)]
 pub struct ImdbTuple {
     pub title: String,
     pub link: String,
