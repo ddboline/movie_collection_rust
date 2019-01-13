@@ -98,8 +98,8 @@ class TraktInstance(object):
         with Trakt.configuration.oauth.from_response(self.authorization, refresh=True):
             shows = Trakt['sync/watchlist'].shows(pagination=True)
             if shows is None:
-                return {}
-            return {x.get_key('imdb'): {'title': x.title, 'year': x.year} for x in shows.values()}
+                return []
+            return [{'link': x.get_key('imdb'), 'title': x.title, 'year': x.year} for x in shows.values()]
 
     def get_watchlist_seasons(self):
         with Trakt.configuration.oauth.from_response(self.authorization, refresh=True):
@@ -111,25 +111,22 @@ class TraktInstance(object):
 
     def get_watched_shows(self, imdb_id=None):
         with Trakt.configuration.oauth.from_response(self.authorization, refresh=True):
-            results = {}
+            results = []
             watched = Trakt['sync/watched'].shows(pagination=True)
             if watched is None:
-                return {}
+                return []
             for show in watched.values():
                 title = show.title
                 imdb_url = show.get_key('imdb')
                 if imdb_id is not None and imdb_url != imdb_id:
                     continue
-                episodes = {}
                 for (season, epi), episode in show.episodes():
-                    key = str((season, epi))
-                    episodes[key] = {
+                    results.append({
                         'title': title,
                         'imdb_url': imdb_url,
                         'season': season,
                         'episode': epi
-                    }
-                results[imdb_url] = episodes
+                    })
             return results
 
     def on_aborted(self):

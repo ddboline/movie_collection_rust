@@ -16,53 +16,9 @@ use std::collections::{HashMap, HashSet};
 
 use movie_collection_rust::config::Config;
 use movie_collection_rust::movie_collection::MovieCollection;
-use movie_collection_rust::utils::map_result_vec;
-
-#[derive(Serialize, Deserialize, Debug, Default)]
-struct WatchListShow {
-    title: String,
-    year: i32,
-}
-
-fn get_watchlist_shows() -> Result<HashMap<String, WatchListShow>, Error> {
-    let config = Config::with_config();
-    let url = format!("https://{}/trakt/watchlist", &config.domain);
-    let watchlist_shows: HashMap<String, WatchListShow> = reqwest::get(&url)?.json()?;
-    Ok(watchlist_shows)
-}
-
-#[derive(Serialize, Deserialize, Debug, Default)]
-struct WatchedShows {
-    episode: i32,
-    imdb_url: String,
-    season: i32,
-    title: String,
-}
-
-fn get_watched_shows() -> Result<HashMap<String, HashMap<String, WatchedShows>>, Error> {
-    let config = Config::with_config();
-    let url = format!("https://{}/trakt/watched_shows", &config.domain);
-    let watched_shows = reqwest::get(&url)?.json()?;
-    Ok(watched_shows)
-}
-
-#[derive(Serialize, Deserialize, Debug, Default)]
-struct TraktCalEntry {
-    ep_link: Option<String>,
-    episode: i32,
-    link: String,
-    season: i32,
-    show: String,
-}
-
-type TraktCalEntryList = Vec<TraktCalEntry>;
-
-fn get_calendar() -> Result<TraktCalEntryList, Error> {
-    let config = Config::with_config();
-    let url = format!("https://{}/trakt/cal", &config.domain);
-    let calendar = reqwest::get(&url)?.json()?;
-    Ok(calendar)
-}
+use movie_collection_rust::utils::{
+    get_calendar, get_watched_shows, get_watchlist_shows, map_result_vec, option_string_wrapper,
+};
 
 fn find_new_episodes() -> Result<(), Error> {
     let trakt_watchlist_shows = get_watchlist_shows()?;
@@ -121,7 +77,7 @@ fn find_new_episodes() -> Result<(), Error> {
             }
         }
     }
-
+/*
     println!("current_shows {}", current_shows.len());
     println!("max_season_map {}", max_season_map.len());
     println!("max_episode_map {}", max_episode_map.len());
@@ -131,7 +87,7 @@ fn find_new_episodes() -> Result<(), Error> {
 
     for imdb_url in &current_shows {
         if let Some(watch_map) = trakt_watched_shows.get(imdb_url) {
-            let show = imdb_show_map.get(imdb_url).unwrap().show.clone();
+            let show = &imdb_show_map.get(imdb_url).as_ref().unwrap().show;
             println!("{} {} {}", show, imdb_url, watch_map.len());
 
             for (key, episode_info) in watch_map {
@@ -170,19 +126,19 @@ fn find_new_episodes() -> Result<(), Error> {
     println!("current_episodes {}", current_episodes.len());
 
     for imdb_url in &current_shows {
-        let show_info = imdb_show_map.get(imdb_url).unwrap().clone();
+        let show_info = imdb_show_map.get(imdb_url).unwrap();
         let show = &show_info.show;
         println!("show {} imdb_url {}", show, imdb_url);
         let max_s = max_season_map.get(imdb_url).unwrap_or(&-1);
         let max_e = max_episode_map
             .get(&(imdb_url.to_string(), *max_s))
             .unwrap_or(&-1);
-        let title = &show_info.title.unwrap();
-        let rating = &show_info.rating.unwrap();
-        let source = &show_info.source.unwrap_or_else(|| "".to_string());
+        let title = option_string_wrapper(&show_info.title);
+        let rating = show_info.rating.unwrap_or(-1.0);
+        let source = option_string_wrapper(&show_info.source);
         println!("{} {:?} {:?} {:?}", show, title, rating, source);
     }
-
+*/
     Ok(())
 }
 

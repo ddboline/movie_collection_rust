@@ -19,7 +19,7 @@ use std::fmt;
 use std::path::Path;
 
 use crate::config::Config;
-use crate::utils::{map_result_vec, parse_file_stem, walk_directory};
+use crate::utils::{map_result_vec, option_string_wrapper, parse_file_stem, walk_directory};
 
 pub type PgPool = Pool<PostgresConnectionManager>;
 
@@ -47,11 +47,11 @@ impl fmt::Display for ImdbRatings {
             "{} {} {} {} {} {} {} ",
             self.index,
             self.show,
-            self.title.clone().unwrap_or_else(|| "".to_string()),
-            self.link.clone().unwrap_or_else(|| "".to_string()),
+            option_string_wrapper(&self.title),
+            option_string_wrapper(&self.link),
             self.rating.unwrap_or(-1.0),
             self.istv.unwrap_or(false),
-            self.source.clone().unwrap_or_else(|| "".to_string()),
+            option_string_wrapper(&self.source),
         )
     }
 }
@@ -866,9 +866,7 @@ impl fmt::Display for MovieQueueResult {
             "{} {} {}",
             self.idx,
             self.path,
-            self.eplink
-                .clone()
-                .unwrap_or_else(|| self.link.clone().unwrap_or_else(|| "".to_string())),
+            option_string_wrapper(&self.eplink),
         )
     }
 }
@@ -906,8 +904,8 @@ impl fmt::Display for MovieCollectionResult {
                 self.season.unwrap_or(-1),
                 self.episode.unwrap_or(-1),
                 self.title,
-                self.eptitle.clone().unwrap_or_else(|| "".to_string()),
-                self.epurl.clone().unwrap_or_else(|| "".to_string()),
+                option_string_wrapper(&self.eptitle),
+                option_string_wrapper(&self.epurl),
             )
         }
     }
@@ -1015,8 +1013,8 @@ impl fmt::Display for ImdbEpisodeResult {
             "{} {} {} {} {} {} {} ",
             self.season,
             self.episode,
-            self.epurl.clone().unwrap_or_else(|| "".to_string()),
-            self.eptitle.clone().unwrap_or_else(|| "".to_string()),
+            option_string_wrapper(&self.epurl),
+            option_string_wrapper(&self.eptitle),
             self.airdate
                 .unwrap_or_else(|| NaiveDate::from_ymd(1970, 1, 1)),
             self.rating.unwrap_or(-1.0),

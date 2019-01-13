@@ -72,3 +72,8 @@ doc = false
 name = "find-new-episodes"
 path = "src/find_new_episodes.rs"
 doc = false
+
+[[bin]]
+name = "trakt-app"
+path = "src/trakt_app.rs"
+doc = false
