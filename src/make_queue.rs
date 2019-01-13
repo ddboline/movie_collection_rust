@@ -7,7 +7,7 @@ use clap::{App, Arg};
 use failure::Error;
 use rayon::prelude::*;
 
-use movie_collection_rust::movie_collection::MovieCollection;
+use movie_collection_rust::movie_collection::MovieCollectionDB;
 use movie_collection_rust::utils::{get_version_number, get_video_runtime, map_result_vec};
 
 fn make_queue() -> Result<(), Error> {
@@ -65,7 +65,7 @@ fn make_queue() -> Result<(), Error> {
         .map(|v| v.map(|s| s.to_string()).collect());
     let do_shows = matches.is_present("shows");
 
-    let mq = MovieCollection::new();
+    let mq = MovieCollectionDB::new();
 
     if do_shows {
         for show in mq.print_tv_shows()? {

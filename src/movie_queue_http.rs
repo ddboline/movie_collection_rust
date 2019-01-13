@@ -16,7 +16,7 @@ use std::path;
 use subprocess::Exec;
 
 use movie_collection_rust::config::Config;
-use movie_collection_rust::movie_collection::MovieCollection;
+use movie_collection_rust::movie_collection::MovieCollectionDB;
 use movie_collection_rust::utils::{map_result_vec, parse_file_stem, remcom_single_file};
 
 fn tvshows(user: LoggedUser) -> Result<HttpResponse, Error> {
@@ -24,7 +24,7 @@ fn tvshows(user: LoggedUser) -> Result<HttpResponse, Error> {
         return Ok(HttpResponse::Unauthorized().json("Unauthorized"));
     }
 
-    let shows = MovieCollection::new().print_tv_shows()?;
+    let shows = MovieCollectionDB::new().print_tv_shows()?;
 
     let body = r#"<!DOCTYPE HTML><html><body><center><H3><table border="0">BODY"#;
 
@@ -50,7 +50,7 @@ fn tvshows(user: LoggedUser) -> Result<HttpResponse, Error> {
 fn movie_queue_base(patterns: &[String]) -> Result<String, Error> {
     let body = include_str!("../templates/queue_list.html");
 
-    let mq = MovieCollection::new();
+    let mq = MovieCollectionDB::new();
     let queue = mq.print_movie_queue(&patterns)?;
 
     let button = r#"<td><button type="submit" id="ID" onclick="delete_show('SHOW');"> remove </button></td>"#;
@@ -148,7 +148,7 @@ fn movie_queue_delete(path: Path<String>, user: LoggedUser) -> Result<HttpRespon
         return Ok(HttpResponse::Unauthorized().json("Unauthorized"));
     }
 
-    let mq = MovieCollection::new();
+    let mq = MovieCollectionDB::new();
     println!("{}", path);
     let index = mq.get_collection_index_match(&path.into_inner())?;
     mq.remove_from_queue_by_collection_idx(index)?;
@@ -164,7 +164,7 @@ fn movie_queue_transcode(path: Path<String>, user: LoggedUser) -> Result<HttpRes
         return Ok(HttpResponse::Unauthorized().json("Unauthorized"));
     }
 
-    let mq = MovieCollection::new();
+    let mq = MovieCollectionDB::new();
     println!("{}", path);
     for entry in mq.print_movie_queue(&[path.into_inner()])? {
         println!("{}", entry);
@@ -186,7 +186,7 @@ fn movie_queue_transcode_directory(
     }
     let (directory, file) = path.into_inner();
 
-    let mq = MovieCollection::new();
+    let mq = MovieCollectionDB::new();
     println!("{}", file);
     for entry in mq.print_movie_queue(&[file])? {
         println!("{}", entry);
@@ -204,7 +204,7 @@ fn movie_queue_play(idx: Path<i32>, user: LoggedUser) -> Result<HttpResponse, Er
         return Ok(HttpResponse::Unauthorized().json("Unauthorized"));
     }
 
-    let mq = MovieCollection::new();
+    let mq = MovieCollectionDB::new();
     let full_path = mq.get_collection_path(idx.into_inner())?;
 
     let path = path::Path::new(&full_path);

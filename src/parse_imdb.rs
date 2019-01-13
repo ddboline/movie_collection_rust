@@ -8,8 +8,10 @@ use clap::{App, Arg};
 use failure::Error;
 use std::collections::HashMap;
 
+use movie_collection_rust::imdb_episodes::ImdbEpisodes;
+use movie_collection_rust::imdb_ratings::ImdbRatings;
 use movie_collection_rust::movie_collection::{
-    parse_imdb, parse_imdb_episode_list, ImdbEpisodes, ImdbRatings, MovieCollection,
+    parse_imdb, parse_imdb_episode_list, MovieCollectionDB,
 };
 use movie_collection_rust::utils::get_version_number;
 
@@ -82,7 +84,7 @@ fn parse_imdb_parser() -> Result<(), Error> {
     let do_update = matches.is_present("update");
     let update_database = matches.is_present("database");
 
-    let mq = MovieCollection::new();
+    let mq = MovieCollectionDB::new();
 
     let shows: HashMap<String, _> = if let Some(ilink) = &imdb_link {
         mq.print_imdb_shows(show, tv)?
@@ -143,7 +145,7 @@ fn parse_imdb_parser() -> Result<(), Error> {
                                 let mut new = s.clone();
                                 new.title = Some(result.title.clone());
                                 new.rating = Some(result.rating);
-                                mq.update_imdb_show(&new)?;
+                                new.update_show(&mq.pool)?;
                                 println!("exists {} {} {}", show, s, result.rating);
                             }
                         }
@@ -151,14 +153,16 @@ fn parse_imdb_parser() -> Result<(), Error> {
                             println!("not exists {} {}", show, result);
                             let istv = result.title.contains("TV Series")
                                 || result.title.contains("TV Mini-Series");
-                            mq.insert_imdb_show(&ImdbRatings {
+
+                            ImdbRatings {
                                 show: show.to_string(),
                                 title: Some(result.title.clone()),
                                 link: Some(result.link.clone()),
                                 rating: Some(result.rating),
                                 istv: Some(istv),
                                 ..Default::default()
-                            })?;
+                            }
+                            .insert_show(&mq.pool)?;
                         }
                     }
                 }
@@ -182,12 +186,12 @@ fn parse_imdb_parser() -> Result<(), Error> {
                                         new.eptitle =
                                             episode.eptitle.unwrap_or_else(|| "".to_string());
                                         new.rating = episode.rating.unwrap_or(-1.0);
-                                        mq.update_imdb_episodes(&new)?;
+                                        new.update_episode(&mq.pool)?;
                                     }
                                 }
                                 None => {
                                     println!("not exists {} {}", result, episode);
-                                    mq.insert_imdb_episode(&ImdbEpisodes {
+                                    ImdbEpisodes {
                                         show: show.to_string(),
                                         title: result
                                             .title
@@ -201,7 +205,8 @@ fn parse_imdb_parser() -> Result<(), Error> {
                                         rating: episode.rating.unwrap_or(-1.0),
                                         eptitle: episode.eptitle.unwrap_or_else(|| "".to_string()),
                                         epurl: episode.epurl.unwrap_or_else(|| "".to_string()),
-                                    })?;
+                                    }
+                                    .insert_episode(&mq.pool)?;
                                 }
                             }
                         }

@@ -19,164 +19,33 @@ use std::fmt;
 use std::path::Path;
 
 use crate::config::Config;
+use crate::imdb_episodes::ImdbEpisodes;
+use crate::imdb_ratings::ImdbRatings;
 use crate::utils::{map_result_vec, option_string_wrapper, parse_file_stem, walk_directory};
 
 pub type PgPool = Pool<PostgresConnectionManager>;
 
 #[derive(Debug)]
-pub struct MovieCollection {
+pub struct MovieCollectionDB {
     pub config: Config,
     pub pool: PgPool,
 }
 
-#[derive(Default, Clone, Debug)]
-pub struct ImdbRatings {
-    pub index: i32,
-    pub show: String,
-    pub title: Option<String>,
-    pub link: Option<String>,
-    pub rating: Option<f64>,
-    pub istv: Option<bool>,
-    pub source: Option<String>,
-}
-
-impl fmt::Display for ImdbRatings {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        write!(
-            f,
-            "{} {} {} {} {} {} {} ",
-            self.index,
-            self.show,
-            option_string_wrapper(&self.title),
-            option_string_wrapper(&self.link),
-            self.rating.unwrap_or(-1.0),
-            self.istv.unwrap_or(false),
-            option_string_wrapper(&self.source),
-        )
+impl Default for MovieCollectionDB {
+    fn default() -> MovieCollectionDB {
+        MovieCollectionDB::new()
     }
 }
 
-#[derive(Clone)]
-pub struct ImdbEpisodes {
-    pub show: String,
-    pub title: String,
-    pub season: i32,
-    pub episode: i32,
-    pub airdate: NaiveDate,
-    pub rating: f64,
-    pub eptitle: String,
-    pub epurl: String,
-}
-
-impl fmt::Display for ImdbEpisodes {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        write!(
-            f,
-            "{} {} {} {} {} {} {} {}",
-            self.show,
-            self.title,
-            self.season,
-            self.episode,
-            self.airdate,
-            self.rating,
-            self.eptitle,
-            self.epurl,
-        )
-    }
-}
-
-impl Default for MovieCollection {
-    fn default() -> MovieCollection {
-        MovieCollection::new()
-    }
-}
-
-impl MovieCollection {
-    pub fn new() -> MovieCollection {
+impl MovieCollectionDB {
+    pub fn new() -> MovieCollectionDB {
         let config = Config::with_config();
         let manager = PostgresConnectionManager::new(config.pgurl.clone(), TlsMode::None)
             .expect("Failed to open DB connection");
-        MovieCollection {
+        MovieCollectionDB {
             config,
             pool: Pool::new(manager).expect("Failed to open DB connection"),
         }
-    }
-
-    pub fn insert_imdb_show(&self, input: &ImdbRatings) -> Result<(), Error> {
-        let query = r#"
-            INSERT INTO imdb_ratings
-            (show, title, link, rating, istv, source)
-            VALUES
-            ($1, $2, $3, $4, $5, $6)
-        "#;
-
-        let conn = self.pool.get()?;
-        conn.execute(
-            query,
-            &[
-                &input.show,
-                &input.title,
-                &input.link,
-                &input.rating,
-                &input.istv,
-                &input.source,
-            ],
-        )?;
-        Ok(())
-    }
-
-    pub fn update_imdb_show(&self, input: &ImdbRatings) -> Result<(), Error> {
-        let query = r#"
-            UPDATE imdb_ratings SET rating=$1,title=$2 WHERE show=$3
-        "#;
-
-        let conn = self.pool.get()?;
-        conn.execute(query, &[&input.rating, &input.title, &input.show])?;
-        Ok(())
-    }
-
-    pub fn insert_imdb_episode(&self, input: &ImdbEpisodes) -> Result<(), Error> {
-        let query = r#"
-            INSERT INTO imdb_episodes
-            (show, season, episode, airdate, rating, eptitle, epurl)
-            VALUES
-            ($1, $2, $3, $4, RATING, $5, $6)
-        "#;
-        let query = query.replace("RATING", &input.rating.to_string());
-
-        let conn = self.pool.get()?;
-        conn.execute(
-            &query,
-            &[
-                &input.show,
-                &input.season,
-                &input.episode,
-                &input.airdate,
-                &input.eptitle,
-                &input.epurl,
-            ],
-        )?;
-        Ok(())
-    }
-
-    pub fn update_imdb_episodes(&self, input: &ImdbEpisodes) -> Result<(), Error> {
-        let query = r#"
-            UPDATE imdb_episodes SET rating=RATING,eptitle=$1,epurl=$2 WHERE show=$3 AND season=$4 AND episode=$5
-        "#;
-        let query = query.replace("RATING", &input.rating.to_string());
-
-        let conn = self.pool.get()?;
-        conn.execute(
-            &query,
-            &[
-                &input.eptitle,
-                &input.epurl,
-                &input.show,
-                &input.season,
-                &input.episode,
-            ],
-        )?;
-        Ok(())
     }
 
     pub fn print_imdb_shows(&self, show: &str, istv: bool) -> Result<Vec<ImdbRatings>, Error> {

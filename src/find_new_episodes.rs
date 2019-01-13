@@ -15,10 +15,9 @@ use rayon::prelude::*;
 use std::collections::{HashMap, HashSet};
 
 use movie_collection_rust::config::Config;
-use movie_collection_rust::movie_collection::MovieCollection;
-use movie_collection_rust::utils::{
-    get_calendar, get_watched_shows, get_watchlist_shows, map_result_vec, option_string_wrapper,
-};
+use movie_collection_rust::movie_collection::MovieCollectionDB;
+use movie_collection_rust::trakt_utils::{get_calendar, get_watched_shows, get_watchlist_shows};
+use movie_collection_rust::utils::{map_result_vec, option_string_wrapper};
 
 fn find_new_episodes() -> Result<(), Error> {
     let trakt_watchlist_shows = get_watchlist_shows()?;
@@ -32,7 +31,7 @@ fn find_new_episodes() -> Result<(), Error> {
 
     println!("cal {}", trakt_cal_shows.len());
 
-    let mq = MovieCollection::new();
+    let mq = MovieCollectionDB::new();
 
     let mut max_season_map = HashMap::new();
     let mut max_episode_map = HashMap::new();
@@ -67,7 +66,7 @@ fn find_new_episodes() -> Result<(), Error> {
         .collect();
 
     let maxdate = Local::today();
-
+    /*
     for (k, v) in trakt_watchlist_shows.iter() {
         if !current_shows.contains(k) {
             if !imdb_show_map.contains_key(k) {
@@ -77,68 +76,67 @@ fn find_new_episodes() -> Result<(), Error> {
             }
         }
     }
-/*
-    println!("current_shows {}", current_shows.len());
-    println!("max_season_map {}", max_season_map.len());
-    println!("max_episode_map {}", max_episode_map.len());
+        println!("current_shows {}", current_shows.len());
+        println!("max_season_map {}", max_season_map.len());
+        println!("max_episode_map {}", max_episode_map.len());
 
-    let mut current_seasons: HashMap<String, Vec<i32>> = HashMap::new();
-    let mut current_episodes: HashMap<String, Vec<(i32, i32)>> = HashMap::new();
+        let mut current_seasons: HashMap<String, Vec<i32>> = HashMap::new();
+        let mut current_episodes: HashMap<String, Vec<(i32, i32)>> = HashMap::new();
 
-    for imdb_url in &current_shows {
-        if let Some(watch_map) = trakt_watched_shows.get(imdb_url) {
-            let show = &imdb_show_map.get(imdb_url).as_ref().unwrap().show;
-            println!("{} {} {}", show, imdb_url, watch_map.len());
+        for imdb_url in &current_shows {
+            if let Some(watch_map) = trakt_watched_shows.get(imdb_url) {
+                let show = &imdb_show_map.get(imdb_url).as_ref().unwrap().show;
+                println!("{} {} {}", show, imdb_url, watch_map.len());
 
-            for (key, episode_info) in watch_map {
-                println!("episode_info {:?}", episode_info);
-                let key: Vec<i32> = key
-                    .replace("(", "")
-                    .replace(")", "")
-                    .split(", ")
-                    .map(|s| s.parse().unwrap())
-                    .collect();
-                let s = key[0];
-                let e = key[1];
-                let max_s = max_season_map.get(imdb_url).unwrap_or(&-1);
-                let max_e = max_episode_map.get(&(show.clone(), s)).unwrap_or(&-1);
-                if s > *max_s {
-                    max_season_map.insert(imdb_url.clone(), s);
-                }
-                if e > *max_e {
-                    max_episode_map.insert((show.clone(), s), e);
-                }
-                if let Some(m) = current_seasons.get_mut(imdb_url) {
-                    m.push(s);
-                } else {
-                    current_seasons.insert(imdb_url.clone(), vec![s]);
-                }
-                if let Some(m) = current_episodes.get_mut(imdb_url) {
-                    m.push((s, e));
-                } else {
-                    current_episodes.insert(imdb_url.clone(), vec![(s, e)]);
+                for (key, episode_info) in watch_map {
+                    println!("episode_info {:?}", episode_info);
+                    let key: Vec<i32> = key
+                        .replace("(", "")
+                        .replace(")", "")
+                        .split(", ")
+                        .map(|s| s.parse().unwrap())
+                        .collect();
+                    let s = key[0];
+                    let e = key[1];
+                    let max_s = max_season_map.get(imdb_url).unwrap_or(&-1);
+                    let max_e = max_episode_map.get(&(show.clone(), s)).unwrap_or(&-1);
+                    if s > *max_s {
+                        max_season_map.insert(imdb_url.clone(), s);
+                    }
+                    if e > *max_e {
+                        max_episode_map.insert((show.clone(), s), e);
+                    }
+                    if let Some(m) = current_seasons.get_mut(imdb_url) {
+                        m.push(s);
+                    } else {
+                        current_seasons.insert(imdb_url.clone(), vec![s]);
+                    }
+                    if let Some(m) = current_episodes.get_mut(imdb_url) {
+                        m.push((s, e));
+                    } else {
+                        current_episodes.insert(imdb_url.clone(), vec![(s, e)]);
+                    }
                 }
             }
         }
-    }
 
-    println!("current_seasons {}", current_seasons.len());
-    println!("current_episodes {}", current_episodes.len());
+        println!("current_seasons {}", current_seasons.len());
+        println!("current_episodes {}", current_episodes.len());
 
-    for imdb_url in &current_shows {
-        let show_info = imdb_show_map.get(imdb_url).unwrap();
-        let show = &show_info.show;
-        println!("show {} imdb_url {}", show, imdb_url);
-        let max_s = max_season_map.get(imdb_url).unwrap_or(&-1);
-        let max_e = max_episode_map
-            .get(&(imdb_url.to_string(), *max_s))
-            .unwrap_or(&-1);
-        let title = option_string_wrapper(&show_info.title);
-        let rating = show_info.rating.unwrap_or(-1.0);
-        let source = option_string_wrapper(&show_info.source);
-        println!("{} {:?} {:?} {:?}", show, title, rating, source);
-    }
-*/
+        for imdb_url in &current_shows {
+            let show_info = imdb_show_map.get(imdb_url).unwrap();
+            let show = &show_info.show;
+            println!("show {} imdb_url {}", show, imdb_url);
+            let max_s = max_season_map.get(imdb_url).unwrap_or(&-1);
+            let max_e = max_episode_map
+                .get(&(imdb_url.to_string(), *max_s))
+                .unwrap_or(&-1);
+            let title = option_string_wrapper(&show_info.title);
+            let rating = show_info.rating.unwrap_or(-1.0);
+            let source = option_string_wrapper(&show_info.source);
+            println!("{} {:?} {:?} {:?}", show, title, rating, source);
+        }
+    */
     Ok(())
 }
 

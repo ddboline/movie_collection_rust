@@ -341,7 +341,7 @@ class TraktInstance(object):
             title = show
             eptitle = ep_.title
             output.append({'show': ep_.show.title, 'link': imdb_url, 'season': season,
-                           'episode': episode, 'ep_link': ep_url})
+                           'episode': episode, 'ep_link': ep_url, 'airdate': airdate})
         return output
 
 

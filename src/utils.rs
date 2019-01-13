@@ -7,6 +7,7 @@ use amqp::{protocol, Basic, Channel, Options, Session, Table};
 use failure::{err_msg, Error};
 use std::collections::HashMap;
 use std::env::var;
+use std::fmt;
 use std::fs::create_dir_all;
 use std::fs::rename;
 use std::fs::File;
@@ -328,52 +329,4 @@ pub fn remcom_single_file(file: &str, directory: &Option<String>, unwatched: boo
         }
         Err(e) => println!("error {}", e),
     }
-}
-
-#[derive(Serialize, Deserialize, Debug, Default)]
-pub struct WatchListShow {
-    pub title: String,
-    pub year: i32,
-}
-
-pub type WatchListShowMap = HashMap<String, WatchListShow>;
-
-pub fn get_watchlist_shows() -> Result<WatchListShowMap, Error> {
-    let config = Config::with_config();
-    let url = format!("https://{}/trakt/watchlist", &config.domain);
-    let watchlist_shows = reqwest::get(&url)?.json()?;
-    Ok(watchlist_shows)
-}
-
-#[derive(Serialize, Deserialize, Debug, Default)]
-pub struct WatchedShows {
-    pub title: String,
-    pub imdb_url: String,
-    pub episode: i32,
-    pub season: i32,
-}
-
-pub fn get_watched_shows() -> Result<Vec<WatchedShows>, Error> {
-    let config = Config::with_config();
-    let url = format!("https://{}/trakt/watched_shows", &config.domain);
-    let watched_shows = reqwest::get(&url)?.json()?;
-    Ok(watched_shows)
-}
-
-#[derive(Serialize, Deserialize, Debug, Default)]
-pub struct TraktCalEntry {
-    pub ep_link: Option<String>,
-    pub episode: i32,
-    pub link: String,
-    pub season: i32,
-    pub show: String,
-}
-
-pub type TraktCalEntryList = Vec<TraktCalEntry>;
-
-pub fn get_calendar() -> Result<TraktCalEntryList, Error> {
-    let config = Config::with_config();
-    let url = format!("https://{}/trakt/cal", &config.domain);
-    let calendar = reqwest::get(&url)?.json()?;
-    Ok(calendar)
 }

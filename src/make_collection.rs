@@ -7,7 +7,7 @@ use failure::Error;
 use rayon::prelude::*;
 
 use movie_collection_rust::config::Config;
-use movie_collection_rust::movie_collection::MovieCollection;
+use movie_collection_rust::movie_collection::MovieCollectionDB;
 use movie_collection_rust::utils::{get_version_number, get_video_runtime, map_result_vec};
 
 fn make_collection() -> Result<(), Error> {
@@ -29,7 +29,7 @@ fn make_collection() -> Result<(), Error> {
                 .long("time")
                 .value_name("TIME")
                 .takes_value(false)
-                .help("Season number"),
+                .help("Run time"),
         )
         .arg(
             Arg::with_name("shows")
@@ -47,7 +47,7 @@ fn make_collection() -> Result<(), Error> {
         .unwrap_or_else(|| Vec::new());
 
     if !do_parse {
-        let mq = MovieCollection::new();
+        let mq = MovieCollectionDB::new();
         let shows = mq.search_movie_collection(&shows)?;
         if do_time {
             let shows: Vec<Result<_, Error>> = shows
@@ -67,7 +67,7 @@ fn make_collection() -> Result<(), Error> {
             }
         }
     } else {
-        let mq = MovieCollection::new();
+        let mq = MovieCollectionDB::new();
         mq.make_collection()?;
         mq.fix_collection_show_id()?;
     }
