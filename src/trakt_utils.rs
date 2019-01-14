@@ -1,3 +1,4 @@
+use chrono::NaiveDate;
 use failure::Error;
 use std::collections::{HashMap, HashSet};
 use std::fmt;
@@ -169,14 +170,14 @@ pub fn get_watched_shows_db(
     Ok(watched_shows)
 }
 
-#[derive(Serialize, Deserialize, Debug, Default)]
+#[derive(Serialize, Deserialize, Debug)]
 pub struct TraktCalEntry {
     pub ep_link: Option<String>,
     pub episode: i32,
     pub link: String,
     pub season: i32,
     pub show: String,
-    pub airdate: String,
+    pub airdate: NaiveDate,
 }
 
 impl fmt::Display for TraktCalEntry {
@@ -193,6 +194,8 @@ impl fmt::Display for TraktCalEntry {
         )
     }
 }
+
+impl TraktCalEntry {}
 
 pub type TraktCalEntryList = Vec<TraktCalEntry>;
 

@@ -12,11 +12,14 @@ use r2d2::Pool;
 use r2d2_postgres::{PostgresConnectionManager, TlsMode};
 use rayon::prelude::*;
 use reqwest::Url;
+use reqwest::{Client, Response};
 use select::document::Document;
 use select::predicate::{Class, Name};
 use std::collections::{HashMap, HashSet};
 use std::fmt;
 use std::path::Path;
+use std::thread::sleep;
+use std::time::Duration;
 
 use crate::config::Config;
 use crate::imdb_episodes::ImdbEpisodes;
@@ -700,6 +703,111 @@ impl MovieCollectionDB {
             .collect();
         Ok(results)
     }
+
+    pub fn get_new_episodes(
+        &self,
+        mindate: &NaiveDate,
+        maxdate: &NaiveDate,
+        source: Option<String>,
+    ) -> Result<Vec<NewEpisodesResult>, Error> {
+        let query = r#"
+            SELECT b.show,
+                   c.link,
+                   c.title,
+                   d.season,
+                   d.episode,
+                   d.epurl,
+                   d.airdate,
+                   c.rating,
+                   cast(d.rating as double precision),
+                   d.eptitle
+            FROM movie_queue a
+            JOIN movie_collection b ON a.collection_idx=b.idx
+            JOIN imdb_ratings c ON b.show_id=c.index
+            JOIN imdb_episodes d ON c.show = d.show
+            LEFT JOIN trakt_watched_episodes e ON c.link=e.link AND d.season=e.season AND d.episode=e.episode
+            WHERE e.episode is null AND c.istv AND d.airdate >= $1 AND d.airdate <= $2
+        "#;
+        let groupby = r#"
+            GROUP BY 1,2,3,4,5,6,7,8,9,10
+            ORDER BY d.airdate, b.show, d.season, d.episode
+        "#;
+        let query: String = match source {
+            Some(source) => {
+                if source.as_str() == "all" {
+                    query.to_string()
+                } else {
+                    format!("{} AND c.source = '{}'", query, source)
+                }
+            }
+            None => format!("{} AND c.source is null", query),
+        };
+        let query = format!("{} {}", query, groupby);
+
+        let results = self
+            .pool
+            .get()?
+            .query(&query, &[&mindate, &maxdate])?
+            .iter()
+            .map(|row| {
+                let show: String = row.get(0);
+                let link: String = row.get(1);
+                let title: String = row.get(2);
+                let season: i32 = row.get(3);
+                let episode: i32 = row.get(4);
+                let epurl: String = row.get(5);
+                let airdate: NaiveDate = row.get(6);
+                let rating: f64 = row.get(7);
+                let eprating: f64 = row.get(8);
+                let eptitle: String = row.get(9);
+                NewEpisodesResult {
+                    show,
+                    link,
+                    title,
+                    season,
+                    episode,
+                    epurl,
+                    airdate,
+                    rating,
+                    eprating,
+                    eptitle,
+                }
+            })
+            .collect();
+        Ok(results)
+    }
+}
+
+pub struct NewEpisodesResult {
+    pub show: String,
+    pub link: String,
+    pub title: String,
+    pub season: i32,
+    pub episode: i32,
+    pub epurl: String,
+    pub airdate: NaiveDate,
+    pub rating: f64,
+    pub eprating: f64,
+    pub eptitle: String,
+}
+
+impl fmt::Display for NewEpisodesResult {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        write!(
+            f,
+            "{} {} {} {} {} {} {} {} {} {}",
+            self.show,
+            self.link,
+            self.title,
+            self.season,
+            self.episode,
+            self.epurl,
+            self.airdate,
+            self.rating,
+            self.eprating,
+            self.eptitle,
+        )
+    }
 }
 
 #[derive(Default)]
@@ -793,75 +901,10 @@ impl fmt::Display for ImdbTuple {
     }
 }
 
-pub fn parse_imdb(title: &str) -> Result<Vec<ImdbTuple>, Error> {
-    let endpoint = "http://www.imdb.com/find?";
-    let url = Url::parse_with_params(endpoint, &[("s", "all"), ("q", title)])?;
-    let body = reqwest::get(url.clone())?.text()?;
-
-    let document = Document::from(body.as_str());
-
-    let mut shows = Vec::new();
-
-    for tr in document.find(Class("result_text")) {
-        let title = tr.text().trim().to_string();
-        for a in tr.find(Name("a")) {
-            if let Some(link) = a.attr("href") {
-                if let Some(link) = link.split('/').nth(2) {
-                    if link.starts_with("tt") {
-                        shows.push((title.clone(), link));
-                    }
-                }
-            } else {
-            };
-        }
-    }
-
-    let results: Vec<Result<_, Error>> = shows
-        .into_par_iter()
-        .map(|(t, l)| {
-            let r = parse_imdb_rating(l)?;
-            Ok(ImdbTuple {
-                title: t.to_string(),
-                link: l.to_string(),
-                rating: r.rating.unwrap_or(-1.0),
-            })
-        })
-        .collect();
-
-    let shows: Vec<_> = map_result_vec(results)?;
-
-    Ok(shows)
-}
-
 #[derive(Debug)]
 pub struct RatingOutput {
     pub rating: Option<f64>,
     pub count: Option<u64>,
-}
-
-pub fn parse_imdb_rating(title: &str) -> Result<RatingOutput, Error> {
-    let mut output = RatingOutput {
-        rating: None,
-        count: None,
-    };
-
-    if !title.starts_with("tt") {
-        return Ok(output);
-    };
-
-    let url = Url::parse("http://www.imdb.com/title/")?.join(title)?;
-    let body = reqwest::get(url)?.text()?;
-    let document = Document::from(body.as_str());
-
-    for span in document.find(Name("span")) {
-        if let Some("ratingValue") = span.attr("itemprop") {
-            output.rating = Some(span.text().parse()?);
-        }
-        if let Some("ratingCount") = span.attr("itemprop") {
-            output.count = Some(span.text().replace(",", "").parse()?);
-        }
-    }
-    Ok(output)
 }
 
 #[derive(Default, Clone)]
@@ -892,84 +935,181 @@ impl fmt::Display for ImdbEpisodeResult {
     }
 }
 
-pub fn parse_imdb_episode_list(
-    imdb_id: &str,
-    season: Option<i32>,
-) -> Result<Vec<ImdbEpisodeResult>, Error> {
-    let endpoint: String = format!("http://m.imdb.com/title/{}/episodes", imdb_id);
-    let url = Url::parse(&endpoint)?;
-    let body = reqwest::get(url)?.text()?;
-    let document = Document::from(body.as_str());
-
-    let mut results = Vec::new();
-
-    for a in document.find(Name("a")) {
-        if let Some("season") = a.attr("class") {
-            let season_: i32 = a.attr("season_number").unwrap_or("-1").parse()?;
-            if let Some(link) = a.attr("href") {
-                if let Some(s) = season {
-                    if s != season_ {
-                        continue;
-                    }
-                }
-                let episode_url = "http://www.imdb.com/title";
-                let episodes_url = format!("{}/{}/episodes/{}", episode_url, imdb_id, link);
-                results.extend_from_slice(&parse_episodes_url(&episodes_url, Some(season_))?);
-            }
-        }
-    }
-    Ok(results)
+pub struct ImdbConnection {
+    client: Client,
 }
 
-fn parse_episodes_url(
-    episodes_url: &str,
-    season: Option<i32>,
-) -> Result<Vec<ImdbEpisodeResult>, Error> {
-    let episodes_url = Url::parse(&episodes_url)?;
-    let body = reqwest::get(episodes_url)?.text()?;
-    let document = Document::from(body.as_str());
+impl ImdbConnection {
+    pub fn new() -> ImdbConnection {
+        ImdbConnection {
+            client: Client::new(),
+        }
+    }
 
-    let mut results = Vec::new();
-
-    for div in document.find(Name("div")) {
-        if let Some("info") = div.attr("class") {
-            if let Some("episodes") = div.attr("itemprop") {
-                let mut result = ImdbEpisodeResult::default();
-                if let Some(s) = season {
-                    result.season = s;
-                }
-                for meta in div.find(Name("meta")) {
-                    if let Some("episodeNumber") = meta.attr("itemprop") {
-                        if let Some(episode) = meta.attr("content") {
-                            result.episode = episode.parse()?;
-                        }
+    pub fn get(&self, url: &Url) -> Result<Response, Error> {
+        let mut timeout: u64 = 1;
+        loop {
+            match self.client.get(url.clone()).send() {
+                Ok(x) => return Ok(x),
+                Err(e) => {
+                    sleep(Duration::from_secs(timeout));
+                    timeout *= 2;
+                    if timeout >= 64 {
+                        return Err(err_msg(e));
                     }
                 }
-                for div_ in div.find(Name("div")) {
-                    if let Some("airdate") = div_.attr("class") {
-                        if let Ok(date) = NaiveDate::parse_from_str(div_.text().trim(), "%d %b. %Y")
-                        {
-                            result.airdate = Some(date);
-                        }
-                    }
-                }
-                for a_ in div.find(Name("a")) {
-                    if result.epurl.is_some() {
-                        continue;
-                    };
-                    if let Some(epi_url) = a_.attr("href") {
-                        if let Some(link) = epi_url.split('/').nth(2) {
-                            result.epurl = Some(link.to_string());
-                            result.eptitle = Some(a_.text().trim().to_string());
-                            let r = parse_imdb_rating(link)?;
-                            result.rating = r.rating;
-                            result.nrating = r.count;
-                        }
-                    }
-                }
-                results.push(result);
             }
         }
     }
-    Ok(results)
+
+    pub fn parse_imdb(&self, title: &str) -> Result<Vec<ImdbTuple>, Error> {
+        let endpoint = "http://www.imdb.com/find?";
+        let url = Url::parse_with_params(endpoint, &[("s", "all"), ("q", title)])?;
+        let body = self.get(&url)?.text()?;
+
+        let document = Document::from(body.as_str());
+
+        let mut shows = Vec::new();
+
+        for tr in document.find(Class("result_text")) {
+            let title = tr.text().trim().to_string();
+            for a in tr.find(Name("a")) {
+                if let Some(link) = a.attr("href") {
+                    if let Some(link) = link.split('/').nth(2) {
+                        if link.starts_with("tt") {
+                            shows.push((title.clone(), link));
+                        }
+                    }
+                } else {
+                };
+            }
+        }
+
+        let results: Vec<Result<_, Error>> = shows
+            .into_par_iter()
+            .map(|(t, l)| {
+                let r = self.parse_imdb_rating(l)?;
+                Ok(ImdbTuple {
+                    title: t.to_string(),
+                    link: l.to_string(),
+                    rating: r.rating.unwrap_or(-1.0),
+                })
+            })
+            .collect();
+
+        let shows: Vec<_> = map_result_vec(results)?;
+
+        Ok(shows)
+    }
+
+    pub fn parse_imdb_rating(&self, title: &str) -> Result<RatingOutput, Error> {
+        let mut output = RatingOutput {
+            rating: None,
+            count: None,
+        };
+
+        if !title.starts_with("tt") {
+            return Ok(output);
+        };
+
+        let url = Url::parse("http://www.imdb.com/title/")?.join(title)?;
+        let body = self.get(&url)?.text()?;
+        let document = Document::from(body.as_str());
+
+        for span in document.find(Name("span")) {
+            if let Some("ratingValue") = span.attr("itemprop") {
+                output.rating = Some(span.text().parse()?);
+            }
+            if let Some("ratingCount") = span.attr("itemprop") {
+                output.count = Some(span.text().replace(",", "").parse()?);
+            }
+        }
+        Ok(output)
+    }
+
+    pub fn parse_imdb_episode_list(
+        &self,
+        imdb_id: &str,
+        season: Option<i32>,
+    ) -> Result<Vec<ImdbEpisodeResult>, Error> {
+        let endpoint: String = format!("http://m.imdb.com/title/{}/episodes", imdb_id);
+        let url = Url::parse(&endpoint)?;
+        let body = self.get(&url)?.text()?;
+        let document = Document::from(body.as_str());
+
+        let mut results = Vec::new();
+
+        for a in document.find(Name("a")) {
+            if let Some("season") = a.attr("class") {
+                let season_: i32 = a.attr("season_number").unwrap_or("-1").parse()?;
+                if let Some(link) = a.attr("href") {
+                    if let Some(s) = season {
+                        if s != season_ {
+                            continue;
+                        }
+                    }
+                    let episode_url = "http://www.imdb.com/title";
+                    let episodes_url = format!("{}/{}/episodes/{}", episode_url, imdb_id, link);
+                    results
+                        .extend_from_slice(&self.parse_episodes_url(&episodes_url, Some(season_))?);
+                }
+            }
+        }
+        Ok(results)
+    }
+
+    fn parse_episodes_url(
+        &self,
+        episodes_url: &str,
+        season: Option<i32>,
+    ) -> Result<Vec<ImdbEpisodeResult>, Error> {
+        let episodes_url = Url::parse(&episodes_url)?;
+        let body = self.get(&episodes_url)?.text()?;
+        let document = Document::from(body.as_str());
+
+        let mut results = Vec::new();
+
+        for div in document.find(Name("div")) {
+            if let Some("info") = div.attr("class") {
+                if let Some("episodes") = div.attr("itemprop") {
+                    let mut result = ImdbEpisodeResult::default();
+                    if let Some(s) = season {
+                        result.season = s;
+                    }
+                    for meta in div.find(Name("meta")) {
+                        if let Some("episodeNumber") = meta.attr("itemprop") {
+                            if let Some(episode) = meta.attr("content") {
+                                result.episode = episode.parse()?;
+                            }
+                        }
+                    }
+                    for div_ in div.find(Name("div")) {
+                        if let Some("airdate") = div_.attr("class") {
+                            if let Ok(date) =
+                                NaiveDate::parse_from_str(div_.text().trim(), "%d %b. %Y")
+                            {
+                                result.airdate = Some(date);
+                            }
+                        }
+                    }
+                    for a_ in div.find(Name("a")) {
+                        if result.epurl.is_some() {
+                            continue;
+                        };
+                        if let Some(epi_url) = a_.attr("href") {
+                            if let Some(link) = epi_url.split('/').nth(2) {
+                                result.epurl = Some(link.to_string());
+                                result.eptitle = Some(a_.text().trim().to_string());
+                                let r = self.parse_imdb_rating(link)?;
+                                result.rating = r.rating;
+                                result.nrating = r.count;
+                            }
+                        }
+                    }
+                    results.push(result);
+                }
+            }
+        }
+        Ok(results)
+    }
 }

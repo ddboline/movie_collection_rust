@@ -9,7 +9,8 @@ extern crate movie_collection_rust;
 extern crate rayon;
 extern crate serde_json;
 
-use chrono::Local;
+use chrono::{Duration, Local};
+use clap::{App, Arg};
 use failure::Error;
 use rayon::prelude::*;
 use std::collections::{HashMap, HashSet};
@@ -17,55 +18,40 @@ use std::collections::{HashMap, HashSet};
 use movie_collection_rust::config::Config;
 use movie_collection_rust::movie_collection::MovieCollectionDB;
 use movie_collection_rust::trakt_utils::{get_calendar, get_watched_shows, get_watchlist_shows};
-use movie_collection_rust::utils::{map_result_vec, option_string_wrapper};
+use movie_collection_rust::utils::{get_version_number, map_result_vec, option_string_wrapper};
 
 fn find_new_episodes() -> Result<(), Error> {
-    let trakt_watchlist_shows = get_watchlist_shows()?;
-    println!("watchlist {}", trakt_watchlist_shows.len());
-    let trakt_watched_shows = get_watched_shows()?;
-    println!("watched {}", trakt_watched_shows.len());
-    let trakt_cal_shows: HashMap<String, String> = get_calendar()?
-        .into_iter()
-        .map(|row| (row.link, row.show))
-        .collect();
+    let matches = App::new("Find new episodes")
+        .version(get_version_number().as_str())
+        .author("Daniel Boline <ddboline@gmail.com>")
+        .about("Query and Parse Video Collectioin")
+        .arg(
+            Arg::with_name("source")
+                .short("s")
+                .long("source")
+                .value_name("SOURCE")
+                .takes_value(true)
+                .help("Restrict source"),
+        )
+        .arg(
+            Arg::with_name("shows")
+                .value_name("SHOWS")
+                .help("Shows")
+                .multiple(true),
+        )
+        .get_matches();
 
-    println!("cal {}", trakt_cal_shows.len());
+    let source = matches.value_of("source").map(|s| s.to_string());
+
+    let mindate = Local::today() + Duration::days(-14);
+    let maxdate = Local::today() + Duration::days(14);
 
     let mq = MovieCollectionDB::new();
 
-    let mut max_season_map = HashMap::new();
-    let mut max_episode_map = HashMap::new();
-    let imdb_show_map = mq.get_imdb_show_map()?;
-    let mut current_shows: HashSet<String> = mq
-        .print_movie_queue(&[])?
-        .iter()
-        .filter_map(|row| {
-            if let Some(show) = &row.show {
-                let max_season = max_season_map.get(show).unwrap_or(&-1);
-                if let Some(season) = row.season {
-                    if season > *max_season {
-                        max_season_map.insert(show.clone(), season);
-                    }
-                    let key = (show.clone(), season);
-                    let max_episode = max_episode_map.get(&key).unwrap_or(&-1);
-                    if let Some(episode) = row.episode {
-                        if episode > *max_episode {
-                            max_episode_map.insert(key, episode);
-                        }
-                    }
-                }
-                if let Some(link) = &row.link {
-                    Some(link.clone())
-                } else {
-                    None
-                }
-            } else {
-                None
-            }
-        })
-        .collect();
+    for epi in mq.get_new_episodes(&mindate.naive_local(), &maxdate.naive_local(), source)? {
+        println!("{}", epi);
+    }
 
-    let maxdate = Local::today();
     /*
     for (k, v) in trakt_watchlist_shows.iter() {
         if !current_shows.contains(k) {

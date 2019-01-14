@@ -64,4 +64,31 @@ impl ImdbRatings {
             .execute(query, &[&self.rating, &self.title, &self.show])?;
         Ok(())
     }
+
+    pub fn get_show_by_link(link: String, pool: &PgPool) -> Result<Option<ImdbRatings>, Error> {
+        let query = r#"
+            SELECT index, show, title, link, rating, istv, source
+            FROM imdb_ratings
+            WHERE link = $1
+        "#;
+        for row in pool.get()?.query(query, &[&link])?.iter() {
+            let index: i32 = row.get(0);
+            let show: String = row.get(1);
+            let title: Option<String> = row.get(2);
+            let link: Option<String> = row.get(3);
+            let rating: Option<f64> = row.get(4);
+            let istv: Option<bool> = row.get(5);
+            let source: Option<String> = row.get(6);
+            return Ok(Some(ImdbRatings {
+                index,
+                show,
+                title,
+                link,
+                rating,
+                istv,
+                source,
+            }));
+        }
+        Ok(None)
+    }
 }

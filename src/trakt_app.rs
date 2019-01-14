@@ -6,6 +6,8 @@ use clap::{App, Arg};
 use failure::Error;
 use rayon::prelude::*;
 
+use movie_collection_rust::imdb_episodes::ImdbEpisodes;
+use movie_collection_rust::imdb_ratings::ImdbRatings;
 use movie_collection_rust::movie_collection::MovieCollectionDB;
 use movie_collection_rust::trakt_utils::{
     get_calendar, get_watched_shows, get_watched_shows_db, get_watchlist_shows,
@@ -36,8 +38,8 @@ fn trakt_app() -> Result<(), Error> {
 
     let do_parse = matches.is_present("parse");
 
+    let mq = MovieCollectionDB::new();
     if do_parse {
-        let mq = MovieCollectionDB::new();
         let watchlist_shows_db = get_watchlist_shows_db(&mq.pool)?;
         let watchlist_shows = get_watchlist_shows()?;
         let results: Vec<Result<_, Error>> = watchlist_shows
@@ -91,7 +93,25 @@ fn trakt_app() -> Result<(), Error> {
         map_result_vec(results)?;
     } else {
         for cal in get_calendar()? {
-            println!("{}", cal);
+            let show = match ImdbRatings::get_show_by_link(cal.link.clone(), &mq.pool)? {
+                Some(s) => s.show,
+                None => "".to_string(),
+            };
+            let exists = if !show.is_empty() {
+                ImdbEpisodes {
+                    show: show.clone(),
+                    season: cal.season,
+                    episode: cal.episode,
+                    ..Default::default()
+                }
+                .get_index(&mq.pool)?
+                .is_some()
+            } else {
+                false
+            };
+            if !exists {
+                println!("{} {}", show, cal);
+            }
         }
     }
 

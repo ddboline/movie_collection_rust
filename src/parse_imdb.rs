@@ -10,9 +10,7 @@ use std::collections::HashMap;
 
 use movie_collection_rust::imdb_episodes::ImdbEpisodes;
 use movie_collection_rust::imdb_ratings::ImdbRatings;
-use movie_collection_rust::movie_collection::{
-    parse_imdb, parse_imdb_episode_list, MovieCollectionDB,
-};
+use movie_collection_rust::movie_collection::{ImdbConnection, MovieCollectionDB};
 use movie_collection_rust::utils::get_version_number;
 
 fn parse_imdb_parser() -> Result<(), Error> {
@@ -121,7 +119,8 @@ fn parse_imdb_parser() -> Result<(), Error> {
     };
 
     if do_update {
-        let results = parse_imdb(&show.replace("_", " "))?;
+        let imdb_conn = ImdbConnection::new();
+        let results = imdb_conn.parse_imdb(&show.replace("_", " "))?;
         let results = if let Some(ilink) = &imdb_link {
             results.into_iter().filter(|r| &r.link == ilink).collect()
         } else {
@@ -172,8 +171,9 @@ fn parse_imdb_parser() -> Result<(), Error> {
                 println!("{}", result);
             }
         } else if let Some(link) = link {
+            println!("Using {}", link);
             if let Some(result) = shows.get(&link) {
-                for episode in parse_imdb_episode_list(&link, season)? {
+                for episode in imdb_conn.parse_imdb_episode_list(&link, season)? {
                     println!("{} {}", result, episode);
                     if update_database {
                         let key = (episode.season, episode.episode);

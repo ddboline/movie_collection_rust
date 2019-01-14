@@ -33,7 +33,43 @@ impl fmt::Display for ImdbEpisodes {
     }
 }
 
+impl Default for ImdbEpisodes {
+    fn default() -> ImdbEpisodes {
+        ImdbEpisodes::new()
+    }
+}
+
 impl ImdbEpisodes {
+    pub fn new() -> ImdbEpisodes {
+        ImdbEpisodes {
+            show: "".to_string(),
+            title: "".to_string(),
+            season: -1,
+            episode: -1,
+            airdate: NaiveDate::from_ymd(1970, 1, 1),
+            rating: -1.0,
+            eptitle: "".to_string(),
+            epurl: "".to_string(),
+        }
+    }
+
+    pub fn get_index(&self, pool: &PgPool) -> Result<Option<i32>, Error> {
+        let query = r#"
+            SELECT id
+            FROM imdb_episodes
+            WHERE show=$1 AND season=$2 AND episode=$3
+        "#;
+        for row in pool
+            .get()?
+            .query(query, &[&self.show, &self.season, &self.episode])?
+            .iter()
+        {
+            let id: i32 = row.get(0);
+            return Ok(Some(id));
+        }
+        Ok(None)
+    }
+
     pub fn insert_episode(&self, pool: &PgPool) -> Result<(), Error> {
         let query = r#"
             INSERT INTO imdb_episodes

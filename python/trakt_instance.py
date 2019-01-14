@@ -99,7 +99,11 @@ class TraktInstance(object):
             shows = Trakt['sync/watchlist'].shows(pagination=True)
             if shows is None:
                 return []
-            return [{'link': x.get_key('imdb'), 'title': x.title, 'year': x.year} for x in shows.values()]
+            return [{
+                'link': x.get_key('imdb'),
+                'title': x.title,
+                'year': x.year
+            } for x in shows.values()]
 
     def get_watchlist_seasons(self):
         with Trakt.configuration.oauth.from_response(self.authorization, refresh=True):
@@ -340,8 +344,14 @@ class TraktInstance(object):
             eprating, rating = -1, -1
             title = show
             eptitle = ep_.title
-            output.append({'show': ep_.show.title, 'link': imdb_url, 'season': season,
-                           'episode': episode, 'ep_link': ep_url, 'airdate': airdate})
+            output.append({
+                'show': ep_.show.title,
+                'link': imdb_url,
+                'season': season,
+                'episode': episode,
+                'ep_link': ep_url,
+                'airdate': airdate
+            })
         return output
 
 
@@ -350,6 +360,7 @@ class TraktInstance(object):
 def get_watchlist():
     ti = TraktInstance()
     return json.jsonify(ti.get_watchlist_shows()), 200
+
 
 @app.route('/trakt/watched_show/<imdb_id>', methods=['GET'])
 def get_watched_show(imdb_id):
@@ -362,10 +373,12 @@ def get_watched_shows():
     ti = TraktInstance()
     return json.jsonify(ti.get_watched_shows()), 200
 
+
 @app.route('/trakt/query/<query_str>', methods=['GET'])
 def do_trakt_query(query_str):
     ti = TraktInstance()
     return json.jsonify(ti.do_query(query_str)), 200
+
 
 @app.route('/trakt/lookup/<imdb_id>', methods=['GET'])
 def do_trakt_lookup(imdb_id):
@@ -376,13 +389,14 @@ def do_trakt_lookup(imdb_id):
 @app.route('/trakt/add_episode_to_watched/<imdb_id>/<season>/<episode>', methods=['GET'])
 def add_episode_to_watched(imdb_id, season, episode):
     ti = TraktInstance()
-    return ti.add_episode_to_watched(imdb_id=imdb_id, season=season, episode=episode)
+    return ti.add_episode_to_watched(imdb_id=imdb_id, season=int(season), episode=int(episode))
 
 
 @app.route('/trakt/add_to_watched/<imdb_id>', methods=['GET'])
 def add_to_watched(imdb_id):
     ti = TraktInstance()
     return ti.add_movie_to_watched(imdb_id=imdb_id), 200
+
 
 @app.route('/trakt/cal', methods=['GET'])
 def get_trakt_cal():
@@ -399,7 +413,7 @@ def delete_show_from_watchlist(imdb_id):
 @app.route('/trakt/delete_watched/<imdb_id>/<season>/<episode>', methods=['GET'])
 def delete_episode_from_watched(imdb_id, season, episode):
     ti = TraktInstance()
-    return ti_.remove_episode_to_watched(imdb_id=imdb_id, season=season, episode=episode), 200
+    return ti_.remove_episode_to_watched(imdb_id=imdb_id, season=int(season), episode=int(episode)), 200
 
 
 @app.route('/trakt/add_to_watchlist/<imdb_id>', methods=['GET'])
