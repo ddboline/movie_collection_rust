@@ -35,4 +35,5 @@ install:
 	cp target/$(build_type)/make-queue /usr/bin/make-queue
 	cp target/$(build_type)/movie-queue-http /usr/bin/movie-queue-http
 	cp target/$(build_type)/trakt-app /usr/bin/trakt-app
+	cp target/$(build_type)/find-new-episodes /usr/bin/find-new-episodes
 	cp python/trakt_instance.py /usr/bin/trakt-flask-app
