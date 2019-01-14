@@ -1,7 +1,4 @@
 use failure::Error;
-use postgres::Connection;
-use r2d2::ManageConnection;
-use r2d2::PooledConnection;
 use std::fmt;
 
 use crate::movie_collection::PgPool;
@@ -71,7 +68,7 @@ impl ImdbRatings {
             FROM imdb_ratings
             WHERE link = $1
         "#;
-        for row in pool.get()?.query(query, &[&link])?.iter() {
+        if let Some(row) = pool.get()?.query(query, &[&link])?.iter().nth(0) {
             let index: i32 = row.get(0);
             let show: String = row.get(1);
             let title: Option<String> = row.get(2);
@@ -88,7 +85,8 @@ impl ImdbRatings {
                 istv,
                 source,
             }));
+        } else {
+            Ok(None)
         }
-        Ok(None)
     }
 }

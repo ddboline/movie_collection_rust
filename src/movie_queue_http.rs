@@ -6,12 +6,11 @@ extern crate rust_auth_server;
 extern crate subprocess;
 
 use actix_web::middleware::identity::{CookieIdentityPolicy, IdentityService};
-use actix_web::{http::Method, http::StatusCode, server, App, HttpResponse, Json, Path, Query};
+use actix_web::{http::Method, http::StatusCode, server, App, HttpResponse, Path};
 use chrono::Duration;
 use failure::Error;
 use rayon::prelude::*;
 use rust_auth_server::auth_handler::LoggedUser;
-use std::env;
 use std::path;
 use subprocess::Exec;
 
@@ -66,7 +65,7 @@ fn movie_queue_base(patterns: &[String]) -> Result<String, Error> {
                 .to_str()
                 .unwrap();
             let file_stem = path.file_stem().unwrap().to_str().unwrap();
-            let (show, season, episode) = parse_file_stem(&file_stem);
+            let (_, season, episode) = parse_file_stem(&file_stem);
 
             let entry = if ext == "mp4" {
                 let collection_idx = mq.get_collection_index(&row.path).unwrap_or(-1);

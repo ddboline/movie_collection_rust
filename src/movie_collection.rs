@@ -330,11 +330,12 @@ impl MovieCollectionDB {
 
     pub fn get_max_queue_index(&self) -> Result<i32, Error> {
         let query = r#"SELECT max(idx) FROM movie_queue"#;
-        for row in self.pool.get()?.query(query, &[])?.iter() {
+        if let Some(row) = self.pool.get()?.query(query, &[])?.iter().nth(0) {
             let max_idx: i32 = row.get(0);
-            return Ok(max_idx);
+            Ok(max_idx)
+        } else {
+            Ok(-1)
         }
-        Ok(-1)
     }
 
     pub fn remove_from_collection(&self, path: &str) -> Result<(), Error> {
@@ -481,18 +482,6 @@ impl MovieCollectionDB {
                 let path: String = row.get(0);
                 let show: String = row.get(1);
                 (path, show)
-            })
-            .collect();
-        let query = "SELECT show, index FROM imdb_ratings";
-        let ratings_map: HashMap<String, i32> = self
-            .pool
-            .get()?
-            .query(query, &[])?
-            .iter()
-            .map(|row| {
-                let show: String = row.get(0);
-                let show_id: i32 = row.get(1);
-                (show, show_id)
             })
             .collect();
         let query = "SELECT show, season, episode from imdb_episodes";
@@ -706,8 +695,8 @@ impl MovieCollectionDB {
 
     pub fn get_new_episodes(
         &self,
-        mindate: &NaiveDate,
-        maxdate: &NaiveDate,
+        mindate: NaiveDate,
+        maxdate: NaiveDate,
         source: Option<String>,
     ) -> Result<Vec<NewEpisodesResult>, Error> {
         let query = r#"

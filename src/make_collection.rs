@@ -6,7 +6,6 @@ use clap::{App, Arg};
 use failure::Error;
 use rayon::prelude::*;
 
-use movie_collection_rust::config::Config;
 use movie_collection_rust::movie_collection::MovieCollectionDB;
 use movie_collection_rust::utils::{get_version_number, get_video_runtime, map_result_vec};
 

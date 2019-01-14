@@ -1,6 +1,6 @@
 use chrono::NaiveDate;
 use failure::Error;
-use std::collections::{HashMap, HashSet};
+use std::collections::HashMap;
 use std::fmt;
 
 use crate::config::Config;
@@ -23,11 +23,12 @@ impl fmt::Display for WatchListShow {
 impl WatchListShow {
     pub fn get_index(&self, pool: &PgPool) -> Result<Option<i32>, Error> {
         let query = "SELECT id FROM trakt_watchlist WHERE link = $1";
-        for row in pool.get()?.query(query, &[&self.link])?.iter() {
+        if let Some(row) = pool.get()?.query(query, &[&self.link])?.iter().nth(0) {
             let id: i32 = row.get(0);
-            return Ok(Some(id));
+            Ok(Some(id))
+        } else {
+            Ok(None)
         }
-        Ok(None)
     }
 
     pub fn insert_show(&self, pool: &PgPool) -> Result<(), Error> {
@@ -96,15 +97,17 @@ impl WatchedShows {
             FROM trakt_watched_episodes
             WHERE link=$1 AND season=$2 AND episode=$3
         "#;
-        for row in pool
+        if let Some(row) = pool
             .get()?
             .query(query, &[&self.imdb_url, &self.season, &self.episode])?
             .iter()
+            .nth(0)
         {
             let id: i32 = row.get(0);
-            return Ok(Some(id));
+            Ok(Some(id))
+        } else {
+            Ok(None)
         }
-        Ok(None)
     }
 
     pub fn insert_episode(&self, pool: &PgPool) -> Result<(), Error> {

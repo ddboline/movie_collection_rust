@@ -5,9 +5,7 @@ extern crate subprocess;
 
 use amqp::{protocol, Basic, Channel, Options, Session, Table};
 use failure::{err_msg, Error};
-use std::collections::HashMap;
 use std::env::var;
-use std::fmt;
 use std::fs::create_dir_all;
 use std::fs::rename;
 use std::fs::File;

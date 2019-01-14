@@ -1,24 +1,16 @@
-#[macro_use]
-extern crate serde_derive;
-
 extern crate actix;
 extern crate actix_web;
 extern crate chrono;
 extern crate failure;
 extern crate movie_collection_rust;
-extern crate rayon;
 extern crate serde_json;
 
 use chrono::{Duration, Local};
 use clap::{App, Arg};
 use failure::Error;
-use rayon::prelude::*;
-use std::collections::{HashMap, HashSet};
 
-use movie_collection_rust::config::Config;
 use movie_collection_rust::movie_collection::MovieCollectionDB;
-use movie_collection_rust::trakt_utils::{get_calendar, get_watched_shows, get_watchlist_shows};
-use movie_collection_rust::utils::{get_version_number, map_result_vec, option_string_wrapper};
+use movie_collection_rust::utils::get_version_number;
 
 fn find_new_episodes() -> Result<(), Error> {
     let matches = App::new("Find new episodes")
@@ -48,7 +40,7 @@ fn find_new_episodes() -> Result<(), Error> {
 
     let mq = MovieCollectionDB::new();
 
-    for epi in mq.get_new_episodes(&mindate.naive_local(), &maxdate.naive_local(), source)? {
+    for epi in mq.get_new_episodes(mindate.naive_local(), maxdate.naive_local(), source)? {
         println!("{}", epi);
     }
 

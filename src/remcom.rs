@@ -4,15 +4,9 @@ extern crate movie_collection_rust;
 use clap::{App, Arg};
 use failure::Error;
 
-use movie_collection_rust::config::Config;
-use movie_collection_rust::utils::{
-    create_move_script, create_transcode_script, get_version_number,
-    publish_transcode_job_to_queue, remcom_single_file,
-};
+use movie_collection_rust::utils::{get_version_number, remcom_single_file};
 
 fn remcom() -> Result<(), Error> {
-    let config = Config::with_config();
-
     let matches = App::new("Remcom")
         .version(get_version_number().as_str())
         .author("Daniel Boline <ddboline@gmail.com>")

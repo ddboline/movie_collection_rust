@@ -59,15 +59,17 @@ impl ImdbEpisodes {
             FROM imdb_episodes
             WHERE show=$1 AND season=$2 AND episode=$3
         "#;
-        for row in pool
+        if let Some(row) = pool
             .get()?
             .query(query, &[&self.show, &self.season, &self.episode])?
             .iter()
+            .nth(0)
         {
             let id: i32 = row.get(0);
-            return Ok(Some(id));
+            Ok(Some(id))
+        } else {
+            Ok(None)
         }
-        Ok(None)
     }
 
     pub fn insert_episode(&self, pool: &PgPool) -> Result<(), Error> {
