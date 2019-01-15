@@ -545,11 +545,15 @@ impl MovieCollectionDB {
                 }
             }
         }
-        for (show, season, episode, path) in &episode_list {
+        let mut shows_not_in_db: HashSet<String> = HashSet::new();
+        for (show, season, episode, _) in &episode_list {
             let key = (show.clone(), *season, *episode);
             if !episodes_set.contains(&key) {
-                println!("episode not in db {} {} {} {}", show, season, episode, path);
+                shows_not_in_db.insert(show.clone());
             }
+        }
+        for show in shows_not_in_db {
+            println!("show has episode not in db {} ", show);
         }
         Ok(())
     }
@@ -926,6 +930,12 @@ impl fmt::Display for ImdbEpisodeResult {
 
 pub struct ImdbConnection {
     client: Client,
+}
+
+impl Default for ImdbConnection {
+    fn default() -> ImdbConnection {
+        ImdbConnection::new()
+    }
 }
 
 impl ImdbConnection {

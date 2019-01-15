@@ -17,7 +17,7 @@ use subprocess::{Exec, Redirection};
 use crate::config::Config;
 
 #[inline]
-pub fn option_string_wrapper<'a>(s: &'a Option<String>) -> &'a str {
+pub fn option_string_wrapper(s: &Option<String>) -> &str {
     s.as_ref().map(|s| s.as_str()).unwrap_or("")
 }
 
@@ -244,7 +244,7 @@ pub fn parse_file_stem(file_stem: &str) -> (String, i32, i32) {
     let show = entries[..(entries.len() - 2)].join("_");
 
     let season = entries[(entries.len() - 2)];
-    let season: i32 = if season.starts_with("s") {
+    let season: i32 = if season.starts_with('s') {
         season.replace("s", "").parse().unwrap_or(-1)
     } else {
         -1

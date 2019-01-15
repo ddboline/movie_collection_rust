@@ -93,7 +93,7 @@ fn trakt_app() -> Result<(), Error> {
         map_result_vec(results)?;
     } else {
         for cal in get_calendar()? {
-            let show = match ImdbRatings::get_show_by_link(cal.link.clone(), &mq.pool)? {
+            let show = match ImdbRatings::get_show_by_link(&cal.link, &mq.pool)? {
                 Some(s) => s.show,
                 None => "".to_string(),
             };

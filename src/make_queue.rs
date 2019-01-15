@@ -100,7 +100,7 @@ fn make_queue() -> Result<(), Error> {
             }
         }
     } else {
-        let results = mq.print_movie_queue(&patterns.unwrap_or_else(|| Vec::new()))?;
+        let results = mq.print_movie_queue(&patterns.unwrap_or_else(Vec::new))?;
         if do_time {
             let results: Vec<Result<_, Error>> = results
                 .into_par_iter()

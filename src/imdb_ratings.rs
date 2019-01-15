@@ -62,7 +62,7 @@ impl ImdbRatings {
         Ok(())
     }
 
-    pub fn get_show_by_link(link: String, pool: &PgPool) -> Result<Option<ImdbRatings>, Error> {
+    pub fn get_show_by_link(link: &str, pool: &PgPool) -> Result<Option<ImdbRatings>, Error> {
         let query = r#"
             SELECT index, show, title, link, rating, istv, source
             FROM imdb_ratings

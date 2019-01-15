@@ -1,3 +1,5 @@
+#![allow(clippy::needless_pass_by_value)]
+
 extern crate actix;
 extern crate actix_web;
 extern crate movie_collection_rust;
@@ -95,9 +97,9 @@ fn movie_queue_base(patterns: &[String]) -> Result<String, Error> {
                         r#"{}<td><button type="submit" id="{}" onclick="transcode('{}');"> transcode </button></td>"#,
                         entry, file_name, file_name)
                 } else {
-                    let entries: Vec<_> = row.path.split("/").collect();
+                    let entries: Vec<_> = row.path.split('/').collect();
                     let len_entries = entries.len();
-                    let directory = entries.iter().nth(len_entries-2).unwrap();
+                    let directory = entries[len_entries-2];
                     format!(
                         r#"{}<td><button type="submit" id="{}" onclick="transcode_directory('{}', '{}');"> transcode </button></td>"#,
                         entry, file_name, file_name, directory)

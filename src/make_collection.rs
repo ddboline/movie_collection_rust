@@ -43,7 +43,7 @@ fn make_collection() -> Result<(), Error> {
     let shows = matches
         .values_of("shows")
         .map(|s| s.map(|x| x.to_string()).collect())
-        .unwrap_or_else(|| Vec::new());
+        .unwrap_or_else(Vec::new);
 
     if !do_parse {
         let mq = MovieCollectionDB::new();
