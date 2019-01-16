@@ -43,6 +43,12 @@ pub struct MovieQueueDB {
     pool: PgPool,
 }
 
+impl Default for MovieQueueDB {
+    fn default() -> MovieQueueDB {
+        MovieQueueDB::new()
+    }
+}
+
 impl MovieQueueDB {
     pub fn new() -> MovieQueueDB {
         let config = Config::with_config();

@@ -45,10 +45,12 @@ impl PgPool {
     }
 
     pub fn get(&self) -> Result<PooledConnection<PostgresConnectionManager>, Error> {
-        self.pool.get().map_err(|e| err_msg(e))
+        self.pool.get().map_err(err_msg)
     }
+}
 
-    pub fn clone(&self) -> PgPool {
+impl Clone for PgPool {
+    fn clone(&self) -> PgPool {
         PgPool {
             pgurl: self.pgurl.clone(),
             pool: self.pool.clone(),
