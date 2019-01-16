@@ -1,8 +1,16 @@
+extern crate chrono;
+extern crate failure;
+extern crate r2d2;
+extern crate r2d2_postgres;
+extern crate rayon;
+extern crate reqwest;
+extern crate select;
+
 use failure::Error;
 use std::fmt;
 
-use crate::movie_collection::PgPool;
-use crate::utils::option_string_wrapper;
+use crate::common::movie_collection::PgPool;
+use crate::common::utils::option_string_wrapper;
 
 #[derive(Default, Clone, Debug)]
 pub struct ImdbRatings {

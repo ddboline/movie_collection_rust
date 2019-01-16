@@ -1,8 +1,16 @@
+extern crate chrono;
+extern crate failure;
+extern crate r2d2;
+extern crate r2d2_postgres;
+extern crate rayon;
+extern crate reqwest;
+extern crate select;
+
 use chrono::NaiveDate;
 use failure::Error;
 use std::fmt;
 
-use crate::movie_collection::PgPool;
+use crate::common::movie_collection::PgPool;
 
 #[derive(Clone)]
 pub struct ImdbEpisodes {

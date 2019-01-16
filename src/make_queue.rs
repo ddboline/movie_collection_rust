@@ -7,8 +7,10 @@ use clap::{App, Arg};
 use failure::Error;
 use rayon::prelude::*;
 
-use movie_collection_rust::movie_collection::MovieCollectionDB;
-use movie_collection_rust::utils::{get_version_number, get_video_runtime, map_result_vec};
+use movie_collection_rust::common::config::Config;
+use movie_collection_rust::common::movie_collection::{MovieCollectionDB, PgPool};
+use movie_collection_rust::common::movie_queue::MovieQueueDB;
+use movie_collection_rust::common::utils::{get_version_number, get_video_runtime, map_result_vec};
 
 fn make_queue() -> Result<(), Error> {
     let matches = App::new("Parse IMDB")
@@ -65,10 +67,13 @@ fn make_queue() -> Result<(), Error> {
         .map(|v| v.map(|s| s.to_string()).collect());
     let do_shows = matches.is_present("shows");
 
-    let mq = MovieCollectionDB::new();
+    let config = Config::with_config();
+    let pool = PgPool::new(&config.pgurl);
+    let mc = MovieCollectionDB::with_pool(pool.clone());
+    let mq = MovieQueueDB::with_pool(pool);
 
     if do_shows {
-        for show in mq.print_tv_shows()? {
+        for show in mc.print_tv_shows()? {
             println!("{}", show);
         }
     } else if let Some(files) = del_files {

@@ -4,7 +4,7 @@ extern crate movie_collection_rust;
 use clap::{App, Arg};
 use failure::Error;
 
-use movie_collection_rust::utils::{get_version_number, remcom_single_file};
+use movie_collection_rust::common::utils::{get_version_number, remcom_single_file};
 
 fn remcom() -> Result<(), Error> {
     let matches = App::new("Remcom")

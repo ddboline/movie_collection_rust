@@ -8,25 +8,139 @@ extern crate select;
 
 use chrono::NaiveDate;
 use failure::{err_msg, Error};
-use r2d2::Pool;
+use r2d2::{Pool, PooledConnection};
 use r2d2_postgres::{PostgresConnectionManager, TlsMode};
 use rayon::prelude::*;
-use reqwest::Url;
-use reqwest::{Client, Response};
-use select::document::Document;
-use select::predicate::{Class, Name};
 use std::collections::{HashMap, HashSet};
 use std::fmt;
 use std::path::Path;
-use std::thread::sleep;
-use std::time::Duration;
 
-use crate::config::Config;
-use crate::imdb_episodes::ImdbEpisodes;
-use crate::imdb_ratings::ImdbRatings;
-use crate::utils::{map_result_vec, option_string_wrapper, parse_file_stem, walk_directory};
+use crate::common::config::Config;
+use crate::common::imdb_episodes::ImdbEpisodes;
+use crate::common::imdb_ratings::ImdbRatings;
+use crate::common::movie_queue::MovieQueueDB;
+use crate::common::utils::{
+    map_result_vec, option_string_wrapper, parse_file_stem, walk_directory,
+};
 
-pub type PgPool = Pool<PostgresConnectionManager>;
+pub struct PgPool {
+    pgurl: String,
+    pool: Pool<PostgresConnectionManager>,
+}
+
+impl fmt::Debug for PgPool {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        write!(f, "PgPool {}", self.pgurl)
+    }
+}
+
+impl PgPool {
+    pub fn new(pgurl: &str) -> PgPool {
+        let manager = PostgresConnectionManager::new(pgurl, TlsMode::None)
+            .expect("Failed to open DB connection");
+        PgPool {
+            pgurl: pgurl.to_string(),
+            pool: Pool::new(manager).expect("Failed to open DB connection"),
+        }
+    }
+
+    pub fn get(&self) -> Result<PooledConnection<PostgresConnectionManager>, Error> {
+        self.pool.get().map_err(|e| err_msg(e))
+    }
+
+    pub fn clone(&self) -> PgPool {
+        PgPool {
+            pgurl: self.pgurl.clone(),
+            pool: self.pool.clone(),
+        }
+    }
+}
+
+pub struct NewEpisodesResult {
+    pub show: String,
+    pub link: String,
+    pub title: String,
+    pub season: i32,
+    pub episode: i32,
+    pub epurl: String,
+    pub airdate: NaiveDate,
+    pub rating: f64,
+    pub eprating: f64,
+    pub eptitle: String,
+}
+
+impl fmt::Display for NewEpisodesResult {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        write!(
+            f,
+            "{} {} {} {} {} {} {} {} {} {}",
+            self.show,
+            self.link,
+            self.title,
+            self.season,
+            self.episode,
+            self.epurl,
+            self.airdate,
+            self.rating,
+            self.eprating,
+            self.eptitle,
+        )
+    }
+}
+
+#[derive(Default)]
+pub struct TvShowsResult {
+    pub show: String,
+    pub link: String,
+    pub count: i64,
+    pub title: String,
+}
+
+impl fmt::Display for TvShowsResult {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        write!(f, "{} {} {}", self.show, self.link, self.count,)
+    }
+}
+
+#[derive(Default)]
+pub struct MovieCollectionResult {
+    pub path: String,
+    pub show: String,
+    pub rating: f64,
+    pub title: String,
+    pub istv: bool,
+    pub eprating: Option<f64>,
+    pub season: Option<i32>,
+    pub episode: Option<i32>,
+    pub eptitle: Option<String>,
+    pub epurl: Option<String>,
+}
+
+impl fmt::Display for MovieCollectionResult {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        if !self.istv {
+            write!(
+                f,
+                "{} {} {:.1} {}",
+                self.path, self.show, self.rating, self.title
+            )
+        } else {
+            write!(
+                f,
+                "{} {} {:.1}/{:.1} s{:02} ep{:02} {} {} {}",
+                self.path,
+                self.show,
+                self.rating,
+                self.eprating.unwrap_or(-1.0),
+                self.season.unwrap_or(-1),
+                self.episode.unwrap_or(-1),
+                self.title,
+                option_string_wrapper(&self.eptitle),
+                option_string_wrapper(&self.epurl),
+            )
+        }
+    }
+}
 
 #[derive(Debug)]
 pub struct MovieCollectionDB {
@@ -43,12 +157,16 @@ impl Default for MovieCollectionDB {
 impl MovieCollectionDB {
     pub fn new() -> MovieCollectionDB {
         let config = Config::with_config();
-        let manager = PostgresConnectionManager::new(config.pgurl.clone(), TlsMode::None)
-            .expect("Failed to open DB connection");
+        let pgurl = &config.pgurl;
         MovieCollectionDB {
+            pool: PgPool::new(&pgurl),
             config,
-            pool: Pool::new(manager).expect("Failed to open DB connection"),
         }
+    }
+
+    pub fn with_pool(pool: PgPool) -> MovieCollectionDB {
+        let config = Config::with_config();
+        MovieCollectionDB { config, pool }
     }
 
     pub fn print_imdb_shows(&self, show: &str, istv: bool) -> Result<Vec<ImdbRatings>, Error> {
@@ -260,84 +378,6 @@ impl MovieCollectionDB {
         Ok(results)
     }
 
-    pub fn remove_from_queue_by_idx(&self, idx: i32) -> Result<(), Error> {
-        let max_idx = self.get_max_queue_index()?;
-        if idx > max_idx || idx < 0 {
-            return Ok(());
-        }
-        let diff = max_idx - idx;
-
-        let conn = self.pool.get()?;
-        let tran = conn.transaction()?;
-        let query = r#"DELETE FROM movie_queue WHERE idx = $1"#;
-        tran.execute(query, &[&idx])?;
-
-        let query = r#"UPDATE movie_queue SET idx = idx + $1 WHERE idx > $2"#;
-        tran.execute(query, &[&diff, &idx])?;
-
-        let query = r#"UPDATE movie_queue SET idx = idx - $1 - 1 WHERE idx > $2"#;
-        tran.execute(query, &[&diff, &idx])?;
-
-        tran.commit().map_err(err_msg)
-    }
-
-    pub fn remove_from_queue_by_collection_idx(&self, collection_idx: i32) -> Result<(), Error> {
-        let query = r#"SELECT idx FROM movie_queue WHERE collection_idx=$1"#;
-        for row in self.pool.get()?.query(query, &[&collection_idx])?.iter() {
-            let idx = row.get(0);
-            self.remove_from_queue_by_idx(idx)?;
-        }
-        Ok(())
-    }
-
-    pub fn remove_from_queue_by_path(&self, path: &str) -> Result<(), Error> {
-        let collection_idx = self.get_collection_index(&path)?;
-        self.remove_from_queue_by_collection_idx(collection_idx)
-    }
-
-    pub fn insert_into_queue(&self, idx: i32, path: &str) -> Result<(), Error> {
-        if !Path::new(&path).exists() {
-            return Err(err_msg("File doesn't exist"));
-        }
-        let collection_idx = self.get_collection_index(&path)?;
-
-        let query = r#"SELECT idx FROM movie_queue WHERE collection_idx = $1"#;
-        let mut current_idx: i32 = -1;
-        for row in self.pool.get()?.query(query, &[&collection_idx])?.iter() {
-            current_idx = row.get(0);
-        }
-
-        if current_idx != -1 {
-            self.remove_from_queue_by_idx(current_idx)?;
-        }
-
-        let max_idx = self.get_max_queue_index()?;
-        let diff = max_idx - idx + 1;
-
-        let conn = self.pool.get()?;
-        let tran = conn.transaction()?;
-        let query = r#"UPDATE movie_queue SET idx = idx + $1 WHERE idx >= $2"#;
-        tran.execute(query, &[&diff, &idx])?;
-
-        let query = r#"INSERT INTO movie_queue (idx, collection_idx) VALUES ($1, $2)"#;
-        tran.execute(query, &[&idx, &collection_idx])?;
-
-        let query = r#"UPDATE movie_queue SET idx = idx - $1 + 1 WHERE idx > $2"#;
-        tran.execute(query, &[&diff, &idx])?;
-
-        tran.commit().map_err(err_msg)
-    }
-
-    pub fn get_max_queue_index(&self) -> Result<i32, Error> {
-        let query = r#"SELECT max(idx) FROM movie_queue"#;
-        if let Some(row) = self.pool.get()?.query(query, &[])?.iter().nth(0) {
-            let max_idx: i32 = row.get(0);
-            Ok(max_idx)
-        } else {
-            Ok(-1)
-        }
-    }
-
     pub fn remove_from_collection(&self, path: &str) -> Result<(), Error> {
         let query = r#"
             DELETE FROM movie_collection
@@ -360,8 +400,9 @@ impl MovieCollectionDB {
             Some(r) => r,
             None => {
                 if Path::new(path).exists() {
-                    let max_idx = self.get_max_queue_index()?;
-                    self.insert_into_queue(max_idx, &path)?;
+                    let mq = MovieQueueDB::with_pool(self.pool.clone());
+                    let max_idx = mq.get_max_queue_index()?;
+                    mq.insert_into_queue(max_idx, &path)?;
                     Some(self.get_collection_index(&path)?)
                 } else {
                     None
@@ -520,7 +561,8 @@ impl MovieCollectionDB {
                     match movie_queue.get(key) {
                         Some(v) => {
                             println!("in queue but not disk {} {}", key, v);
-                            self.remove_from_queue_by_path(key)?;
+                            let mq = MovieQueueDB::with_pool(self.pool.clone());
+                            mq.remove_from_queue_by_path(key)?;
                             self.remove_from_collection(key)
                         }
                         None => {
@@ -556,78 +598,6 @@ impl MovieCollectionDB {
             println!("show has episode not in db {} ", show);
         }
         Ok(())
-    }
-
-    pub fn print_movie_queue(&self, patterns: &[String]) -> Result<Vec<MovieQueueResult>, Error> {
-        let query = r#"
-            SELECT a.idx, b.path, c.link, c.istv
-            FROM movie_queue a
-            JOIN movie_collection b ON a.collection_idx = b.idx
-            LEFT JOIN imdb_ratings c ON b.show_id = c.index
-        "#;
-        let query = if !patterns.is_empty() {
-            let constraints: Vec<_> = patterns
-                .iter()
-                .map(|p| format!("b.path like '%{}%'", p))
-                .collect();
-            format!("{} WHERE {}", query, constraints.join(" OR "))
-        } else {
-            query.to_string()
-        };
-        let results: Vec<_> = self
-            .pool
-            .get()?
-            .query(&query, &[])?
-            .iter()
-            .map(|row| {
-                let idx: i32 = row.get(0);
-                let path: String = row.get(1);
-                let link: Option<String> = row.get(2);
-                let istv: Option<bool> = row.get(3);
-                MovieQueueResult {
-                    idx,
-                    path,
-                    link,
-                    istv: istv.unwrap_or(false),
-                    ..Default::default()
-                }
-            })
-            .collect();
-
-        let results: Vec<Result<_, Error>> = results
-            .into_par_iter()
-            .map(|mut result| {
-                if result.istv {
-                    let file_stem = Path::new(&result.path)
-                        .file_stem()
-                        .unwrap()
-                        .to_str()
-                        .unwrap();
-                    let (show, season, episode) = parse_file_stem(&file_stem);
-                    let query = r#"
-                        SELECT epurl
-                        FROM imdb_episodes
-                        WHERE show = $1 AND season = $2 AND episode = $3
-                    "#;
-                    for row in self
-                        .pool
-                        .get()?
-                        .query(query, &[&show, &season, &episode])?
-                        .iter()
-                    {
-                        let epurl: String = row.get(0);
-                        result.eplink = Some(epurl);
-                        result.show = Some(show.clone());
-                        result.season = Some(season);
-                        result.episode = Some(episode);
-                    }
-                }
-                Ok(result)
-            })
-            .collect();
-        let mut results = map_result_vec(results)?;
-        results.sort_by_key(|r| r.idx);
-        Ok(results)
     }
 
     pub fn get_imdb_show_map(&self) -> Result<HashMap<String, ImdbRatings>, Error> {
@@ -767,348 +737,6 @@ impl MovieCollectionDB {
                 }
             })
             .collect();
-        Ok(results)
-    }
-}
-
-pub struct NewEpisodesResult {
-    pub show: String,
-    pub link: String,
-    pub title: String,
-    pub season: i32,
-    pub episode: i32,
-    pub epurl: String,
-    pub airdate: NaiveDate,
-    pub rating: f64,
-    pub eprating: f64,
-    pub eptitle: String,
-}
-
-impl fmt::Display for NewEpisodesResult {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        write!(
-            f,
-            "{} {} {} {} {} {} {} {} {} {}",
-            self.show,
-            self.link,
-            self.title,
-            self.season,
-            self.episode,
-            self.epurl,
-            self.airdate,
-            self.rating,
-            self.eprating,
-            self.eptitle,
-        )
-    }
-}
-
-#[derive(Default)]
-pub struct TvShowsResult {
-    pub show: String,
-    pub link: String,
-    pub count: i64,
-    pub title: String,
-}
-
-impl fmt::Display for TvShowsResult {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        write!(f, "{} {} {}", self.show, self.link, self.count,)
-    }
-}
-
-#[derive(Default)]
-pub struct MovieQueueResult {
-    pub idx: i32,
-    pub path: String,
-    pub link: Option<String>,
-    pub istv: bool,
-    pub show: Option<String>,
-    pub eplink: Option<String>,
-    pub season: Option<i32>,
-    pub episode: Option<i32>,
-}
-
-impl fmt::Display for MovieQueueResult {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        write!(
-            f,
-            "{} {} {}",
-            self.idx,
-            self.path,
-            option_string_wrapper(&self.eplink),
-        )
-    }
-}
-
-#[derive(Default)]
-pub struct MovieCollectionResult {
-    pub path: String,
-    pub show: String,
-    pub rating: f64,
-    pub title: String,
-    pub istv: bool,
-    pub eprating: Option<f64>,
-    pub season: Option<i32>,
-    pub episode: Option<i32>,
-    pub eptitle: Option<String>,
-    pub epurl: Option<String>,
-}
-
-impl fmt::Display for MovieCollectionResult {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        if !self.istv {
-            write!(
-                f,
-                "{} {} {:.1} {}",
-                self.path, self.show, self.rating, self.title
-            )
-        } else {
-            write!(
-                f,
-                "{} {} {:.1}/{:.1} s{:02} ep{:02} {} {} {}",
-                self.path,
-                self.show,
-                self.rating,
-                self.eprating.unwrap_or(-1.0),
-                self.season.unwrap_or(-1),
-                self.episode.unwrap_or(-1),
-                self.title,
-                option_string_wrapper(&self.eptitle),
-                option_string_wrapper(&self.epurl),
-            )
-        }
-    }
-}
-
-#[derive(Default)]
-pub struct ImdbTuple {
-    pub title: String,
-    pub link: String,
-    pub rating: f64,
-}
-
-impl fmt::Display for ImdbTuple {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        write!(f, "{} {} {}", self.title, self.link, self.rating)
-    }
-}
-
-#[derive(Debug)]
-pub struct RatingOutput {
-    pub rating: Option<f64>,
-    pub count: Option<u64>,
-}
-
-#[derive(Default, Clone)]
-pub struct ImdbEpisodeResult {
-    pub season: i32,
-    pub episode: i32,
-    pub epurl: Option<String>,
-    pub eptitle: Option<String>,
-    pub airdate: Option<NaiveDate>,
-    pub rating: Option<f64>,
-    pub nrating: Option<u64>,
-}
-
-impl fmt::Display for ImdbEpisodeResult {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        write!(
-            f,
-            "{} {} {} {} {} {} {} ",
-            self.season,
-            self.episode,
-            option_string_wrapper(&self.epurl),
-            option_string_wrapper(&self.eptitle),
-            self.airdate
-                .unwrap_or_else(|| NaiveDate::from_ymd(1970, 1, 1)),
-            self.rating.unwrap_or(-1.0),
-            self.nrating.unwrap_or(0),
-        )
-    }
-}
-
-pub struct ImdbConnection {
-    client: Client,
-}
-
-impl Default for ImdbConnection {
-    fn default() -> ImdbConnection {
-        ImdbConnection::new()
-    }
-}
-
-impl ImdbConnection {
-    pub fn new() -> ImdbConnection {
-        ImdbConnection {
-            client: Client::new(),
-        }
-    }
-
-    pub fn get(&self, url: &Url) -> Result<Response, Error> {
-        let mut timeout: u64 = 1;
-        loop {
-            match self.client.get(url.clone()).send() {
-                Ok(x) => return Ok(x),
-                Err(e) => {
-                    sleep(Duration::from_secs(timeout));
-                    timeout *= 2;
-                    if timeout >= 64 {
-                        return Err(err_msg(e));
-                    }
-                }
-            }
-        }
-    }
-
-    pub fn parse_imdb(&self, title: &str) -> Result<Vec<ImdbTuple>, Error> {
-        let endpoint = "http://www.imdb.com/find?";
-        let url = Url::parse_with_params(endpoint, &[("s", "all"), ("q", title)])?;
-        let body = self.get(&url)?.text()?;
-
-        let document = Document::from(body.as_str());
-
-        let mut shows = Vec::new();
-
-        for tr in document.find(Class("result_text")) {
-            let title = tr.text().trim().to_string();
-            for a in tr.find(Name("a")) {
-                if let Some(link) = a.attr("href") {
-                    if let Some(link) = link.split('/').nth(2) {
-                        if link.starts_with("tt") {
-                            shows.push((title.clone(), link));
-                        }
-                    }
-                } else {
-                };
-            }
-        }
-
-        let results: Vec<Result<_, Error>> = shows
-            .into_par_iter()
-            .map(|(t, l)| {
-                let r = self.parse_imdb_rating(l)?;
-                Ok(ImdbTuple {
-                    title: t.to_string(),
-                    link: l.to_string(),
-                    rating: r.rating.unwrap_or(-1.0),
-                })
-            })
-            .collect();
-
-        let shows: Vec<_> = map_result_vec(results)?;
-
-        Ok(shows)
-    }
-
-    pub fn parse_imdb_rating(&self, title: &str) -> Result<RatingOutput, Error> {
-        let mut output = RatingOutput {
-            rating: None,
-            count: None,
-        };
-
-        if !title.starts_with("tt") {
-            return Ok(output);
-        };
-
-        let url = Url::parse("http://www.imdb.com/title/")?.join(title)?;
-        let body = self.get(&url)?.text()?;
-        let document = Document::from(body.as_str());
-
-        for span in document.find(Name("span")) {
-            if let Some("ratingValue") = span.attr("itemprop") {
-                output.rating = Some(span.text().parse()?);
-            }
-            if let Some("ratingCount") = span.attr("itemprop") {
-                output.count = Some(span.text().replace(",", "").parse()?);
-            }
-        }
-        Ok(output)
-    }
-
-    pub fn parse_imdb_episode_list(
-        &self,
-        imdb_id: &str,
-        season: Option<i32>,
-    ) -> Result<Vec<ImdbEpisodeResult>, Error> {
-        let endpoint: String = format!("http://m.imdb.com/title/{}/episodes", imdb_id);
-        let url = Url::parse(&endpoint)?;
-        let body = self.get(&url)?.text()?;
-        let document = Document::from(body.as_str());
-
-        let mut results = Vec::new();
-
-        for a in document.find(Name("a")) {
-            if let Some("season") = a.attr("class") {
-                let season_: i32 = a.attr("season_number").unwrap_or("-1").parse()?;
-                if let Some(link) = a.attr("href") {
-                    if let Some(s) = season {
-                        if s != season_ {
-                            continue;
-                        }
-                    }
-                    let episode_url = "http://www.imdb.com/title";
-                    let episodes_url = format!("{}/{}/episodes/{}", episode_url, imdb_id, link);
-                    results
-                        .extend_from_slice(&self.parse_episodes_url(&episodes_url, Some(season_))?);
-                }
-            }
-        }
-        Ok(results)
-    }
-
-    fn parse_episodes_url(
-        &self,
-        episodes_url: &str,
-        season: Option<i32>,
-    ) -> Result<Vec<ImdbEpisodeResult>, Error> {
-        let episodes_url = Url::parse(&episodes_url)?;
-        let body = self.get(&episodes_url)?.text()?;
-        let document = Document::from(body.as_str());
-
-        let mut results = Vec::new();
-
-        for div in document.find(Name("div")) {
-            if let Some("info") = div.attr("class") {
-                if let Some("episodes") = div.attr("itemprop") {
-                    let mut result = ImdbEpisodeResult::default();
-                    if let Some(s) = season {
-                        result.season = s;
-                    }
-                    for meta in div.find(Name("meta")) {
-                        if let Some("episodeNumber") = meta.attr("itemprop") {
-                            if let Some(episode) = meta.attr("content") {
-                                result.episode = episode.parse()?;
-                            }
-                        }
-                    }
-                    for div_ in div.find(Name("div")) {
-                        if let Some("airdate") = div_.attr("class") {
-                            if let Ok(date) =
-                                NaiveDate::parse_from_str(div_.text().trim(), "%d %b. %Y")
-                            {
-                                result.airdate = Some(date);
-                            }
-                        }
-                    }
-                    for a_ in div.find(Name("a")) {
-                        if result.epurl.is_some() {
-                            continue;
-                        };
-                        if let Some(epi_url) = a_.attr("href") {
-                            if let Some(link) = epi_url.split('/').nth(2) {
-                                result.epurl = Some(link.to_string());
-                                result.eptitle = Some(a_.text().trim().to_string());
-                                let r = self.parse_imdb_rating(link)?;
-                                result.rating = r.rating;
-                                result.nrating = r.count;
-                            }
-                        }
-                    }
-                    results.push(result);
-                }
-            }
-        }
         Ok(results)
     }
 }

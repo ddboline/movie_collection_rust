@@ -6,14 +6,13 @@ use clap::{App, Arg};
 use failure::Error;
 use rayon::prelude::*;
 
-use movie_collection_rust::imdb_episodes::ImdbEpisodes;
-use movie_collection_rust::imdb_ratings::ImdbRatings;
-use movie_collection_rust::movie_collection::MovieCollectionDB;
-use movie_collection_rust::trakt_utils::{
-    get_calendar, get_watched_shows, get_watched_shows_db, get_watchlist_shows,
-    get_watchlist_shows_db,
+use movie_collection_rust::common::imdb_episodes::ImdbEpisodes;
+use movie_collection_rust::common::imdb_ratings::ImdbRatings;
+use movie_collection_rust::common::movie_collection::MovieCollectionDB;
+use movie_collection_rust::common::trakt_utils::{
+    get_watched_shows_db, get_watchlist_shows_db, TraktConnection,
 };
-use movie_collection_rust::utils::{get_version_number, map_result_vec};
+use movie_collection_rust::common::utils::{get_version_number, map_result_vec};
 
 fn trakt_app() -> Result<(), Error> {
     let matches = App::new("Trakt Query/Parser")
@@ -39,9 +38,10 @@ fn trakt_app() -> Result<(), Error> {
     let do_parse = matches.is_present("parse");
 
     let mq = MovieCollectionDB::new();
+    let ti = TraktConnection::new();
     if do_parse {
         let watchlist_shows_db = get_watchlist_shows_db(&mq.pool)?;
-        let watchlist_shows = get_watchlist_shows()?;
+        let watchlist_shows = ti.get_watchlist_shows()?;
         let results: Vec<Result<_, Error>> = watchlist_shows
             .par_iter()
             .map(|(link, show)| {
@@ -67,7 +67,7 @@ fn trakt_app() -> Result<(), Error> {
         map_result_vec(results)?;
 
         let watched_shows_db = get_watched_shows_db(&mq.pool)?;
-        let watched_shows = get_watched_shows()?;
+        let watched_shows = ti.get_watched_shows()?;
         let results: Vec<Result<_, Error>> = watched_shows
             .par_iter()
             .map(|(key, episode)| {
@@ -92,7 +92,7 @@ fn trakt_app() -> Result<(), Error> {
             .collect();
         map_result_vec(results)?;
     } else {
-        for cal in get_calendar()? {
+        for cal in ti.get_calendar()? {
             let show = match ImdbRatings::get_show_by_link(&cal.link, &mq.pool)? {
                 Some(s) => s.show,
                 None => "".to_string(),

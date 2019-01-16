@@ -1,11 +1,93 @@
+extern crate chrono;
+extern crate failure;
+extern crate r2d2;
+extern crate r2d2_postgres;
+extern crate rayon;
+extern crate reqwest;
+extern crate select;
+
 use chrono::NaiveDate;
 use failure::Error;
+use reqwest::Client;
 use std::collections::HashMap;
 use std::fmt;
 
-use crate::config::Config;
-use crate::movie_collection::PgPool;
-use crate::utils::option_string_wrapper;
+use crate::common::config::Config;
+use crate::common::movie_collection::PgPool;
+use crate::common::utils::option_string_wrapper;
+
+#[derive(Serialize, Deserialize, Debug)]
+pub struct TraktCalEntry {
+    pub ep_link: Option<String>,
+    pub episode: i32,
+    pub link: String,
+    pub season: i32,
+    pub show: String,
+    pub airdate: NaiveDate,
+}
+
+impl fmt::Display for TraktCalEntry {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        write!(
+            f,
+            "{} {} {} {} {} {}",
+            self.show,
+            self.link,
+            self.season,
+            self.episode,
+            option_string_wrapper(&self.ep_link),
+            self.airdate,
+        )
+    }
+}
+
+pub type TraktCalEntryList = Vec<TraktCalEntry>;
+
+pub struct TraktConnection {
+    client: Client,
+    config: Config,
+}
+
+impl Default for TraktConnection {
+    fn default() -> TraktConnection {
+        TraktConnection::new()
+    }
+}
+
+impl TraktConnection {
+    pub fn new() -> TraktConnection {
+        TraktConnection {
+            client: Client::new(),
+            config: Config::with_config(),
+        }
+    }
+
+    pub fn get_watchlist_shows(&self) -> Result<HashMap<String, WatchListShow>, Error> {
+        let url = format!("https://{}/trakt/watchlist", &self.config.domain);
+        let watchlist_shows: Vec<WatchListShow> = self.client.get(&url).send()?.json()?;
+        let watchlist_shows = watchlist_shows
+            .into_iter()
+            .map(|s| (s.link.clone(), s))
+            .collect();
+        Ok(watchlist_shows)
+    }
+
+    pub fn get_watched_shows(&self) -> Result<HashMap<(String, i32, i32), WatchedShows>, Error> {
+        let url = format!("https://{}/trakt/watched_shows", &self.config.domain);
+        let watched_shows: Vec<WatchedShows> = self.client.get(&url).send()?.json()?;
+        let watched_shows: HashMap<(String, i32, i32), WatchedShows> = watched_shows
+            .into_iter()
+            .map(|s| ((s.imdb_url.clone(), s.season, s.episode), s))
+            .collect();
+        Ok(watched_shows)
+    }
+
+    pub fn get_calendar(&self) -> Result<TraktCalEntryList, Error> {
+        let url = format!("https://{}/trakt/cal", &self.config.domain);
+        let calendar = self.client.get(&url).send()?.json()?;
+        Ok(calendar)
+    }
+}
 
 #[derive(Serialize, Deserialize, Debug, Default)]
 pub struct WatchListShow {
@@ -43,17 +125,6 @@ impl WatchListShow {
         pool.get()?.execute(query, &[&self.link])?;
         Ok(())
     }
-}
-
-pub fn get_watchlist_shows() -> Result<HashMap<String, WatchListShow>, Error> {
-    let config = Config::with_config();
-    let url = format!("https://{}/trakt/watchlist", &config.domain);
-    let watchlist_shows: Vec<WatchListShow> = reqwest::get(&url)?.json()?;
-    let watchlist_shows = watchlist_shows
-        .into_iter()
-        .map(|s| (s.link.clone(), s))
-        .collect();
-    Ok(watchlist_shows)
 }
 
 pub fn get_watchlist_shows_db(pool: &PgPool) -> Result<HashMap<String, WatchListShow>, Error> {
@@ -131,17 +202,6 @@ impl WatchedShows {
     }
 }
 
-pub fn get_watched_shows() -> Result<HashMap<(String, i32, i32), WatchedShows>, Error> {
-    let config = Config::with_config();
-    let url = format!("https://{}/trakt/watched_shows", &config.domain);
-    let watched_shows: Vec<WatchedShows> = reqwest::get(&url)?.json()?;
-    let watched_shows: HashMap<(String, i32, i32), WatchedShows> = watched_shows
-        .into_iter()
-        .map(|s| ((s.imdb_url.clone(), s.season, s.episode), s))
-        .collect();
-    Ok(watched_shows)
-}
-
 pub fn get_watched_shows_db(
     pool: &PgPool,
 ) -> Result<HashMap<(String, i32, i32), WatchedShows>, Error> {
@@ -171,40 +231,4 @@ pub fn get_watched_shows_db(
         })
         .collect();
     Ok(watched_shows)
-}
-
-#[derive(Serialize, Deserialize, Debug)]
-pub struct TraktCalEntry {
-    pub ep_link: Option<String>,
-    pub episode: i32,
-    pub link: String,
-    pub season: i32,
-    pub show: String,
-    pub airdate: NaiveDate,
-}
-
-impl fmt::Display for TraktCalEntry {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        write!(
-            f,
-            "{} {} {} {} {} {}",
-            self.show,
-            self.link,
-            self.season,
-            self.episode,
-            option_string_wrapper(&self.ep_link),
-            self.airdate,
-        )
-    }
-}
-
-impl TraktCalEntry {}
-
-pub type TraktCalEntryList = Vec<TraktCalEntry>;
-
-pub fn get_calendar() -> Result<TraktCalEntryList, Error> {
-    let config = Config::with_config();
-    let url = format!("https://{}/trakt/cal", &config.domain);
-    let calendar = reqwest::get(&url)?.json()?;
-    Ok(calendar)
 }

@@ -9,8 +9,8 @@ use chrono::{Duration, Local};
 use clap::{App, Arg};
 use failure::Error;
 
-use movie_collection_rust::movie_collection::MovieCollectionDB;
-use movie_collection_rust::utils::get_version_number;
+use movie_collection_rust::common::movie_collection::MovieCollectionDB;
+use movie_collection_rust::common::utils::get_version_number;
 
 fn find_new_episodes() -> Result<(), Error> {
     let matches = App::new("Find new episodes")

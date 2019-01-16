@@ -16,9 +16,10 @@ use rust_auth_server::auth_handler::LoggedUser;
 use std::path;
 use subprocess::Exec;
 
-use movie_collection_rust::config::Config;
-use movie_collection_rust::movie_collection::MovieCollectionDB;
-use movie_collection_rust::utils::{map_result_vec, parse_file_stem, remcom_single_file};
+use movie_collection_rust::common::config::Config;
+use movie_collection_rust::common::movie_collection::{MovieCollectionDB, PgPool};
+use movie_collection_rust::common::movie_queue::MovieQueueDB;
+use movie_collection_rust::common::utils::{map_result_vec, parse_file_stem, remcom_single_file};
 
 fn tvshows(user: LoggedUser) -> Result<HttpResponse, Error> {
     if user.email != "ddboline@gmail.com" {
@@ -51,7 +52,10 @@ fn tvshows(user: LoggedUser) -> Result<HttpResponse, Error> {
 fn movie_queue_base(patterns: &[String]) -> Result<String, Error> {
     let body = include_str!("../templates/queue_list.html");
 
-    let mq = MovieCollectionDB::new();
+    let config = Config::with_config();
+    let pool = PgPool::new(&config.pgurl);
+    let mc = MovieCollectionDB::with_pool(pool.clone());
+    let mq = MovieQueueDB::with_pool(pool);
     let queue = mq.print_movie_queue(&patterns)?;
 
     let button = r#"<td><button type="submit" id="ID" onclick="delete_show('SHOW');"> remove </button></td>"#;
@@ -70,7 +74,7 @@ fn movie_queue_base(patterns: &[String]) -> Result<String, Error> {
             let (_, season, episode) = parse_file_stem(&file_stem);
 
             let entry = if ext == "mp4" {
-                let collection_idx = mq.get_collection_index(&row.path).unwrap_or(-1);
+                let collection_idx = mc.get_collection_index(&row.path).unwrap_or(-1);
                 format!(
                     "<a href={}>{}</a>",
                     &format!(
@@ -149,9 +153,12 @@ fn movie_queue_delete(path: Path<String>, user: LoggedUser) -> Result<HttpRespon
         return Ok(HttpResponse::Unauthorized().json("Unauthorized"));
     }
 
-    let mq = MovieCollectionDB::new();
+    let config = Config::with_config();
+    let pool = PgPool::new(&config.pgurl);
+    let mc = MovieCollectionDB::with_pool(pool.clone());
+    let mq = MovieQueueDB::with_pool(pool);
     println!("{}", path);
-    let index = mq.get_collection_index_match(&path.into_inner())?;
+    let index = mc.get_collection_index_match(&path.into_inner())?;
     mq.remove_from_queue_by_collection_idx(index)?;
 
     let resp = HttpResponse::build(StatusCode::OK)
@@ -165,7 +172,7 @@ fn movie_queue_transcode(path: Path<String>, user: LoggedUser) -> Result<HttpRes
         return Ok(HttpResponse::Unauthorized().json("Unauthorized"));
     }
 
-    let mq = MovieCollectionDB::new();
+    let mq = MovieQueueDB::new();
     println!("{}", path);
     for entry in mq.print_movie_queue(&[path.into_inner()])? {
         println!("{}", entry);
@@ -187,9 +194,9 @@ fn movie_queue_transcode_directory(
     }
     let (directory, file) = path.into_inner();
 
-    let mq = MovieCollectionDB::new();
+    let mc = MovieQueueDB::new();
     println!("{}", file);
-    for entry in mq.print_movie_queue(&[file])? {
+    for entry in mc.print_movie_queue(&[file])? {
         println!("{}", entry);
         remcom_single_file(&entry.path, &Some(directory.clone()), false);
     }

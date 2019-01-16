@@ -8,8 +8,8 @@ use rayon::prelude::*;
 use std::collections::HashMap;
 use std::path::Path;
 
-use movie_collection_rust::config::Config;
-use movie_collection_rust::utils::{get_video_runtime, map_result_vec, walk_directory};
+use movie_collection_rust::common::config::Config;
+use movie_collection_rust::common::utils::{get_video_runtime, map_result_vec, walk_directory};
 
 fn make_list() -> Result<(), Error> {
     let config = Config::with_config();

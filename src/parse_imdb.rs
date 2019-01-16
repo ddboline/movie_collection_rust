@@ -8,10 +8,11 @@ use clap::{App, Arg};
 use failure::Error;
 use std::collections::HashMap;
 
-use movie_collection_rust::imdb_episodes::ImdbEpisodes;
-use movie_collection_rust::imdb_ratings::ImdbRatings;
-use movie_collection_rust::movie_collection::{ImdbConnection, MovieCollectionDB};
-use movie_collection_rust::utils::get_version_number;
+use movie_collection_rust::common::imdb_episodes::ImdbEpisodes;
+use movie_collection_rust::common::imdb_ratings::ImdbRatings;
+use movie_collection_rust::common::movie_collection::MovieCollectionDB;
+use movie_collection_rust::common::parse_imdb::ImdbConnection;
+use movie_collection_rust::common::utils::get_version_number;
 
 fn parse_imdb_parser() -> Result<(), Error> {
     let matches = App::new("Parse IMDB")

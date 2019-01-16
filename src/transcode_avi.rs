@@ -5,8 +5,8 @@ extern crate movie_collection_rust;
 use clap::{App, Arg};
 use std::path::{Path, PathBuf};
 
-use movie_collection_rust::config::Config;
-use movie_collection_rust::utils::{
+use movie_collection_rust::common::config::Config;
+use movie_collection_rust::common::utils::{
     create_transcode_script, get_version_number, publish_transcode_job_to_queue,
 };
 
