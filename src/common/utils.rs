@@ -14,7 +14,7 @@ use failure::{err_msg, Error};
 use std::env::var;
 use std::fs::create_dir_all;
 use std::fs::rename;
-use std::fs::File;
+use std::fs::{File, OpenOptions};
 use std::io::Write;
 use std::io::{BufRead, BufReader};
 use std::path::Path;
@@ -130,6 +130,12 @@ pub fn read_transcode_jobs_from_queue(queue: &str) -> Result<(), Error> {
             let body: ScriptStruct = serde_json::from_slice(&body).unwrap();
             let script = body.script;
 
+            let mut output_file = OpenOptions::new()
+                .append(true)
+                .create(true)
+                .open("/tmp/temp_encoding.out")
+                .unwrap();
+
             let path = Path::new(&script);
             let file_name = path.file_name().unwrap().to_str().unwrap();
             let home_dir = var("HOME").unwrap_or_else(|_| "/tmp".to_string());
@@ -142,7 +148,7 @@ pub fn read_transcode_jobs_from_queue(queue: &str) -> Result<(), Error> {
                     .unwrap();
 
                 for line in BufReader::new(stream).lines() {
-                    println!("{}", line.unwrap());
+                    write!(output_file, "{}", line.unwrap()).unwrap();
                 }
                 rename(&script, &format!("{}/tmp_avi/{}", home_dir, file_name)).unwrap();
             }

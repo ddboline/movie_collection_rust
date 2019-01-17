@@ -50,7 +50,8 @@ fn transcode_avi() {
         } else {
             path
         }
-        .canonicalize().unwrap();
+        .canonicalize()
+        .unwrap();
 
         if !path.exists() {
             panic!("file doesn't exist {}", f);
