@@ -28,7 +28,7 @@ fn transcode_avi() {
         dotenv::dotenv().ok();
     }
 
-    let matches = App::new("Remcom")
+    let matches = App::new("Transcode AVI")
         .version(get_version_number().as_str())
         .author("Daniel Boline <ddboline@gmail.com>")
         .about("Create script to do stuff")
@@ -41,13 +41,16 @@ fn transcode_avi() {
         .get_matches();
 
     for f in matches.values_of("files").unwrap() {
-        let mut path = PathBuf::from(f);
+        let path = PathBuf::from(f);
 
         let movie_path = format!("{}/Documents/movies", config.home_dir);
 
-        if !path.exists() {
-            path = Path::new(&movie_path).join(f);
+        let path = if !path.exists() {
+            Path::new(&movie_path).join(f)
+        } else {
+            path
         }
+        .canonicalize().unwrap();
 
         if !path.exists() {
             panic!("file doesn't exist {}", f);
