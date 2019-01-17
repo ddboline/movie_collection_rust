@@ -43,7 +43,7 @@ fn find_new_episodes() -> Result<(), Error> {
     let mq = MovieQueueDB::with_pool(mc.pool.clone());
 
     'outer: for epi in mc.get_new_episodes(mindate.naive_local(), maxdate.naive_local(), source)? {
-        'inner: for s in mq.print_movie_queue(&[&epi.show])? {
+        for s in mq.print_movie_queue(&[&epi.show])? {
             if let Some(show) = &s.show {
                 if let Some(season) = &s.season {
                     if let Some(episode) = &s.episode {
