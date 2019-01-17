@@ -389,29 +389,15 @@ impl MovieCollectionDB {
         Ok(())
     }
 
-    pub fn get_collection_index(&self, path: &str) -> Result<i32, Error> {
+    pub fn get_collection_index(&self, path: &str) -> Result<Option<i32>, Error> {
         let query = r#"SELECT idx FROM movie_collection WHERE path = $1"#;
-        let result = match self
+        let result = self
             .pool
             .get()?
             .query(query, &[&path])?
             .iter()
             .map(|row| row.get(0))
-            .nth(0)
-        {
-            Some(r) => r,
-            None => {
-                if Path::new(path).exists() {
-                    let mq = MovieQueueDB::with_pool(self.pool.clone());
-                    let max_idx = mq.get_max_queue_index()?;
-                    mq.insert_into_queue(max_idx, &path)?;
-                    Some(self.get_collection_index(&path)?)
-                } else {
-                    None
-                }
-            }
-        }
-        .ok_or_else(|| err_msg("No path found"))?;
+            .nth(0);
         Ok(result)
     }
 
@@ -428,7 +414,7 @@ impl MovieCollectionDB {
         Ok(path)
     }
 
-    pub fn get_collection_index_match(&self, path: &str) -> Result<i32, Error> {
+    pub fn get_collection_index_match(&self, path: &str) -> Result<Option<i32>, Error> {
         let query = format!(
             r#"SELECT idx FROM movie_collection WHERE path like '%{}%'"#,
             path
@@ -439,8 +425,7 @@ impl MovieCollectionDB {
             .query(&query, &[])?
             .iter()
             .map(|row| row.get(0))
-            .nth(0)
-            .ok_or_else(|| err_msg("No path found"))?;
+            .nth(0);
         Ok(result)
     }
 
@@ -541,9 +526,9 @@ impl MovieCollectionDB {
             })
             .collect();
 
-        for e in &file_list {
-            if collection_map.get(e).is_none() {
-                let ext = Path::new(&e)
+        for f in &file_list {
+            if collection_map.get(f).is_none() {
+                let ext = Path::new(&f)
                     .extension()
                     .unwrap()
                     .to_str()
@@ -552,8 +537,8 @@ impl MovieCollectionDB {
                 if !self.config.suffixes.contains(&ext) {
                     continue;
                 }
-                println!("not in collection {}", e);
-                self.insert_into_collection(e)?;
+                println!("not in collection {}", f);
+                self.insert_into_collection(f)?;
             }
         }
         let results = collection_map

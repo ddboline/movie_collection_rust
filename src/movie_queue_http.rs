@@ -10,7 +10,7 @@ extern crate subprocess;
 use actix_web::middleware::identity::{CookieIdentityPolicy, IdentityService};
 use actix_web::{http::Method, http::StatusCode, server, App, HttpResponse, Path};
 use chrono::Duration;
-use failure::Error;
+use failure::{err_msg, Error};
 use rayon::prelude::*;
 use rust_auth_server::auth_handler::LoggedUser;
 use std::path;
@@ -74,7 +74,7 @@ fn movie_queue_base(patterns: &[&str]) -> Result<String, Error> {
             let (_, season, episode) = parse_file_stem(&file_stem);
 
             let entry = if ext == "mp4" {
-                let collection_idx = mc.get_collection_index(&row.path).unwrap_or(-1);
+                let collection_idx = mc.get_collection_index(&row.path)?.unwrap_or(-1);
                 format!(
                     "<a href={}>{}</a>",
                     &format!(
@@ -158,7 +158,7 @@ fn movie_queue_delete(path: Path<String>, user: LoggedUser) -> Result<HttpRespon
     let mc = MovieCollectionDB::with_pool(pool.clone());
     let mq = MovieQueueDB::with_pool(pool);
     println!("{}", path);
-    let index = mc.get_collection_index_match(&path.into_inner())?;
+    let index = mc.get_collection_index_match(&path.into_inner())?.ok_or_else(|| err_msg("Path doesn't exist"))?;
     mq.remove_from_queue_by_collection_idx(index)?;
 
     let resp = HttpResponse::build(StatusCode::OK)

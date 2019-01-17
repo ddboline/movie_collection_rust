@@ -94,8 +94,11 @@ impl MovieQueueDB {
 
     pub fn remove_from_queue_by_path(&self, path: &str) -> Result<(), Error> {
         let mc = MovieCollectionDB::with_pool(self.pool.clone());
-        let collection_idx = mc.get_collection_index(&path)?;
-        self.remove_from_queue_by_collection_idx(collection_idx)
+        if let Some(collection_idx) = mc.get_collection_index(&path)? {
+            self.remove_from_queue_by_collection_idx(collection_idx)
+        } else {
+            Ok(())
+        }
     }
 
     pub fn insert_into_queue(&self, idx: i32, path: &str) -> Result<(), Error> {
@@ -103,7 +106,13 @@ impl MovieQueueDB {
             return Err(err_msg("File doesn't exist"));
         }
         let mc = MovieCollectionDB::with_pool(self.pool.clone());
-        let collection_idx = mc.get_collection_index(&path)?;
+        let collection_idx = match mc.get_collection_index(&path)? {
+            Some(idx) => idx,
+            None => {
+                mc.insert_into_collection(&path)?;
+                mc.get_collection_index(&path)?.ok_or_else(|| err_msg("Path not found"))?
+            }
+        };
 
         let query = r#"SELECT idx FROM movie_queue WHERE collection_idx = $1"#;
         let mut current_idx: i32 = -1;
