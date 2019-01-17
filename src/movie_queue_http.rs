@@ -49,7 +49,7 @@ fn tvshows(user: LoggedUser) -> Result<HttpResponse, Error> {
     Ok(resp)
 }
 
-fn movie_queue_base(patterns: &[String]) -> Result<String, Error> {
+fn movie_queue_base(patterns: &[&str]) -> Result<String, Error> {
     let body = include_str!("../templates/queue_list.html");
 
     let config = Config::with_config();
@@ -140,7 +140,7 @@ fn movie_queue_show(path: Path<String>, user: LoggedUser) -> Result<HttpResponse
 
     let path = path.into_inner();
 
-    let body = movie_queue_base(&[path])?;
+    let body = movie_queue_base(&[&path])?;
 
     let resp = HttpResponse::build(StatusCode::OK)
         .content_type("text/html; charset=utf-8")
@@ -172,9 +172,11 @@ fn movie_queue_transcode(path: Path<String>, user: LoggedUser) -> Result<HttpRes
         return Ok(HttpResponse::Unauthorized().json("Unauthorized"));
     }
 
+    let path = path.into_inner();
+
     let mq = MovieQueueDB::new();
     println!("{}", path);
-    for entry in mq.print_movie_queue(&[path.into_inner()])? {
+    for entry in mq.print_movie_queue(&[&path])? {
         println!("{}", entry);
         remcom_single_file(&entry.path, &None, false);
     }
@@ -196,7 +198,7 @@ fn movie_queue_transcode_directory(
 
     let mc = MovieQueueDB::new();
     println!("{}", file);
-    for entry in mc.print_movie_queue(&[file])? {
+    for entry in mc.print_movie_queue(&[&file])? {
         println!("{}", entry);
         remcom_single_file(&entry.path, &Some(directory.clone()), false);
     }

@@ -64,7 +64,7 @@ fn make_queue() -> Result<(), Error> {
     let do_time = matches.is_present("time");
     let patterns: Option<Vec<_>> = matches
         .values_of("patterns")
-        .map(|v| v.map(|s| s.to_string()).collect());
+        .map(|v| v.map(|s| s).collect());
     let do_shows = matches.is_present("shows");
 
     let config = Config::with_config();
