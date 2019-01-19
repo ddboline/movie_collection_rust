@@ -670,6 +670,9 @@ pub fn trakt_app_parse(
 
                 if let Some(imdb_url) = get_imdb_url_from_show(&mc, show)? {
                     for show in &watched_shows {
+                        if season != -1 && show.season != season {
+                            continue;
+                        }
                         if show.imdb_url == imdb_url {
                             println!("{}", show);
                         }

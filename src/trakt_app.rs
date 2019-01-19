@@ -26,7 +26,7 @@ fn trakt_app() -> Result<(), Error> {
         .arg(
             Arg::with_name("commands")
                 .value_name("COMMANDS")
-                .help("Commands")
+                .help("Commands: trakt-app <cal|watchlist|watched> <list|add|rm> <show> (season) (episode)")
                 .multiple(true),
         )
         .get_matches();
