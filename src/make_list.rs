@@ -18,7 +18,7 @@ fn make_list() -> Result<(), Error> {
 
     let path = Path::new(&movies_dir);
 
-    let local_file_list: Vec<_> = path
+    let mut local_file_list: Vec<_> = path
         .read_dir()?
         .filter_map(|f| match f {
             Ok(fname) => {
@@ -38,13 +38,17 @@ fn make_list() -> Result<(), Error> {
         return Ok(());
     }
 
+    local_file_list.sort();
+
     let file_list: Vec<_> = config
         .movie_dirs
         .par_iter()
         .map(|d| walk_directory(&d, &local_file_list))
         .collect();
 
-    let file_list: Vec<_> = map_result_vec(file_list)?.into_iter().flatten().collect();
+    let mut file_list: Vec<_> = map_result_vec(file_list)?.into_iter().flatten().collect();
+
+    file_list.sort();
 
     let file_map: HashMap<String, String> = file_list
         .iter()
@@ -54,25 +58,33 @@ fn make_list() -> Result<(), Error> {
         })
         .collect();
 
-    local_file_list
+    let result: Vec<_> = local_file_list
         .iter()
         .map(|f| {
             let full_path = match file_map.get(f) {
                 Some(s) => s.clone(),
                 None => "".to_string(),
             };
-            println!("{} {}", f, full_path);
+            format!("{} {}", f, full_path)
         })
-        .for_each(drop);
+        .collect();
 
-    file_list
+    for e in result {
+        println!("{}", e);
+    }
+
+    let result: Vec<_> = file_list
         .par_iter()
         .map(|f| {
             let timeval = get_video_runtime(f).unwrap_or_else(|_| "".to_string());
 
-            println!("{} {}", timeval, f);
+            format!("{} {}", timeval, f)
         })
-        .for_each(drop);
+        .collect();
+
+    for e in result {
+        println!("{}", e);
+    }
 
     Ok(())
 }

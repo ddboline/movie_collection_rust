@@ -591,8 +591,8 @@ fn get_imdb_url_from_show(
 }
 
 pub fn trakt_app_parse(
-    trakt_command: TraktCommands,
-    trakt_action: TraktActions,
+    trakt_command: &TraktCommands,
+    trakt_action: &TraktActions,
     show: Option<&String>,
     season: i32,
     episode: i32,
