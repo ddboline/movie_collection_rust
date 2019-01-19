@@ -110,7 +110,8 @@ impl MovieQueueDB {
             Some(idx) => idx,
             None => {
                 mc.insert_into_collection(&path)?;
-                mc.get_collection_index(&path)?.ok_or_else(|| err_msg("Path not found"))?
+                mc.get_collection_index(&path)?
+                    .ok_or_else(|| err_msg("Path not found"))?
             }
         };
 

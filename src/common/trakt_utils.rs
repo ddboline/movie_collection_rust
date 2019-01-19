@@ -8,13 +8,53 @@ extern crate select;
 
 use chrono::NaiveDate;
 use failure::Error;
+use rayon::prelude::*;
 use reqwest::Client;
 use std::collections::HashMap;
 use std::fmt;
 
 use crate::common::config::Config;
-use crate::common::movie_collection::PgPool;
-use crate::common::utils::option_string_wrapper;
+use crate::common::imdb_episodes::ImdbEpisodes;
+use crate::common::imdb_ratings::ImdbRatings;
+use crate::common::movie_collection::{MovieCollectionDB, PgPool};
+use crate::common::utils::{map_result_vec, option_string_wrapper};
+
+pub enum TraktActions {
+    None,
+    List,
+    Add,
+    Remove,
+}
+
+impl TraktActions {
+    pub fn from_command(command: &str) -> TraktActions {
+        match command {
+            "list" => TraktActions::List,
+            "add" => TraktActions::Add,
+            "rm" => TraktActions::Remove,
+            "del" => TraktActions::Remove,
+            _ => TraktActions::None,
+        }
+    }
+}
+
+pub enum TraktCommands {
+    None,
+    Calendar,
+    WatchList,
+    Watched,
+}
+
+impl TraktCommands {
+    pub fn from_command(command: &str) -> TraktCommands {
+        match command {
+            "cal" | "calendar" => TraktCommands::Calendar,
+            "watchlist" => TraktCommands::WatchList,
+            "watched" => TraktCommands::Watched,
+            _ => TraktCommands::None,
+        }
+    }
+}
 
 #[derive(Serialize, Deserialize, Debug)]
 pub struct TraktCalEntry {
@@ -72,20 +112,105 @@ impl TraktConnection {
         Ok(watchlist_shows)
     }
 
-    pub fn get_watched_shows(&self) -> Result<HashMap<(String, i32, i32), WatchedShows>, Error> {
+    pub fn add_watchlist_show(&self, imdb_id: &str) -> Result<TraktResult, Error> {
+        let url = format!(
+            "https://{}/trakt/add_to_watchlist/{}",
+            &self.config.domain, imdb_id
+        );
+        let result: TraktResult = self.client.get(&url).send()?.json()?;
+        Ok(result)
+    }
+
+    pub fn remove_watchlist_show(&self, imdb_id: &str) -> Result<TraktResult, Error> {
+        let url = format!(
+            "https://{}/trakt/delete_show/{}",
+            &self.config.domain, imdb_id
+        );
+        let result: TraktResult = self.client.get(&url).send()?.json()?;
+        Ok(result)
+    }
+
+    pub fn get_watched_shows(&self) -> Result<HashMap<(String, i32, i32), WatchedEpisode>, Error> {
         let url = format!("https://{}/trakt/watched_shows", &self.config.domain);
-        let watched_shows: Vec<WatchedShows> = self.client.get(&url).send()?.json()?;
-        let watched_shows: HashMap<(String, i32, i32), WatchedShows> = watched_shows
+        let watched_shows: Vec<WatchedEpisode> = self.client.get(&url).send()?.json()?;
+        let watched_shows: HashMap<(String, i32, i32), WatchedEpisode> = watched_shows
             .into_iter()
             .map(|s| ((s.imdb_url.clone(), s.season, s.episode), s))
             .collect();
         Ok(watched_shows)
     }
 
+    pub fn get_watched_movies(&self) -> Result<HashMap<String, WatchedMovie>, Error> {
+        let url = format!("https://{}/trakt/watched_movies", &self.config.domain);
+        let watched_movies: Vec<WatchedMovie> = self.client.get(&url).send()?.json()?;
+        let watched_movies: HashMap<String, WatchedMovie> = watched_movies
+            .into_iter()
+            .map(|s| (s.imdb_url.clone(), s))
+            .collect();
+        Ok(watched_movies)
+    }
+
     pub fn get_calendar(&self) -> Result<TraktCalEntryList, Error> {
         let url = format!("https://{}/trakt/cal", &self.config.domain);
         let calendar = self.client.get(&url).send()?.json()?;
         Ok(calendar)
+    }
+
+    pub fn add_episode_to_watched(
+        &self,
+        imdb_id: &str,
+        season: i32,
+        episode: i32,
+    ) -> Result<TraktResult, Error> {
+        let url = format!(
+            "https://{}/trakt/add_episode_to_watched/{}/{}/{}",
+            &self.config.domain, imdb_id, season, episode
+        );
+        let result: TraktResult = self.client.get(&url).send()?.json()?;
+        Ok(result)
+    }
+
+    pub fn add_movie_to_watched(&self, imdb_id: &str) -> Result<TraktResult, Error> {
+        let url = format!(
+            "https://{}/trakt/add_to_watched/{}",
+            &self.config.domain, imdb_id
+        );
+        let result: TraktResult = self.client.get(&url).send()?.json()?;
+        Ok(result)
+    }
+
+    pub fn remove_episode_to_watched(
+        &self,
+        imdb_id: &str,
+        season: i32,
+        episode: i32,
+    ) -> Result<TraktResult, Error> {
+        let url = format!(
+            "https://{}/trakt/delete_watched/{}/{}/{}",
+            &self.config.domain, imdb_id, season, episode
+        );
+        let result: TraktResult = self.client.get(&url).send()?.json()?;
+        Ok(result)
+    }
+
+    pub fn remove_movie_to_watched(&self, imdb_id: &str) -> Result<TraktResult, Error> {
+        let url = format!(
+            "https://{}/trakt/delete_watched_movie/{}",
+            &self.config.domain, imdb_id
+        );
+        let result: TraktResult = self.client.get(&url).send()?.json()?;
+        Ok(result)
+    }
+}
+
+#[derive(Serialize, Deserialize, Debug, Default)]
+pub struct TraktResult {
+    pub status: String,
+}
+
+impl fmt::Display for TraktResult {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        write!(f, "status {}", self.status)
     }
 }
 
@@ -144,24 +269,24 @@ pub fn get_watchlist_shows_db(pool: &PgPool) -> Result<HashMap<String, WatchList
 }
 
 #[derive(Serialize, Deserialize, Debug, Default, PartialEq, Eq, Hash)]
-pub struct WatchedShows {
+pub struct WatchedEpisode {
     pub title: String,
     pub imdb_url: String,
     pub episode: i32,
     pub season: i32,
 }
 
-impl fmt::Display for WatchedShows {
+impl fmt::Display for WatchedEpisode {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         write!(
             f,
             "{} {} {} {}",
-            self.title, self.imdb_url, self.episode, self.season
+            self.title, self.imdb_url, self.season, self.episode
         )
     }
 }
 
-impl WatchedShows {
+impl WatchedEpisode {
     pub fn get_index(&self, pool: &PgPool) -> Result<Option<i32>, Error> {
         let query = r#"
             SELECT id
@@ -179,6 +304,40 @@ impl WatchedShows {
         } else {
             Ok(None)
         }
+    }
+
+    pub fn get_watched_episode(
+        pool: &PgPool,
+        link: &str,
+        season: i32,
+        episode: i32,
+    ) -> Result<Option<WatchedEpisode>, Error> {
+        let query = r#"
+            SELECT a.link, b.title, a.season, a.episode
+            FROM trakt_watched_episodes a
+            JOIN imdb_ratings b ON a.link = b.link
+            WHERE a.link = $1 AND a.season = $2 AND a.episode = $3
+        "#;
+        let watched_episode = if let Some(row) = pool
+            .get()?
+            .query(query, &[&link, &season, &episode])?
+            .iter()
+            .nth(0)
+        {
+            let imdb_url: String = row.get(0);
+            let title: String = row.get(1);
+            let season: i32 = row.get(2);
+            let episode: i32 = row.get(3);
+            Some(WatchedEpisode {
+                title,
+                imdb_url,
+                season,
+                episode,
+            })
+        } else {
+            None
+        };
+        Ok(watched_episode)
     }
 
     pub fn insert_episode(&self, pool: &PgPool) -> Result<(), Error> {
@@ -202,13 +361,12 @@ impl WatchedShows {
     }
 }
 
-pub fn get_watched_shows_db(
-    pool: &PgPool,
-) -> Result<HashMap<(String, i32, i32), WatchedShows>, Error> {
+pub fn get_watched_shows_db(pool: &PgPool) -> Result<Vec<WatchedEpisode>, Error> {
     let query = r#"
         SELECT a.link, b.title, a.season, a.episode
         FROM trakt_watched_episodes a
         JOIN imdb_ratings b ON a.link = b.link
+        ORDER BY 2,3,4
     "#;
     let watched_shows = pool
         .get()?
@@ -219,16 +377,320 @@ pub fn get_watched_shows_db(
             let title: String = row.get(1);
             let season: i32 = row.get(2);
             let episode: i32 = row.get(3);
-            (
-                (imdb_url.clone(), season, episode),
-                WatchedShows {
-                    title,
-                    imdb_url,
-                    season,
-                    episode,
-                },
-            )
+            WatchedEpisode {
+                title,
+                imdb_url,
+                season,
+                episode,
+            }
         })
         .collect();
     Ok(watched_shows)
+}
+
+#[derive(Serialize, Deserialize, Debug, Default, PartialEq, Eq, Hash)]
+pub struct WatchedMovie {
+    pub title: String,
+    pub imdb_url: String,
+}
+
+impl fmt::Display for WatchedMovie {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        write!(f, "{} {}", self.title, self.imdb_url)
+    }
+}
+
+impl WatchedMovie {
+    pub fn get_index(&self, pool: &PgPool) -> Result<Option<i32>, Error> {
+        let query = r#"
+            SELECT id
+            FROM trakt_watched_movies
+            WHERE link=$1
+        "#;
+        if let Some(row) = pool.get()?.query(query, &[&self.imdb_url])?.iter().nth(0) {
+            let id: i32 = row.get(0);
+            Ok(Some(id))
+        } else {
+            Ok(None)
+        }
+    }
+
+    pub fn get_watched_movie(pool: &PgPool, link: &str) -> Result<Option<WatchedMovie>, Error> {
+        let query = r#"
+            SELECT a.link, b.title
+            FROM trakt_watched_movies a
+            JOIN imdb_ratings b ON a.link = b.link
+            WHERE a.link = $1
+        "#;
+        let watched_movie = if let Some(row) = pool.get()?.query(query, &[&link])?.iter().nth(0) {
+            let imdb_url: String = row.get(0);
+            let title: String = row.get(1);
+            Some(WatchedMovie { title, imdb_url })
+        } else {
+            None
+        };
+        Ok(watched_movie)
+    }
+
+    pub fn insert_movie(&self, pool: &PgPool) -> Result<(), Error> {
+        let query = r#"
+            INSERT INTO trakt_watched_movies (link)
+            VALUES ($1)
+        "#;
+        pool.get()?.execute(query, &[&self.imdb_url])?;
+        Ok(())
+    }
+
+    pub fn delete_movie(&self, pool: &PgPool) -> Result<(), Error> {
+        let query = r#"
+            DELETE FROM trakt_watched_movies
+            WHERE link=$1
+        "#;
+        pool.get()?.execute(query, &[&self.imdb_url])?;
+        Ok(())
+    }
+}
+
+pub fn get_watched_movies_db(pool: &PgPool) -> Result<Vec<WatchedMovie>, Error> {
+    let query = r#"
+        SELECT a.link, b.title
+        FROM trakt_watched_movies a
+        JOIN imdb_ratings b ON a.link = b.link
+        ORDER BY b.show
+    "#;
+    let watched_shows = pool
+        .get()?
+        .query(query, &[])?
+        .iter()
+        .map(|row| {
+            let imdb_url: String = row.get(0);
+            let title: String = row.get(1);
+            WatchedMovie { title, imdb_url }
+        })
+        .collect();
+    Ok(watched_shows)
+}
+
+pub fn sync_trakt_with_db() -> Result<(), Error> {
+    let mc = MovieCollectionDB::new();
+    let ti = TraktConnection::new();
+
+    let watchlist_shows_db = get_watchlist_shows_db(&mc.pool)?;
+    let watchlist_shows = ti.get_watchlist_shows()?;
+    if watchlist_shows.is_empty() {
+        return Ok(());
+    }
+    let results: Vec<Result<_, Error>> = watchlist_shows
+        .par_iter()
+        .map(|(link, show)| {
+            if !watchlist_shows_db.contains_key(link) {
+                show.insert_show(&mc.pool)?;
+                println!("insert watchlist {}", show);
+            }
+            Ok(())
+        })
+        .collect();
+    map_result_vec(results)?;
+
+    let results: Vec<Result<_, Error>> = watchlist_shows_db
+        .par_iter()
+        .map(|(link, show)| {
+            if !watchlist_shows.contains_key(link) {
+                show.delete_show(&mc.pool)?;
+                println!("delete watchlist {}", show);
+            }
+            Ok(())
+        })
+        .collect();
+    map_result_vec(results)?;
+
+    let watched_shows_db: HashMap<(String, i32, i32), _> = get_watched_shows_db(&mc.pool)?
+        .into_iter()
+        .map(|s| ((s.imdb_url.clone(), s.season, s.episode), s))
+        .collect();
+    let watched_shows = ti.get_watched_shows()?;
+    if watched_shows.is_empty() {
+        return Ok(());
+    }
+    let results: Vec<Result<_, Error>> = watched_shows
+        .par_iter()
+        .map(|(key, episode)| {
+            if !watched_shows_db.contains_key(&key) {
+                episode.insert_episode(&mc.pool)?;
+                println!("insert watched {}", episode);
+            }
+            Ok(())
+        })
+        .collect();
+    map_result_vec(results)?;
+
+    let results: Vec<Result<_, Error>> = watched_shows_db
+        .par_iter()
+        .map(|(key, episode)| {
+            if !watched_shows.contains_key(&key) {
+                episode.delete_episode(&mc.pool)?;
+                println!("delete watched {}", episode);
+            }
+            Ok(())
+        })
+        .collect();
+    map_result_vec(results)?;
+
+    let watched_movies_db: HashMap<String, _> = get_watched_movies_db(&mc.pool)?
+        .into_iter()
+        .map(|s| (s.imdb_url.clone(), s))
+        .collect();
+    let watched_movies = ti.get_watched_movies()?;
+    if watched_movies.is_empty() {
+        return Ok(());
+    }
+    let results: Vec<Result<_, Error>> = watched_movies
+        .par_iter()
+        .map(|(key, movie)| {
+            if !watched_movies_db.contains_key(key) {
+                movie.insert_movie(&mc.pool)?;
+                println!("insert watched {}", movie);
+            }
+            Ok(())
+        })
+        .collect();
+    map_result_vec(results)?;
+
+    let results: Vec<Result<_, Error>> = watched_movies_db
+        .par_iter()
+        .map(|(key, movie)| {
+            if !watched_movies.contains_key(key) {
+                movie.delete_movie(&mc.pool)?;
+                println!("delete watched {}", movie);
+            }
+            Ok(())
+        })
+        .collect();
+    map_result_vec(results)?;
+    Ok(())
+}
+
+fn get_imdb_url_from_show(
+    mc: &MovieCollectionDB,
+    show: Option<&String>,
+) -> Result<Option<String>, Error> {
+    let result = if let Some(show) = show {
+        let imdb_shows = mc.print_imdb_shows(show, false)?;
+        if imdb_shows.len() > 1 {
+            for show in imdb_shows {
+                println!("{}", show);
+            }
+            None
+        } else {
+            imdb_shows[0].link.clone()
+        }
+    } else {
+        None
+    };
+    Ok(result)
+}
+
+pub fn trakt_app_parse(
+    trakt_command: TraktCommands,
+    trakt_action: TraktActions,
+    show: Option<&String>,
+    season: i32,
+    episode: i32,
+) -> Result<(), Error> {
+    let mc = MovieCollectionDB::new();
+    let ti = TraktConnection::new();
+    match trakt_command {
+        TraktCommands::Calendar => {
+            for cal in ti.get_calendar()? {
+                let show = match ImdbRatings::get_show_by_link(&cal.link, &mc.pool)? {
+                    Some(s) => s.show,
+                    None => "".to_string(),
+                };
+                let exists = if !show.is_empty() {
+                    ImdbEpisodes {
+                        show: show.clone(),
+                        season: cal.season,
+                        episode: cal.episode,
+                        ..Default::default()
+                    }
+                    .get_index(&mc.pool)?
+                    .is_some()
+                } else {
+                    false
+                };
+                if !exists {
+                    println!("{} {}", show, cal);
+                }
+            }
+        }
+        TraktCommands::WatchList => match trakt_action {
+            TraktActions::Add => {
+                if let Some(imdb_url) = get_imdb_url_from_show(&mc, show)? {
+                    println!("result: {}", ti.add_watchlist_show(&imdb_url)?);
+                    sync_trakt_with_db()?;
+                }
+            }
+            TraktActions::Remove => {
+                if let Some(imdb_url) = get_imdb_url_from_show(&mc, show)? {
+                    println!("result: {}", ti.remove_watchlist_show(&imdb_url)?);
+                    sync_trakt_with_db()?;
+                }
+            }
+            TraktActions::List => {
+                for (_, show) in get_watchlist_shows_db(&mc.pool)? {
+                    println!("{}", show);
+                }
+            }
+            _ => {}
+        },
+        TraktCommands::Watched => match trakt_action {
+            TraktActions::Add => {
+                if let Some(imdb_url) = get_imdb_url_from_show(&mc, show)? {
+                    if season != -1 && episode != -1 {
+                        ti.add_episode_to_watched(&imdb_url, season, episode)?;
+                    } else {
+                        ti.add_movie_to_watched(&imdb_url)?;
+                    }
+                    sync_trakt_with_db()?;
+                }
+            }
+            TraktActions::Remove => {
+                if let Some(imdb_url) = get_imdb_url_from_show(&mc, show)? {
+                    if season != -1 && episode != -1 {
+                        ti.remove_episode_to_watched(&imdb_url, season, episode)?;
+                    } else {
+                        ti.remove_movie_to_watched(&imdb_url)?;
+                    }
+                    sync_trakt_with_db()?;
+                }
+            }
+            TraktActions::List => {
+                let watched_shows = get_watched_shows_db(&mc.pool)?;
+                let watched_movies = get_watched_movies_db(&mc.pool)?;
+
+                if let Some(imdb_url) = get_imdb_url_from_show(&mc, show)? {
+                    for show in &watched_shows {
+                        if show.imdb_url == imdb_url {
+                            println!("{}", show);
+                        }
+                    }
+                    for show in &watched_movies {
+                        if show.imdb_url == imdb_url {
+                            println!("{}", show);
+                        }
+                    }
+                } else {
+                    for show in &watched_shows {
+                        println!("{}", show);
+                    }
+                    for show in &watched_movies {
+                        println!("{}", show);
+                    }
+                }
+            }
+            _ => {}
+        },
+        _ => {}
+    }
+    Ok(())
 }

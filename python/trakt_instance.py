@@ -133,6 +133,23 @@ class TraktInstance(object):
                     })
             return results
 
+    def get_watched_movies(self, imdb_id=None):
+        with Trakt.configuration.oauth.from_response(self.authorization, refresh=True):
+            results = []
+            watched = Trakt['sync/watched'].movies(pagination=True)
+            if watched is None:
+                return []
+            for movies in watched.values():
+                title = movies.title
+                imdb_url = movies.get_key('imdb')
+                if imdb_id is not None and imdb_url != imdb_id:
+                    continue
+                results.append({
+                    'title': title,
+                    'imdb_url': imdb_url,
+                })
+            return results
+
     def on_aborted(self):
         """Device authentication aborted.
 
@@ -219,12 +236,11 @@ class TraktInstance(object):
             show_obj = self.do_query(show)
         if isinstance(show_obj, list):
             if len(show_obj) < 1:
-                return
+                return {}
             else:
                 show_obj = show_obj[0]
         with Trakt.configuration.oauth.from_response(self.authorization, refresh=True):
             items = {'shows': [show_obj.to_dict()]}
-            print(show_obj)
             return Trakt['sync/watchlist'].add(items=items)
 
     def add_episode_to_watched(self, show=None, imdb_id=None, season=None, episode=None):
@@ -232,28 +248,29 @@ class TraktInstance(object):
             show_obj = self.do_lookup(imdb_id)
         elif show:
             show_obj = self.do_query(show)
+        if show_obj is None:
+            return {}
         if isinstance(show_obj, list):
             if len(show_obj) < 1:
-                return
+                return {}
             else:
                 show_obj = show_obj[0]
         if season and episode:
+            print(show_obj)
             episode_ = Trakt['shows'].episode(
                 show_obj.get_key('imdb'), season=season, episode=episode)
             if not episode_:
-                return False
+                return {}
             with Trakt.configuration.oauth.from_response(self.authorization, refresh=True):
                 items = {'episodes': [episode_.to_dict()]}
-                print(episode_)
                 return Trakt['sync/history'].add(items=items)
         elif season:
             with Trakt.configuration.oauth.from_response(self.authorization, refresh=True):
                 episodes = Trakt['shows'].season(show_obj.get_key('imdb'), season=season)
                 if not episodes:
-                    return False
+                    return {}
                 episodes = [e.to_dict() for e in episodes]
                 items = {'episodes': episodes}
-                print(episodes)
                 return Trakt['sync/history'].add(items=items)
 
     def remove_show_to_watchlist(self, show=None, imdb_id=None):
@@ -263,13 +280,27 @@ class TraktInstance(object):
             show_obj = self.do_query(show)
         if isinstance(show_obj, list):
             if len(show_obj) < 1:
-                return
+                return {}
             else:
                 show_obj = show_obj[0]
         with Trakt.configuration.oauth.from_response(self.authorization, refresh=True):
             items = {'shows': [show_obj.to_dict()]}
             print(show_obj)
             return Trakt['sync/watchlist'].remove(items=items)
+
+    def remove_movie_to_watched(self, show=None, imdb_id=None):
+        if imdb_id:
+            show_obj = self.do_lookup(imdb_id)
+        elif show:
+            show_obj = self.do_query(show)
+        if isinstance(show_obj, list):
+            if len(show_obj) < 1:
+                return
+            else:
+                show_obj = show_obj[0]
+        with Trakt.configuration.oauth.from_response(self.authorization, refresh=True):
+            items = {'movies': [show_obj.to_dict()]}
+            return Trakt['sync/history'].remove(items=items)
 
     def remove_episode_to_watched(self, show=None, imdb_id=None, season=None, episode=None):
         if imdb_id:
@@ -304,17 +335,15 @@ class TraktInstance(object):
             show_obj = self.do_query(title)
         if isinstance(show_obj, list):
             if len(show_obj) < 1:
-                return
+                return {}
             else:
                 show_obj = show_obj[0]
         if isinstance(show_obj, dict):
             if not show_obj:
-                return
+                return {}
             show_obj.values()[0]
-        print(show_obj)
         with Trakt.configuration.oauth.from_response(self.authorization, refresh=True):
             items = {'movies': [show_obj.to_dict()]}
-            print(show_obj)
             return Trakt['sync/history'].add(items=items)
 
     def get_calendar(self):
@@ -374,6 +403,18 @@ def get_watched_shows():
     return json.jsonify(ti.get_watched_shows()), 200
 
 
+@app.route('/trakt/watched_movie/<imdb_id>', methods=['GET'])
+def get_watched_movie(imdb_id):
+    ti = TraktInstance()
+    return json.jsonify(ti.get_watched_movies(imdb_id=imdb_id)), 200
+
+
+@app.route('/trakt/watched_movies', methods=['GET'])
+def get_watched_movies():
+    ti = TraktInstance()
+    return json.jsonify(ti.get_watched_movies()), 200
+
+
 @app.route('/trakt/query/<query_str>', methods=['GET'])
 def do_trakt_query(query_str):
     ti = TraktInstance()
@@ -389,13 +430,21 @@ def do_trakt_lookup(imdb_id):
 @app.route('/trakt/add_episode_to_watched/<imdb_id>/<season>/<episode>', methods=['GET'])
 def add_episode_to_watched(imdb_id, season, episode):
     ti = TraktInstance()
-    return ti.add_episode_to_watched(imdb_id=imdb_id, season=int(season), episode=int(episode))
+    result = ti.add_episode_to_watched(imdb_id=imdb_id, season=int(season), episode=int(episode))
+    if result:
+        return json.jsonify({'status': 'success'}), 200
+    else:
+        return json.jsonify({'status': 'failure'}), 200
 
 
 @app.route('/trakt/add_to_watched/<imdb_id>', methods=['GET'])
 def add_to_watched(imdb_id):
     ti = TraktInstance()
-    return ti.add_movie_to_watched(imdb_id=imdb_id), 200
+    result = ti.add_movie_to_watched(imdb_id=imdb_id)
+    if result:
+        return json.jsonify({'status': 'success'}), 200
+    else:
+        return json.jsonify({'status': 'failure'}), 200
 
 
 @app.route('/trakt/cal', methods=['GET'])
@@ -406,20 +455,43 @@ def get_trakt_cal():
 
 @app.route('/trakt/delete_show/<imdb_id>', methods=['GET'])
 def delete_show_from_watchlist(imdb_id):
-    ti = TraktInstance()
-    return ti_.remove_show_to_watchlist(imdb_id=imdb), 200
+    ti_ = TraktInstance()
+    result = ti_.remove_show_to_watchlist(imdb_id=imdb_id)
+    if result:
+        return json.jsonify({'status': 'success'}), 200
+    else:
+        return json.jsonify({'status': 'failure'}), 200
 
 
 @app.route('/trakt/delete_watched/<imdb_id>/<season>/<episode>', methods=['GET'])
 def delete_episode_from_watched(imdb_id, season, episode):
-    ti = TraktInstance()
-    return ti_.remove_episode_to_watched(imdb_id=imdb_id, season=int(season), episode=int(episode)), 200
+    ti_ = TraktInstance()
+    result = ti_.remove_episode_to_watched(
+        imdb_id=imdb_id, season=int(season), episode=int(episode))
+    if result:
+        return json.jsonify({'status': 'success'}), 200
+    else:
+        return json.jsonify({'status': 'failure'}), 200
+
+
+@app.route('/trakt/delete_watched_movie/<imdb_id>', methods=['GET'])
+def delete_movie_from_watched(imdb_id):
+    ti_ = TraktInstance()
+    result = ti_.remove_movie_to_watched(imdb_id=imdb_id)
+    if result:
+        return json.jsonify({'status': 'success'}), 200
+    else:
+        return json.jsonify({'status': 'failure'}), 200
 
 
 @app.route('/trakt/add_to_watchlist/<imdb_id>', methods=['GET'])
 def add_to_watchlist(imdb_id):
     ti = TraktInstance()
-    return ti.add_show_to_watchlist(imdb_id=imdb_id)
+    result = ti.add_show_to_watchlist(imdb_id=imdb_id)
+    if result:
+        return json.jsonify({'status': 'success'}), 200
+    else:
+        return json.jsonify({'status': 'failure'}), 200
 
 
 if __name__ == '__main__':

@@ -158,7 +158,9 @@ fn movie_queue_delete(path: Path<String>, user: LoggedUser) -> Result<HttpRespon
     let mc = MovieCollectionDB::with_pool(pool.clone());
     let mq = MovieQueueDB::with_pool(pool);
     println!("{}", path);
-    let index = mc.get_collection_index_match(&path.into_inner())?.ok_or_else(|| err_msg("Path doesn't exist"))?;
+    let index = mc
+        .get_collection_index_match(&path.into_inner())?
+        .ok_or_else(|| err_msg("Path doesn't exist"))?;
     mq.remove_from_queue_by_collection_idx(index)?;
 
     let resp = HttpResponse::build(StatusCode::OK)

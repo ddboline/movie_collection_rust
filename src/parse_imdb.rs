@@ -89,7 +89,10 @@ fn parse_imdb_parser() -> Result<(), Error> {
         mq.print_imdb_shows(show, tv)?
             .into_iter()
             .filter_map(|s| match &s.link {
-                Some(l) if l == ilink => Some((l.clone(), s.clone())),
+                Some(l) if l == ilink => {
+                    println!("{}", s);
+                    Some((l.clone(), s.clone()))
+                }
                 _ => None,
             })
             .collect()
@@ -97,7 +100,10 @@ fn parse_imdb_parser() -> Result<(), Error> {
         mq.print_imdb_shows(show, tv)?
             .into_iter()
             .filter_map(|s| match &s.link {
-                Some(l) => Some((l.clone(), s.clone())),
+                Some(l) => {
+                    println!("{}", s);
+                    Some((l.clone(), s.clone()))
+                }
                 None => None,
             })
             .collect()

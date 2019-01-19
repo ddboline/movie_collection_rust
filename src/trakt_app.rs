@@ -4,15 +4,11 @@ extern crate rayon;
 
 use clap::{App, Arg};
 use failure::Error;
-use rayon::prelude::*;
 
-use movie_collection_rust::common::imdb_episodes::ImdbEpisodes;
-use movie_collection_rust::common::imdb_ratings::ImdbRatings;
-use movie_collection_rust::common::movie_collection::MovieCollectionDB;
 use movie_collection_rust::common::trakt_utils::{
-    get_watched_shows_db, get_watchlist_shows_db, TraktConnection,
+    sync_trakt_with_db, trakt_app_parse, TraktActions, TraktCommands,
 };
-use movie_collection_rust::common::utils::{get_version_number, map_result_vec};
+use movie_collection_rust::common::utils::get_version_number;
 
 fn trakt_app() -> Result<(), Error> {
     let matches = App::new("Trakt Query/Parser")
@@ -28,94 +24,56 @@ fn trakt_app() -> Result<(), Error> {
                 .help("Parse collection for new videos"),
         )
         .arg(
-            Arg::with_name("shows")
-                .value_name("SHOWS")
-                .help("Shows")
+            Arg::with_name("commands")
+                .value_name("COMMANDS")
+                .help("Commands")
                 .multiple(true),
         )
         .get_matches();
 
     let do_parse = matches.is_present("parse");
 
-    let mq = MovieCollectionDB::new();
-    let ti = TraktConnection::new();
-    if do_parse {
-        let watchlist_shows_db = get_watchlist_shows_db(&mq.pool)?;
-        let watchlist_shows = ti.get_watchlist_shows()?;
-        let results: Vec<Result<_, Error>> = watchlist_shows
-            .par_iter()
-            .map(|(link, show)| {
-                if !watchlist_shows_db.contains_key(link) {
-                    show.insert_show(&mq.pool)?;
-                    println!("insert watchlist {}", show);
-                }
-                Ok(())
-            })
-            .collect();
-        map_result_vec(results)?;
+    let commands: Vec<String> = matches
+        .values_of("commands")
+        .map(|v| v.map(|s| s.to_string()).collect())
+        .unwrap_or_else(Vec::new);
 
-        let results: Vec<Result<_, Error>> = watchlist_shows_db
-            .par_iter()
-            .map(|(link, show)| {
-                if !watchlist_shows.contains_key(link) {
-                    show.delete_show(&mq.pool)?;
-                    println!("delete watchlist {}", show);
-                }
-                Ok(())
-            })
-            .collect();
-        map_result_vec(results)?;
-
-        let watched_shows_db = get_watched_shows_db(&mq.pool)?;
-        let watched_shows = ti.get_watched_shows()?;
-        let results: Vec<Result<_, Error>> = watched_shows
-            .par_iter()
-            .map(|(key, episode)| {
-                if !watched_shows_db.contains_key(&key) {
-                    episode.insert_episode(&mq.pool)?;
-                    println!("insert watched {}", episode);
-                }
-                Ok(())
-            })
-            .collect();
-        map_result_vec(results)?;
-
-        let results: Vec<Result<_, Error>> = watched_shows_db
-            .par_iter()
-            .map(|(key, episode)| {
-                if !watched_shows.contains_key(&key) {
-                    episode.delete_episode(&mq.pool)?;
-                    println!("delete watched {}", episode);
-                }
-                Ok(())
-            })
-            .collect();
-        map_result_vec(results)?;
-    } else {
-        for cal in ti.get_calendar()? {
-            let show = match ImdbRatings::get_show_by_link(&cal.link, &mq.pool)? {
-                Some(s) => s.show,
-                None => "".to_string(),
-            };
-            let exists = if !show.is_empty() {
-                ImdbEpisodes {
-                    show: show.clone(),
-                    season: cal.season,
-                    episode: cal.episode,
-                    ..Default::default()
-                }
-                .get_index(&mq.pool)?
-                .is_some()
+    let trakt_command = match commands.get(0) {
+        Some(c) => TraktCommands::from_command(c),
+        None => TraktCommands::None,
+    };
+    let trakt_action = match commands.get(1) {
+        Some(a) => TraktActions::from_command(a),
+        None => TraktActions::None,
+    };
+    let show = commands.get(2).map(|s| s.clone());
+    let season: i32 = match commands.get(3) {
+        Some(c) => {
+            if let Ok(s) = c.parse() {
+                s
             } else {
-                false
-            };
-            if !exists {
-                println!("{} {}", show, cal);
+                -1
             }
         }
+        _ => -1,
+    };
+    let episode: i32 = match commands.get(4) {
+        Some(c) => {
+            if let Ok(s) = c.parse() {
+                s
+            } else {
+                -1
+            }
+        }
+        _ => -1,
+    };
+
+    if do_parse {
+        sync_trakt_with_db()?;
+    } else {
+        trakt_app_parse(trakt_command, trakt_action, show.as_ref(), season, episode)?;
     }
 
-    println!("hello world");
     Ok(())
 }
 

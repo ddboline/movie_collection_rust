@@ -212,7 +212,6 @@ impl MovieCollectionDB {
                         let link: String = row.get(3);
                         let rating: f64 = row.get(4);
 
-                        println!("{} {} {} {}", show, title, link, rating);
                         ImdbRatings {
                             index,
                             show,
