@@ -12,7 +12,8 @@ use std::fmt;
 use std::path::Path;
 
 use crate::common::config::Config;
-use crate::common::movie_collection::{MovieCollectionDB, PgPool};
+use crate::common::movie_collection::MovieCollectionDB;
+use crate::common::pgpool::PgPool;
 use crate::common::utils::{map_result_vec, option_string_wrapper, parse_file_stem};
 
 #[derive(Default)]

@@ -10,7 +10,7 @@ use chrono::NaiveDate;
 use failure::Error;
 use std::fmt;
 
-use crate::common::movie_collection::PgPool;
+use crate::common::pgpool::PgPool;
 
 #[derive(Clone)]
 pub struct ImdbEpisodes {

@@ -35,6 +35,16 @@ fn find_new_episodes() -> Result<(), Error> {
         .get_matches();
 
     let source = matches.value_of("source").map(|s| s.to_string());
+    let shows = matches
+        .values_of("shows")
+        .map(|v| v.map(|s| s.to_string()).collect())
+        .unwrap_or_else(Vec::new);
+
+    let source = if shows.is_empty() {
+        source
+    } else {
+        Some("all".to_string())
+    };
 
     let mindate = Local::today() + Duration::days(-14);
     let maxdate = Local::today() + Duration::days(7);
@@ -55,6 +65,11 @@ fn find_new_episodes() -> Result<(), Error> {
                         }
                     }
                 }
+            }
+        }
+        if !shows.is_empty() {
+            if shows.iter().any(|s| &epi.show != s) {
+                continue;
             }
         }
         println!("{}", epi);

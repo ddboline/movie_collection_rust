@@ -299,7 +299,7 @@ pub fn get_video_runtime(f: &str) -> Result<String, Error> {
                 let nsecs: f64 = nframes as f64 / fps;
                 let nmin = (nsecs / 60.) as u64;
                 let nhour = (nmin as f64 / 60.) as u64;
-                timeval = format!("{:02}:{:02}:{:02}", nhour, nmin, nsecs as u64 % 60);
+                timeval = format!("{:02}:{:02}:{:02}", nhour, nmin % 60, nsecs as u64 % 60);
             }
             if items.len() > 1 && items[0] == "Duration:" {
                 let its: Vec<_> = items[1].trim_matches(',').split(':').collect();

@@ -14,7 +14,7 @@ fn trakt_app() -> Result<(), Error> {
     let matches = App::new("Trakt Query/Parser")
         .version(get_version_number().as_str())
         .author("Daniel Boline <ddboline@gmail.com>")
-        .about("Query and Parse Video Collectioin")
+        .about("Query and Parse Video Collection")
         .arg(
             Arg::with_name("parse")
                 .short("p")
@@ -57,15 +57,9 @@ fn trakt_app() -> Result<(), Error> {
         }
         _ => -1,
     };
-    let episode: i32 = match commands.get(4) {
-        Some(c) => {
-            if let Ok(s) = c.parse() {
-                s
-            } else {
-                -1
-            }
-        }
-        _ => -1,
+    let episode: Vec<i32> = match commands.get(4) {
+        Some(c) => c.split(',').filter_map(|s| s.parse().ok()).collect(),
+        _ => Vec::new(),
     };
 
     if do_parse {
@@ -76,7 +70,7 @@ fn trakt_app() -> Result<(), Error> {
             &trakt_action,
             show.as_ref(),
             season,
-            episode,
+            &episode,
         )?;
     }
 

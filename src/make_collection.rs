@@ -45,9 +45,9 @@ fn make_collection() -> Result<(), Error> {
         .map(|s| s.map(|x| x.to_string()).collect())
         .unwrap_or_else(Vec::new);
 
+    let mc = MovieCollectionDB::new();
     if !do_parse {
-        let mq = MovieCollectionDB::new();
-        let shows = mq.search_movie_collection(&shows)?;
+        let shows = mc.search_movie_collection(&shows)?;
         if do_time {
             let shows: Vec<Result<_, Error>> = shows
                 .into_par_iter()
@@ -66,9 +66,8 @@ fn make_collection() -> Result<(), Error> {
             }
         }
     } else {
-        let mq = MovieCollectionDB::new();
-        mq.make_collection()?;
-        mq.fix_collection_show_id()?;
+        mc.make_collection()?;
+        mc.fix_collection_show_id()?;
     }
     Ok(())
 }

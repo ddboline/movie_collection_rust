@@ -17,8 +17,9 @@ use std::path;
 use subprocess::Exec;
 
 use movie_collection_rust::common::config::Config;
-use movie_collection_rust::common::movie_collection::{MovieCollectionDB, PgPool};
+use movie_collection_rust::common::movie_collection::MovieCollectionDB;
 use movie_collection_rust::common::movie_queue::MovieQueueDB;
+use movie_collection_rust::common::pgpool::PgPool;
 use movie_collection_rust::common::utils::{map_result_vec, parse_file_stem, remcom_single_file};
 
 fn tvshows(user: LoggedUser) -> Result<HttpResponse, Error> {
@@ -239,6 +240,67 @@ fn movie_queue_play(idx: Path<i32>, user: LoggedUser) -> Result<HttpResponse, Er
     Ok(resp)
 }
 
+fn trakt_cal(user: LoggedUser) -> Result<HttpResponse, Error> {
+    if user.email != "ddboline@gmail.com" {
+        return Ok(HttpResponse::Unauthorized().json("Unauthorized"));
+    }
+    let body = "";
+    let resp = HttpResponse::build(StatusCode::OK)
+        .content_type("text/html; charset=utf-8")
+        .body(body);
+    Ok(resp)
+}
+
+fn trakt_watchlist(user: LoggedUser) -> Result<HttpResponse, Error> {
+    if user.email != "ddboline@gmail.com" {
+        return Ok(HttpResponse::Unauthorized().json("Unauthorized"));
+    }
+    let body = "";
+    let resp = HttpResponse::build(StatusCode::OK)
+        .content_type("text/html; charset=utf-8")
+        .body(body);
+    Ok(resp)
+}
+
+fn trakt_watchlist_action(
+    path: Path<(String, String)>,
+    user: LoggedUser,
+) -> Result<HttpResponse, Error> {
+    if user.email != "ddboline@gmail.com" {
+        return Ok(HttpResponse::Unauthorized().json("Unauthorized"));
+    }
+    let body = "";
+    let resp = HttpResponse::build(StatusCode::OK)
+        .content_type("text/html; charset=utf-8")
+        .body(body);
+    Ok(resp)
+}
+
+fn trakt_watched(user: LoggedUser) -> Result<HttpResponse, Error> {
+    if user.email != "ddboline@gmail.com" {
+        return Ok(HttpResponse::Unauthorized().json("Unauthorized"));
+    }
+    let body = "";
+    let resp = HttpResponse::build(StatusCode::OK)
+        .content_type("text/html; charset=utf-8")
+        .body(body);
+    Ok(resp)
+}
+
+fn trakt_watched_action(
+    path: Path<(String, String, i32, i32)>,
+    user: LoggedUser,
+) -> Result<HttpResponse, Error> {
+    if user.email != "ddboline@gmail.com" {
+        return Ok(HttpResponse::Unauthorized().json("Unauthorized"));
+    }
+    let body = "";
+    let resp = HttpResponse::build(StatusCode::OK)
+        .content_type("text/html; charset=utf-8")
+        .body(body);
+    Ok(resp)
+}
+
 fn main() {
     let config = Config::with_config();
     let command = "rm -f /var/www/html/videos/partial/*";
@@ -259,10 +321,7 @@ fn main() {
                     .max_age(Duration::days(1))
                     .secure(false), // this can only be true if you have https
             ))
-            .resource("/tvshows", |r| r.method(Method::GET).with(tvshows))
-            .resource("/list/{show}", |r| {
-                r.method(Method::GET).with(movie_queue_show)
-            })
+            .resource("/list/tvshows", |r| r.method(Method::GET).with(tvshows))
             .resource("/list/delete/{path}", |r| {
                 r.method(Method::GET).with(movie_queue_delete)
             })
@@ -274,6 +333,23 @@ fn main() {
             })
             .resource("/list/play/{index}", |r| {
                 r.method(Method::GET).with(movie_queue_play)
+            })
+            .resource("/list/trakt/cal", |r| r.method(Method::GET).with(trakt_cal))
+            .resource("/list/trakt/watchlist", |r| {
+                r.method(Method::GET).with(trakt_watchlist)
+            })
+            .resource("/list/trakt/watchlist/{action}/{imdb_url}", |r| {
+                r.method(Method::GET).with(trakt_watchlist_action)
+            })
+            .resource("/list/trakt/watched", |r| {
+                r.method(Method::GET).with(trakt_watched)
+            })
+            .resource(
+                "/list/trakt/watched/{action}/{imdb_url}/{season}/{episode}",
+                |r| r.method(Method::GET).with(trakt_watched_action),
+            )
+            .resource("/list/{show}", |r| {
+                r.method(Method::GET).with(movie_queue_show)
             })
             .resource("/list", |r| r.method(Method::GET).with(movie_queue))
     })

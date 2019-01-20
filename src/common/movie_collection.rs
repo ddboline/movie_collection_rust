@@ -8,8 +8,6 @@ extern crate select;
 
 use chrono::NaiveDate;
 use failure::{err_msg, Error};
-use r2d2::{Pool, PooledConnection};
-use r2d2_postgres::{PostgresConnectionManager, TlsMode};
 use rayon::prelude::*;
 use std::collections::{HashMap, HashSet};
 use std::fmt;
@@ -19,44 +17,10 @@ use crate::common::config::Config;
 use crate::common::imdb_episodes::ImdbEpisodes;
 use crate::common::imdb_ratings::ImdbRatings;
 use crate::common::movie_queue::MovieQueueDB;
+use crate::common::pgpool::PgPool;
 use crate::common::utils::{
     map_result_vec, option_string_wrapper, parse_file_stem, walk_directory,
 };
-
-pub struct PgPool {
-    pgurl: String,
-    pool: Pool<PostgresConnectionManager>,
-}
-
-impl fmt::Debug for PgPool {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        write!(f, "PgPool {}", self.pgurl)
-    }
-}
-
-impl PgPool {
-    pub fn new(pgurl: &str) -> PgPool {
-        let manager = PostgresConnectionManager::new(pgurl, TlsMode::None)
-            .expect("Failed to open DB connection");
-        PgPool {
-            pgurl: pgurl.to_string(),
-            pool: Pool::new(manager).expect("Failed to open DB connection"),
-        }
-    }
-
-    pub fn get(&self) -> Result<PooledConnection<PostgresConnectionManager>, Error> {
-        self.pool.get().map_err(err_msg)
-    }
-}
-
-impl Clone for PgPool {
-    fn clone(&self) -> PgPool {
-        PgPool {
-            pgurl: self.pgurl.clone(),
-            pool: self.pool.clone(),
-        }
-    }
-}
 
 pub struct NewEpisodesResult {
     pub show: String,
@@ -660,26 +624,37 @@ impl MovieCollectionDB {
         source: Option<String>,
     ) -> Result<Vec<NewEpisodesResult>, Error> {
         let query = r#"
-            SELECT b.show,
-                   c.link,
-                   c.title,
-                   d.season,
-                   d.episode,
-                   d.epurl,
-                   d.airdate,
-                   c.rating,
-                   cast(d.rating as double precision),
-                   d.eptitle
-            FROM movie_queue a
-            JOIN movie_collection b ON a.collection_idx=b.idx
-            JOIN imdb_ratings c ON b.show_id=c.index
+            WITH active_links AS (
+                SELECT c.link
+                FROM movie_queue a
+                JOIN movie_collection b ON a.collection_idx=b.idx
+                JOIN imdb_ratings c ON b.show_id=c.index
+                JOIN imdb_episodes d ON c.show = d.show
+                UNION
+                SELECT link
+                FROM trakt_watchlist
+            )
+            SELECT c.show,
+                    c.link,
+                    c.title,
+                    d.season,
+                    d.episode,
+                    d.epurl,
+                    d.airdate,
+                    c.rating,
+                    cast(d.rating as double precision),
+                    d.eptitle
+            FROM imdb_ratings c
             JOIN imdb_episodes d ON c.show = d.show
             LEFT JOIN trakt_watched_episodes e ON c.link=e.link AND d.season=e.season AND d.episode=e.episode
-            WHERE e.episode is null AND c.istv AND d.airdate >= $1 AND d.airdate <= $2
+            WHERE c.link in (SELECT link FROM active_links GROUP BY link) AND
+                e.episode is null AND
+                c.istv AND d.airdate >= $1 AND
+                d.airdate <= $2
         "#;
         let groupby = r#"
             GROUP BY 1,2,3,4,5,6,7,8,9,10
-            ORDER BY d.airdate, b.show, d.season, d.episode
+            ORDER BY d.airdate, c.show, d.season, d.episode
         "#;
         let query: String = match source {
             Some(source) => {

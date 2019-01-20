@@ -1,16 +1,11 @@
 extern crate clap;
 extern crate failure;
-extern crate movie_collection_rust;
-extern crate rayon;
 
 use clap::{App, Arg};
 use failure::Error;
-use rayon::prelude::*;
 
-use movie_collection_rust::common::config::Config;
-use movie_collection_rust::common::movie_collection::{MovieCollectionDB, PgPool};
-use movie_collection_rust::common::movie_queue::MovieQueueDB;
-use movie_collection_rust::common::utils::{get_version_number, get_video_runtime, map_result_vec};
+use movie_collection_rust::common::make_queue::make_queue_worker;
+use movie_collection_rust::common::utils::get_version_number;
 
 fn make_queue() -> Result<(), Error> {
     let matches = App::new("Parse IMDB")
@@ -62,70 +57,13 @@ fn make_queue() -> Result<(), Error> {
         .values_of("remove")
         .map(|v| v.map(|s| s.to_string()).collect());
     let do_time = matches.is_present("time");
-    let patterns: Option<Vec<_>> = matches
+    let patterns: Vec<_> = matches
         .values_of("patterns")
-        .map(|v| v.map(|s| s).collect());
+        .map(|v| v.map(|s| s).collect())
+        .unwrap_or_else(Vec::new);
     let do_shows = matches.is_present("shows");
 
-    let config = Config::with_config();
-    let pool = PgPool::new(&config.pgurl);
-    let mc = MovieCollectionDB::with_pool(pool.clone());
-    let mq = MovieQueueDB::with_pool(pool);
-
-    if do_shows {
-        for show in mc.print_tv_shows()? {
-            println!("{}", show);
-        }
-    } else if let Some(files) = del_files {
-        for file in files {
-            if let Ok(idx) = file.parse::<i32>() {
-                mq.remove_from_queue_by_idx(idx)?;
-            } else {
-                mq.remove_from_queue_by_path(&file)?;
-            }
-        }
-    } else if let Some(files) = add_files {
-        if files.len() == 1 {
-            let max_idx = mq.get_max_queue_index()?;
-            mq.insert_into_queue(max_idx + 1, &files[0])?;
-        } else if files.len() == 2 {
-            if let Ok(idx) = files[0].parse::<i32>() {
-                println!("inserting into {}", idx);
-                mq.insert_into_queue(idx, &files[1])?;
-            } else {
-                for file in &files {
-                    let max_idx = mq.get_max_queue_index()?;
-                    mq.insert_into_queue(max_idx + 1, &file)?;
-                }
-            }
-        } else {
-            for file in &files {
-                let max_idx = mq.get_max_queue_index()?;
-                mq.insert_into_queue(max_idx + 1, &file)?;
-            }
-        }
-    } else {
-        let results = mq.print_movie_queue(&patterns.unwrap_or_else(Vec::new))?;
-        if do_time {
-            let results: Vec<Result<_, Error>> = results
-                .into_par_iter()
-                .map(|result| {
-                    let timeval = get_video_runtime(&result.path)?;
-                    Ok((timeval, result))
-                })
-                .collect();
-
-            let results = map_result_vec(results)?;
-
-            for (timeval, result) in results {
-                println!("{} {}", result, timeval);
-            }
-        } else {
-            for result in results {
-                println!("{}", result);
-            }
-        }
-    }
+    make_queue_worker(add_files, del_files, do_time, &patterns, do_shows)?;
     Ok(())
 }
 

@@ -16,7 +16,8 @@ use std::fmt;
 use crate::common::config::Config;
 use crate::common::imdb_episodes::ImdbEpisodes;
 use crate::common::imdb_ratings::ImdbRatings;
-use crate::common::movie_collection::{MovieCollectionDB, PgPool};
+use crate::common::movie_collection::MovieCollectionDB;
+use crate::common::pgpool::PgPool;
 use crate::common::utils::{map_result_vec, option_string_wrapper};
 
 pub enum TraktActions {
@@ -595,7 +596,7 @@ pub fn trakt_app_parse(
     trakt_action: &TraktActions,
     show: Option<&String>,
     season: i32,
-    episode: i32,
+    episode: &[i32],
 ) -> Result<(), Error> {
     let mc = MovieCollectionDB::new();
     let ti = TraktConnection::new();
@@ -646,8 +647,10 @@ pub fn trakt_app_parse(
         TraktCommands::Watched => match trakt_action {
             TraktActions::Add => {
                 if let Some(imdb_url) = get_imdb_url_from_show(&mc, show)? {
-                    if season != -1 && episode != -1 {
-                        ti.add_episode_to_watched(&imdb_url, season, episode)?;
+                    if season != -1 && !episode.is_empty() {
+                        for epi in episode {
+                            ti.add_episode_to_watched(&imdb_url, season, *epi)?;
+                        }
                     } else {
                         ti.add_movie_to_watched(&imdb_url)?;
                     }
@@ -656,8 +659,10 @@ pub fn trakt_app_parse(
             }
             TraktActions::Remove => {
                 if let Some(imdb_url) = get_imdb_url_from_show(&mc, show)? {
-                    if season != -1 && episode != -1 {
-                        ti.remove_episode_to_watched(&imdb_url, season, episode)?;
+                    if season != -1 && !episode.is_empty() {
+                        for epi in episode {
+                            ti.remove_episode_to_watched(&imdb_url, season, *epi)?;
+                        }
                     } else {
                         ti.remove_movie_to_watched(&imdb_url)?;
                     }

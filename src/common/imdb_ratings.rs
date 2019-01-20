@@ -9,7 +9,7 @@ extern crate select;
 use failure::Error;
 use std::fmt;
 
-use crate::common::movie_collection::PgPool;
+use crate::common::pgpool::PgPool;
 use crate::common::utils::option_string_wrapper;
 
 #[derive(Default, Clone, Debug)]
