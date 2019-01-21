@@ -264,10 +264,10 @@ pub fn parse_imdb_worker(
     do_update: bool,
     update_database: bool,
 ) -> Result<(), Error> {
-    let mq = MovieCollectionDB::new();
+    let mc = MovieCollectionDB::new();
 
     let shows: HashMap<String, _> = if let Some(ilink) = &imdb_link {
-        mq.print_imdb_shows(show, tv)?
+        mc.print_imdb_shows(show, tv)?
             .into_iter()
             .filter_map(|s| match &s.link {
                 Some(l) if l == ilink => {
@@ -278,7 +278,7 @@ pub fn parse_imdb_worker(
             })
             .collect()
     } else {
-        mq.print_imdb_shows(show, tv)?
+        mc.print_imdb_shows(show, tv)?
             .into_iter()
             .filter_map(|s| match &s.link {
                 Some(l) => {
@@ -292,13 +292,18 @@ pub fn parse_imdb_worker(
 
     let episodes: Option<HashMap<(i32, i32), _>> = if tv {
         if all_seasons {
-            mq.print_imdb_all_seasons(show)?;
+            for s in mc.print_imdb_all_seasons(show)? {
+                println!("{}", s);
+            }
             None
         } else {
-            let r = mq
+            let r = mc
                 .print_imdb_episodes(show, season)?
                 .into_iter()
-                .map(|e| ((e.season, e.episode), e))
+                .map(|e| {
+                    println!("{}", e);
+                    ((e.season, e.episode), e)
+                })
                 .collect();
             Some(r)
         }
@@ -332,7 +337,7 @@ pub fn parse_imdb_worker(
                                 let mut new = s.clone();
                                 new.title = Some(result.title.clone());
                                 new.rating = Some(result.rating);
-                                new.update_show(&mq.pool)?;
+                                new.update_show(&mc.pool)?;
                                 println!("exists {} {} {}", show, s, result.rating);
                             }
                         }
@@ -349,7 +354,7 @@ pub fn parse_imdb_worker(
                                 istv: Some(istv),
                                 ..Default::default()
                             }
-                            .insert_show(&mq.pool)?;
+                            .insert_show(&mc.pool)?;
                         }
                     }
                 }
@@ -374,7 +379,7 @@ pub fn parse_imdb_worker(
                                         new.eptitle =
                                             episode.eptitle.unwrap_or_else(|| "".to_string());
                                         new.rating = episode.rating.unwrap_or(-1.0);
-                                        new.update_episode(&mq.pool)?;
+                                        new.update_episode(&mc.pool)?;
                                     }
                                 }
                                 None => {
@@ -394,7 +399,7 @@ pub fn parse_imdb_worker(
                                         eptitle: episode.eptitle.unwrap_or_else(|| "".to_string()),
                                         epurl: episode.epurl.unwrap_or_else(|| "".to_string()),
                                     }
-                                    .insert_episode(&mq.pool)?;
+                                    .insert_episode(&mc.pool)?;
                                 }
                             }
                         }

@@ -60,11 +60,19 @@ pub struct TvShowsResult {
     pub link: String,
     pub count: i64,
     pub title: String,
+    pub source: Option<String>,
 }
 
 impl fmt::Display for TvShowsResult {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        write!(f, "{} {} {}", self.show, self.link, self.count,)
+        write!(
+            f,
+            "{} {} {} {}",
+            self.show,
+            self.link,
+            self.count,
+            option_string_wrapper(&self.source),
+        )
     }
 }
 
@@ -105,6 +113,24 @@ impl fmt::Display for MovieCollectionResult {
                 option_string_wrapper(&self.epurl),
             )
         }
+    }
+}
+
+#[derive(Debug, Default)]
+pub struct ImdbSeason {
+    pub show: String,
+    pub title: String,
+    pub season: i32,
+    pub nepisodes: i64,
+}
+
+impl fmt::Display for ImdbSeason {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        write!(
+            f,
+            "{} {} {} {}",
+            self.show, self.title, self.season, self.nepisodes
+        )
     }
 }
 
@@ -227,10 +253,6 @@ impl MovieCollectionDB {
                 let eptitle: String = row.get(6);
                 let epurl: String = row.get(7);
 
-                println!(
-                    "{} {} {} {} {} {} {} {}",
-                    show, title, season, episode, airdate, rating, eptitle, epurl
-                );
                 ImdbEpisodes {
                     show,
                     title,
@@ -246,7 +268,7 @@ impl MovieCollectionDB {
         Ok(result)
     }
 
-    pub fn print_imdb_all_seasons(&self, show: &str) -> Result<(), Error> {
+    pub fn print_imdb_all_seasons(&self, show: &str) -> Result<Vec<ImdbSeason>, Error> {
         let conn = self.pool.get()?;
         let query = r#"
             SELECT a.show, b.title, a.season, count(distinct a.episode)
@@ -256,15 +278,24 @@ impl MovieCollectionDB {
         let query = format!("{} GROUP BY a.show, b.title, a.season", query);
         let query = format!("{} ORDER BY a.season", query);
 
-        for row in conn.query(&query, &[])?.iter() {
-            let show: String = row.get(0);
-            let title: String = row.get(1);
-            let season: i32 = row.get(2);
-            let nepisodes: i64 = row.get(3);
+        let result = conn
+            .query(&query, &[])?
+            .iter()
+            .map(|row| {
+                let show: String = row.get(0);
+                let title: String = row.get(1);
+                let season: i32 = row.get(2);
+                let nepisodes: i64 = row.get(3);
 
-            println!("{} {} {} {}", show, title, season, nepisodes);
-        }
-        Ok(())
+                ImdbSeason {
+                    show,
+                    title,
+                    season,
+                    nepisodes,
+                }
+            })
+            .collect();
+        Ok(result)
     }
 
     pub fn search_movie_collection(
@@ -588,13 +619,13 @@ impl MovieCollectionDB {
 
     pub fn print_tv_shows(&self) -> Result<Vec<TvShowsResult>, Error> {
         let query = r#"
-            SELECT b.show, c.link, c.title, count(*)
+            SELECT b.show, c.link, c.title, c.source, count(*) as count
             FROM movie_queue a
             JOIN movie_collection b ON a.collection_idx=b.idx
             JOIN imdb_ratings c ON b.show_id=c.index
             WHERE c.istv
-            GROUP BY 1,2,3
-            ORDER BY 1,2,3
+            GROUP BY 1,2,3,4
+            ORDER BY 1,2,3,4
         "#;
         let results: Vec<_> = self
             .pool
@@ -605,12 +636,14 @@ impl MovieCollectionDB {
                 let show: String = row.get(0);
                 let link: String = row.get(1);
                 let title: String = row.get(2);
-                let count: i64 = row.get(3);
+                let source: Option<String> = row.get(3);
+                let count: i64 = row.get(4);
                 TvShowsResult {
                     show,
                     link,
                     title,
                     count,
+                    source,
                 }
             })
             .collect();

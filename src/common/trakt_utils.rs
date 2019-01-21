@@ -254,7 +254,10 @@ impl WatchListShow {
 }
 
 pub fn get_watchlist_shows_db(pool: &PgPool) -> Result<HashMap<String, WatchListShow>, Error> {
-    let query = "SELECT link, title, year FROM trakt_watchlist";
+    let query = r#"
+        SELECT a.link, a.title, a.year
+        FROM trakt_watchlist a
+    "#;
     let watchlist = pool
         .get()?
         .query(query, &[])?
@@ -264,6 +267,33 @@ pub fn get_watchlist_shows_db(pool: &PgPool) -> Result<HashMap<String, WatchList
             let title: String = row.get(1);
             let year: i32 = row.get(2);
             (link.clone(), WatchListShow { link, title, year })
+        })
+        .collect();
+    Ok(watchlist)
+}
+
+pub fn get_watchlist_shows_db_map(
+    pool: &PgPool,
+) -> Result<HashMap<String, (String, WatchListShow, Option<String>)>, Error> {
+    let query = r#"
+        SELECT b.show, a.link, a.title, a.year, b.source
+        FROM trakt_watchlist a
+        JOIN imdb_ratings b ON a.link=b.link
+    "#;
+    let watchlist = pool
+        .get()?
+        .query(query, &[])?
+        .iter()
+        .map(|row| {
+            let show: String = row.get(0);
+            let link: String = row.get(1);
+            let title: String = row.get(2);
+            let year: i32 = row.get(3);
+            let source: Option<String> = row.get(4);
+            (
+                link.clone(),
+                (show, WatchListShow { link, title, year }, source),
+            )
         })
         .collect();
     Ok(watchlist)
@@ -493,6 +523,7 @@ pub fn sync_trakt_with_db() -> Result<(), Error> {
         .collect();
     map_result_vec(results)?;
 
+    /*
     let results: Vec<Result<_, Error>> = watchlist_shows_db
         .par_iter()
         .map(|(link, show)| {
@@ -504,6 +535,7 @@ pub fn sync_trakt_with_db() -> Result<(), Error> {
         })
         .collect();
     map_result_vec(results)?;
+    */
 
     let watched_shows_db: HashMap<(String, i32, i32), _> = get_watched_shows_db(&mc.pool)?
         .into_iter()

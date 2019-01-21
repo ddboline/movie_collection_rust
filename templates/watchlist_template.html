@@ -1,0 +1,48 @@
+<!DOCTYPE HTML>
+<html>
+<body>
+<center>
+
+<H3 align="center">
+<a href="PREVIOUS">Go Back</a>
+</H3>
+<H3 align="center">
+        <button name="remcomout" id="remcomoutput"> &nbsp; </button>
+</H3>
+
+<H3>
+<table border="0">
+BODY
+</table>
+</H3>
+</center>
+
+<script language="JavaScript" type="text/javascript">
+
+    function watchlist_add(link) {
+        var ostr = "/list/trakt/watchlist/add/" + link
+        var xmlhttp = new XMLHttpRequest();
+        xmlhttp.open("GET", ostr, true);
+        xmlhttp.onload = function nothing() {
+            location.reload();
+        }
+        xmlhttp.send(null);
+        var out = "requested " + link
+        document.getElementById("remcomoutput").innerHTML = out;
+    }
+    function watchlist_rm(link) {
+        var ostr = "/list/trakt/watchlist/rm/" + link
+        var xmlhttp = new XMLHttpRequest();
+        xmlhttp.open("GET", ostr, true);
+        xmlhttp.onload = function nothing() {
+            location.reload();
+        }
+        xmlhttp.send(null);
+        var out = "requested " + link
+        document.getElementById("remcomoutput").innerHTML = out;
+    }
+
+    </script>
+
+</body>
+</html>
