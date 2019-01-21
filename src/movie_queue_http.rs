@@ -238,17 +238,17 @@ fn trakt_watchlist(user: LoggedUser) -> Result<HttpResponse, Error> {
     let mc = MovieCollectionDB::new();
     let mut shows: Vec<_> = get_watchlist_shows_db_map(&mc.pool)?
         .into_iter()
-        .map(|(_, (show, s, source))| (show, s.title, s.link, source))
+        .map(|(_, (_, s, source))| (s.title, s.link, source))
         .collect();
 
     shows.sort();
 
     let body = include_str!("../templates/watchlist_template.html")
-        .replace("PREVIOUS", "/list/trakt/watchlist");
+        .replace("PREVIOUS", "/list/tvshows");
 
     let shows: Vec<_> = shows
         .into_iter()
-        .map(|(show, title, link, source)| {
+        .map(|(title, link, source)| {
             format!(
                 r#"<tr><td>{}</td>
                    <td><a href="https://www.imdb.com/title/{}">imdb</a> {} </tr>"#,
