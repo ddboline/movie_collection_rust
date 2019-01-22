@@ -11,6 +11,8 @@ use failure::{err_msg, Error};
 use rayon::prelude::*;
 use std::collections::{HashMap, HashSet};
 use std::fmt;
+use std::io;
+use std::io::Write;
 use std::path::Path;
 
 use crate::common::config::Config;
@@ -531,7 +533,7 @@ impl MovieCollectionDB {
                 if !self.config.suffixes.contains(&ext) {
                     continue;
                 }
-                println!("not in collection {}", f);
+                writeln!(io::stdout().lock(), "not in collection {}", f)?;
                 self.insert_into_collection(f)?;
             }
         }
@@ -541,13 +543,13 @@ impl MovieCollectionDB {
                 if !file_list.contains(key) {
                     match movie_queue.get(key) {
                         Some(v) => {
-                            println!("in queue but not disk {} {}", key, v);
+                            writeln!(io::stdout().lock(), "in queue but not disk {} {}", key, v)?;
                             let mq = MovieQueueDB::with_pool(self.pool.clone());
                             mq.remove_from_queue_by_path(key)?;
                             self.remove_from_collection(key)
                         }
                         None => {
-                            println!("not on disk {} {}", key, val);
+                            writeln!(io::stdout().lock(), "not on disk {} {}", key, val)?;
                             self.remove_from_collection(key)
                         }
                     }
@@ -562,9 +564,9 @@ impl MovieCollectionDB {
         for (key, val) in collection_map {
             if !file_list.contains(&key) {
                 if movie_queue.contains_key(&key) {
-                    println!("in queue but not disk {}", key);
+                    writeln!(io::stdout().lock(), "in queue but not disk {}", key)?;
                 } else {
-                    println!("not on disk {} {}", key, val);
+                    writeln!(io::stdout().lock(), "not on disk {} {}", key, val)?;
                 }
             }
         }
@@ -576,7 +578,7 @@ impl MovieCollectionDB {
             }
         }
         for show in shows_not_in_db {
-            println!("show has episode not in db {} ", show);
+            writeln!(io::stdout().lock(), "show has episode not in db {} ", show)?;
         }
         Ok(())
     }

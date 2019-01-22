@@ -78,5 +78,13 @@ fn trakt_app() -> Result<(), Error> {
 }
 
 fn main() {
-    trakt_app().unwrap();
+    match trakt_app() {
+        Ok(_) => (),
+        Err(e) => {
+            if e.to_string().contains("Broken pipe") {
+            } else {
+                panic!("{}", e)
+            }
+        }
+    }
 }

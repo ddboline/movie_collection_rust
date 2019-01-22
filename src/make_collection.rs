@@ -5,6 +5,8 @@ extern crate rayon;
 use clap::{App, Arg};
 use failure::Error;
 use rayon::prelude::*;
+use std::io;
+use std::io::Write;
 
 use movie_collection_rust::common::movie_collection::MovieCollectionDB;
 use movie_collection_rust::common::utils::{get_version_number, get_video_runtime, map_result_vec};
@@ -58,11 +60,11 @@ fn make_collection() -> Result<(), Error> {
                 .collect();
             let shows = map_result_vec(shows)?;
             for (timeval, show) in shows {
-                println!("{} {}", timeval, show);
+                writeln!(io::stdout().lock(), "{} {}", timeval, show)?;
             }
         } else {
             for show in shows {
-                println!("{}", show);
+                writeln!(io::stdout().lock(), "{}", show)?;
             }
         }
     } else {
@@ -73,5 +75,13 @@ fn make_collection() -> Result<(), Error> {
 }
 
 fn main() {
-    make_collection().unwrap();
+    match make_collection() {
+        Ok(_) => {}
+        Err(e) => {
+            if e.to_string().contains("Broken pipe") {
+            } else {
+                panic!("{}", e)
+            }
+        }
+    }
 }

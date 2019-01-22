@@ -12,6 +12,8 @@ use rayon::prelude::*;
 use reqwest::Client;
 use std::collections::HashMap;
 use std::fmt;
+use std::io;
+use std::io::Write;
 
 use crate::common::config::Config;
 use crate::common::imdb_episodes::ImdbEpisodes;
@@ -272,9 +274,9 @@ pub fn get_watchlist_shows_db(pool: &PgPool) -> Result<HashMap<String, WatchList
     Ok(watchlist)
 }
 
-pub fn get_watchlist_shows_db_map(
-    pool: &PgPool,
-) -> Result<HashMap<String, (String, WatchListShow, Option<String>)>, Error> {
+pub type WatchListMap = HashMap<String, (String, WatchListShow, Option<String>)>;
+
+pub fn get_watchlist_shows_db_map(pool: &PgPool) -> Result<WatchListMap, Error> {
     let query = r#"
         SELECT b.show, a.link, a.title, a.year, b.source
         FROM trakt_watchlist a
@@ -516,7 +518,7 @@ pub fn sync_trakt_with_db() -> Result<(), Error> {
         .map(|(link, show)| {
             if !watchlist_shows_db.contains_key(link) {
                 show.insert_show(&mc.pool)?;
-                println!("insert watchlist {}", show);
+                writeln!(io::stdout().lock(), "insert watchlist {}", show)?;
             }
             Ok(())
         })
@@ -529,7 +531,7 @@ pub fn sync_trakt_with_db() -> Result<(), Error> {
         .map(|(link, show)| {
             if !watchlist_shows.contains_key(link) {
                 show.delete_show(&mc.pool)?;
-                println!("delete watchlist {}", show);
+                writeln!(io::stdout().lock(), "delete watchlist {}", show)?;
             }
             Ok(())
         })
@@ -550,7 +552,7 @@ pub fn sync_trakt_with_db() -> Result<(), Error> {
         .map(|(key, episode)| {
             if !watched_shows_db.contains_key(&key) {
                 episode.insert_episode(&mc.pool)?;
-                println!("insert watched {}", episode);
+                writeln!(io::stdout().lock(), "insert watched {}", episode)?;
             }
             Ok(())
         })
@@ -562,7 +564,7 @@ pub fn sync_trakt_with_db() -> Result<(), Error> {
         .map(|(key, episode)| {
             if !watched_shows.contains_key(&key) {
                 episode.delete_episode(&mc.pool)?;
-                println!("delete watched {}", episode);
+                writeln!(io::stdout().lock(), "delete watched {}", episode)?;
             }
             Ok(())
         })
@@ -582,7 +584,7 @@ pub fn sync_trakt_with_db() -> Result<(), Error> {
         .map(|(key, movie)| {
             if !watched_movies_db.contains_key(key) {
                 movie.insert_movie(&mc.pool)?;
-                println!("insert watched {}", movie);
+                writeln!(io::stdout().lock(), "insert watched {}", movie)?;
             }
             Ok(())
         })
@@ -594,7 +596,7 @@ pub fn sync_trakt_with_db() -> Result<(), Error> {
         .map(|(key, movie)| {
             if !watched_movies.contains_key(key) {
                 movie.delete_movie(&mc.pool)?;
-                println!("delete watched {}", movie);
+                writeln!(io::stdout().lock(), "delete watched {}", movie)?;
             }
             Ok(())
         })
@@ -611,7 +613,7 @@ fn get_imdb_url_from_show(
         let imdb_shows = mc.print_imdb_shows(show, false)?;
         if imdb_shows.len() > 1 {
             for show in imdb_shows {
-                println!("{}", show);
+                writeln!(io::stdout().lock(), "{}", show)?;
             }
             None
         } else {
@@ -652,26 +654,34 @@ pub fn trakt_app_parse(
                     false
                 };
                 if !exists {
-                    println!("{} {}", show, cal);
+                    writeln!(io::stdout().lock(), "{} {}", show, cal)?;
                 }
             }
         }
         TraktCommands::WatchList => match trakt_action {
             TraktActions::Add => {
                 if let Some(imdb_url) = get_imdb_url_from_show(&mc, show)? {
-                    println!("result: {}", ti.add_watchlist_show(&imdb_url)?);
+                    writeln!(
+                        io::stdout().lock(),
+                        "result: {}",
+                        ti.add_watchlist_show(&imdb_url)?
+                    )?;
                     sync_trakt_with_db()?;
                 }
             }
             TraktActions::Remove => {
                 if let Some(imdb_url) = get_imdb_url_from_show(&mc, show)? {
-                    println!("result: {}", ti.remove_watchlist_show(&imdb_url)?);
+                    writeln!(
+                        io::stdout().lock(),
+                        "result: {}",
+                        ti.remove_watchlist_show(&imdb_url)?
+                    )?;
                     sync_trakt_with_db()?;
                 }
             }
             TraktActions::List => {
                 for (_, show) in get_watchlist_shows_db(&mc.pool)? {
-                    println!("{}", show);
+                    writeln!(io::stdout().lock(), "{}", show)?;
                 }
             }
             _ => {}
@@ -711,20 +721,20 @@ pub fn trakt_app_parse(
                             continue;
                         }
                         if show.imdb_url == imdb_url {
-                            println!("{}", show);
+                            writeln!(io::stdout().lock(), "{}", show)?;
                         }
                     }
                     for show in &watched_movies {
                         if show.imdb_url == imdb_url {
-                            println!("{}", show);
+                            writeln!(io::stdout().lock(), "{}", show)?;
                         }
                     }
                 } else {
                     for show in &watched_shows {
-                        println!("{}", show);
+                        writeln!(io::stdout().lock(), "{}", show)?;
                     }
                     for show in &watched_movies {
-                        println!("{}", show);
+                        writeln!(io::stdout().lock(), "{}", show)?;
                     }
                 }
             }

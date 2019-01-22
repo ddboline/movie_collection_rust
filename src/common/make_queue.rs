@@ -7,6 +7,8 @@ extern crate subprocess;
 use failure::Error;
 use rayon::prelude::*;
 
+use std::io;
+use std::io::Write;
 use std::path;
 
 use crate::common::config::Config;
@@ -77,7 +79,7 @@ pub fn make_queue_worker(
             }
         } else {
             for result in results {
-                println!("{}", result);
+                writeln!(io::stdout().lock(), "{}", result)?;
             }
         }
     }

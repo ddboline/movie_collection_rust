@@ -68,5 +68,13 @@ fn make_queue() -> Result<(), Error> {
 }
 
 fn main() {
-    make_queue().unwrap();
+    match make_queue() {
+        Ok(_) => (),
+        Err(e) => {
+            if e.to_string().contains("Broken pipe") {
+            } else {
+                panic!("{}", e)
+            }
+        }
+    }
 }

@@ -243,8 +243,8 @@ fn trakt_watchlist(user: LoggedUser) -> Result<HttpResponse, Error> {
 
     shows.sort();
 
-    let body = include_str!("../templates/watchlist_template.html")
-        .replace("PREVIOUS", "/list/tvshows");
+    let body =
+        include_str!("../templates/watchlist_template.html").replace("PREVIOUS", "/list/tvshows");
 
     let shows: Vec<_> = shows
         .into_iter()

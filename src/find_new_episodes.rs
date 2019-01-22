@@ -8,6 +8,8 @@ extern crate serde_json;
 use chrono::{Duration, Local};
 use clap::{App, Arg};
 use failure::Error;
+use std::io;
+use std::io::Write;
 
 use movie_collection_rust::common::movie_collection::MovieCollectionDB;
 use movie_collection_rust::common::movie_queue::MovieQueueDB;
@@ -52,6 +54,8 @@ fn find_new_episodes() -> Result<(), Error> {
     let mc = MovieCollectionDB::new();
     let mq = MovieQueueDB::with_pool(mc.pool.clone());
 
+    let stdout = io::stdout();
+
     'outer: for epi in mc.get_new_episodes(mindate.naive_local(), maxdate.naive_local(), source)? {
         for s in mq.print_movie_queue(&[&epi.show])? {
             if let Some(show) = &s.show {
@@ -67,17 +71,26 @@ fn find_new_episodes() -> Result<(), Error> {
                 }
             }
         }
-        if !shows.is_empty() {
-            if shows.iter().any(|s| &epi.show != s) {
-                continue;
-            }
+        if !shows.is_empty() && shows.iter().any(|s| &epi.show != s) {
+            continue;
         }
-        println!("{}", epi);
+
+        {
+            writeln!(stdout.lock(), "{}", epi)?;
+        }
     }
 
     Ok(())
 }
 
 fn main() {
-    find_new_episodes().unwrap()
+    match find_new_episodes() {
+        Ok(_) => (),
+        Err(e) => {
+            if e.to_string().contains("Broken pipe") {
+            } else {
+                panic!("{}", e)
+            }
+        }
+    }
 }

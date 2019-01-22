@@ -3,6 +3,7 @@ use r2d2::{Pool, PooledConnection};
 use r2d2_postgres::{PostgresConnectionManager, TlsMode};
 use std::fmt;
 
+#[derive(Clone)]
 pub struct PgPool {
     pgurl: String,
     pool: Pool<PostgresConnectionManager>,
@@ -26,14 +27,5 @@ impl PgPool {
 
     pub fn get(&self) -> Result<PooledConnection<PostgresConnectionManager>, Error> {
         self.pool.get().map_err(err_msg)
-    }
-}
-
-impl Clone for PgPool {
-    fn clone(&self) -> PgPool {
-        PgPool {
-            pgurl: self.pgurl.clone(),
-            pool: self.pool.clone(),
-        }
     }
 }

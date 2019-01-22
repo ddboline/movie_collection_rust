@@ -15,6 +15,8 @@ use select::document::Document;
 use select::predicate::{Class, Name};
 use std::collections::HashMap;
 use std::fmt;
+use std::io;
+use std::io::Write;
 use std::thread::sleep;
 use std::time::Duration;
 
@@ -266,14 +268,11 @@ pub fn parse_imdb_worker(
 ) -> Result<(), Error> {
     let mc = MovieCollectionDB::new();
 
-    let shows: HashMap<String, _> = if let Some(ilink) = &imdb_link {
+    let shows: Vec<_> = if let Some(ilink) = &imdb_link {
         mc.print_imdb_shows(show, tv)?
             .into_iter()
             .filter_map(|s| match &s.link {
-                Some(l) if l == ilink => {
-                    println!("{}", s);
-                    Some((l.clone(), s.clone()))
-                }
+                Some(l) if l == ilink => Some((l.clone(), s)),
                 _ => None,
             })
             .collect()
@@ -281,35 +280,43 @@ pub fn parse_imdb_worker(
         mc.print_imdb_shows(show, tv)?
             .into_iter()
             .filter_map(|s| match &s.link {
-                Some(l) => {
-                    println!("{}", s);
-                    Some((l.clone(), s.clone()))
-                }
+                Some(l) => Some((l.clone(), s)),
                 None => None,
             })
             .collect()
     };
 
-    let episodes: Option<HashMap<(i32, i32), _>> = if tv {
+    for (_, s) in &shows {
+        writeln!(io::stdout().lock(), "{}", s)?;
+    }
+
+    let shows: HashMap<String, _> = shows.into_iter().collect();
+
+    let episodes: Option<Vec<_>> = if tv {
         if all_seasons {
             for s in mc.print_imdb_all_seasons(show)? {
-                println!("{}", s);
+                writeln!(io::stdout().lock(), "{}", s)?;
             }
             None
         } else {
             let r = mc
                 .print_imdb_episodes(show, season)?
                 .into_iter()
-                .map(|e| {
-                    println!("{}", e);
-                    ((e.season, e.episode), e)
-                })
+                .map(|e| ((e.season, e.episode), e))
                 .collect();
             Some(r)
         }
     } else {
         None
     };
+
+    if let Some(v) = episodes.as_ref() {
+        for ((_, _), e) in v {
+            writeln!(io::stdout().lock(), "{}", e)?;
+        }
+    }
+
+    let episodes: Option<HashMap<(i32, i32), _>> = episodes.map(|v| v.into_iter().collect());
 
     if do_update {
         let imdb_conn = ImdbConnection::new();
@@ -338,11 +345,17 @@ pub fn parse_imdb_worker(
                                 new.title = Some(result.title.clone());
                                 new.rating = Some(result.rating);
                                 new.update_show(&mc.pool)?;
-                                println!("exists {} {} {}", show, s, result.rating);
+                                writeln!(
+                                    io::stdout().lock(),
+                                    "exists {} {} {}",
+                                    show,
+                                    s,
+                                    result.rating
+                                )?;
                             }
                         }
                         None => {
-                            println!("not exists {} {}", show, result);
+                            writeln!(io::stdout().lock(), "not exists {} {}", show, result)?;
                             let istv = result.title.contains("TV Series")
                                 || result.title.contains("TV Mini-Series");
 
@@ -361,20 +374,26 @@ pub fn parse_imdb_worker(
             }
 
             for result in &results {
-                println!("{}", result);
+                writeln!(io::stdout().lock(), "{}", result)?;
             }
         } else if let Some(link) = link {
-            println!("Using {}", link);
+            writeln!(io::stdout().lock(), "Using {}", link)?;
             if let Some(result) = shows.get(&link) {
                 for episode in imdb_conn.parse_imdb_episode_list(&link, season)? {
-                    println!("{} {}", result, episode);
+                    writeln!(io::stdout().lock(), "{} {}", result, episode)?;
                     if update_database {
                         let key = (episode.season, episode.episode);
                         if let Some(episodes) = &episodes {
                             match episodes.get(&key) {
                                 Some(e) => {
                                     if (e.rating - episode.rating.unwrap_or(-1.0)).abs() > 0.1 {
-                                        println!("exists {} {} {}", result, episode, e.rating);
+                                        writeln!(
+                                            io::stdout().lock(),
+                                            "exists {} {} {}",
+                                            result,
+                                            episode,
+                                            e.rating
+                                        )?;
                                         let mut new = e.clone();
                                         new.eptitle =
                                             episode.eptitle.unwrap_or_else(|| "".to_string());
@@ -383,7 +402,12 @@ pub fn parse_imdb_worker(
                                     }
                                 }
                                 None => {
-                                    println!("not exists {} {}", result, episode);
+                                    writeln!(
+                                        io::stdout().lock(),
+                                        "not exists {} {}",
+                                        result,
+                                        episode
+                                    )?;
                                     ImdbEpisodes {
                                         show: show.to_string(),
                                         title: result

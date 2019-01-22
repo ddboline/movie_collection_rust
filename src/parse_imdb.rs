@@ -92,5 +92,13 @@ fn parse_imdb_parser() -> Result<(), Error> {
 }
 
 fn main() {
-    parse_imdb_parser().unwrap();
+    match parse_imdb_parser() {
+        Ok(_) => (),
+        Err(e) => {
+            if e.to_string().contains("Broken pipe") {
+            } else {
+                panic!("{}", e)
+            }
+        }
+    }
 }
