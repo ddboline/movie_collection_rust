@@ -22,7 +22,7 @@ use movie_collection_rust::common::movie_collection::{MovieCollection, MovieColl
 use movie_collection_rust::common::movie_queue::MovieQueueDB;
 use movie_collection_rust::common::pgpool::PgPool;
 use movie_collection_rust::common::trakt_utils::{
-    get_watched_shows_db, get_watchlist_shows_db_map, sync_trakt_with_db, TraktConnection,
+    get_watched_shows_db, get_watchlist_shows_db_map, TraktConnection, WatchListShow, WatchedEpisode, WatchedMovie
 };
 use movie_collection_rust::common::utils::remcom_single_file;
 
@@ -286,13 +286,25 @@ fn trakt_watchlist_action(
     let (action, imdb_url) = path.into_inner();
 
     let ti = TraktConnection::new();
+    let mc = MovieCollectionDB::new();
 
     let body = match action.as_str() {
-        "add" => format!("{}", ti.add_watchlist_show(&imdb_url)?),
-        "rm" => format!("{}", ti.remove_watchlist_show(&imdb_url)?),
+        "add" => {
+            let result = ti.add_watchlist_show(&imdb_url)?;
+            if let Some(show) = ti.get_watchlist_shows()?.get(&imdb_url) {
+                show.insert_show(&mc.pool)?;
+            }
+            format!("{}", result)
+        }
+        "rm" => {
+            let result = ti.remove_watchlist_show(&imdb_url)?;
+            if let Some(show) = WatchListShow::get_show_by_link(&imdb_url, &mc.pool)? {
+                show.delete_show(&mc.pool)?;
+            }
+            format!("{}", result)
+        }
         _ => "".to_string(),
     };
-    sync_trakt_with_db()?;
 
     let resp = HttpResponse::build(StatusCode::OK)
         .content_type("text/html; charset=utf-8")
@@ -443,27 +455,56 @@ fn trakt_watched_action(
     let (action, imdb_url, season, episode) = path.into_inner();
 
     let ti = TraktConnection::new();
+    let mc = MovieCollectionDB::new();
 
     let body = match action.as_str() {
-        "add" => format!(
-            "{}",
-            if season != -1 && episode != -1 {
+        "add" => {
+            let result = if season != -1 && episode != -1 {
                 ti.add_episode_to_watched(&imdb_url, season, episode)?
             } else {
                 ti.add_movie_to_watched(&imdb_url)?
-            }
-        ),
-        "rm" => format!(
-            "{}",
+            };
             if season != -1 && episode != -1 {
+                WatchedEpisode {
+                    imdb_url: imdb_url.clone(),
+                    season,
+                    episode,
+                    ..Default::default()
+                }
+                .insert_episode(&mc.pool)?;
+            } else {
+                WatchedMovie {
+                    imdb_url,
+                    title: "".to_string(),
+                }
+                .insert_movie(&mc.pool)?;
+            }
+
+            format!("{}", result)
+        }
+        "rm" => {
+            let result = if season != -1 && episode != -1 {
                 ti.remove_episode_to_watched(&imdb_url, season, episode)?
             } else {
                 ti.remove_movie_to_watched(&imdb_url)?
-            }
-        ),
+            };
+
+            if season != -1 && episode != -1 {
+                if let Some(epi_) =
+                    WatchedEpisode::get_watched_episode(&mc.pool, &imdb_url, season, episode)?
+                {
+                    epi_.delete_episode(&mc.pool)?;
+                }
+            } else {
+                if let Some(movie) = WatchedMovie::get_watched_movie(&mc.pool, &imdb_url)? {
+                    movie.delete_movie(&mc.pool)?;
+                }
+            };
+
+            format!("{}", result)
+        }
         _ => "".to_string(),
     };
-    sync_trakt_with_db()?;
 
     let resp = HttpResponse::build(StatusCode::OK)
         .content_type("text/html; charset=utf-8")
