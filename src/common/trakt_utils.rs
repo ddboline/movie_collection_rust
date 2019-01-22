@@ -681,7 +681,7 @@ pub fn trakt_app_parse(
                         "result: {}",
                         ti.add_watchlist_show(&imdb_url)?
                     )?;
-                    if let Some(show) = WatchListShow::get_show_by_link(&imdb_url, &mc.pool)? {
+                    if let Some(show) = ti.get_watchlist_shows()?.get(&imdb_url) {
                         show.insert_show(&mc.pool)?;
                     }
                 }
@@ -711,17 +711,21 @@ pub fn trakt_app_parse(
                     if season != -1 && !episode.is_empty() {
                         for epi in episode {
                             ti.add_episode_to_watched(&imdb_url, season, *epi)?;
-                            if let Some(epi_) = WatchedEpisode::get_watched_episode(
-                                &mc.pool, &imdb_url, season, *epi,
-                            )? {
-                                epi_.insert_episode(&mc.pool)?;
+                            WatchedEpisode {
+                                imdb_url: imdb_url.clone(),
+                                season,
+                                episode: *epi,
+                                ..Default::default()
                             }
+                            .insert_episode(&mc.pool)?;
                         }
                     } else {
                         ti.add_movie_to_watched(&imdb_url)?;
-                        if let Some(movie) = WatchedMovie::get_watched_movie(&mc.pool, &imdb_url)? {
-                            movie.insert_movie(&mc.pool)?;
+                        WatchedMovie {
+                            imdb_url,
+                            title: "".to_string(),
                         }
+                        .insert_movie(&mc.pool)?;
                     }
                 }
             }
@@ -730,9 +734,9 @@ pub fn trakt_app_parse(
                     if season != -1 && !episode.is_empty() {
                         for epi in episode {
                             ti.remove_episode_to_watched(&imdb_url, season, *epi)?;
-                            if let Some(epi_) =
-                                WatchedEpisode::get_watched_episode(&mc.pool, &imdb_url, season, *epi)?
-                            {
+                            if let Some(epi_) = WatchedEpisode::get_watched_episode(
+                                &mc.pool, &imdb_url, season, *epi,
+                            )? {
                                 epi_.delete_episode(&mc.pool)?;
                             }
                         }
