@@ -162,9 +162,25 @@ impl MovieCollectionDB {
         let config = Config::with_config();
         MovieCollectionDB { config, pool }
     }
+}
 
-    pub fn print_imdb_shows(&self, show: &str, istv: bool) -> Result<Vec<ImdbRatings>, Error> {
-        let conn = self.pool.get()?;
+impl MovieCollection for MovieCollectionDB {
+    fn get_pool(&self) -> &PgPool {
+        &self.pool
+    }
+
+    fn get_config(&self) -> &Config {
+        &self.config
+    }
+}
+
+pub trait MovieCollection: Send + Sync {
+    fn get_pool(&self) -> &PgPool;
+
+    fn get_config(&self) -> &Config;
+
+    fn print_imdb_shows(&self, show: &str, istv: bool) -> Result<Vec<ImdbRatings>, Error> {
+        let conn = self.get_pool().get()?;
 
         let query = format!("SELECT show FROM imdb_ratings WHERE show like '%{}%'", show);
         let query = if istv {
@@ -221,12 +237,12 @@ impl MovieCollectionDB {
         Ok(results)
     }
 
-    pub fn print_imdb_episodes(
+    fn print_imdb_episodes(
         &self,
         show: &str,
         season: Option<i32>,
     ) -> Result<Vec<ImdbEpisodes>, Error> {
-        let conn = self.pool.get()?;
+        let conn = self.get_pool().get()?;
         let query = r#"
             SELECT a.show, b.title, a.season, a.episode,
                    a.airdate,
@@ -270,8 +286,8 @@ impl MovieCollectionDB {
         Ok(result)
     }
 
-    pub fn print_imdb_all_seasons(&self, show: &str) -> Result<Vec<ImdbSeason>, Error> {
-        let conn = self.pool.get()?;
+    fn print_imdb_all_seasons(&self, show: &str) -> Result<Vec<ImdbSeason>, Error> {
+        let conn = self.get_pool().get()?;
         let query = r#"
             SELECT a.show, b.title, a.season, count(distinct a.episode)
             FROM imdb_episodes a
@@ -300,7 +316,7 @@ impl MovieCollectionDB {
         Ok(result)
     }
 
-    pub fn search_movie_collection(
+    fn search_movie_collection(
         &self,
         search_strs: &[String],
     ) -> Result<Vec<MovieCollectionResult>, Error> {
@@ -323,7 +339,7 @@ impl MovieCollectionDB {
         };
 
         let results: Vec<_> = self
-            .pool
+            .get_pool()
             .get()?
             .query(&query, &[])?
             .iter()
@@ -356,7 +372,7 @@ impl MovieCollectionDB {
                         WHERE show = $1 AND season = $2 AND episode = $3
                     "#;
                     for row in self
-                        .pool
+                        .get_pool()
                         .get()?
                         .query(query, &[&show, &season, &episode])?
                         .iter()
@@ -376,19 +392,21 @@ impl MovieCollectionDB {
         Ok(results)
     }
 
-    pub fn remove_from_collection(&self, path: &str) -> Result<(), Error> {
+    fn remove_from_collection(&self, path: &str) -> Result<(), Error> {
         let query = r#"
             DELETE FROM movie_collection
             WHERE path = $1
         "#;
-        self.pool.get()?.execute(query, &[&path.to_string()])?;
+        self.get_pool()
+            .get()?
+            .execute(query, &[&path.to_string()])?;
         Ok(())
     }
 
-    pub fn get_collection_index(&self, path: &str) -> Result<Option<i32>, Error> {
+    fn get_collection_index(&self, path: &str) -> Result<Option<i32>, Error> {
         let query = r#"SELECT idx FROM movie_collection WHERE path = $1"#;
         let result = self
-            .pool
+            .get_pool()
             .get()?
             .query(query, &[&path])?
             .iter()
@@ -397,10 +415,10 @@ impl MovieCollectionDB {
         Ok(result)
     }
 
-    pub fn get_collection_path(&self, idx: i32) -> Result<String, Error> {
+    fn get_collection_path(&self, idx: i32) -> Result<String, Error> {
         let query = "SELECT path FROM movie_collection WHERE idx = $1";
         let path: String = self
-            .pool
+            .get_pool()
             .get()?
             .query(query, &[&idx])?
             .iter()
@@ -410,13 +428,13 @@ impl MovieCollectionDB {
         Ok(path)
     }
 
-    pub fn get_collection_index_match(&self, path: &str) -> Result<Option<i32>, Error> {
+    fn get_collection_index_match(&self, path: &str) -> Result<Option<i32>, Error> {
         let query = format!(
             r#"SELECT idx FROM movie_collection WHERE path like '%{}%'"#,
             path
         );
         let result = self
-            .pool
+            .get_pool()
             .get()?
             .query(&query, &[])?
             .iter()
@@ -425,7 +443,7 @@ impl MovieCollectionDB {
         Ok(result)
     }
 
-    pub fn insert_into_collection(&self, path: &str) -> Result<(), Error> {
+    fn insert_into_collection(&self, path: &str) -> Result<(), Error> {
         if !Path::new(&path).exists() {
             return Err(err_msg("No such file"));
         }
@@ -435,13 +453,13 @@ impl MovieCollectionDB {
             INSERT INTO movie_collection (idx, path, show)
             VALUES ((SELECT max(idx)+1 FROM movie_collection), $1, $2)
         "#;
-        self.pool
+        self.get_pool()
             .get()?
             .execute(query, &[&path.to_string(), &show])?;
         Ok(())
     }
 
-    pub fn fix_collection_show_id(&self) -> Result<u64, Error> {
+    fn fix_collection_show_id(&self) -> Result<u64, Error> {
         let query = r#"
             WITH a AS (
                 SELECT a.idx, a.show, b.index
@@ -452,16 +470,16 @@ impl MovieCollectionDB {
             UPDATE movie_collection b set show_id=(SELECT c.index FROM imdb_ratings c WHERE b.show=c.show)
             WHERE idx in (SELECT a.idx FROM a)
         "#;
-        let rows = self.pool.get()?.execute(query, &[])?;
+        let rows = self.get_pool().get()?.execute(query, &[])?;
         Ok(rows)
     }
 
-    pub fn make_collection(&self) -> Result<(), Error> {
+    fn make_collection(&self) -> Result<(), Error> {
         let file_list: Vec<_> = self
-            .config
+            .get_config()
             .movie_dirs
             .par_iter()
-            .map(|d| walk_directory(&d, &self.config.suffixes))
+            .map(|d| walk_directory(&d, &self.get_config().suffixes))
             .collect();
 
         let file_list: HashSet<_> = map_result_vec(file_list)?.into_iter().flatten().collect();
@@ -485,7 +503,7 @@ impl MovieCollectionDB {
             JOIN movie_collection b ON a.collection_idx=b.idx
         "#;
         let movie_queue: HashMap<String, i32> = self
-            .pool
+            .get_pool()
             .get()?
             .query(query, &[])?
             .iter()
@@ -498,7 +516,7 @@ impl MovieCollectionDB {
 
         let query = "SELECT path, show FROM movie_collection";
         let collection_map: HashMap<String, String> = self
-            .pool
+            .get_pool()
             .get()?
             .query(query, &[])?
             .iter()
@@ -510,7 +528,7 @@ impl MovieCollectionDB {
             .collect();
         let query = "SELECT show, season, episode from imdb_episodes";
         let episodes_set: HashSet<(String, i32, i32)> = self
-            .pool
+            .get_pool()
             .get()?
             .query(query, &[])?
             .iter()
@@ -530,7 +548,7 @@ impl MovieCollectionDB {
                     .to_str()
                     .unwrap()
                     .to_string();
-                if !self.config.suffixes.contains(&ext) {
+                if !self.get_config().suffixes.contains(&ext) {
                     continue;
                 }
                 writeln!(io::stdout().lock(), "not in collection {}", f)?;
@@ -544,7 +562,7 @@ impl MovieCollectionDB {
                     match movie_queue.get(key) {
                         Some(v) => {
                             writeln!(io::stdout().lock(), "in queue but not disk {} {}", key, v)?;
-                            let mq = MovieQueueDB::with_pool(self.pool.clone());
+                            let mq = MovieQueueDB::with_pool(self.get_pool().clone());
                             mq.remove_from_queue_by_path(key)?;
                             self.remove_from_collection(key)
                         }
@@ -583,14 +601,14 @@ impl MovieCollectionDB {
         Ok(())
     }
 
-    pub fn get_imdb_show_map(&self) -> Result<HashMap<String, ImdbRatings>, Error> {
+    fn get_imdb_show_map(&self) -> Result<HashMap<String, ImdbRatings>, Error> {
         let query = r#"
             SELECT link, show, title, rating, istv, source
             FROM imdb_ratings
             WHERE link IS NOT null AND rating IS NOT null
         "#;
         let results: HashMap<String, ImdbRatings> = self
-            .pool
+            .get_pool()
             .get()?
             .query(query, &[])?
             .iter()
@@ -619,7 +637,7 @@ impl MovieCollectionDB {
         Ok(results)
     }
 
-    pub fn print_tv_shows(&self) -> Result<Vec<TvShowsResult>, Error> {
+    fn print_tv_shows(&self) -> Result<Vec<TvShowsResult>, Error> {
         let query = r#"
             SELECT b.show, c.link, c.title, c.source, count(*) as count
             FROM movie_queue a
@@ -630,7 +648,7 @@ impl MovieCollectionDB {
             ORDER BY 1,2,3,4
         "#;
         let results: Vec<_> = self
-            .pool
+            .get_pool()
             .get()?
             .query(query, &[])?
             .iter()
@@ -652,7 +670,7 @@ impl MovieCollectionDB {
         Ok(results)
     }
 
-    pub fn get_new_episodes(
+    fn get_new_episodes(
         &self,
         mindate: NaiveDate,
         maxdate: NaiveDate,
@@ -704,7 +722,7 @@ impl MovieCollectionDB {
         let query = format!("{} {}", query, groupby);
 
         let results = self
-            .pool
+            .get_pool()
             .get()?
             .query(&query, &[&mindate, &maxdate])?
             .iter()

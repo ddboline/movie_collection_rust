@@ -86,17 +86,17 @@ pub fn get_version_number() -> String {
     )
 }
 
-#[derive(Serialize, Deserialize)]
-struct ScriptStruct {
-    script: String,
-}
-
 pub fn open_transcode_channel(queue: &str) -> Result<Channel, Error> {
     let options: Options = Default::default();
     let mut session = Session::new(options)?;
     let mut channel = session.open_channel(1)?;
     channel.queue_declare(queue, false, true, false, false, false, Table::new())?;
     Ok(channel)
+}
+
+#[derive(Serialize, Deserialize)]
+struct ScriptStruct {
+    script: String,
 }
 
 pub fn publish_transcode_job_to_queue(

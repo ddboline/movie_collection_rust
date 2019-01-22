@@ -22,7 +22,7 @@ use std::time::Duration;
 
 use crate::common::imdb_episodes::ImdbEpisodes;
 use crate::common::imdb_ratings::ImdbRatings;
-use crate::common::movie_collection::MovieCollectionDB;
+use crate::common::movie_collection::{MovieCollection, MovieCollectionDB};
 use crate::common::utils::{map_result_vec, option_string_wrapper};
 
 #[derive(Default)]

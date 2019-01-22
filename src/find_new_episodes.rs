@@ -11,7 +11,7 @@ use failure::Error;
 use std::io;
 use std::io::Write;
 
-use movie_collection_rust::common::movie_collection::MovieCollectionDB;
+use movie_collection_rust::common::movie_collection::{MovieCollection, MovieCollectionDB};
 use movie_collection_rust::common::movie_queue::MovieQueueDB;
 use movie_collection_rust::common::utils::get_version_number;
 

@@ -18,7 +18,7 @@ use subprocess::Exec;
 use movie_collection_rust::common::config::Config;
 use movie_collection_rust::common::imdb_ratings::ImdbRatings;
 use movie_collection_rust::common::make_queue::movie_queue_http;
-use movie_collection_rust::common::movie_collection::MovieCollectionDB;
+use movie_collection_rust::common::movie_collection::{MovieCollection, MovieCollectionDB};
 use movie_collection_rust::common::movie_queue::MovieQueueDB;
 use movie_collection_rust::common::pgpool::PgPool;
 use movie_collection_rust::common::trakt_utils::{

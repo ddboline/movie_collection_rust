@@ -12,7 +12,7 @@ use std::io::Write;
 use std::path;
 
 use crate::common::config::Config;
-use crate::common::movie_collection::MovieCollectionDB;
+use crate::common::movie_collection::{MovieCollection, MovieCollectionDB};
 use crate::common::movie_queue::MovieQueueDB;
 use crate::common::pgpool::PgPool;
 use crate::common::utils::{get_video_runtime, map_result_vec, parse_file_stem};

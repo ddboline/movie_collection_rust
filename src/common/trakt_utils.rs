@@ -18,7 +18,7 @@ use std::io::Write;
 use crate::common::config::Config;
 use crate::common::imdb_episodes::ImdbEpisodes;
 use crate::common::imdb_ratings::ImdbRatings;
-use crate::common::movie_collection::MovieCollectionDB;
+use crate::common::movie_collection::{MovieCollection, MovieCollectionDB};
 use crate::common::pgpool::PgPool;
 use crate::common::utils::{map_result_vec, option_string_wrapper};
 
@@ -231,6 +231,21 @@ impl fmt::Display for WatchListShow {
 }
 
 impl WatchListShow {
+    pub fn get_show_by_link(link: &str, pool: &PgPool) -> Result<Option<WatchListShow>, Error> {
+        let query = "SELECT title, year FROM trakt_watchlist WHERE link = $1";
+        if let Some(row) = pool.get()?.query(query, &[&link])?.iter().nth(0) {
+            let title: String = row.get(0);
+            let year: i32 = row.get(1);
+            Ok(Some(WatchListShow {
+                link: link.to_string(),
+                title,
+                year,
+            }))
+        } else {
+            Ok(None)
+        }
+    }
+
     pub fn get_index(&self, pool: &PgPool) -> Result<Option<i32>, Error> {
         let query = "SELECT id FROM trakt_watchlist WHERE link = $1";
         if let Some(row) = pool.get()?.query(query, &[&self.link])?.iter().nth(0) {
@@ -666,7 +681,9 @@ pub fn trakt_app_parse(
                         "result: {}",
                         ti.add_watchlist_show(&imdb_url)?
                     )?;
-                    sync_trakt_with_db()?;
+                    if let Some(show) = WatchListShow::get_show_by_link(&imdb_url, &mc.pool)? {
+                        show.insert_show(&mc.pool)?;
+                    }
                 }
             }
             TraktActions::Remove => {
@@ -676,7 +693,9 @@ pub fn trakt_app_parse(
                         "result: {}",
                         ti.remove_watchlist_show(&imdb_url)?
                     )?;
-                    sync_trakt_with_db()?;
+                    if let Some(show) = WatchListShow::get_show_by_link(&imdb_url, &mc.pool)? {
+                        show.delete_show(&mc.pool)?;
+                    }
                 }
             }
             TraktActions::List => {
@@ -692,11 +711,18 @@ pub fn trakt_app_parse(
                     if season != -1 && !episode.is_empty() {
                         for epi in episode {
                             ti.add_episode_to_watched(&imdb_url, season, *epi)?;
+                            if let Some(epi_) = WatchedEpisode::get_watched_episode(
+                                &mc.pool, &imdb_url, season, *epi,
+                            )? {
+                                epi_.insert_episode(&mc.pool)?;
+                            }
                         }
                     } else {
                         ti.add_movie_to_watched(&imdb_url)?;
+                        if let Some(movie) = WatchedMovie::get_watched_movie(&mc.pool, &imdb_url)? {
+                            movie.insert_movie(&mc.pool)?;
+                        }
                     }
-                    sync_trakt_with_db()?;
                 }
             }
             TraktActions::Remove => {
@@ -704,11 +730,18 @@ pub fn trakt_app_parse(
                     if season != -1 && !episode.is_empty() {
                         for epi in episode {
                             ti.remove_episode_to_watched(&imdb_url, season, *epi)?;
+                            if let Some(epi_) =
+                                WatchedEpisode::get_watched_episode(&mc.pool, &imdb_url, season, *epi)?
+                            {
+                                epi_.delete_episode(&mc.pool)?;
+                            }
                         }
                     } else {
                         ti.remove_movie_to_watched(&imdb_url)?;
+                        if let Some(movie) = WatchedMovie::get_watched_movie(&mc.pool, &imdb_url)? {
+                            movie.delete_movie(&mc.pool)?;
+                        }
                     }
-                    sync_trakt_with_db()?;
                 }
             }
             TraktActions::List => {
