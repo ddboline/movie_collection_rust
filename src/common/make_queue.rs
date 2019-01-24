@@ -29,9 +29,11 @@ pub fn make_queue_worker(
     let mc = MovieCollectionDB::with_pool(pool.clone());
     let mq = MovieQueueDB::with_pool(pool);
 
+    let stdout = io::stdout();
+
     if do_shows {
         for show in mc.print_tv_shows()? {
-            println!("{}", show);
+            writeln!(stdout.lock(), "{}", show)?;
         }
     } else if let Some(files) = del_files {
         for file in files {
@@ -47,7 +49,7 @@ pub fn make_queue_worker(
             mq.insert_into_queue(max_idx + 1, &files[0])?;
         } else if files.len() == 2 {
             if let Ok(idx) = files[0].parse::<i32>() {
-                println!("inserting into {}", idx);
+                writeln!(stdout.lock(), "inserting into {}", idx)?;
                 mq.insert_into_queue(idx, &files[1])?;
             } else {
                 for file in &files {
@@ -75,11 +77,11 @@ pub fn make_queue_worker(
             let results = map_result_vec(results)?;
 
             for (timeval, result) in results {
-                println!("{} {}", result, timeval);
+                writeln!(stdout.lock(), "{} {}", result, timeval)?;
             }
         } else {
             for result in results {
-                writeln!(io::stdout().lock(), "{}", result)?;
+                writeln!(stdout.lock(), "{}", result)?;
             }
         }
     }

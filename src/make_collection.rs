@@ -47,6 +47,8 @@ fn make_collection() -> Result<(), Error> {
         .map(|s| s.map(|x| x.to_string()).collect())
         .unwrap_or_else(Vec::new);
 
+    let stdout = io::stdout();
+
     let mc = MovieCollectionDB::new();
     if !do_parse {
         let shows = mc.search_movie_collection(&shows)?;
@@ -60,11 +62,11 @@ fn make_collection() -> Result<(), Error> {
                 .collect();
             let shows = map_result_vec(shows)?;
             for (timeval, show) in shows {
-                writeln!(io::stdout().lock(), "{} {}", timeval, show)?;
+                writeln!(stdout.lock(), "{} {}", timeval, show)?;
             }
         } else {
             for show in shows {
-                writeln!(io::stdout().lock(), "{}", show)?;
+                writeln!(stdout.lock(), "{}", show)?;
             }
         }
     } else {

@@ -9,7 +9,7 @@ extern crate subprocess;
 use actix_web::middleware::identity::{CookieIdentityPolicy, IdentityService};
 use actix_web::{http::Method, http::StatusCode, server, App, HttpResponse, Path};
 use chrono::Duration;
-use failure::{err_msg, Error};
+use failure::Error;
 use rust_auth_server::auth_handler::LoggedUser;
 use std::collections::{HashMap, HashSet};
 use std::path;
@@ -22,9 +22,10 @@ use movie_collection_rust::common::movie_collection::{MovieCollection, MovieColl
 use movie_collection_rust::common::movie_queue::MovieQueueDB;
 use movie_collection_rust::common::pgpool::PgPool;
 use movie_collection_rust::common::trakt_utils::{
-    get_watched_shows_db, get_watchlist_shows_db_map, TraktConnection, WatchListShow, WatchedEpisode, WatchedMovie
+    get_watched_shows_db, get_watchlist_shows_db_map, TraktConnection, WatchListShow,
+    WatchedEpisode, WatchedMovie,
 };
-use movie_collection_rust::common::utils::remcom_single_file;
+use movie_collection_rust::common::utils::{map_result_vec, remcom_single_file};
 
 fn tvshows(user: LoggedUser) -> Result<HttpResponse, Error> {
     if user.email != "ddboline@gmail.com" {
@@ -135,18 +136,16 @@ fn movie_queue_delete(path: Path<String>, user: LoggedUser) -> Result<HttpRespon
 
     let config = Config::with_config();
     let pool = PgPool::new(&config.pgurl);
-    let mc = MovieCollectionDB::with_pool(pool.clone());
     let mq = MovieQueueDB::with_pool(pool);
-    println!("{}", path);
+    let path = path.into_inner();
 
-    let index = mc
-        .get_collection_index_match(&path.into_inner())?
-        .ok_or_else(|| err_msg("Path doesn't exist"))?;
-    mq.remove_from_queue_by_collection_idx(index)?;
+    if path::Path::new(&path).exists() {
+        mq.remove_from_queue_by_path(&path)?;
+    }
 
     let resp = HttpResponse::build(StatusCode::OK)
         .content_type("text/html; charset=utf-8")
-        .body(index.to_string());
+        .body(path);
     Ok(resp)
 }
 
@@ -158,15 +157,21 @@ fn movie_queue_transcode(path: Path<String>, user: LoggedUser) -> Result<HttpRes
     let path = path.into_inner();
 
     let mq = MovieQueueDB::new();
-    println!("{}", path);
-    for entry in mq.print_movie_queue(&[&path])? {
-        println!("{}", entry);
-        remcom_single_file(&entry.path, &None, false);
-    }
+
+    let entries: Vec<Result<_, Error>> = mq
+        .print_movie_queue(&[&path])?
+        .iter()
+        .map(|entry| {
+            remcom_single_file(&entry.path, &None, false)?;
+            Ok(format!("{}", entry))
+        })
+        .collect();
+
+    let entries = map_result_vec(entries)?;
 
     let resp = HttpResponse::build(StatusCode::OK)
         .content_type("text/html; charset=utf-8")
-        .body("".to_string());
+        .body(entries.join("\n"));
     Ok(resp)
 }
 
@@ -180,15 +185,21 @@ fn movie_queue_transcode_directory(
     let (directory, file) = path.into_inner();
 
     let mc = MovieQueueDB::new();
-    println!("{}", file);
-    for entry in mc.print_movie_queue(&[&file])? {
-        println!("{}", entry);
-        remcom_single_file(&entry.path, &Some(directory.clone()), false);
-    }
+
+    let entries: Vec<Result<_, Error>> = mc
+        .print_movie_queue(&[&file])?
+        .iter()
+        .map(|entry| {
+            remcom_single_file(&entry.path, &Some(directory.clone()), false)?;
+            Ok(format!("{}", entry))
+        })
+        .collect();
+
+    let entries = map_result_vec(entries)?;
 
     let resp = HttpResponse::build(StatusCode::OK)
         .content_type("text/html; charset=utf-8")
-        .body("".to_string());
+        .body(entries.join("\n"));
     Ok(resp)
 }
 

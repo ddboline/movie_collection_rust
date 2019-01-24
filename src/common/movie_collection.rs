@@ -540,6 +540,8 @@ pub trait MovieCollection: Send + Sync {
             })
             .collect();
 
+        let stdout = io::stdout();
+
         for f in &file_list {
             if collection_map.get(f).is_none() {
                 let ext = Path::new(&f)
@@ -551,7 +553,7 @@ pub trait MovieCollection: Send + Sync {
                 if !self.get_config().suffixes.contains(&ext) {
                     continue;
                 }
-                writeln!(io::stdout().lock(), "not in collection {}", f)?;
+                writeln!(stdout.lock(), "not in collection {}", f)?;
                 self.insert_into_collection(f)?;
             }
         }
@@ -561,13 +563,13 @@ pub trait MovieCollection: Send + Sync {
                 if !file_list.contains(key) {
                     match movie_queue.get(key) {
                         Some(v) => {
-                            writeln!(io::stdout().lock(), "in queue but not disk {} {}", key, v)?;
+                            writeln!(stdout.lock(), "in queue but not disk {} {}", key, v)?;
                             let mq = MovieQueueDB::with_pool(self.get_pool().clone());
                             mq.remove_from_queue_by_path(key)?;
                             self.remove_from_collection(key)
                         }
                         None => {
-                            writeln!(io::stdout().lock(), "not on disk {} {}", key, val)?;
+                            writeln!(stdout.lock(), "not on disk {} {}", key, val)?;
                             self.remove_from_collection(key)
                         }
                     }
@@ -582,9 +584,9 @@ pub trait MovieCollection: Send + Sync {
         for (key, val) in collection_map {
             if !file_list.contains(&key) {
                 if movie_queue.contains_key(&key) {
-                    writeln!(io::stdout().lock(), "in queue but not disk {}", key)?;
+                    writeln!(stdout.lock(), "in queue but not disk {}", key)?;
                 } else {
-                    writeln!(io::stdout().lock(), "not on disk {} {}", key, val)?;
+                    writeln!(stdout.lock(), "not on disk {} {}", key, val)?;
                 }
             }
         }
@@ -596,7 +598,7 @@ pub trait MovieCollection: Send + Sync {
             }
         }
         for show in shows_not_in_db {
-            writeln!(io::stdout().lock(), "show has episode not in db {} ", show)?;
+            writeln!(stdout.lock(), "show has episode not in db {} ", show)?;
         }
         Ok(())
     }

@@ -528,12 +528,15 @@ pub fn sync_trakt_with_db() -> Result<(), Error> {
     if watchlist_shows.is_empty() {
         return Ok(());
     }
+
+    let stdout = io::stdout();
+
     let results: Vec<Result<_, Error>> = watchlist_shows
         .par_iter()
         .map(|(link, show)| {
             if !watchlist_shows_db.contains_key(link) {
                 show.insert_show(&mc.pool)?;
-                writeln!(io::stdout().lock(), "insert watchlist {}", show)?;
+                writeln!(stdout.lock(), "insert watchlist {}", show)?;
             }
             Ok(())
         })
@@ -546,7 +549,7 @@ pub fn sync_trakt_with_db() -> Result<(), Error> {
         .map(|(link, show)| {
             if !watchlist_shows.contains_key(link) {
                 show.delete_show(&mc.pool)?;
-                writeln!(io::stdout().lock(), "delete watchlist {}", show)?;
+                writeln!(stdout.lock(), "delete watchlist {}", show)?;
             }
             Ok(())
         })
@@ -567,7 +570,7 @@ pub fn sync_trakt_with_db() -> Result<(), Error> {
         .map(|(key, episode)| {
             if !watched_shows_db.contains_key(&key) {
                 episode.insert_episode(&mc.pool)?;
-                writeln!(io::stdout().lock(), "insert watched {}", episode)?;
+                writeln!(stdout.lock(), "insert watched {}", episode)?;
             }
             Ok(())
         })
@@ -579,7 +582,7 @@ pub fn sync_trakt_with_db() -> Result<(), Error> {
         .map(|(key, episode)| {
             if !watched_shows.contains_key(&key) {
                 episode.delete_episode(&mc.pool)?;
-                writeln!(io::stdout().lock(), "delete watched {}", episode)?;
+                writeln!(stdout.lock(), "delete watched {}", episode)?;
             }
             Ok(())
         })
@@ -599,7 +602,7 @@ pub fn sync_trakt_with_db() -> Result<(), Error> {
         .map(|(key, movie)| {
             if !watched_movies_db.contains_key(key) {
                 movie.insert_movie(&mc.pool)?;
-                writeln!(io::stdout().lock(), "insert watched {}", movie)?;
+                writeln!(stdout.lock(), "insert watched {}", movie)?;
             }
             Ok(())
         })
@@ -611,7 +614,7 @@ pub fn sync_trakt_with_db() -> Result<(), Error> {
         .map(|(key, movie)| {
             if !watched_movies.contains_key(key) {
                 movie.delete_movie(&mc.pool)?;
-                writeln!(io::stdout().lock(), "delete watched {}", movie)?;
+                writeln!(stdout.lock(), "delete watched {}", movie)?;
             }
             Ok(())
         })
@@ -624,11 +627,13 @@ fn get_imdb_url_from_show(
     mc: &MovieCollectionDB,
     show: Option<&String>,
 ) -> Result<Option<String>, Error> {
+    let stdout = io::stdout();
+
     let result = if let Some(show) = show {
         let imdb_shows = mc.print_imdb_shows(show, false)?;
         if imdb_shows.len() > 1 {
             for show in imdb_shows {
-                writeln!(io::stdout().lock(), "{}", show)?;
+                writeln!(stdout.lock(), "{}", show)?;
             }
             None
         } else {

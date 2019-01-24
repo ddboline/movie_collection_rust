@@ -15,7 +15,7 @@ use std::env::var;
 use std::fs::create_dir_all;
 use std::fs::rename;
 use std::fs::{File, OpenOptions};
-use std::io::Write;
+use std::io::{stdout, Write};
 use std::io::{BufRead, BufReader};
 use std::path::Path;
 use subprocess::{Exec, Redirection};
@@ -315,28 +315,37 @@ pub fn get_video_runtime(f: &str) -> Result<String, Error> {
     Ok(timeval)
 }
 
-pub fn remcom_single_file(file: &str, directory: &Option<String>, unwatched: bool) {
+pub fn remcom_single_file(
+    file: &str,
+    directory: &Option<String>,
+    unwatched: bool,
+) -> Result<(), Error> {
     let config = Config::with_config();
     let path = Path::new(&file);
-    let ext = path.extension().unwrap().to_str().unwrap();
+    let ext = path
+        .extension()
+        .ok_or_else(|| err_msg("no extension"))?
+        .to_str()
+        .ok_or_else(|| err_msg("invalid str"))?;
+
+    let stdout = stdout();
 
     if ext != "mp4" {
         match create_transcode_script(&config, &path) {
             Ok(s) => {
-                println!("script {}", s);
-                publish_transcode_job_to_queue(&s, "transcode_work_queue", "transcode_work_queue")
-                    .expect("Publish to queue failed");
+                writeln!(stdout.lock(), "script {}", s)?;
+                publish_transcode_job_to_queue(&s, "transcode_work_queue", "transcode_work_queue")?;
             }
-            Err(e) => println!("error {}", e),
+            Err(e) => writeln!(stdout.lock(), "error {}", e)?,
         }
     }
 
     match create_move_script(&config, directory.clone(), unwatched, &path) {
         Ok(s) => {
-            println!("script {}", s);
-            publish_transcode_job_to_queue(&s, "transcode_work_queue", "transcode_work_queue")
-                .expect("Publish to queue failed");
+            writeln!(stdout.lock(), "script {}", s)?;
+            publish_transcode_job_to_queue(&s, "transcode_work_queue", "transcode_work_queue")?;
         }
-        Err(e) => println!("error {}", e),
+        Err(e) => writeln!(stdout.lock(), "error {}", e)?,
     }
+    Ok(())
 }

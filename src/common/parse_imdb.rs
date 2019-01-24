@@ -286,8 +286,10 @@ pub fn parse_imdb_worker(
             .collect()
     };
 
+    let stdout = io::stdout();
+
     for (_, s) in &shows {
-        writeln!(io::stdout().lock(), "{}", s)?;
+        writeln!(stdout.lock(), "{}", s)?;
     }
 
     let shows: HashMap<String, _> = shows.into_iter().collect();
@@ -295,7 +297,7 @@ pub fn parse_imdb_worker(
     let episodes: Option<Vec<_>> = if tv {
         if all_seasons {
             for s in mc.print_imdb_all_seasons(show)? {
-                writeln!(io::stdout().lock(), "{}", s)?;
+                writeln!(stdout.lock(), "{}", s)?;
             }
             None
         } else {
@@ -312,7 +314,7 @@ pub fn parse_imdb_worker(
 
     if let Some(v) = episodes.as_ref() {
         for ((_, _), e) in v {
-            writeln!(io::stdout().lock(), "{}", e)?;
+            writeln!(stdout.lock(), "{}", e)?;
         }
     }
 
@@ -345,17 +347,11 @@ pub fn parse_imdb_worker(
                                 new.title = Some(result.title.clone());
                                 new.rating = Some(result.rating);
                                 new.update_show(&mc.pool)?;
-                                writeln!(
-                                    io::stdout().lock(),
-                                    "exists {} {} {}",
-                                    show,
-                                    s,
-                                    result.rating
-                                )?;
+                                writeln!(stdout.lock(), "exists {} {} {}", show, s, result.rating)?;
                             }
                         }
                         None => {
-                            writeln!(io::stdout().lock(), "not exists {} {}", show, result)?;
+                            writeln!(stdout.lock(), "not exists {} {}", show, result)?;
                             let istv = result.title.contains("TV Series")
                                 || result.title.contains("TV Mini-Series");
 
@@ -374,13 +370,13 @@ pub fn parse_imdb_worker(
             }
 
             for result in &results {
-                writeln!(io::stdout().lock(), "{}", result)?;
+                writeln!(stdout.lock(), "{}", result)?;
             }
         } else if let Some(link) = link {
-            writeln!(io::stdout().lock(), "Using {}", link)?;
+            writeln!(stdout.lock(), "Using {}", link)?;
             if let Some(result) = shows.get(&link) {
                 for episode in imdb_conn.parse_imdb_episode_list(&link, season)? {
-                    writeln!(io::stdout().lock(), "{} {}", result, episode)?;
+                    writeln!(stdout.lock(), "{} {}", result, episode)?;
                     if update_database {
                         let key = (episode.season, episode.episode);
                         if let Some(episodes) = &episodes {
@@ -388,7 +384,7 @@ pub fn parse_imdb_worker(
                                 Some(e) => {
                                     if (e.rating - episode.rating.unwrap_or(-1.0)).abs() > 0.1 {
                                         writeln!(
-                                            io::stdout().lock(),
+                                            stdout.lock(),
                                             "exists {} {} {}",
                                             result,
                                             episode,
@@ -402,12 +398,7 @@ pub fn parse_imdb_worker(
                                     }
                                 }
                                 None => {
-                                    writeln!(
-                                        io::stdout().lock(),
-                                        "not exists {} {}",
-                                        result,
-                                        episode
-                                    )?;
+                                    writeln!(stdout.lock(), "not exists {} {}", result, episode)?;
                                     ImdbEpisodes {
                                         show: show.to_string(),
                                         title: result

@@ -5,6 +5,7 @@ extern crate rayon;
 use failure::Error;
 use rayon::prelude::*;
 use std::collections::HashMap;
+use std::io::{stdout, Write};
 use std::path::Path;
 
 use crate::common::config::Config;
@@ -68,8 +69,10 @@ pub fn make_list() -> Result<(), Error> {
         })
         .collect();
 
+    let stdout = stdout();
+
     for e in result {
-        println!("{}", e);
+        writeln!(stdout.lock(), "{}", e)?;
     }
 
     let result: Vec<_> = file_list
@@ -82,7 +85,7 @@ pub fn make_list() -> Result<(), Error> {
         .collect();
 
     for e in result {
-        println!("{}", e);
+        writeln!(stdout.lock(), "{}", e)?;
     }
 
     Ok(())
