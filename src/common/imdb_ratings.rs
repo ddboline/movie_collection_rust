@@ -27,8 +27,7 @@ impl fmt::Display for ImdbRatings {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         write!(
             f,
-            "{} {} {} {} {} {} {} ",
-            self.index,
+            "{} {} {} {} {} {} ",
             self.show,
             option_string_wrapper(&self.title),
             option_string_wrapper(&self.link),
@@ -100,7 +99,6 @@ impl ImdbRatings {
 
     pub fn get_string_vec(&self) -> Vec<String> {
         vec![
-            self.index.to_string(),
             self.show.clone(),
             option_string_wrapper(&self.title).to_string(),
             option_string_wrapper(&self.link).to_string(),
