@@ -1,5 +1,7 @@
 #![allow(clippy::needless_pass_by_value)]
 
+#[macro_use]
+extern crate serde_derive;
 extern crate actix;
 extern crate actix_web;
 extern crate movie_collection_rust;
@@ -7,7 +9,7 @@ extern crate rust_auth_server;
 extern crate subprocess;
 
 use actix_web::middleware::identity::{CookieIdentityPolicy, IdentityService};
-use actix_web::{http::Method, http::StatusCode, server, App, HttpResponse, Path};
+use actix_web::{http::Method, http::StatusCode, server, App, HttpResponse, Path, Query};
 use chrono::Duration;
 use failure::Error;
 use rust_auth_server::auth_handler::LoggedUser;
@@ -531,29 +533,52 @@ fn trakt_watched_action(
     Ok(resp)
 }
 
-fn imdb_show(path: Path<String>, user: LoggedUser) -> Result<HttpResponse, Error> {
+#[derive(Deserialize, Default)]
+struct ParseImdbRequest {
+    all: Option<bool>,
+    database: Option<bool>,
+    tv: Option<bool>,
+    update: Option<bool>,
+    imdblink: Option<String>,
+    season: Option<i32>,
+}
+
+fn imdb_show(
+    path: Path<String>,
+    query: Query<ParseImdbRequest>,
+    user: LoggedUser,
+) -> Result<HttpResponse, Error> {
     if user.email != "ddboline@gmail.com" {
         return Ok(HttpResponse::Unauthorized().json("Unauthorized"));
     }
 
     let show = path.into_inner();
+    let query = query.into_inner();
 
-    let output: Vec<_> = parse_imdb_worker(&show, false, None, false, None, false, false)?
-        .into_iter()
-        .map(|line| {
-            let tmp: Vec<_> = line
-                .into_iter()
-                .map(|i| {
-                    if i.starts_with("tt") {
-                        format!(r#"<a href="https://www.imdb.com/title/{}">{}</a>"#, i, i)
-                    } else {
-                        i.to_string()
-                    }
-                })
-                .collect();
-            format!("<tr><td>{}</td></tr>", tmp.join("</td><td>"))
-        })
-        .collect();
+    let output: Vec<_> = parse_imdb_worker(
+        &show,
+        query.tv.unwrap_or(false),
+        query.imdblink.clone(),
+        query.all.unwrap_or(false),
+        query.season,
+        query.update.unwrap_or(false),
+        query.database.unwrap_or(false),
+    )?
+    .into_iter()
+    .map(|line| {
+        let tmp: Vec<_> = line
+            .into_iter()
+            .map(|i| {
+                if i.starts_with("tt") {
+                    format!(r#"<a href="https://www.imdb.com/title/{}">{}</a>"#, i, i)
+                } else {
+                    i.to_string()
+                }
+            })
+            .collect();
+        format!("<tr><td>{}</td></tr>", tmp.join("</td><td>"))
+    })
+    .collect();
 
     let body = include_str!("../templates/watched_template.html");
 
