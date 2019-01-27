@@ -86,7 +86,7 @@ fn tvshows(user: LoggedUser) -> Result<HttpResponse, Error> {
                     _ => "",
                 },
                 if has_watchlist {
-                    format!(r#"<a href="/list/watched/list/{}""#, link)
+                    format!(r#"<a href="/list/watched/list/{}">watchlist</a>"#, link)
                 } else {
                     "".to_string()
                 },
