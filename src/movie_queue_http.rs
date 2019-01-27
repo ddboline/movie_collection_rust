@@ -66,9 +66,10 @@ fn tvshows(user: LoggedUser) -> Result<HttpResponse, Error> {
     let shows: Vec<_> = shows
         .into_iter()
         .map(|(show, title, link, source)| {
+            let has_watchlist = watchlist.contains_key(link);
             format!(
                 r#"<tr><td>{}</td>
-                   <td><a href="https://www.imdb.com/title/{}">imdb</a><td>{}<td>{}</tr>"#,
+                   <td><a href="https://www.imdb.com/title/{}">imdb</a></td><td>{}</td><td>{}</td><td>{}</td></tr>"#,
                 if tvshows.contains_key(link) {
                     format!(r#"<a href="/list/{}">{}</a>"#, show, title)
                 } else {
@@ -84,7 +85,12 @@ fn tvshows(user: LoggedUser) -> Result<HttpResponse, Error> {
                     Some("amazon") => r#"<a href="https://amazon.com">netflix</a>"#,
                     _ => "",
                 },
-                if !watchlist.contains_key(link) {
+                if has_watchlist {
+                    format!(r#"<a href="/list/watched/list/{}"#, link)
+                } else {
+                    "".to_string()
+                },
+                if !has_watchlist {
                     button_add.replace("SHOW", link)
                 } else {
                     button_rm.replace("SHOW", link)
