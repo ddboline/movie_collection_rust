@@ -645,6 +645,161 @@ fn get_imdb_url_from_show(
     Ok(result)
 }
 
+fn trakt_cal_list(ti: &TraktConnection, mc: &MovieCollectionDB) -> Result<(), Error> {
+    for cal in ti.get_calendar()? {
+        let show = match ImdbRatings::get_show_by_link(&cal.link, &mc.pool)? {
+            Some(s) => s.show,
+            None => "".to_string(),
+        };
+        let exists = if !show.is_empty() {
+            ImdbEpisodes {
+                show: show.clone(),
+                season: cal.season,
+                episode: cal.episode,
+                ..Default::default()
+            }
+            .get_index(&mc.pool)?
+            .is_some()
+        } else {
+            false
+        };
+        if !exists {
+            writeln!(io::stdout().lock(), "{} {}", show, cal)?;
+        }
+    }
+    Ok(())
+}
+
+fn watchlist_add(
+    ti: &TraktConnection,
+    mc: &MovieCollectionDB,
+    show: Option<&String>,
+) -> Result<(), Error> {
+    if let Some(imdb_url) = get_imdb_url_from_show(&mc, show)? {
+        writeln!(
+            io::stdout().lock(),
+            "result: {}",
+            ti.add_watchlist_show(&imdb_url)?
+        )?;
+        if let Some(show) = ti.get_watchlist_shows()?.get(&imdb_url) {
+            show.insert_show(&mc.pool)?;
+        }
+    }
+    Ok(())
+}
+
+fn watchlist_rm(
+    ti: &TraktConnection,
+    mc: &MovieCollectionDB,
+    show: Option<&String>,
+) -> Result<(), Error> {
+    if let Some(imdb_url) = get_imdb_url_from_show(&mc, show)? {
+        writeln!(
+            io::stdout().lock(),
+            "result: {}",
+            ti.remove_watchlist_show(&imdb_url)?
+        )?;
+        if let Some(show) = WatchListShow::get_show_by_link(&imdb_url, &mc.pool)? {
+            show.delete_show(&mc.pool)?;
+        }
+    }
+    Ok(())
+}
+
+fn watchlist_list(mc: &MovieCollectionDB) -> Result<(), Error> {
+    for (_, show) in get_watchlist_shows_db(&mc.pool)? {
+        writeln!(io::stdout().lock(), "{}", show)?;
+    }
+    Ok(())
+}
+
+fn watched_add(
+    ti: &TraktConnection,
+    mc: &MovieCollectionDB,
+    show: Option<&String>,
+    season: i32,
+    episode: &[i32],
+) -> Result<(), Error> {
+    if let Some(imdb_url) = get_imdb_url_from_show(&mc, show)? {
+        if season != -1 && !episode.is_empty() {
+            for epi in episode {
+                ti.add_episode_to_watched(&imdb_url, season, *epi)?;
+                WatchedEpisode {
+                    imdb_url: imdb_url.clone(),
+                    season,
+                    episode: *epi,
+                    ..Default::default()
+                }
+                .insert_episode(&mc.pool)?;
+            }
+        } else {
+            ti.add_movie_to_watched(&imdb_url)?;
+            WatchedMovie {
+                imdb_url,
+                title: "".to_string(),
+            }
+            .insert_movie(&mc.pool)?;
+        }
+    }
+    Ok(())
+}
+
+fn watched_rm(
+    ti: &TraktConnection,
+    mc: &MovieCollectionDB,
+    show: Option<&String>,
+    season: i32,
+    episode: &[i32],
+) -> Result<(), Error> {
+    if let Some(imdb_url) = get_imdb_url_from_show(&mc, show)? {
+        if season != -1 && !episode.is_empty() {
+            for epi in episode {
+                ti.remove_episode_to_watched(&imdb_url, season, *epi)?;
+                if let Some(epi_) =
+                    WatchedEpisode::get_watched_episode(&mc.pool, &imdb_url, season, *epi)?
+                {
+                    epi_.delete_episode(&mc.pool)?;
+                }
+            }
+        } else {
+            ti.remove_movie_to_watched(&imdb_url)?;
+            if let Some(movie) = WatchedMovie::get_watched_movie(&mc.pool, &imdb_url)? {
+                movie.delete_movie(&mc.pool)?;
+            }
+        }
+    }
+    Ok(())
+}
+
+fn watched_list(mc: &MovieCollectionDB, show: Option<&String>, season: i32) -> Result<(), Error> {
+    let watched_shows = get_watched_shows_db(&mc.pool)?;
+    let watched_movies = get_watched_movies_db(&mc.pool)?;
+
+    if let Some(imdb_url) = get_imdb_url_from_show(&mc, show)? {
+        for show in &watched_shows {
+            if season != -1 && show.season != season {
+                continue;
+            }
+            if show.imdb_url == imdb_url {
+                writeln!(io::stdout().lock(), "{}", show)?;
+            }
+        }
+        for show in &watched_movies {
+            if show.imdb_url == imdb_url {
+                writeln!(io::stdout().lock(), "{}", show)?;
+            }
+        }
+    } else {
+        for show in &watched_shows {
+            writeln!(io::stdout().lock(), "{}", show)?;
+        }
+        for show in &watched_movies {
+            writeln!(io::stdout().lock(), "{}", show)?;
+        }
+    }
+    Ok(())
+}
+
 pub fn trakt_app_parse(
     trakt_command: &TraktCommands,
     trakt_action: &TraktActions,
@@ -655,131 +810,17 @@ pub fn trakt_app_parse(
     let mc = MovieCollectionDB::new();
     let ti = TraktConnection::new();
     match trakt_command {
-        TraktCommands::Calendar => {
-            for cal in ti.get_calendar()? {
-                let show = match ImdbRatings::get_show_by_link(&cal.link, &mc.pool)? {
-                    Some(s) => s.show,
-                    None => "".to_string(),
-                };
-                let exists = if !show.is_empty() {
-                    ImdbEpisodes {
-                        show: show.clone(),
-                        season: cal.season,
-                        episode: cal.episode,
-                        ..Default::default()
-                    }
-                    .get_index(&mc.pool)?
-                    .is_some()
-                } else {
-                    false
-                };
-                if !exists {
-                    writeln!(io::stdout().lock(), "{} {}", show, cal)?;
-                }
-            }
-        }
+        TraktCommands::Calendar => trakt_cal_list(&ti, &mc)?,
         TraktCommands::WatchList => match trakt_action {
-            TraktActions::Add => {
-                if let Some(imdb_url) = get_imdb_url_from_show(&mc, show)? {
-                    writeln!(
-                        io::stdout().lock(),
-                        "result: {}",
-                        ti.add_watchlist_show(&imdb_url)?
-                    )?;
-                    if let Some(show) = ti.get_watchlist_shows()?.get(&imdb_url) {
-                        show.insert_show(&mc.pool)?;
-                    }
-                }
-            }
-            TraktActions::Remove => {
-                if let Some(imdb_url) = get_imdb_url_from_show(&mc, show)? {
-                    writeln!(
-                        io::stdout().lock(),
-                        "result: {}",
-                        ti.remove_watchlist_show(&imdb_url)?
-                    )?;
-                    if let Some(show) = WatchListShow::get_show_by_link(&imdb_url, &mc.pool)? {
-                        show.delete_show(&mc.pool)?;
-                    }
-                }
-            }
-            TraktActions::List => {
-                for (_, show) in get_watchlist_shows_db(&mc.pool)? {
-                    writeln!(io::stdout().lock(), "{}", show)?;
-                }
-            }
+            TraktActions::Add => watchlist_add(&ti, &mc, show)?,
+            TraktActions::Remove => watchlist_rm(&ti, &mc, show)?,
+            TraktActions::List => watchlist_list(&mc)?,
             _ => {}
         },
         TraktCommands::Watched => match trakt_action {
-            TraktActions::Add => {
-                if let Some(imdb_url) = get_imdb_url_from_show(&mc, show)? {
-                    if season != -1 && !episode.is_empty() {
-                        for epi in episode {
-                            ti.add_episode_to_watched(&imdb_url, season, *epi)?;
-                            WatchedEpisode {
-                                imdb_url: imdb_url.clone(),
-                                season,
-                                episode: *epi,
-                                ..Default::default()
-                            }
-                            .insert_episode(&mc.pool)?;
-                        }
-                    } else {
-                        ti.add_movie_to_watched(&imdb_url)?;
-                        WatchedMovie {
-                            imdb_url,
-                            title: "".to_string(),
-                        }
-                        .insert_movie(&mc.pool)?;
-                    }
-                }
-            }
-            TraktActions::Remove => {
-                if let Some(imdb_url) = get_imdb_url_from_show(&mc, show)? {
-                    if season != -1 && !episode.is_empty() {
-                        for epi in episode {
-                            ti.remove_episode_to_watched(&imdb_url, season, *epi)?;
-                            if let Some(epi_) = WatchedEpisode::get_watched_episode(
-                                &mc.pool, &imdb_url, season, *epi,
-                            )? {
-                                epi_.delete_episode(&mc.pool)?;
-                            }
-                        }
-                    } else {
-                        ti.remove_movie_to_watched(&imdb_url)?;
-                        if let Some(movie) = WatchedMovie::get_watched_movie(&mc.pool, &imdb_url)? {
-                            movie.delete_movie(&mc.pool)?;
-                        }
-                    }
-                }
-            }
-            TraktActions::List => {
-                let watched_shows = get_watched_shows_db(&mc.pool)?;
-                let watched_movies = get_watched_movies_db(&mc.pool)?;
-
-                if let Some(imdb_url) = get_imdb_url_from_show(&mc, show)? {
-                    for show in &watched_shows {
-                        if season != -1 && show.season != season {
-                            continue;
-                        }
-                        if show.imdb_url == imdb_url {
-                            writeln!(io::stdout().lock(), "{}", show)?;
-                        }
-                    }
-                    for show in &watched_movies {
-                        if show.imdb_url == imdb_url {
-                            writeln!(io::stdout().lock(), "{}", show)?;
-                        }
-                    }
-                } else {
-                    for show in &watched_shows {
-                        writeln!(io::stdout().lock(), "{}", show)?;
-                    }
-                    for show in &watched_movies {
-                        writeln!(io::stdout().lock(), "{}", show)?;
-                    }
-                }
-            }
+            TraktActions::Add => watched_add(&ti, &mc, show, season, episode)?,
+            TraktActions::Remove => watched_rm(&ti, &mc, show, season, episode)?,
+            TraktActions::List => watched_list(&mc, show, season)?,
             _ => {}
         },
         _ => {}

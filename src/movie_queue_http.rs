@@ -516,10 +516,8 @@ fn trakt_watched_action(
                 {
                     epi_.delete_episode(&mc.pool)?;
                 }
-            } else {
-                if let Some(movie) = WatchedMovie::get_watched_movie(&mc.pool, &imdb_url)? {
-                    movie.delete_movie(&mc.pool)?;
-                }
+            } else if let Some(movie) = WatchedMovie::get_watched_movie(&mc.pool, &imdb_url)? {
+                movie.delete_movie(&mc.pool)?;
             };
 
             format!("{}", result)
