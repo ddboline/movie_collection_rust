@@ -539,8 +539,20 @@ fn imdb_show(path: Path<String>, user: LoggedUser) -> Result<HttpResponse, Error
     let show = path.into_inner();
 
     let output: Vec<_> = parse_imdb_worker(&show, false, None, false, None, false, false)?
-        .iter()
-        .map(|line| format!("<tr><td>{}</td></tr>", line.join("</td><td>")))
+        .into_iter()
+        .map(|line| {
+            let tmp: Vec<_> = line
+                .into_iter()
+                .map(|i| {
+                    if i.starts_with("tt") {
+                        format!(r#"<a href="https://www.imdb.com/title/{}">{}</a>"#, i, i)
+                    } else {
+                        i.to_string()
+                    }
+                })
+                .collect();
+            format!("<tr><td>{}</td></tr>", tmp.join("</td><td>"))
+        })
         .collect();
 
     let body = include_str!("../templates/watched_template.html");
