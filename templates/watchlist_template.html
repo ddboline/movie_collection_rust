@@ -41,6 +41,17 @@ BODY
         var out = "requested " + link
         document.getElementById("remcomoutput").innerHTML = out;
     }
+    function imdb_update(show, link, season) {
+        var ostr = "/list/imdb/" + show + "?tv=true&update=true&database=true&link=" + link + "&season=" + season;
+        var xmlhttp = new XMLHttpRequest();
+        xmlhttp.open("GET", ostr, true);
+        xmlhttp.onload = function nothing() {
+            location.reload();
+        }
+        xmlhttp.send(null);
+        var out = "requested " + link
+        document.getElementById("remcomoutput").innerHTML = out;
+    }
 
     </script>
 

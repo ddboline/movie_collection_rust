@@ -341,6 +341,8 @@ fn trakt_watched_seasons(path: Path<String>, user: LoggedUser) -> Result<HttpRes
 
     let mc = MovieCollectionDB::new();
 
+    let button_add = r#"<td><button type="submit" id="ID" onclick="imdb_update('SHOW', 'LINK', SEASON);">update database</button></td>"#;
+
     let body = include_str!("../templates/watchlist_template.html")
         .replace("PREVIOUS", "/list/trakt/watchlist");
 
@@ -351,13 +353,17 @@ fn trakt_watched_seasons(path: Path<String>, user: LoggedUser) -> Result<HttpRes
             .iter()
             .map(|s| {
                 format!(
-                    "<tr><td>{}<td>{}<td>{}</tr>",
+                    "<tr><td>{}<td>{}<td>{}<td>{}</tr>",
                     format!(
                         r#"<a href="/list/trakt/watched/list/{}/{}">{}</t>"#,
                         imdb_url, s.season, s.title
                     ),
                     s.season,
-                    s.nepisodes
+                    s.nepisodes,
+                    button_add
+                        .replace("SHOW", &show.show)
+                        .replace("LINK", &imdb_url)
+                        .replace("SEASON", &s.season.to_string())
                 )
             })
             .collect()
@@ -537,7 +543,7 @@ struct ParseImdbRequest {
     database: Option<bool>,
     tv: Option<bool>,
     update: Option<bool>,
-    imdblink: Option<String>,
+    link: Option<String>,
     season: Option<i32>,
 }
 
@@ -556,7 +562,7 @@ fn imdb_show(
     let output: Vec<_> = parse_imdb_worker(
         &show,
         query.tv.unwrap_or(false),
-        query.imdblink.clone(),
+        query.link.clone(),
         query.all.unwrap_or(false),
         query.season,
         query.update.unwrap_or(false),
