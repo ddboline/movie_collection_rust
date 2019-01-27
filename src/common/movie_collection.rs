@@ -136,6 +136,17 @@ impl fmt::Display for ImdbSeason {
     }
 }
 
+impl ImdbSeason {
+    pub fn get_string_vec(&self) -> Vec<String> {
+        vec![
+            self.show.clone(),
+            self.title.clone(),
+            self.season.to_string(),
+            self.nepisodes.to_string(),
+        ]
+    }
+}
+
 #[derive(Debug)]
 pub struct MovieCollectionDB {
     pub config: Config,

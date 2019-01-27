@@ -20,6 +20,7 @@ use movie_collection_rust::common::imdb_ratings::ImdbRatings;
 use movie_collection_rust::common::make_queue::movie_queue_http;
 use movie_collection_rust::common::movie_collection::{MovieCollection, MovieCollectionDB};
 use movie_collection_rust::common::movie_queue::MovieQueueDB;
+use movie_collection_rust::common::parse_imdb::parse_imdb_worker;
 use movie_collection_rust::common::pgpool::PgPool;
 use movie_collection_rust::common::trakt_utils::{
     get_watched_shows_db, get_watchlist_shows_db_map, TraktConnection, WatchListShow,
@@ -530,6 +531,28 @@ fn trakt_watched_action(
     Ok(resp)
 }
 
+fn imdb_show(path: Path<String>, user: LoggedUser) -> Result<HttpResponse, Error> {
+    if user.email != "ddboline@gmail.com" {
+        return Ok(HttpResponse::Unauthorized().json("Unauthorized"));
+    }
+
+    let show = path.into_inner();
+
+    let output: Vec<_> = parse_imdb_worker(&show, false, None, false, None, false, false)?
+        .iter()
+        .map(|line| format!("<tr><td>{}</td></tr>", line.join("</td><td>")))
+        .collect();
+
+    let body = include_str!("../templates/watched_template.html");
+
+    let body = body.replace("BODY", &output.join("\n"));
+
+    let resp = HttpResponse::build(StatusCode::OK)
+        .content_type("text/html; charset=utf-8")
+        .body(body);
+    Ok(resp)
+}
+
 fn main() {
     let config = Config::with_config();
     let command = "rm -f /var/www/html/videos/partial/*";
@@ -582,6 +605,9 @@ fn main() {
             )
             .resource("/list/{show}", |r| {
                 r.method(Method::GET).with(movie_queue_show)
+            })
+            .resource("/list/imdb/{show}", |r| {
+                r.method(Method::GET).with(imdb_show)
             })
             .resource("/list", |r| r.method(Method::GET).with(movie_queue))
     })

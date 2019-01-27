@@ -120,4 +120,17 @@ impl ImdbEpisodes {
         )?;
         Ok(())
     }
+
+    pub fn get_string_vec(&self) -> Vec<String> {
+        vec![
+            self.show.clone(),
+            self.title.clone(),
+            self.season.to_string(),
+            self.episode.to_string(),
+            self.airdate.to_string(),
+            self.rating.to_string(),
+            self.eptitle.clone(),
+            self.epurl.clone(),
+        ]
+    }
 }

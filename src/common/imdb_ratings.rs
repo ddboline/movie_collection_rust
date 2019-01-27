@@ -97,4 +97,16 @@ impl ImdbRatings {
             Ok(None)
         }
     }
+
+    pub fn get_string_vec(&self) -> Vec<String> {
+        vec![
+            self.index.to_string(),
+            self.show.clone(),
+            option_string_wrapper(&self.title).to_string(),
+            option_string_wrapper(&self.link).to_string(),
+            self.rating.unwrap_or(-1.0).to_string(),
+            self.istv.unwrap_or(false).to_string(),
+            option_string_wrapper(&self.source).to_string(),
+        ]
+    }
 }
