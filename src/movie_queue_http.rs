@@ -69,7 +69,7 @@ fn tvshows(user: LoggedUser) -> Result<HttpResponse, Error> {
             let has_watchlist = watchlist.contains_key(link);
             format!(
                 r#"<tr><td>{}</td>
-                   <td><a href="https://www.imdb.com/title/{}">imdb</a><td>{}<td>{}<td>{}</tr>"#,
+                   <td><a href="https://www.imdb.com/title/{}">imdb</a></td><td>{}</td><td>{}</td><td>{}</td></tr>"#,
                 if tvshows.contains_key(link) {
                     format!(r#"<a href="/list/{}">{}</a>"#, show, title)
                 } else {
@@ -86,7 +86,7 @@ fn tvshows(user: LoggedUser) -> Result<HttpResponse, Error> {
                     _ => "",
                 },
                 if has_watchlist {
-                    format!(r#"<a href="/list/watched/list/{}"#, link)
+                    format!(r#"<a href="/list/watched/list/{}""#, link)
                 } else {
                     "".to_string()
                 },
