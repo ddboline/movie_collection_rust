@@ -86,7 +86,7 @@ fn tvshows(user: LoggedUser) -> Result<HttpResponse, Error> {
                     _ => "",
                 },
                 if has_watchlist {
-                    format!(r#"<a href="/list/watched/list/{}">watchlist</a>"#, link)
+                    format!(r#"<a href="/list/trakt/watched/list/{}">watchlist</a>"#, link)
                 } else {
                     "".to_string()
                 },
@@ -431,10 +431,11 @@ fn trakt_watched_list(path: Path<(String, i32)>, user: LoggedUser) -> Result<Htt
                 };
 
                 format!(
-                    "<tr><td>{}<td>{}<td>{}<td>{}</tr>",
+                    "<tr><td>{}</td><td>{}</td><td>{}</td><td>{}</td><td>{}</td></tr>",
                     entry,
                     season,
                     s.episode,
+                    s.airdate,
                     if watched_shows_db.contains(&(imdb_url.clone(), season, s.episode)) {
                         button_rm
                             .replace("SHOW", &imdb_url)
