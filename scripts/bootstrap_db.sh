@@ -35,3 +35,6 @@ psql movie_queue < ./scripts/imdb_episodes.sql
 psql movie_queue < ./scripts/movie_collection_on_dvd.sql
 psql movie_queue < ./scripts/movie_collection.sql
 psql movie_queue < ./scripts/movie_queue.sql
+psql movie_queue < ./scripts/trakt_watched_episodes.sql
+psql movie_queue < ./scripts/trakt_watched_movies.sql
+psql movie_queue < ./scripts/trakt_watchlist.sql
