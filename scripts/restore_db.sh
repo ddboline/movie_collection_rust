@@ -12,5 +12,5 @@ trakt_watchlist"
 
 for T in $TABLES;
 do
-    gzip backup/${T}.sql.gz | psql movie_queue -c "COPY $T FROM STDIN"
+    gzip -d backup/${T}.sql.gz | psql movie_queue -c "COPY $T FROM STDIN"
 done
