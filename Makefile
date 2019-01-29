@@ -37,3 +37,9 @@ install:
 	cp target/$(build_type)/trakt-app /usr/bin/trakt-app
 	cp target/$(build_type)/find-new-episodes /usr/bin/find-new-episodes
 	cp python/trakt_instance.py /usr/bin/trakt-flask-app
+
+pull:
+	`aws ecr get-login --no-include-email`
+	docker pull 281914939654.dkr.ecr.us-east-1.amazonaws.com/rust_stable:latest
+	docker tag 281914939654.dkr.ecr.us-east-1.amazonaws.com/rust_stable:latest rust_stable:latest
+	docker rmi 281914939654.dkr.ecr.us-east-1.amazonaws.com/rust_stable:latest

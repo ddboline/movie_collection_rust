@@ -9,15 +9,9 @@ sudo apt-get install -y postgresql
 sudo -u postgres createuser -E -e $USER
 sudo -u postgres psql -c "CREATE ROLE $USER PASSWORD '$PASSWORD' NOSUPERUSER NOCREATEDB NOCREATEROLE INHERIT LOGIN;"
 sudo -u postgres psql -c "ALTER ROLE $USER PASSWORD '$PASSWORD' NOSUPERUSER NOCREATEDB NOCREATEROLE INHERIT LOGIN;"
-sudo -u postgres createdb garmin_summary
+sudo -u postgres createdb movie_queue
 
-for DIR in ${HOME}/.config/garmin_rust ${HOME}/.garmin_cache/run/gps_tracks \
-           ${HOME}/.garmin_cache/run/cache ${HOME}/.garmin_cache/run/summary_cache;
-do
-    mkdir -p $DIR;
-done
-
-cat > ${HOME}/.config/garmin_rust/config.env <<EOL
+cat > ${HOME}/.config/movie_collection_rust/config.env <<EOL
 PGURL=postgresql://$USER:$PASSWORD@localhost:5432/movie_queue
 AUTHDB=postgresql://$USER:$PASSWORD@localhost:5432/auth
 MOVIEDIRS=$MOVIDIRS
