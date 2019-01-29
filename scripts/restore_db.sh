@@ -1,5 +1,7 @@
 #!/bin/bash
 
+DB="movie_queue"
+
 TABLES="
 imdb_ratings
 imdb_episodes
@@ -12,5 +14,5 @@ trakt_watchlist"
 
 for T in $TABLES;
 do
-    gzip -dc backup/${T}.sql.gz | psql movie_queue -c "COPY $T FROM STDIN"
+    gzip -dc backup/${T}.sql.gz | psql $DB -c "COPY $T FROM STDIN"
 done
