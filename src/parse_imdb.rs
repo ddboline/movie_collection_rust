@@ -5,6 +5,7 @@ extern crate movie_collection_rust;
 
 use clap::{App, Arg};
 use failure::Error;
+use std::io::{stdout, Write};
 
 use movie_collection_rust::common::parse_imdb::parse_imdb_worker;
 use movie_collection_rust::common::utils::get_version_number;
@@ -78,7 +79,7 @@ fn parse_imdb_parser() -> Result<(), Error> {
     let do_update = matches.is_present("update");
     let update_database = matches.is_present("database");
 
-    parse_imdb_worker(
+    let output = parse_imdb_worker(
         show,
         tv,
         imdb_link,
@@ -87,6 +88,12 @@ fn parse_imdb_parser() -> Result<(), Error> {
         do_update,
         update_database,
     )?;
+
+    let stdout = stdout();
+
+    for line in output {
+        writeln!(stdout.lock(), "{}", line.join(" "))?;
+    }
 
     Ok(())
 }

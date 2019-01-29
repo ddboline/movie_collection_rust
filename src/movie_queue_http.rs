@@ -1,5 +1,7 @@
 #![allow(clippy::needless_pass_by_value)]
 
+#[macro_use]
+extern crate serde_derive;
 extern crate actix;
 extern crate actix_web;
 extern crate movie_collection_rust;
@@ -7,7 +9,7 @@ extern crate rust_auth_server;
 extern crate subprocess;
 
 use actix_web::middleware::identity::{CookieIdentityPolicy, IdentityService};
-use actix_web::{http::Method, http::StatusCode, server, App, HttpResponse, Path};
+use actix_web::{http::Method, http::StatusCode, server, App, HttpResponse, Path, Query};
 use chrono::Duration;
 use failure::Error;
 use rust_auth_server::auth_handler::LoggedUser;
@@ -20,6 +22,7 @@ use movie_collection_rust::common::imdb_ratings::ImdbRatings;
 use movie_collection_rust::common::make_queue::movie_queue_http;
 use movie_collection_rust::common::movie_collection::{MovieCollection, MovieCollectionDB};
 use movie_collection_rust::common::movie_queue::MovieQueueDB;
+use movie_collection_rust::common::parse_imdb::parse_imdb_worker;
 use movie_collection_rust::common::pgpool::PgPool;
 use movie_collection_rust::common::trakt_utils::{
     get_watched_shows_db, get_watchlist_shows_db_map, TraktConnection, WatchListShow,
@@ -66,9 +69,10 @@ fn tvshows(user: LoggedUser) -> Result<HttpResponse, Error> {
     let shows: Vec<_> = shows
         .into_iter()
         .map(|(show, title, link, source)| {
+            let has_watchlist = watchlist.contains_key(link);
             format!(
                 r#"<tr><td>{}</td>
-                   <td><a href="https://www.imdb.com/title/{}">imdb</a><td>{}<td>{}</tr>"#,
+                   <td><a href="https://www.imdb.com/title/{}">imdb</a></td><td>{}</td><td>{}</td><td>{}</td></tr>"#,
                 if tvshows.contains_key(link) {
                     format!(r#"<a href="/list/{}">{}</a>"#, show, title)
                 } else {
@@ -84,7 +88,12 @@ fn tvshows(user: LoggedUser) -> Result<HttpResponse, Error> {
                     Some("amazon") => r#"<a href="https://amazon.com">netflix</a>"#,
                     _ => "",
                 },
-                if !watchlist.contains_key(link) {
+                if has_watchlist {
+                    format!(r#"<a href="/list/trakt/watched/list/{}">watchlist</a>"#, link)
+                } else {
+                    "".to_string()
+                },
+                if !has_watchlist {
                     button_add.replace("SHOW", link)
                 } else {
                     button_rm.replace("SHOW", link)
@@ -425,10 +434,11 @@ fn trakt_watched_list(path: Path<(String, i32)>, user: LoggedUser) -> Result<Htt
                 };
 
                 format!(
-                    "<tr><td>{}<td>{}<td>{}<td>{}</tr>",
+                    "<tr><td>{}</td><td>{}</td><td>{}</td><td>{}</td><td>{}</td></tr>",
                     entry,
                     season,
                     s.episode,
+                    s.airdate,
                     if watched_shows_db.contains(&(imdb_url.clone(), season, s.episode)) {
                         button_rm
                             .replace("SHOW", &imdb_url)
@@ -506,16 +516,71 @@ fn trakt_watched_action(
                 {
                     epi_.delete_episode(&mc.pool)?;
                 }
-            } else {
-                if let Some(movie) = WatchedMovie::get_watched_movie(&mc.pool, &imdb_url)? {
-                    movie.delete_movie(&mc.pool)?;
-                }
+            } else if let Some(movie) = WatchedMovie::get_watched_movie(&mc.pool, &imdb_url)? {
+                movie.delete_movie(&mc.pool)?;
             };
 
             format!("{}", result)
         }
         _ => "".to_string(),
     };
+
+    let resp = HttpResponse::build(StatusCode::OK)
+        .content_type("text/html; charset=utf-8")
+        .body(body);
+    Ok(resp)
+}
+
+#[derive(Deserialize, Default)]
+struct ParseImdbRequest {
+    all: Option<bool>,
+    database: Option<bool>,
+    tv: Option<bool>,
+    update: Option<bool>,
+    imdblink: Option<String>,
+    season: Option<i32>,
+}
+
+fn imdb_show(
+    path: Path<String>,
+    query: Query<ParseImdbRequest>,
+    user: LoggedUser,
+) -> Result<HttpResponse, Error> {
+    if user.email != "ddboline@gmail.com" {
+        return Ok(HttpResponse::Unauthorized().json("Unauthorized"));
+    }
+
+    let show = path.into_inner();
+    let query = query.into_inner();
+
+    let output: Vec<_> = parse_imdb_worker(
+        &show,
+        query.tv.unwrap_or(false),
+        query.imdblink.clone(),
+        query.all.unwrap_or(false),
+        query.season,
+        query.update.unwrap_or(false),
+        query.database.unwrap_or(false),
+    )?
+    .into_iter()
+    .map(|line| {
+        let tmp: Vec<_> = line
+            .into_iter()
+            .map(|i| {
+                if i.starts_with("tt") {
+                    format!(r#"<a href="https://www.imdb.com/title/{}">{}</a>"#, i, i)
+                } else {
+                    i.to_string()
+                }
+            })
+            .collect();
+        format!("<tr><td>{}</td></tr>", tmp.join("</td><td>"))
+    })
+    .collect();
+
+    let body = include_str!("../templates/watched_template.html");
+
+    let body = body.replace("BODY", &output.join("\n"));
 
     let resp = HttpResponse::build(StatusCode::OK)
         .content_type("text/html; charset=utf-8")
@@ -575,6 +640,9 @@ fn main() {
             )
             .resource("/list/{show}", |r| {
                 r.method(Method::GET).with(movie_queue_show)
+            })
+            .resource("/list/imdb/{show}", |r| {
+                r.method(Method::GET).with(imdb_show)
             })
             .resource("/list", |r| r.method(Method::GET).with(movie_queue))
     })
