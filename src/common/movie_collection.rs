@@ -169,9 +169,12 @@ impl MovieCollectionDB {
         }
     }
 
-    pub fn with_pool(pool: PgPool) -> MovieCollectionDB {
+    pub fn with_pool(pool: &PgPool) -> MovieCollectionDB {
         let config = Config::with_config();
-        MovieCollectionDB { config, pool }
+        MovieCollectionDB {
+            config,
+            pool: pool.clone(),
+        }
     }
 }
 
@@ -575,7 +578,7 @@ pub trait MovieCollection: Send + Sync {
                     match movie_queue.get(key) {
                         Some(v) => {
                             writeln!(stdout.lock(), "in queue but not disk {} {}", key, v)?;
-                            let mq = MovieQueueDB::with_pool(self.get_pool().clone());
+                            let mq = MovieQueueDB::with_pool(self.get_pool());
                             mq.remove_from_queue_by_path(key)?;
                             self.remove_from_collection(key)
                         }

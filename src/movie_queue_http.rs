@@ -23,7 +23,6 @@ use movie_collection_rust::common::make_queue::movie_queue_http;
 use movie_collection_rust::common::movie_collection::{MovieCollection, MovieCollectionDB};
 use movie_collection_rust::common::movie_queue::MovieQueueDB;
 use movie_collection_rust::common::parse_imdb::parse_imdb_worker;
-use movie_collection_rust::common::pgpool::PgPool;
 use movie_collection_rust::common::trakt_utils::{
     get_watched_shows_db, get_watchlist_shows_db_map, TraktConnection, WatchListShow,
     WatchedEpisode, WatchedMovie,
@@ -143,9 +142,7 @@ fn movie_queue_delete(path: Path<String>, user: LoggedUser) -> Result<HttpRespon
         return Ok(HttpResponse::Unauthorized().json("Unauthorized"));
     }
 
-    let config = Config::with_config();
-    let pool = PgPool::new(&config.pgurl);
-    let mq = MovieQueueDB::with_pool(pool);
+    let mq = MovieQueueDB::new();
     let path = path.into_inner();
 
     if path::Path::new(&path).exists() {
@@ -387,7 +384,7 @@ fn trakt_watched_list(path: Path<(String, i32)>, user: LoggedUser) -> Result<Htt
     let (imdb_url, season) = path.into_inner();
 
     let mc = MovieCollectionDB::new();
-    let mq = MovieQueueDB::with_pool(mc.pool.clone());
+    let mq = MovieQueueDB::with_pool(&mc.pool);
 
     let watched_shows_db: HashSet<(String, i32, i32)> = get_watched_shows_db(&mc.pool)?
         .into_iter()

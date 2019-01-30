@@ -52,7 +52,7 @@ fn find_new_episodes() -> Result<(), Error> {
     let maxdate = Local::today() + Duration::days(7);
 
     let mc = MovieCollectionDB::new();
-    let mq = MovieQueueDB::with_pool(mc.pool.clone());
+    let mq = MovieQueueDB::with_pool(&mc.pool);
 
     let stdout = io::stdout();
 

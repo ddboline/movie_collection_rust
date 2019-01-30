@@ -59,8 +59,8 @@ impl MovieQueueDB {
         }
     }
 
-    pub fn with_pool(pool: PgPool) -> MovieQueueDB {
-        MovieQueueDB { pool }
+    pub fn with_pool(pool: &PgPool) -> MovieQueueDB {
+        MovieQueueDB { pool: pool.clone() }
     }
 
     pub fn remove_from_queue_by_idx(&self, idx: i32) -> Result<(), Error> {
@@ -94,7 +94,7 @@ impl MovieQueueDB {
     }
 
     pub fn remove_from_queue_by_path(&self, path: &str) -> Result<(), Error> {
-        let mc = MovieCollectionDB::with_pool(self.pool.clone());
+        let mc = MovieCollectionDB::with_pool(&self.pool);
         if let Some(collection_idx) = mc.get_collection_index(&path)? {
             self.remove_from_queue_by_collection_idx(collection_idx)
         } else {
@@ -106,7 +106,7 @@ impl MovieQueueDB {
         if !Path::new(&path).exists() {
             return Err(err_msg("File doesn't exist"));
         }
-        let mc = MovieCollectionDB::with_pool(self.pool.clone());
+        let mc = MovieCollectionDB::with_pool(&self.pool);
         let collection_idx = match mc.get_collection_index(&path)? {
             Some(idx) => idx,
             None => {

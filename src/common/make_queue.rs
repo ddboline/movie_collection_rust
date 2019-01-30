@@ -11,10 +11,8 @@ use std::io;
 use std::io::Write;
 use std::path;
 
-use crate::common::config::Config;
 use crate::common::movie_collection::{MovieCollection, MovieCollectionDB};
 use crate::common::movie_queue::MovieQueueDB;
-use crate::common::pgpool::PgPool;
 use crate::common::utils::{get_video_runtime, map_result_vec, parse_file_stem};
 
 pub fn make_queue_worker(
@@ -24,10 +22,8 @@ pub fn make_queue_worker(
     patterns: &[&str],
     do_shows: bool,
 ) -> Result<(), Error> {
-    let config = Config::with_config();
-    let pool = PgPool::new(&config.pgurl);
-    let mc = MovieCollectionDB::with_pool(pool.clone());
-    let mq = MovieQueueDB::with_pool(pool);
+    let mc = MovieCollectionDB::new();
+    let mq = MovieQueueDB::with_pool(&mc.pool);
 
     let stdout = io::stdout();
 
@@ -91,10 +87,8 @@ pub fn make_queue_worker(
 pub fn movie_queue_http(patterns: &[&str]) -> Result<String, Error> {
     let body = include_str!("../../templates/queue_list.html");
 
-    let config = Config::with_config();
-    let pool = PgPool::new(&config.pgurl);
-    let mc = MovieCollectionDB::with_pool(pool.clone());
-    let mq = MovieQueueDB::with_pool(pool);
+    let mc = MovieCollectionDB::new();
+    let mq = MovieQueueDB::with_pool(&mc.pool);
     let queue = mq.print_movie_queue(&patterns)?;
 
     let button = r#"<td><button type="submit" id="ID" onclick="delete_show('SHOW');"> remove </button></td>"#;
