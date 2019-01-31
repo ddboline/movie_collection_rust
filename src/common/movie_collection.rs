@@ -194,15 +194,19 @@ pub trait MovieCollection: Send + Sync {
     fn get_config(&self) -> &Config;
 
     fn print_imdb_shows(&self, show: &str, istv: bool) -> Result<Vec<ImdbRatings>, Error> {
-        let conn = self.get_pool().get()?;
-
         let query = format!("SELECT show FROM imdb_ratings WHERE show like '%{}%'", show);
         let query = if istv {
             format!("{} AND istv", query)
         } else {
             query
         };
-        let shows: Vec<String> = conn.query(&query, &[])?.iter().map(|r| r.get(0)).collect();
+        let shows: Vec<String> = self
+            .get_pool()
+            .get()?
+            .query(&query, &[])?
+            .iter()
+            .map(|r| r.get(0))
+            .collect();
 
         let shows = if shows.contains(&show.to_string()) {
             vec![show.to_string()]
@@ -211,7 +215,7 @@ pub trait MovieCollection: Send + Sync {
         };
 
         let shows: Vec<Result<_, Error>> = shows
-            .iter()
+            .par_iter()
             .map(|show| {
                 let query = r#"
                     SELECT index, show, title, link, rating
@@ -224,7 +228,9 @@ pub trait MovieCollection: Send + Sync {
                     query
                 };
 
-                let results: Vec<_> = conn
+                let results: Vec<_> = self
+                    .get_pool()
+                    .get()?
                     .query(&query, &[])?
                     .iter()
                     .map(|row| {
@@ -256,7 +262,6 @@ pub trait MovieCollection: Send + Sync {
         show: &str,
         season: Option<i32>,
     ) -> Result<Vec<ImdbEpisodes>, Error> {
-        let conn = self.get_pool().get()?;
         let query = r#"
             SELECT a.show, b.title, a.season, a.episode,
                    a.airdate,
@@ -272,7 +277,9 @@ pub trait MovieCollection: Send + Sync {
         };
         let query = format!("{} ORDER BY a.season, a.episode", query);
 
-        let result: Vec<_> = conn
+        let result: Vec<_> = self
+            .get_pool()
+            .get()?
             .query(&query, &[])?
             .iter()
             .map(|row| {
@@ -301,7 +308,6 @@ pub trait MovieCollection: Send + Sync {
     }
 
     fn print_imdb_all_seasons(&self, show: &str) -> Result<Vec<ImdbSeason>, Error> {
-        let conn = self.get_pool().get()?;
         let query = r#"
             SELECT a.show, b.title, a.season, count(distinct a.episode)
             FROM imdb_episodes a
@@ -310,7 +316,9 @@ pub trait MovieCollection: Send + Sync {
         let query = format!("{} GROUP BY a.show, b.title, a.season", query);
         let query = format!("{} ORDER BY a.season", query);
 
-        let result = conn
+        let result = self
+            .get_pool()
+            .get()?
             .query(&query, &[])?
             .iter()
             .map(|row| {

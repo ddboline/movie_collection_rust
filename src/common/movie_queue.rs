@@ -117,10 +117,14 @@ impl MovieQueueDB {
         };
 
         let query = r#"SELECT idx FROM movie_queue WHERE collection_idx = $1"#;
-        let mut current_idx: i32 = -1;
-        for row in self.pool.get()?.query(query, &[&collection_idx])?.iter() {
-            current_idx = row.get(0);
-        }
+        let current_idx: i32 = self
+            .pool
+            .get()?
+            .query(query, &[&collection_idx])?
+            .iter()
+            .last()
+            .map(|row| row.get(0))
+            .unwrap_or(-1);
 
         if current_idx != -1 {
             self.remove_from_queue_by_idx(current_idx)?;
