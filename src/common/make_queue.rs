@@ -88,7 +88,7 @@ pub fn movie_queue_http(patterns: &[&str]) -> Result<String, Error> {
     let watchlist_url = if patterns.is_empty() {
         "/list/trakt/watchlist".to_string()
     } else {
-        format!("/list/trakt/watchlist/list/{}", patterns.join("_"))
+        format!("/list/trakt/watched/list/{}", patterns.join("_"))
     };
     let body = include_str!("../../templates/queue_list.html").replace("WATCHLIST", &watchlist_url);
 
