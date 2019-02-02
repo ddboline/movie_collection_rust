@@ -13,9 +13,10 @@ use std::collections::HashMap;
 use crate::common::imdb_episodes::ImdbEpisodes;
 use crate::common::imdb_ratings::ImdbRatings;
 use crate::common::imdb_utils::ImdbConnection;
-use crate::common::movie_collection::{MovieCollection, MovieCollectionDB};
+use crate::common::movie_collection::MovieCollection;
 
 pub fn parse_imdb_worker(
+    mc: &MovieCollection,
     show: &str,
     tv: bool,
     imdb_link: Option<String>,
@@ -24,8 +25,6 @@ pub fn parse_imdb_worker(
     do_update: bool,
     update_database: bool,
 ) -> Result<Vec<Vec<String>>, Error> {
-    let mc = MovieCollectionDB::new();
-
     let shows: Vec<_> = if let Some(ilink) = &imdb_link {
         mc.print_imdb_shows(show, tv)?
             .into_iter()
@@ -46,16 +45,20 @@ pub fn parse_imdb_worker(
 
     let mut output = Vec::new();
 
-    for (_, s) in &shows {
-        output.push(s.get_string_vec());
+    if !do_update {
+        for (_, s) in &shows {
+            output.push(s.get_string_vec());
+        }
     }
 
     let shows: HashMap<String, _> = shows.into_iter().collect();
 
     let episodes: Option<Vec<_>> = if tv {
         if all_seasons {
-            for s in mc.print_imdb_all_seasons(show)? {
-                output.push(s.get_string_vec());
+            if !do_update {
+                for s in mc.print_imdb_all_seasons(show)? {
+                    output.push(s.get_string_vec());
+                }
             }
             None
         } else {
@@ -70,9 +73,11 @@ pub fn parse_imdb_worker(
         None
     };
 
-    if let Some(v) = episodes.as_ref() {
-        for ((_, _), e) in v {
-            output.push(e.get_string_vec());
+    if !do_update {
+        if let Some(v) = episodes.as_ref() {
+            for ((_, _), e) in v {
+                output.push(e.get_string_vec());
+            }
         }
     }
 
@@ -104,7 +109,7 @@ pub fn parse_imdb_worker(
                                 let mut new = s.clone();
                                 new.title = Some(result.title.clone());
                                 new.rating = Some(result.rating);
-                                new.update_show(&mc.pool)?;
+                                new.update_show(&mc.get_pool())?;
                                 output
                                     .push(vec![format!("exists {} {} {}", show, s, result.rating)]);
                             }
@@ -122,7 +127,7 @@ pub fn parse_imdb_worker(
                                 istv: Some(istv),
                                 ..Default::default()
                             }
-                            .insert_show(&mc.pool)?;
+                            .insert_show(&mc.get_pool())?;
                         }
                     }
                 }
@@ -150,7 +155,7 @@ pub fn parse_imdb_worker(
                                         new.eptitle =
                                             episode.eptitle.unwrap_or_else(|| "".to_string());
                                         new.rating = episode.rating.unwrap_or(-1.0);
-                                        new.update_episode(&mc.pool)?;
+                                        new.update_episode(&mc.get_pool())?;
                                     }
                                 }
                                 None => {
@@ -170,7 +175,7 @@ pub fn parse_imdb_worker(
                                         eptitle: episode.eptitle.unwrap_or_else(|| "".to_string()),
                                         epurl: episode.epurl.unwrap_or_else(|| "".to_string()),
                                     }
-                                    .insert_episode(&mc.pool)?;
+                                    .insert_episode(&mc.get_pool())?;
                                 }
                             }
                         }

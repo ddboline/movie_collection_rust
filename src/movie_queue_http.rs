@@ -561,10 +561,20 @@ fn imdb_show(
         return Ok(HttpResponse::Unauthorized().json("Unauthorized"));
     }
 
+    let mc = MovieCollectionDB::new();
+    let watchlist: HashMap<String, _> = get_watchlist_shows_db_map(&mc.pool)?
+        .into_iter()
+        .map(|(link, (show, s, source))| (link, (show, s.title, s.link, source)))
+        .collect();
+
+    let button_add = r#"<td><button type="submit" id="ID" onclick="watchlist_add('SHOW');">add to watchlist</button></td>"#;
+    let button_rm = r#"<td><button type="submit" id="ID" onclick="watchlist_rm('SHOW');">remove from watchlist</button></td>"#;
+
     let show = path.into_inner();
     let query = query.into_inner();
 
     let output: Vec<_> = parse_imdb_worker(
+        &mc,
         &show,
         query.tv.unwrap_or(false),
         query.link.clone(),
@@ -575,21 +585,36 @@ fn imdb_show(
     )?
     .into_iter()
     .map(|line| {
+        let mut imdb_url = None;
         let tmp: Vec<_> = line
             .into_iter()
             .map(|i| {
                 if i.starts_with("tt") {
+                    imdb_url = Some(i.clone());
                     format!(r#"<a href="https://www.imdb.com/title/{}">{}</a>"#, i, i)
                 } else {
                     i.to_string()
                 }
             })
             .collect();
-        format!("<tr><td>{}</td></tr>", tmp.join("</td><td>"))
+        format!(
+            "<tr><td>{}</td><td>{}</td></tr>",
+            tmp.join("</td><td>"),
+            match imdb_url {
+                Some(url) => {
+                    if watchlist.contains_key(&url) {
+                        button_rm.replace("SHOW", &url)
+                    } else {
+                        button_add.replace("SHOW", &url)
+                    }
+                }
+                None => "".to_string(),
+            }
+        )
     })
     .collect();
 
-    let body = include_str!("../templates/watched_template.html");
+    let body = include_str!("../templates/watchlist_template.html");
 
     let body = body.replace("BODY", &output.join("\n"));
 
