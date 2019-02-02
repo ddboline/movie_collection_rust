@@ -562,10 +562,7 @@ fn imdb_show(
     }
 
     let mc = MovieCollectionDB::new();
-    let watchlist: HashMap<String, _> = get_watchlist_shows_db_map(&mc.pool)?
-        .into_iter()
-        .map(|(link, (show, s, source))| (link, (show, s.title, s.link, source)))
-        .collect();
+    let watchlist = get_watchlist_shows_db_map(&mc.pool)?;
 
     let button_add = r#"<td><button type="submit" id="ID" onclick="watchlist_add('SHOW');">add to watchlist</button></td>"#;
     let button_rm = r#"<td><button type="submit" id="ID" onclick="watchlist_rm('SHOW');">remove from watchlist</button></td>"#;
