@@ -144,9 +144,14 @@ pub fn parse_imdb_worker(
                     if update_database {
                         let key = (episode.season, episode.episode);
                         if let Some(episodes) = &episodes {
+                            let airdate = episode
+                                .airdate
+                                .unwrap_or_else(|| NaiveDate::from_ymd(1970, 1, 1));
                             match episodes.get(&key) {
                                 Some(e) => {
-                                    if (e.rating - episode.rating.unwrap_or(-1.0)).abs() > 0.1 {
+                                    if (e.rating - episode.rating.unwrap_or(-1.0)).abs() > 0.1
+                                        || e.airdate != airdate
+                                    {
                                         output.push(vec![format!(
                                             "exists {} {} {}",
                                             result, episode, e.rating
@@ -168,9 +173,7 @@ pub fn parse_imdb_worker(
                                             .unwrap_or_else(|| "".to_string()),
                                         season: episode.season,
                                         episode: episode.episode,
-                                        airdate: episode
-                                            .airdate
-                                            .unwrap_or_else(|| NaiveDate::from_ymd(1970, 1, 1)),
+                                        airdate,
                                         rating: episode.rating.unwrap_or(-1.0),
                                         eptitle: episode.eptitle.unwrap_or_else(|| "".to_string()),
                                         epurl: episode.epurl.unwrap_or_else(|| "".to_string()),
