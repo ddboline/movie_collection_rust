@@ -11,6 +11,10 @@ extern crate subprocess;
 
 use amqp::{protocol, Basic, Channel, Options, Session, Table};
 use failure::{err_msg, Error};
+use rand::distributions::{Distribution, Uniform};
+use rand::thread_rng;
+use reqwest::Url;
+use reqwest::{Client, Response};
 use std::env::var;
 use std::fs::create_dir_all;
 use std::fs::rename;
@@ -18,6 +22,8 @@ use std::fs::{File, OpenOptions};
 use std::io::{stdout, Write};
 use std::io::{BufRead, BufReader};
 use std::path::Path;
+use std::thread::sleep;
+use std::time::Duration;
 use subprocess::{Exec, Redirection};
 
 use crate::common::config::Config;
@@ -348,4 +354,26 @@ pub fn remcom_single_file(
         Err(e) => writeln!(stdout.lock(), "error {}", e)?,
     }
     Ok(())
+}
+
+pub trait ExponentialRetry {
+    fn get_client(&self) -> &Client;
+
+    fn get(&self, url: &Url) -> Result<Response, Error> {
+        let mut timeout: u64 = 1000;
+        let mut rng = thread_rng();
+        let range = Uniform::from(0..1000);
+        loop {
+            match self.get_client().get(url.clone()).send() {
+                Ok(x) => return Ok(x),
+                Err(e) => {
+                    sleep(Duration::from_millis(timeout));
+                    timeout *= 4 * range.sample(&mut rng);
+                    if timeout >= 64_000 {
+                        return Err(err_msg(e));
+                    }
+                }
+            }
+        }
+    }
 }
