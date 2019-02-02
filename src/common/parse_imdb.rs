@@ -160,6 +160,7 @@ pub fn parse_imdb_worker(
                                         new.eptitle =
                                             episode.eptitle.unwrap_or_else(|| "".to_string());
                                         new.rating = episode.rating.unwrap_or(-1.0);
+                                        new.airdate = airdate;
                                         new.update_episode(&mc.get_pool())?;
                                     }
                                 }
