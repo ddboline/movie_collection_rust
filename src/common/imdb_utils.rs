@@ -240,6 +240,10 @@ impl ImdbConnection {
                                 NaiveDate::parse_from_str(div_.text().trim(), "%d %b. %Y")
                             {
                                 result.airdate = Some(date);
+                            } else if let Ok(date) =
+                                NaiveDate::parse_from_str(div_.text().trim(), "%d %b %Y")
+                            {
+                                result.airdate = Some(date);
                             }
                         }
                     }
