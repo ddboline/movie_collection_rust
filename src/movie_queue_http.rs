@@ -437,13 +437,14 @@ fn trakt_watched_list(path: Path<(String, i32)>, user: LoggedUser) -> Result<Htt
                 };
 
                 format!(
-                    "<tr><td>{}</td><td>{}</td><td>{}</td><td>{}</td><td>{}</td></tr>",
+                    "<tr><td>{}</td><td>{}</td><td>{}</td><td>{}</td><td>{}</td><td>{}</td></tr>",
                     entry,
                     season,
                     format!(
                         r#"<a href="https://www.imdb.com/title/{}">{} {}</a>"#,
-                        s.epurl, s.episode, s.airdate
+                        s.epurl, s.episode
                     ),
+                    s.airdate,
                     format!(
                         "{:0.1} / {:0.1}",
                         s.rating,
