@@ -577,6 +577,7 @@ pub fn sync_trakt_with_db() -> Result<(), Error> {
         .collect();
     map_result_vec(results)?;
 
+    /*
     let results: Vec<Result<_, Error>> = watched_shows_db
         .par_iter()
         .map(|(key, episode)| {
@@ -588,6 +589,7 @@ pub fn sync_trakt_with_db() -> Result<(), Error> {
         })
         .collect();
     map_result_vec(results)?;
+    */
 
     let watched_movies_db: HashMap<String, _> = get_watched_movies_db(&mc.pool)?
         .into_iter()

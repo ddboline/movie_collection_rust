@@ -413,8 +413,8 @@ fn trakt_watched_list(path: Path<(String, i32)>, user: LoggedUser) -> Result<Htt
         })
         .collect();
 
-    let button_add = r#"<td><button type="submit" id="ID" onclick="watched_add('SHOW', SEASON, EPISODE);">add to watched</button></td>"#;
-    let button_rm = r#"<td><button type="submit" id="ID" onclick="watched_rm('SHOW', SEASON, EPISODE);">remove from watched</button></td>"#;
+    let button_add = r#"<button type="submit" id="ID" onclick="watched_add('SHOW', SEASON, EPISODE);">add to watched</button>"#;
+    let button_rm = r#"<button type="submit" id="ID" onclick="watched_rm('SHOW', SEASON, EPISODE);">remove from watched</button>"#;
 
     let body = include_str!("../templates/watched_template.html").replace(
         "PREVIOUS",
@@ -430,18 +430,25 @@ fn trakt_watched_list(path: Path<(String, i32)>, user: LoggedUser) -> Result<Htt
                     format!(
                         "<a href={}>{}</a>",
                         &format!(r#""{}/{}""#, "/list/play", collection_idx),
-                        s.title
+                        s.eptitle
                     )
                 } else {
-                    s.title.clone()
+                    s.eptitle.clone()
                 };
 
                 format!(
                     "<tr><td>{}</td><td>{}</td><td>{}</td><td>{}</td><td>{}</td></tr>",
                     entry,
                     season,
-                    s.episode,
-                    s.airdate,
+                    format!(
+                        r#"<a href="https://www.imdb.com/title/{}">{} {}</a>"#,
+                        s.epurl, s.episode, s.airdate
+                    ),
+                    format!(
+                        "{:0.1} / {:0.1}",
+                        s.rating,
+                        show.rating.as_ref().unwrap_or(&-1.0)
+                    ),
                     if watched_shows_db.contains(&(imdb_url.clone(), season, s.episode)) {
                         button_rm
                             .replace("SHOW", &imdb_url)
