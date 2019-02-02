@@ -437,7 +437,7 @@ fn trakt_watched_list(path: Path<(String, i32)>, user: LoggedUser) -> Result<Htt
                 };
 
                 format!(
-                    "<tr><td>{}</td><td>{}</td><td>{}</td><td>{}</td><td>{}</td><td>{}</td></tr>",
+                    "<tr><td>{}</td><td><td>{}</td><td>{}</td><td>{}</td><td>{}</td><td>{}</td></tr>",
                     show.show,
                     entry,
                     format!(
