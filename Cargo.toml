@@ -20,7 +20,7 @@ amqp = {version="*", default_features=false}
 select = "*"
 reqwest = "*"
 chrono = "*"
-rand = "*"
+rand = "0.6"
 actix = "*"
 actix-web = "*"
 rust_auth_server = {git = "https://github.com/ddboline/rust-auth-server.git", tag="0.1.2"}

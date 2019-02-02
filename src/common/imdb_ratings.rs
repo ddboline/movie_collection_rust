@@ -73,7 +73,7 @@ impl ImdbRatings {
         let query = r#"
             SELECT index, show, title, link, rating, istv, source
             FROM imdb_ratings
-            WHERE link = $1
+            WHERE (link = $1 OR show = $1)
         "#;
         if let Some(row) = pool.get()?.query(query, &[&link])?.iter().nth(0) {
             let index: i32 = row.get(0);

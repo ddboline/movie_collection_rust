@@ -8,6 +8,7 @@ extern crate reqwest;
 extern crate select;
 extern crate serde_json;
 extern crate subprocess;
+extern crate rand;
 
 use amqp::{protocol, Basic, Channel, Options, Session, Table};
 use failure::{err_msg, Error};
