@@ -437,18 +437,19 @@ fn trakt_watched_list(path: Path<(String, i32)>, user: LoggedUser) -> Result<Htt
                 };
 
                 format!(
-                    "<tr><td>{}</td><td>{}</td><td>{}</td><td>{}</td><td>{}</td></tr>",
+                    "<tr><td>{}</td><td>{}</td><td>{}</td><td>{}</td><td>{}</td><td>{}</td></tr>",
+                    show.show,
                     entry,
                     format!(
-                        r#"<a href="https://www.imdb.com/title/{}">{} {}</a>"#,
+                        r#"<a href="https://www.imdb.com/title/{}">s{} e{}</a>"#,
                         s.epurl, season, s.episode,
                     ),
-                    s.airdate,
                     format!(
-                        "{:0.1} / {:0.1}",
+                        "rating: {:0.1} / {:0.1}",
                         s.rating,
                         show.rating.as_ref().unwrap_or(&-1.0)
                     ),
+                    s.airdate,
                     if watched_shows_db.contains(&(imdb_url.clone(), season, s.episode)) {
                         button_rm
                             .replace("SHOW", &imdb_url)
