@@ -104,7 +104,7 @@ impl ImdbEpisodes {
 
     pub fn update_episode(&self, pool: &PgPool) -> Result<(), Error> {
         let query = r#"
-            UPDATE imdb_episodes SET rating=RATING,eptitle=$1,epurl=$2 WHERE show=$3 AND season=$4 AND episode=$5
+            UPDATE imdb_episodes SET rating=RATING,eptitle=$1,epurl=$2,airdate=$3 WHERE show=$4 AND season=$5 AND episode=$6
         "#;
         let query = query.replace("RATING", &self.rating.to_string());
 
@@ -113,6 +113,7 @@ impl ImdbEpisodes {
             &[
                 &self.eptitle,
                 &self.epurl,
+                &self.airdate,
                 &self.show,
                 &self.season,
                 &self.episode,
