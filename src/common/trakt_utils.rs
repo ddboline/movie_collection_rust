@@ -9,7 +9,7 @@ extern crate select;
 use chrono::NaiveDate;
 use failure::Error;
 use rayon::prelude::*;
-use reqwest::Client;
+use reqwest::{Client, Url};
 use std::collections::HashMap;
 use std::fmt;
 use std::io;
@@ -20,7 +20,7 @@ use crate::common::imdb_episodes::ImdbEpisodes;
 use crate::common::imdb_ratings::ImdbRatings;
 use crate::common::movie_collection::{MovieCollection, MovieCollectionDB};
 use crate::common::pgpool::PgPool;
-use crate::common::utils::{map_result_vec, option_string_wrapper};
+use crate::common::utils::{map_result_vec, option_string_wrapper, ExponentialRetry};
 
 pub enum TraktActions {
     None,
@@ -97,6 +97,12 @@ impl Default for TraktConnection {
     }
 }
 
+impl ExponentialRetry for TraktConnection {
+    fn get_client(&self) -> &Client {
+        &self.client
+    }
+}
+
 impl TraktConnection {
     pub fn new() -> TraktConnection {
         TraktConnection {
@@ -107,7 +113,8 @@ impl TraktConnection {
 
     pub fn get_watchlist_shows(&self) -> Result<HashMap<String, WatchListShow>, Error> {
         let url = format!("https://{}/trakt/watchlist", &self.config.domain);
-        let watchlist_shows: Vec<WatchListShow> = self.client.get(&url).send()?.json()?;
+        let url = Url::parse(&url)?;
+        let watchlist_shows: Vec<WatchListShow> = self.get(&url)?.json()?;
         let watchlist_shows = watchlist_shows
             .into_iter()
             .map(|s| (s.link.clone(), s))
@@ -120,7 +127,8 @@ impl TraktConnection {
             "https://{}/trakt/add_to_watchlist/{}",
             &self.config.domain, imdb_id
         );
-        let result: TraktResult = self.client.get(&url).send()?.json()?;
+        let url = Url::parse(&url)?;
+        let result: TraktResult = self.get(&url)?.json()?;
         Ok(result)
     }
 
@@ -129,13 +137,15 @@ impl TraktConnection {
             "https://{}/trakt/delete_show/{}",
             &self.config.domain, imdb_id
         );
-        let result: TraktResult = self.client.get(&url).send()?.json()?;
+        let url = Url::parse(&url)?;
+        let result: TraktResult = self.get(&url)?.json()?;
         Ok(result)
     }
 
     pub fn get_watched_shows(&self) -> Result<HashMap<(String, i32, i32), WatchedEpisode>, Error> {
         let url = format!("https://{}/trakt/watched_shows", &self.config.domain);
-        let watched_shows: Vec<WatchedEpisode> = self.client.get(&url).send()?.json()?;
+        let url = Url::parse(&url)?;
+        let watched_shows: Vec<WatchedEpisode> = self.get(&url)?.json()?;
         let watched_shows: HashMap<(String, i32, i32), WatchedEpisode> = watched_shows
             .into_iter()
             .map(|s| ((s.imdb_url.clone(), s.season, s.episode), s))
@@ -145,7 +155,8 @@ impl TraktConnection {
 
     pub fn get_watched_movies(&self) -> Result<HashMap<String, WatchedMovie>, Error> {
         let url = format!("https://{}/trakt/watched_movies", &self.config.domain);
-        let watched_movies: Vec<WatchedMovie> = self.client.get(&url).send()?.json()?;
+        let url = Url::parse(&url)?;
+        let watched_movies: Vec<WatchedMovie> = self.get(&url)?.json()?;
         let watched_movies: HashMap<String, WatchedMovie> = watched_movies
             .into_iter()
             .map(|s| (s.imdb_url.clone(), s))
@@ -155,7 +166,8 @@ impl TraktConnection {
 
     pub fn get_calendar(&self) -> Result<TraktCalEntryList, Error> {
         let url = format!("https://{}/trakt/cal", &self.config.domain);
-        let calendar = self.client.get(&url).send()?.json()?;
+        let url = Url::parse(&url)?;
+        let calendar = self.get(&url)?.json()?;
         Ok(calendar)
     }
 
@@ -169,7 +181,8 @@ impl TraktConnection {
             "https://{}/trakt/add_episode_to_watched/{}/{}/{}",
             &self.config.domain, imdb_id, season, episode
         );
-        let result: TraktResult = self.client.get(&url).send()?.json()?;
+        let url = Url::parse(&url)?;
+        let result: TraktResult = self.get(&url)?.json()?;
         Ok(result)
     }
 
@@ -178,7 +191,8 @@ impl TraktConnection {
             "https://{}/trakt/add_to_watched/{}",
             &self.config.domain, imdb_id
         );
-        let result: TraktResult = self.client.get(&url).send()?.json()?;
+        let url = Url::parse(&url)?;
+        let result: TraktResult = self.get(&url)?.json()?;
         Ok(result)
     }
 
@@ -192,7 +206,8 @@ impl TraktConnection {
             "https://{}/trakt/delete_watched/{}/{}/{}",
             &self.config.domain, imdb_id, season, episode
         );
-        let result: TraktResult = self.client.get(&url).send()?.json()?;
+        let url = Url::parse(&url)?;
+        let result: TraktResult = self.get(&url)?.json()?;
         Ok(result)
     }
 
@@ -201,7 +216,8 @@ impl TraktConnection {
             "https://{}/trakt/delete_watched_movie/{}",
             &self.config.domain, imdb_id
         );
-        let result: TraktResult = self.client.get(&url).send()?.json()?;
+        let url = Url::parse(&url)?;
+        let result: TraktResult = self.get(&url)?.json()?;
         Ok(result)
     }
 }
