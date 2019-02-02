@@ -582,12 +582,12 @@ fn imdb_show(
     )?
     .into_iter()
     .map(|line| {
-        let mut imdb_url: Option<String> = None;
+        let mut imdb_url = "".to_string();
         let tmp: Vec<_> = line
             .into_iter()
             .map(|i| {
                 if i.starts_with("tt") {
-                    imdb_url = Some(i.clone());
+                    imdb_url = i.clone();
                     format!(r#"<a href="https://www.imdb.com/title/{}">{}</a>"#, i, i)
                 } else {
                     i.to_string()
@@ -597,15 +597,10 @@ fn imdb_show(
         format!(
             "<tr><td>{}</td><td>{}</td></tr>",
             tmp.join("</td><td>"),
-            match imdb_url {
-                Some(url) => {
-                    if watchlist.contains_key(&url) {
-                        button_rm.replace("SHOW", &url)
-                    } else {
-                        button_add.replace("SHOW", &url)
-                    }
-                }
-                None => "".to_string(),
+            if watchlist.contains_key(&imdb_url) {
+                button_rm.replace("SHOW", &imdb_url)
+            } else {
+                button_add.replace("SHOW", &imdb_url)
             }
         )
     })
