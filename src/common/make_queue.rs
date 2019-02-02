@@ -85,7 +85,12 @@ pub fn make_queue_worker(
 }
 
 pub fn movie_queue_http(patterns: &[&str]) -> Result<String, Error> {
-    let body = include_str!("../../templates/queue_list.html");
+    let watchlist_url = if patterns.is_empty() {
+        "/list/trakt/watchlist".to_string()
+    } else {
+        format!("/list/trakt/watchlist/list/{}", patterns.join("_"))
+    };
+    let body = include_str!("../../templates/queue_list.html").replace("WATCHLIST", &watchlist_url);
 
     let mc = MovieCollectionDB::new();
     let mq = MovieQueueDB::with_pool(&mc.pool);
