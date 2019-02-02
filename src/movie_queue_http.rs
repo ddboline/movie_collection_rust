@@ -585,7 +585,7 @@ fn imdb_show(
     )?
     .into_iter()
     .map(|line| {
-        let mut imdb_url = None;
+        let mut imdb_url: Option<String> = None;
         let tmp: Vec<_> = line
             .into_iter()
             .map(|i| {
