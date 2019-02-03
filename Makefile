@@ -5,8 +5,12 @@ cidfile := "/tmp/.tmp.docker.$(uniq)"
 build_type := release
 
 all:
-	mkdir build/ &&  cp Dockerfile.ubuntu18.04 build/Dockerfile && cp -a Cargo.toml templates src scripts Makefile python build/
-	cd build/ && docker build -t movie_collection_rust/build_rust:ubuntu18.04 . && cd ../ && rm -rf build/
+	mkdir build/ && \
+	cp Dockerfile.ubuntu18.04 build/Dockerfile && \
+	cp -a Cargo.toml templates src scripts Makefile python build/ && \
+	cd build/ && \
+	docker build -t movie_collection_rust/build_rust:ubuntu18.04 . && \
+	cd ../ && rm -rf build/
 
 amazon:
 	cp Dockerfile.amazonlinux2018.03 Dockerfile

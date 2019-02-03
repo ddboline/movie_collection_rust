@@ -43,7 +43,7 @@ pub fn map_result_vec<T, E>(input: Vec<Result<T, E>>) -> Result<Vec<T>, E> {
 }
 
 pub fn walk_directory(path: &str, match_strs: &[String]) -> Result<Vec<String>, Error> {
-    Ok(Path::new(path)
+    let results = Path::new(path)
         .read_dir()?
         .filter_map(|f| match f {
             Ok(fpath) => match fpath.file_type() {
@@ -80,7 +80,8 @@ pub fn walk_directory(path: &str, match_strs: &[String]) -> Result<Vec<String>, 
             Err(_) => None,
         })
         .flatten()
-        .collect())
+        .collect();
+    Ok(results)
 }
 
 pub fn get_version_number() -> String {
