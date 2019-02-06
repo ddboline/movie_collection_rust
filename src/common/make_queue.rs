@@ -12,14 +12,14 @@ use std::io::Write;
 use std::path;
 
 use crate::common::movie_collection::{MovieCollection, MovieCollectionDB};
-use crate::common::movie_queue::MovieQueueDB;
+use crate::common::movie_queue::{MovieQueueDB, MovieQueueResult};
 use crate::common::utils::{get_video_runtime, map_result_vec, parse_file_stem};
 
 pub fn make_queue_worker(
     add_files: Option<Vec<String>>,
     del_files: Option<Vec<String>>,
     do_time: bool,
-    patterns: &[&str],
+    patterns: &[String],
     do_shows: bool,
 ) -> Result<(), Error> {
     let mc = MovieCollectionDB::new();
@@ -84,17 +84,8 @@ pub fn make_queue_worker(
     Ok(())
 }
 
-pub fn movie_queue_http(patterns: &[&str]) -> Result<String, Error> {
-    let watchlist_url = if patterns.is_empty() {
-        "/list/trakt/watchlist".to_string()
-    } else {
-        format!("/list/trakt/watched/list/{}", patterns.join("_"))
-    };
-    let body = include_str!("../../templates/queue_list.html").replace("WATCHLIST", &watchlist_url);
-
+pub fn movie_queue_http(queue: &[MovieQueueResult]) -> Result<Vec<String>, Error> {
     let mc = MovieCollectionDB::new();
-    let mq = MovieQueueDB::with_pool(&mc.pool);
-    let queue = mq.print_movie_queue(&patterns)?;
 
     let button = r#"<td><button type="submit" id="ID" onclick="delete_show('SHOW');"> remove </button></td>"#;
 
@@ -154,6 +145,5 @@ pub fn movie_queue_http(patterns: &[&str]) -> Result<String, Error> {
 
     let entries = map_result_vec(entries)?;
 
-    let body = body.replace("BODY", &entries.join("\n"));
-    Ok(body)
+    Ok(entries)
 }

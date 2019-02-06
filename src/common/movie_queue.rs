@@ -157,7 +157,7 @@ impl MovieQueueDB {
         }
     }
 
-    pub fn print_movie_queue(&self, patterns: &[&str]) -> Result<Vec<MovieQueueResult>, Error> {
+    pub fn print_movie_queue(&self, patterns: &[String]) -> Result<Vec<MovieQueueResult>, Error> {
         let query = r#"
             SELECT a.idx, b.path, c.link, c.istv
             FROM movie_queue a

@@ -14,22 +14,18 @@ pub struct Config {
     pub episode_table: String,
     pub port: u32,
     pub domain: String,
+    pub n_db_workers: usize,
 }
 
 impl Config {
     pub fn new() -> Config {
         Config {
             home_dir: "/tmp".to_string(),
-            pgurl: "".to_string(),
-            movie_dirs: Vec::new(),
             suffixes: vec!["avi".to_string(), "mp4".to_string(), "mkv".to_string()],
-            preferred_dir: "".to_string(),
-            queue_table: "".to_string(),
-            collection_table: "".to_string(),
-            ratings_table: "".to_string(),
-            episode_table: "".to_string(),
             port: 8042,
             domain: "localhost".to_string(),
+            n_db_workers: 2,
+            ..Default::default()
         }
     }
 
@@ -78,6 +74,11 @@ impl Config {
         }
         if let Ok(domain) = var("DOMAIN") {
             config.domain = domain;
+        }
+        if let Ok(n_db_workers_str) = var("N_DB_WORKERS") {
+            if let Ok(n_db_workers) = n_db_workers_str.parse() {
+                config.n_db_workers = n_db_workers
+            }
         }
 
         config

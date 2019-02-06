@@ -59,7 +59,7 @@ fn make_queue() -> Result<(), Error> {
     let do_time = matches.is_present("time");
     let patterns: Vec<_> = matches
         .values_of("patterns")
-        .map(|v| v.map(|s| s).collect())
+        .map(|v| v.map(|s| s.to_string()).collect())
         .unwrap_or_else(Vec::new);
     let do_shows = matches.is_present("shows");
 
