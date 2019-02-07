@@ -426,16 +426,38 @@ impl WatchedEpisode {
     }
 }
 
-pub fn get_watched_shows_db(pool: &PgPool) -> Result<Vec<WatchedEpisode>, Error> {
-    let query = r#"
+pub fn get_watched_shows_db(
+    pool: &PgPool,
+    show: &str,
+    season: Option<i32>,
+) -> Result<Vec<WatchedEpisode>, Error> {
+    let where_vec = vec![
+        show.to_string(),
+        season
+            .map(|x| x.to_string())
+            .unwrap_or_else(|| "".to_string()),
+    ];
+    let where_vec: Vec<_> = where_vec.into_iter().filter(|x| !x.is_empty()).collect();
+    let where_str = if !where_vec.is_empty() {
+        format!("WHERE {}", where_vec.join(" AND "))
+    } else {
+        "".to_string()
+    };
+
+    let query = format!(
+        r#"
         SELECT a.link, b.title, a.season, a.episode
         FROM trakt_watched_episodes a
         JOIN imdb_ratings b ON a.link = b.link
+        {}
         ORDER BY 2,3,4
-    "#;
+    "#,
+        where_str
+    );
+
     let watched_shows = pool
         .get()?
-        .query(query, &[])?
+        .query(&query, &[])?
         .iter()
         .map(|row| {
             let imdb_url: String = row.get(0);
@@ -574,10 +596,11 @@ pub fn sync_trakt_with_db() -> Result<(), Error> {
     map_result_vec(results)?;
     */
 
-    let watched_shows_db: HashMap<(String, i32, i32), _> = get_watched_shows_db(&mc.pool)?
-        .into_iter()
-        .map(|s| ((s.imdb_url.clone(), s.season, s.episode), s))
-        .collect();
+    let watched_shows_db: HashMap<(String, i32, i32), _> =
+        get_watched_shows_db(&mc.pool, "", None)?
+            .into_iter()
+            .map(|s| ((s.imdb_url.clone(), s.season, s.episode), s))
+            .collect();
     let watched_shows = ti.get_watched_shows()?;
     if watched_shows.is_empty() {
         return Ok(());
@@ -791,7 +814,7 @@ fn watched_rm(
 }
 
 fn watched_list(mc: &MovieCollectionDB, show: Option<&String>, season: i32) -> Result<(), Error> {
-    let watched_shows = get_watched_shows_db(&mc.pool)?;
+    let watched_shows = get_watched_shows_db(&mc.pool, "", None)?;
     let watched_movies = get_watched_movies_db(&mc.pool)?;
 
     if let Some(imdb_url) = get_imdb_url_from_show(&mc, show)? {

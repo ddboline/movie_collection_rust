@@ -165,7 +165,10 @@ impl Handler<WatchlistActionRequest> for PgPool {
     }
 }
 
-pub struct WatchedShowsRequest {}
+pub struct WatchedShowsRequest {
+    pub show: String,
+    pub season: i32,
+}
 
 impl Message for WatchedShowsRequest {
     type Result = Result<Vec<WatchedEpisode>, Error>;
@@ -174,8 +177,8 @@ impl Message for WatchedShowsRequest {
 impl Handler<WatchedShowsRequest> for PgPool {
     type Result = Result<Vec<WatchedEpisode>, Error>;
 
-    fn handle(&mut self, _: WatchedShowsRequest, _: &mut Self::Context) -> Self::Result {
-        get_watched_shows_db(&self)
+    fn handle(&mut self, msg: WatchedShowsRequest, _: &mut Self::Context) -> Self::Result {
+        get_watched_shows_db(&self, &msg.show, Some(msg.season))
     }
 }
 

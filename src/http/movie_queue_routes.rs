@@ -20,7 +20,7 @@ use subprocess::Exec;
 use super::movie_queue_app::AppState;
 use super::movie_queue_requests::{
     ImdbRatingsRequest, ImdbSeasonsRequest, MoviePathRequest, MovieQueueRequest,
-    QueueDeleteRequest, TvShowsRequest, WatchlistShowsRequest,
+    QueueDeleteRequest, TvShowsRequest, WatchlistActionRequest, WatchlistShowsRequest,
 };
 use crate::common::imdb_ratings::ImdbRatings;
 use crate::common::make_queue::movie_queue_http;
@@ -28,7 +28,7 @@ use crate::common::movie_collection::{MovieCollection, MovieCollectionDB};
 use crate::common::movie_queue::MovieQueueDB;
 use crate::common::parse_imdb::parse_imdb_worker;
 use crate::common::trakt_utils::{
-    get_watched_shows_db, get_watchlist_shows_db_map, TraktConnection, WatchListShow,
+    get_watched_shows_db, get_watchlist_shows_db_map, TraktActions, TraktConnection,
     WatchedEpisode, WatchedMovie,
 };
 use crate::common::utils::{map_result_vec, remcom_single_file};
@@ -431,38 +431,41 @@ pub fn trakt_watchlist(
 pub fn trakt_watchlist_action(
     path: Path<(String, String)>,
     user: LoggedUser,
-) -> Result<HttpResponse, Error> {
+    request: HttpRequest<AppState>,
+) -> FutureResponse<HttpResponse> {
     if user.email != "ddboline@gmail.com" {
-        return Ok(HttpResponse::Unauthorized().json("Unauthorized"));
+        send_unauthorized(request)
+    } else {
+        let (action, imdb_url) = path.into_inner();
+
+        let action = TraktActions::from_command(&action);
+
+        let ti = TraktConnection::new();
+
+        request
+            .state()
+            .db
+            .send(WatchlistActionRequest {
+                action: action.clone(),
+                imdb_url: imdb_url.clone(),
+            })
+            .from_err()
+            .and_then(move |res| match res {
+                Ok(_) => {
+                    let body = match action {
+                        TraktActions::Add => ti.add_watchlist_show(&imdb_url)?.to_string(),
+                        TraktActions::Remove => ti.remove_watchlist_show(&imdb_url)?.to_string(),
+                        _ => "".to_string(),
+                    };
+                    let resp = HttpResponse::build(StatusCode::OK)
+                        .content_type("text/html; charset=utf-8")
+                        .body(body);
+                    Ok(resp)
+                }
+                Err(err) => Err(err.into()),
+            })
+            .responder()
     }
-
-    let (action, imdb_url) = path.into_inner();
-
-    let ti = TraktConnection::new();
-    let mc = MovieCollectionDB::new();
-
-    let body = match action.as_str() {
-        "add" => {
-            let result = ti.add_watchlist_show(&imdb_url)?;
-            if let Some(show) = ti.get_watchlist_shows()?.get(&imdb_url) {
-                show.insert_show(&mc.pool)?;
-            }
-            format!("{}", result)
-        }
-        "rm" => {
-            let result = ti.remove_watchlist_show(&imdb_url)?;
-            if let Some(show) = WatchListShow::get_show_by_link(&imdb_url, &mc.pool)? {
-                show.delete_show(&mc.pool)?;
-            }
-            format!("{}", result)
-        }
-        _ => "".to_string(),
-    };
-
-    let resp = HttpResponse::build(StatusCode::OK)
-        .content_type("text/html; charset=utf-8")
-        .body(body);
-    Ok(resp)
 }
 
 pub fn trakt_watched_seasons(
@@ -540,20 +543,27 @@ pub fn trakt_watched_list(
 
     let (imdb_url, season) = path.into_inner();
 
+    let button_add = r#"<button type="submit" id="ID" onclick="watched_add('SHOW', SEASON, EPISODE);">add to watched</button>"#;
+    let button_rm = r#"<button type="submit" id="ID" onclick="watched_rm('SHOW', SEASON, EPISODE);">remove from watched</button>"#;
+
+    let body = include_str!("../../templates/watched_template.html").replace(
+        "PREVIOUS",
+        &format!("/list/trakt/watched/list/{}", imdb_url),
+    );
+
     let mc = MovieCollectionDB::new();
     let mq = MovieQueueDB::with_pool(&mc.pool);
 
-    let watched_shows_db: HashSet<(String, i32, i32)> = get_watched_shows_db(&mc.pool)?
-        .into_iter()
-        .map(|s| (s.imdb_url.clone(), s.season, s.episode))
-        .collect();
+    let show = ImdbRatings::get_show_by_link(&imdb_url, &mc.pool)?
+        .ok_or_else(|| err_msg("Show Doesn't exist"))?;
 
-    let show_opt = ImdbRatings::get_show_by_link(&imdb_url, &mc.pool)?;
+    let watched_episodes_db: HashSet<i32> =
+        get_watched_shows_db(&mc.pool, &show.show, Some(season))?
+            .into_iter()
+            .map(|s| s.episode)
+            .collect();
 
-    let patterns = match show_opt.as_ref() {
-        Some(show) => vec![show.show.clone()],
-        None => Vec::new(),
-    };
+    let patterns = vec![show.show.clone()];
 
     let queue: HashMap<(String, i32, i32), _> = mq
         .print_movie_queue(&patterns)?
@@ -570,61 +580,68 @@ pub fn trakt_watched_list(
         })
         .collect();
 
-    let button_add = r#"<button type="submit" id="ID" onclick="watched_add('SHOW', SEASON, EPISODE);">add to watched</button>"#;
-    let button_rm = r#"<button type="submit" id="ID" onclick="watched_rm('SHOW', SEASON, EPISODE);">remove from watched</button>"#;
+    let entries: Vec<_> = mc.print_imdb_episodes(&show.show, Some(season))?;
 
-    let body = include_str!("../../templates/watched_template.html").replace(
-        "PREVIOUS",
-        &format!("/list/trakt/watched/list/{}", imdb_url),
-    );
+    let collection_idx_map: Vec<Result<_, Error>> = entries
+        .iter()
+        .filter_map(
+            |r| match queue.get(&(show.show.clone(), season, r.episode)) {
+                Some(row) => match mc.get_collection_index(&row.path) {
+                    Ok(i) => match i {
+                        Some(index) => Some(Ok((r.episode, index))),
+                        None => None,
+                    },
+                    Err(e) => Some(Err(e)),
+                },
+                None => None,
+            },
+        )
+        .collect();
 
-    let entries = if let Some(show) = show_opt {
-        mc.print_imdb_episodes(&show.show, Some(season))?
-            .iter()
-            .map(|s| {
-                let entry = if let Some(row) = queue.get(&(show.show.clone(), season, s.episode)) {
-                    let collection_idx = mc.get_collection_index(&row.path).unwrap().unwrap_or(-1);
-                    format!(
-                        "<a href={}>{}</a>",
-                        &format!(r#""{}/{}""#, "/list/play", collection_idx),
-                        s.eptitle
-                    )
-                } else {
-                    s.eptitle.clone()
-                };
-                let link = show.link.clone().unwrap_or("".to_string());
+    let collection_idx_map = map_result_vec(collection_idx_map)?;
+    let collection_idx_map: HashMap<i32, i32> = collection_idx_map.into_iter().collect();
 
+    let entries: Vec<_> = entries
+        .iter()
+        .map(|s| {
+            let entry = if let Some(collection_idx) = collection_idx_map.get(&s.episode) {
                 format!(
-                    "<tr><td>{}</td><td><td>{}</td><td>{}</td><td>{}</td><td>{}</td><td>{}</td></tr>",
-                    show.show,
-                    entry,
-                    format!(
-                        r#"<a href="https://www.imdb.com/title/{}">s{} e{}</a>"#,
-                        s.epurl, season, s.episode,
-                    ),
-                    format!(
-                        "rating: {:0.1} / {:0.1}",
-                        s.rating,
-                        show.rating.as_ref().unwrap_or(&-1.0)
-                    ),
-                    s.airdate,
-                    if watched_shows_db.contains(&(link, season, s.episode)) {
-                        button_rm
-                            .replace("SHOW", &imdb_url)
-                            .replace("SEASON", &season.to_string())
-                            .replace("EPISODE", &s.episode.to_string())
-                    } else {
-                        button_add
-                            .replace("SHOW", &imdb_url)
-                            .replace("SEASON", &season.to_string())
-                            .replace("EPISODE", &s.episode.to_string())
-                    }
+                    "<a href={}>{}</a>",
+                    &format!(r#""{}/{}""#, "/list/play", collection_idx),
+                    s.eptitle
                 )
-            })
-            .collect()
-    } else {
-        Vec::new()
-    };
+            } else {
+                s.eptitle.clone()
+            };
+
+            format!(
+                "<tr><td>{}</td><td><td>{}</td><td>{}</td><td>{}</td><td>{}</td><td>{}</td></tr>",
+                show.show,
+                entry,
+                format!(
+                    r#"<a href="https://www.imdb.com/title/{}">s{} e{}</a>"#,
+                    s.epurl, season, s.episode,
+                ),
+                format!(
+                    "rating: {:0.1} / {:0.1}",
+                    s.rating,
+                    show.rating.as_ref().unwrap_or(&-1.0)
+                ),
+                s.airdate,
+                if watched_episodes_db.contains(&s.episode) {
+                    button_rm
+                        .replace("SHOW", &imdb_url)
+                        .replace("SEASON", &season.to_string())
+                        .replace("EPISODE", &s.episode.to_string())
+                } else {
+                    button_add
+                        .replace("SHOW", &imdb_url)
+                        .replace("SEASON", &season.to_string())
+                        .replace("EPISODE", &s.episode.to_string())
+                }
+            )
+        })
+        .collect();
 
     let body = body.replace("BODY", &entries.join("\n"));
 
