@@ -11,7 +11,7 @@ use crate::common::movie_queue::{MovieQueueDB, MovieQueueResult};
 use crate::common::pgpool::PgPool;
 use crate::common::trakt_utils::{
     get_watched_shows_db, get_watchlist_shows_db_map, TraktActions, TraktConnection, WatchListMap,
-    WatchListShow, WatchedEpisode
+    WatchListShow, WatchedEpisode,
 };
 
 pub struct TvShowsRequest {}
