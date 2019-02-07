@@ -22,6 +22,7 @@ use crate::common::movie_collection::{MovieCollection, MovieCollectionDB};
 use crate::common::pgpool::PgPool;
 use crate::common::utils::{map_result_vec, option_string_wrapper, ExponentialRetry};
 
+#[derive(Clone)]
 pub enum TraktActions {
     None,
     List,
