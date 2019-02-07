@@ -2,13 +2,17 @@ use actix::{Handler, Message};
 use failure::Error;
 use std::path;
 
+use crate::common::imdb_episodes::ImdbEpisodes;
 use crate::common::imdb_ratings::ImdbRatings;
 use crate::common::movie_collection::{
     ImdbSeason, MovieCollection, MovieCollectionDB, TvShowsResult,
 };
 use crate::common::movie_queue::{MovieQueueDB, MovieQueueResult};
 use crate::common::pgpool::PgPool;
-use crate::common::trakt_utils::{get_watchlist_shows_db_map, WatchListMap};
+use crate::common::trakt_utils::{
+    get_watched_shows_db, get_watchlist_shows_db_map, TraktActions, TraktConnection, WatchListMap,
+    WatchListShow, WatchedEpisode
+};
 
 pub struct TvShowsRequest {}
 
@@ -122,5 +126,88 @@ impl Handler<ImdbSeasonsRequest> for PgPool {
         } else {
             MovieCollectionDB::with_pool(&self).print_imdb_all_seasons(&msg.show)
         }
+    }
+}
+
+pub struct WatchlistActionRequest {
+    pub action: TraktActions,
+    pub imdb_url: String,
+}
+
+impl Message for WatchlistActionRequest {
+    type Result = Result<(), Error>;
+}
+
+impl Handler<WatchlistActionRequest> for PgPool {
+    type Result = Result<(), Error>;
+
+    fn handle(&mut self, msg: WatchlistActionRequest, _: &mut Self::Context) -> Self::Result {
+        let imdb_url = msg.imdb_url.clone();
+
+        let ti = TraktConnection::new();
+        let mc = MovieCollectionDB::with_pool(&self);
+
+        match msg.action {
+            TraktActions::Add => {
+                if let Some(show) = ti.get_watchlist_shows()?.get(&imdb_url) {
+                    show.insert_show(&mc.pool)?;
+                }
+                Ok(())
+            }
+            TraktActions::Remove => {
+                if let Some(show) = WatchListShow::get_show_by_link(&imdb_url, &mc.pool)? {
+                    show.delete_show(&mc.pool)?;
+                }
+                Ok(())
+            }
+            _ => Ok(()),
+        }
+    }
+}
+
+pub struct WatchedShowsRequest {}
+
+impl Message for WatchedShowsRequest {
+    type Result = Result<Vec<WatchedEpisode>, Error>;
+}
+
+impl Handler<WatchedShowsRequest> for PgPool {
+    type Result = Result<Vec<WatchedEpisode>, Error>;
+
+    fn handle(&mut self, _: WatchedShowsRequest, _: &mut Self::Context) -> Self::Result {
+        get_watched_shows_db(&self)
+    }
+}
+
+pub struct ImdbEpisodesRequest {
+    pub show: String,
+    pub season: Option<i32>,
+}
+
+impl Message for ImdbEpisodesRequest {
+    type Result = Result<Vec<ImdbEpisodes>, Error>;
+}
+
+impl Handler<ImdbEpisodesRequest> for PgPool {
+    type Result = Result<Vec<ImdbEpisodes>, Error>;
+
+    fn handle(&mut self, msg: ImdbEpisodesRequest, _: &mut Self::Context) -> Self::Result {
+        MovieCollectionDB::with_pool(&self).print_imdb_episodes(&msg.show, msg.season)
+    }
+}
+
+pub struct CollectionIndexRequest {
+    pub path: String,
+}
+
+impl Message for CollectionIndexRequest {
+    type Result = Result<Option<i32>, Error>;
+}
+
+impl Handler<CollectionIndexRequest> for PgPool {
+    type Result = Result<Option<i32>, Error>;
+
+    fn handle(&mut self, msg: CollectionIndexRequest, _: &mut Self::Context) -> Self::Result {
+        MovieCollectionDB::with_pool(&self).get_collection_index(&msg.path)
     }
 }
