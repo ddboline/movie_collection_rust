@@ -487,19 +487,17 @@ pub fn trakt_watched_seasons(
             .send(ImdbRatingsRequest {
                 imdb_url: imdb_url.clone(),
             })
-            .from_err()
-            .and_then(move |res| match res {
-                Ok(show_opt) => {
-                    let show = show_opt.map(|s| s.show).unwrap_or("".to_string());
-                    request
-                        .state()
-                        .db
-                        .send(ImdbSeasonsRequest { show })
-                        .from_err()
-                        .wait()
-                }
-                Err(err) => Err(err.into()),
+            .map(move |show_opt| {
+                let show = show_opt
+                    .map(|s| s.map(|t| t.show.clone()).unwrap_or_else(|| "".to_string()))
+                    .unwrap_or_else(|_| "".to_string());
+                request
+                    .state()
+                    .db
+                    .send(ImdbSeasonsRequest { show })
+                    .from_err()
             })
+            .flatten()
             .and_then(move |res| match res {
                 Ok(entries) => {
                     let entries: Vec<_> = entries
