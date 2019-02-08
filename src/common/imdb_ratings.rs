@@ -17,7 +17,7 @@ pub struct ImdbRatings {
     pub index: i32,
     pub show: String,
     pub title: Option<String>,
-    pub link: Option<String>,
+    pub link: String,
     pub rating: Option<f64>,
     pub istv: Option<bool>,
     pub source: Option<String>,
@@ -30,7 +30,7 @@ impl fmt::Display for ImdbRatings {
             "{} {} {} {} {} {} ",
             self.show,
             option_string_wrapper(&self.title),
-            option_string_wrapper(&self.link),
+            self.link,
             self.rating.unwrap_or(-1.0),
             self.istv.unwrap_or(false),
             option_string_wrapper(&self.source),
@@ -79,7 +79,7 @@ impl ImdbRatings {
             let index: i32 = row.get(0);
             let show: String = row.get(1);
             let title: Option<String> = row.get(2);
-            let link: Option<String> = row.get(3);
+            let link: String = row.get(3);
             let rating: Option<f64> = row.get(4);
             let istv: Option<bool> = row.get(5);
             let source: Option<String> = row.get(6);
@@ -101,7 +101,7 @@ impl ImdbRatings {
         vec![
             self.show.clone(),
             option_string_wrapper(&self.title).to_string(),
-            option_string_wrapper(&self.link).to_string(),
+            self.link.clone(),
             self.rating.unwrap_or(-1.0).to_string(),
             self.istv.unwrap_or(false).to_string(),
             option_string_wrapper(&self.source).to_string(),

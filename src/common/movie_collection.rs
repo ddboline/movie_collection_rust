@@ -244,7 +244,7 @@ pub trait MovieCollection: Send + Sync {
                             index,
                             show,
                             title: Some(title),
-                            link: Some(link),
+                            link: link,
                             rating: Some(rating),
                             ..Default::default()
                         }
@@ -649,7 +649,7 @@ pub trait MovieCollection: Send + Sync {
                     ImdbRatings {
                         show,
                         title: Some(title),
-                        link: Some(link),
+                        link: link,
                         rating: Some(rating),
                         istv: Some(istv),
                         source,

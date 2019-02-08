@@ -628,12 +628,12 @@ pub fn trakt_watched_list(
                 s.airdate,
                 if watched_episodes_db.contains(&s.episode) {
                     button_rm
-                        .replace("SHOW", &imdb_url)
+                        .replace("SHOW", &show.link)
                         .replace("SEASON", &season.to_string())
                         .replace("EPISODE", &s.episode.to_string())
                 } else {
                     button_add
-                        .replace("SHOW", &imdb_url)
+                        .replace("SHOW", &show.link)
                         .replace("SEASON", &season.to_string())
                         .replace("EPISODE", &s.episode.to_string())
                 }

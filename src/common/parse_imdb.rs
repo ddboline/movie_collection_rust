@@ -28,18 +28,18 @@ pub fn parse_imdb_worker(
     let shows: Vec<_> = if let Some(ilink) = &imdb_link {
         mc.print_imdb_shows(show, tv)?
             .into_iter()
-            .filter_map(|s| match &s.link {
-                Some(l) if l == ilink => Some((l.clone(), s)),
-                _ => None,
+            .filter_map(|s| {
+                if &s.link == ilink {
+                    Some((s.link.clone(), s))
+                } else {
+                    None
+                }
             })
             .collect()
     } else {
         mc.print_imdb_shows(show, tv)?
             .into_iter()
-            .filter_map(|s| match &s.link {
-                Some(l) => Some((l.clone(), s)),
-                None => None,
-            })
+            .map(|s| (s.link.clone(), s))
             .collect()
     };
 
@@ -122,7 +122,7 @@ pub fn parse_imdb_worker(
                             ImdbRatings {
                                 show: show.to_string(),
                                 title: Some(result.title.clone()),
-                                link: Some(result.link.clone()),
+                                link: result.link.clone(),
                                 rating: Some(result.rating),
                                 istv: Some(istv),
                                 ..Default::default()

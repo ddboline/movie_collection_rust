@@ -431,13 +431,14 @@ pub fn get_watched_shows_db(
     show: &str,
     season: Option<i32>,
 ) -> Result<Vec<WatchedEpisode>, Error> {
-    let where_vec = vec![
-        show.to_string(),
-        season
-            .map(|x| x.to_string())
-            .unwrap_or_else(|| "".to_string()),
-    ];
-    let where_vec: Vec<_> = where_vec.into_iter().filter(|x| !x.is_empty()).collect();
+    let mut where_vec = Vec::new();
+    if !show.is_empty() {
+        where_vec.push(format!("show='{}'", show));
+    }
+    if let Some(season) = season {
+        where_vec.push(format!("season={}", season));
+    }
+
     let where_str = if !where_vec.is_empty() {
         format!("WHERE {}", where_vec.join(" AND "))
     } else {
@@ -679,7 +680,7 @@ fn get_imdb_url_from_show(
             }
             None
         } else {
-            imdb_shows[0].link.clone()
+            Some(imdb_shows[0].link.clone())
         }
     } else {
         None
