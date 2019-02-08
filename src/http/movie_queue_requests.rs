@@ -2,7 +2,6 @@ use actix::{Handler, Message};
 use failure::{err_msg, Error};
 use std::collections::{HashMap, HashSet};
 use std::path;
-use std::sync::Arc;
 
 use crate::common::imdb_episodes::ImdbEpisodes;
 use crate::common::imdb_ratings::ImdbRatings;
@@ -146,20 +145,18 @@ impl Handler<WatchlistActionRequest> for PgPool {
     type Result = Result<(), Error>;
 
     fn handle(&mut self, msg: WatchlistActionRequest, _: &mut Self::Context) -> Self::Result {
-        let imdb_url = msg.imdb_url.clone();
-
         let ti = TraktConnection::new();
         let mc = MovieCollectionDB::with_pool(&self);
 
         match msg.action {
             TraktActions::Add => {
-                if let Some(show) = ti.get_watchlist_shows()?.get(&imdb_url) {
+                if let Some(show) = ti.get_watchlist_shows()?.get(&msg.imdb_url) {
                     show.insert_show(&mc.pool)?;
                 }
                 Ok(())
             }
             TraktActions::Remove => {
-                if let Some(show) = WatchListShow::get_show_by_link(&imdb_url, &mc.pool)? {
+                if let Some(show) = WatchListShow::get_show_by_link(&msg.imdb_url, &mc.pool)? {
                     show.delete_show(&mc.pool)?;
                 }
                 Ok(())
@@ -200,48 +197,6 @@ impl Handler<ImdbEpisodesRequest> for PgPool {
 
     fn handle(&mut self, msg: ImdbEpisodesRequest, _: &mut Self::Context) -> Self::Result {
         MovieCollectionDB::with_pool(&self).print_imdb_episodes(&msg.show, msg.season)
-    }
-}
-
-pub struct CollectionIndexRequest {
-    pub season: i32,
-    pub show: Arc<ImdbRatings>,
-    pub entries: Arc<Vec<ImdbEpisodes>>,
-    pub queue: Arc<HashMap<(String, i32, i32), MovieQueueResult>>,
-}
-
-impl Message for CollectionIndexRequest {
-    type Result = Result<HashMap<i32, i32>, Error>;
-}
-
-impl Handler<CollectionIndexRequest> for PgPool {
-    type Result = Result<HashMap<i32, i32>, Error>;
-
-    fn handle(&mut self, msg: CollectionIndexRequest, _: &mut Self::Context) -> Self::Result {
-        let mc = MovieCollectionDB::with_pool(&self);
-        let collection_idx_map = msg
-            .entries
-            .iter()
-            .filter_map(|r| {
-                match msg
-                    .queue
-                    .get(&(msg.show.show.clone(), msg.season, r.episode))
-                {
-                    Some(row) => match mc.get_collection_index(&row.path) {
-                        Ok(i) => match i {
-                            Some(index) => Some(Ok((r.episode, index))),
-                            None => None,
-                        },
-                        Err(e) => Some(Err(e)),
-                    },
-                    None => None,
-                }
-            })
-            .collect();
-        let collection_idx_map = map_result_vec(collection_idx_map)?;
-        let collection_idx_map: HashMap<i32, i32> = collection_idx_map.into_iter().collect();
-
-        Ok(collection_idx_map)
     }
 }
 
@@ -390,7 +345,7 @@ impl Handler<WatchedActionRequest> for PgPool {
                 };
                 if msg.season != -1 && msg.episode != -1 {
                     WatchedEpisode {
-                        imdb_url: msg.imdb_url.clone(),
+                        imdb_url: msg.imdb_url,
                         season: msg.season,
                         episode: msg.episode,
                         ..Default::default()
