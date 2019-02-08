@@ -1,6 +1,8 @@
 use actix::{Handler, Message};
 use failure::Error;
+use std::collections::HashMap;
 use std::path;
+use std::sync::Arc;
 
 use crate::common::imdb_episodes::ImdbEpisodes;
 use crate::common::imdb_ratings::ImdbRatings;
@@ -13,6 +15,7 @@ use crate::common::trakt_utils::{
     get_watched_shows_db, get_watchlist_shows_db_map, TraktActions, TraktConnection, WatchListMap,
     WatchListShow, WatchedEpisode,
 };
+use crate::common::utils::map_result_vec;
 
 pub struct TvShowsRequest {}
 
@@ -200,17 +203,43 @@ impl Handler<ImdbEpisodesRequest> for PgPool {
 }
 
 pub struct CollectionIndexRequest {
-    pub path: String,
+    pub season: i32,
+    pub show: Arc<ImdbRatings>,
+    pub entries: Arc<Vec<ImdbEpisodes>>,
+    pub queue: Arc<HashMap<(String, i32, i32), MovieQueueResult>>,
 }
 
 impl Message for CollectionIndexRequest {
-    type Result = Result<Option<i32>, Error>;
+    type Result = Result<HashMap<i32, i32>, Error>;
 }
 
 impl Handler<CollectionIndexRequest> for PgPool {
-    type Result = Result<Option<i32>, Error>;
+    type Result = Result<HashMap<i32, i32>, Error>;
 
     fn handle(&mut self, msg: CollectionIndexRequest, _: &mut Self::Context) -> Self::Result {
-        MovieCollectionDB::with_pool(&self).get_collection_index(&msg.path)
+        let mc = MovieCollectionDB::with_pool(&self);
+        let collection_idx_map = msg
+            .entries
+            .iter()
+            .filter_map(|r| {
+                match msg
+                    .queue
+                    .get(&(msg.show.show.clone(), msg.season, r.episode))
+                {
+                    Some(row) => match mc.get_collection_index(&row.path) {
+                        Ok(i) => match i {
+                            Some(index) => Some(Ok((r.episode, index))),
+                            None => None,
+                        },
+                        Err(e) => Some(Err(e)),
+                    },
+                    None => None,
+                }
+            })
+            .collect();
+        let collection_idx_map = map_result_vec(collection_idx_map)?;
+        let collection_idx_map: HashMap<i32, i32> = collection_idx_map.into_iter().collect();
+
+        Ok(collection_idx_map)
     }
 }
