@@ -13,24 +13,18 @@ use actix_web::{
 use failure::{err_msg, Error};
 use futures::future::Future;
 use rust_auth_server::auth_handler::LoggedUser;
-use std::collections::{HashMap, HashSet};
+use std::collections::HashMap;
 use std::path;
 use subprocess::Exec;
 
 use super::movie_queue_app::AppState;
 use super::movie_queue_requests::{
-    ImdbRatingsRequest, ImdbSeasonsRequest, MoviePathRequest, MovieQueueRequest,
-    QueueDeleteRequest, TvShowsRequest, WatchlistActionRequest, WatchlistShowsRequest,
+    ImdbRatingsRequest, ImdbSeasonsRequest, ImdbShowRequest, MoviePathRequest, MovieQueueRequest,
+    ParseImdbRequest, QueueDeleteRequest, TvShowsRequest, WatchedActionRequest, WatchedListRequest,
+    WatchlistActionRequest, WatchlistShowsRequest,
 };
-use crate::common::imdb_ratings::ImdbRatings;
 use crate::common::make_queue::movie_queue_http;
-use crate::common::movie_collection::{MovieCollection, MovieCollectionDB};
-use crate::common::movie_queue::MovieQueueDB;
-use crate::common::parse_imdb::parse_imdb_worker;
-use crate::common::trakt_utils::{
-    get_watched_shows_db, get_watchlist_shows_db_map, TraktActions, TraktConnection,
-    WatchedEpisode, WatchedMovie,
-};
+use crate::common::trakt_utils::{TraktActions, TraktConnection};
 use crate::common::utils::{map_result_vec, remcom_single_file};
 
 fn process_shows(
@@ -534,259 +528,92 @@ pub fn trakt_watched_seasons(
 pub fn trakt_watched_list(
     path: Path<(String, i32)>,
     user: LoggedUser,
-) -> Result<HttpResponse, Error> {
+    request: HttpRequest<AppState>,
+) -> FutureResponse<HttpResponse> {
     if user.email != "ddboline@gmail.com" {
-        return Ok(HttpResponse::Unauthorized().json("Unauthorized"));
-    }
+        send_unauthorized(request)
+    } else {
+        let (imdb_url, season) = path.into_inner();
 
-    let (imdb_url, season) = path.into_inner();
-
-    let button_add = r#"<button type="submit" id="ID" onclick="watched_add('SHOW', SEASON, EPISODE);">add to watched</button>"#;
-    let button_rm = r#"<button type="submit" id="ID" onclick="watched_rm('SHOW', SEASON, EPISODE);">remove from watched</button>"#;
-
-    let body = include_str!("../../templates/watched_template.html").replace(
-        "PREVIOUS",
-        &format!("/list/trakt/watched/list/{}", imdb_url),
-    );
-
-    let mc = MovieCollectionDB::new();
-    let mq = MovieQueueDB::with_pool(&mc.pool);
-
-    let show = ImdbRatings::get_show_by_link(&imdb_url, &mc.pool)?
-        .ok_or_else(|| err_msg("Show Doesn't exist"))?;
-
-    let watched_episodes_db: HashSet<i32> =
-        get_watched_shows_db(&mc.pool, &show.show, Some(season))?
-            .into_iter()
-            .map(|s| s.episode)
-            .collect();
-
-    let patterns = vec![show.show.clone()];
-
-    let queue: HashMap<(String, i32, i32), _> = mq
-        .print_movie_queue(&patterns)?
-        .into_iter()
-        .filter_map(|s| match &s.show {
-            Some(show) => match s.season {
-                Some(season) => match s.episode {
-                    Some(episode) => Some(((show.clone(), season, episode), s)),
-                    None => None,
-                },
-                None => None,
-            },
-            None => None,
-        })
-        .collect();
-
-    let entries: Vec<_> = mc.print_imdb_episodes(&show.show, Some(season))?;
-
-    let collection_idx_map: Vec<Result<_, Error>> = entries
-        .iter()
-        .filter_map(
-            |r| match queue.get(&(show.show.clone(), season, r.episode)) {
-                Some(row) => match mc.get_collection_index(&row.path) {
-                    Ok(i) => match i {
-                        Some(index) => Some(Ok((r.episode, index))),
-                        None => None,
-                    },
-                    Err(e) => Some(Err(e)),
-                },
-                None => None,
-            },
-        )
-        .collect();
-
-    let collection_idx_map = map_result_vec(collection_idx_map)?;
-    let collection_idx_map: HashMap<i32, i32> = collection_idx_map.into_iter().collect();
-
-    let entries: Vec<_> = entries
-        .iter()
-        .map(|s| {
-            let entry = if let Some(collection_idx) = collection_idx_map.get(&s.episode) {
-                format!(
-                    "<a href={}>{}</a>",
-                    &format!(r#""{}/{}""#, "/list/play", collection_idx),
-                    s.eptitle
-                )
-            } else {
-                s.eptitle.clone()
-            };
-
-            format!(
-                "<tr><td>{}</td><td><td>{}</td><td>{}</td><td>{}</td><td>{}</td><td>{}</td></tr>",
-                show.show,
-                entry,
-                format!(
-                    r#"<a href="https://www.imdb.com/title/{}">s{} e{}</a>"#,
-                    s.epurl, season, s.episode,
-                ),
-                format!(
-                    "rating: {:0.1} / {:0.1}",
-                    s.rating,
-                    show.rating.as_ref().unwrap_or(&-1.0)
-                ),
-                s.airdate,
-                if watched_episodes_db.contains(&s.episode) {
-                    button_rm
-                        .replace("SHOW", &show.link)
-                        .replace("SEASON", &season.to_string())
-                        .replace("EPISODE", &s.episode.to_string())
-                } else {
-                    button_add
-                        .replace("SHOW", &show.link)
-                        .replace("SEASON", &season.to_string())
-                        .replace("EPISODE", &s.episode.to_string())
+        request
+            .state()
+            .db
+            .send(WatchedListRequest { imdb_url, season })
+            .from_err()
+            .and_then(move |res| match res {
+                Ok(body) => {
+                    let resp = HttpResponse::build(StatusCode::OK)
+                        .content_type("text/html; charset=utf-8")
+                        .body(body);
+                    Ok(resp)
                 }
-            )
-        })
-        .collect();
-
-    let body = body.replace("BODY", &entries.join("\n"));
-
-    let resp = HttpResponse::build(StatusCode::OK)
-        .content_type("text/html; charset=utf-8")
-        .body(body);
-    Ok(resp)
+                Err(err) => Err(err.into()),
+            })
+            .responder()
+    }
 }
 
 pub fn trakt_watched_action(
     path: Path<(String, String, i32, i32)>,
     user: LoggedUser,
-) -> Result<HttpResponse, Error> {
+    request: HttpRequest<AppState>,
+) -> FutureResponse<HttpResponse> {
     if user.email != "ddboline@gmail.com" {
-        return Ok(HttpResponse::Unauthorized().json("Unauthorized"));
+        send_unauthorized(request)
+    } else {
+        let (action, imdb_url, season, episode) = path.into_inner();
+
+        request
+            .state()
+            .db
+            .send(WatchedActionRequest {
+                action: TraktActions::from_command(&action),
+                imdb_url,
+                season,
+                episode,
+            })
+            .from_err()
+            .and_then(move |res| match res {
+                Ok(body) => {
+                    let resp = HttpResponse::build(StatusCode::OK)
+                        .content_type("text/html; charset=utf-8")
+                        .body(body);
+                    Ok(resp)
+                }
+                Err(err) => Err(err.into()),
+            })
+            .responder()
     }
-
-    let (action, imdb_url, season, episode) = path.into_inner();
-
-    let ti = TraktConnection::new();
-    let mc = MovieCollectionDB::new();
-
-    let body = match action.as_str() {
-        "add" => {
-            let result = if season != -1 && episode != -1 {
-                ti.add_episode_to_watched(&imdb_url, season, episode)?
-            } else {
-                ti.add_movie_to_watched(&imdb_url)?
-            };
-            if season != -1 && episode != -1 {
-                WatchedEpisode {
-                    imdb_url: imdb_url.clone(),
-                    season,
-                    episode,
-                    ..Default::default()
-                }
-                .insert_episode(&mc.pool)?;
-            } else {
-                WatchedMovie {
-                    imdb_url,
-                    title: "".to_string(),
-                }
-                .insert_movie(&mc.pool)?;
-            }
-
-            format!("{}", result)
-        }
-        "rm" => {
-            let result = if season != -1 && episode != -1 {
-                ti.remove_episode_to_watched(&imdb_url, season, episode)?
-            } else {
-                ti.remove_movie_to_watched(&imdb_url)?
-            };
-
-            if season != -1 && episode != -1 {
-                if let Some(epi_) =
-                    WatchedEpisode::get_watched_episode(&mc.pool, &imdb_url, season, episode)?
-                {
-                    epi_.delete_episode(&mc.pool)?;
-                }
-            } else if let Some(movie) = WatchedMovie::get_watched_movie(&mc.pool, &imdb_url)? {
-                movie.delete_movie(&mc.pool)?;
-            };
-
-            format!("{}", result)
-        }
-        _ => "".to_string(),
-    };
-
-    let resp = HttpResponse::build(StatusCode::OK)
-        .content_type("text/html; charset=utf-8")
-        .body(body);
-    Ok(resp)
-}
-
-#[derive(Deserialize, Default)]
-pub struct ParseImdbRequest {
-    pub all: Option<bool>,
-    pub database: Option<bool>,
-    pub tv: Option<bool>,
-    pub update: Option<bool>,
-    pub link: Option<String>,
-    pub season: Option<i32>,
 }
 
 pub fn imdb_show(
     path: Path<String>,
     query: Query<ParseImdbRequest>,
     user: LoggedUser,
-) -> Result<HttpResponse, Error> {
+    request: HttpRequest<AppState>,
+) -> FutureResponse<HttpResponse> {
     if user.email != "ddboline@gmail.com" {
-        return Ok(HttpResponse::Unauthorized().json("Unauthorized"));
-    }
+        send_unauthorized(request)
+    } else {
+        let show = path.into_inner();
+        let query = query.into_inner();
 
-    let mc = MovieCollectionDB::new();
-    let watchlist = get_watchlist_shows_db_map(&mc.pool)?;
-
-    let button_add = r#"<td><button type="submit" id="ID" onclick="watchlist_add('SHOW');">add to watchlist</button></td>"#;
-    let button_rm = r#"<td><button type="submit" id="ID" onclick="watchlist_rm('SHOW');">remove from watchlist</button></td>"#;
-
-    let show = path.into_inner();
-    let query = query.into_inner();
-
-    let output: Vec<_> = parse_imdb_worker(
-        &mc,
-        &show,
-        query.tv.unwrap_or(false),
-        query.link.clone(),
-        query.all.unwrap_or(false),
-        query.season,
-        query.update.unwrap_or(false),
-        query.database.unwrap_or(false),
-    )?
-    .into_iter()
-    .map(|line| {
-        let mut imdb_url = "".to_string();
-        let tmp: Vec<_> = line
-            .into_iter()
-            .map(|i| {
-                if i.starts_with("tt") {
-                    imdb_url = i.clone();
-                    format!(r#"<a href="https://www.imdb.com/title/{}">{}</a>"#, i, i)
-                } else {
-                    i.to_string()
+        request
+            .state()
+            .db
+            .send(ImdbShowRequest { show, query })
+            .from_err()
+            .and_then(move |res| match res {
+                Ok(body) => {
+                    let resp = HttpResponse::build(StatusCode::OK)
+                        .content_type("text/html; charset=utf-8")
+                        .body(body);
+                    Ok(resp)
                 }
+                Err(err) => Err(err.into()),
             })
-            .collect();
-        format!(
-            "<tr><td>{}</td><td>{}</td></tr>",
-            tmp.join("</td><td>"),
-            if watchlist.contains_key(&imdb_url) {
-                button_rm.replace("SHOW", &imdb_url)
-            } else {
-                button_add.replace("SHOW", &imdb_url)
-            }
-        )
-    })
-    .collect();
-
-    let body = include_str!("../../templates/watchlist_template.html");
-
-    let body = body.replace("BODY", &output.join("\n"));
-
-    let resp = HttpResponse::build(StatusCode::OK)
-        .content_type("text/html; charset=utf-8")
-        .body(body);
-    Ok(resp)
+            .responder()
+    }
 }
 
 pub fn trakt_cal(user: LoggedUser) -> Result<HttpResponse, Error> {
