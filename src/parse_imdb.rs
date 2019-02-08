@@ -8,7 +8,7 @@ use failure::Error;
 use std::io::{stdout, Write};
 
 use movie_collection_rust::common::movie_collection::MovieCollectionDB;
-use movie_collection_rust::common::parse_imdb::ParseImdb;
+use movie_collection_rust::common::parse_imdb::{ParseImdb, ParseImdbOptions};
 use movie_collection_rust::common::utils::get_version_number;
 
 fn parse_imdb_parser() -> Result<(), Error> {
@@ -83,15 +83,17 @@ fn parse_imdb_parser() -> Result<(), Error> {
     let mc = MovieCollectionDB::new();
     let pi = ParseImdb::with_pool(&mc.pool);
 
-    let output = pi.parse_imdb_worker(
-        show,
+    let opts = ParseImdbOptions {
+        show: show.to_string(),
         tv,
         imdb_link,
         all_seasons,
         season,
         do_update,
         update_database,
-    )?;
+    };
+
+    let output = pi.parse_imdb_worker(&opts)?;
 
     let stdout = stdout();
 

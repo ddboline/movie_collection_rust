@@ -16,6 +16,18 @@ use crate::common::imdb_utils::ImdbConnection;
 use crate::common::movie_collection::{MovieCollection, MovieCollectionDB};
 use crate::common::pgpool::PgPool;
 
+#[derive(Default, Debug)]
+pub struct ParseImdbOptions {
+    pub show: String,
+    pub tv: bool,
+    pub imdb_link: Option<String>,
+    pub all_seasons: bool,
+    pub season: Option<i32>,
+    pub do_update: bool,
+    pub update_database: bool,
+}
+
+#[derive(Default)]
 pub struct ParseImdb {
     pub mc: MovieCollectionDB,
 }
@@ -27,19 +39,10 @@ impl ParseImdb {
         }
     }
 
-    pub fn parse_imdb_worker(
-        &self,
-        show: &str,
-        tv: bool,
-        imdb_link: Option<String>,
-        all_seasons: bool,
-        season: Option<i32>,
-        do_update: bool,
-        update_database: bool,
-    ) -> Result<Vec<Vec<String>>, Error> {
-        let shows: Vec<_> = if let Some(ilink) = &imdb_link {
+    pub fn parse_imdb_worker(&self, opts: &ParseImdbOptions) -> Result<Vec<Vec<String>>, Error> {
+        let shows: Vec<_> = if let Some(ilink) = &opts.imdb_link {
             self.mc
-                .print_imdb_shows(show, tv)?
+                .print_imdb_shows(&opts.show, opts.tv)?
                 .into_iter()
                 .filter_map(|s| {
                     if &s.link == ilink {
@@ -51,7 +54,7 @@ impl ParseImdb {
                 .collect()
         } else {
             self.mc
-                .print_imdb_shows(show, tv)?
+                .print_imdb_shows(&opts.show, opts.tv)?
                 .into_iter()
                 .map(|s| (s.link.clone(), s))
                 .collect()
@@ -59,7 +62,7 @@ impl ParseImdb {
 
         let mut output = Vec::new();
 
-        if !do_update {
+        if !opts.do_update {
             for (_, s) in &shows {
                 output.push(s.get_string_vec());
             }
@@ -67,10 +70,10 @@ impl ParseImdb {
 
         let shows: HashMap<String, _> = shows.into_iter().collect();
 
-        let episodes: Option<Vec<_>> = if tv {
-            if all_seasons {
-                if !do_update {
-                    for s in self.mc.print_imdb_all_seasons(show)? {
+        let episodes: Option<Vec<_>> = if opts.tv {
+            if opts.all_seasons {
+                if !opts.do_update {
+                    for s in self.mc.print_imdb_all_seasons(&opts.show)? {
                         output.push(s.get_string_vec());
                     }
                 }
@@ -78,7 +81,7 @@ impl ParseImdb {
             } else {
                 let r = self
                     .mc
-                    .print_imdb_episodes(show, season)?
+                    .print_imdb_episodes(&opts.show, opts.season)?
                     .into_iter()
                     .map(|e| ((e.season, e.episode), e))
                     .collect();
@@ -88,7 +91,7 @@ impl ParseImdb {
             None
         };
 
-        if !do_update {
+        if !opts.do_update {
             if let Some(v) = episodes.as_ref() {
                 for ((_, _), e) in v {
                     output.push(e.get_string_vec());
@@ -98,50 +101,37 @@ impl ParseImdb {
 
         let episodes: Option<HashMap<(i32, i32), _>> = episodes.map(|v| v.into_iter().collect());
 
-        if do_update {
-            self.parse_imdb_update_worker(
-                season,
-                shows,
-                episodes,
-                update_database,
-                tv,
-                show,
-                imdb_link,
-                &mut output,
-            )?;
+        if opts.do_update {
+            self.parse_imdb_update_worker(&opts, shows, episodes, &mut output)?;
         }
         Ok(output)
     }
 
     fn parse_imdb_update_worker(
         &self,
-        season: Option<i32>,
+        opts: &ParseImdbOptions,
         shows: HashMap<String, ImdbRatings>,
         episodes: Option<HashMap<(i32, i32), ImdbEpisodes>>,
-        update_database: bool,
-        tv: bool,
-        show: &str,
-        imdb_link: Option<String>,
         output: &mut Vec<Vec<String>>,
     ) -> Result<(), Error> {
         let imdb_conn = ImdbConnection::new();
-        let results = imdb_conn.parse_imdb(&show.replace("_", " "))?;
-        let results = if let Some(ilink) = &imdb_link {
+        let results = imdb_conn.parse_imdb(&opts.show.replace("_", " "))?;
+        let results = if let Some(ilink) = &opts.imdb_link {
             results.into_iter().filter(|r| &r.link == ilink).collect()
         } else {
             results
         };
 
-        let link = if let Some(link) = imdb_link {
-            Some(link)
+        let link = if let Some(link) = &opts.imdb_link {
+            Some(link.clone())
         } else if let Some(result) = results.get(0) {
             Some(result.link.clone())
         } else {
             None
         };
 
-        if !tv {
-            if update_database {
+        if !opts.tv {
+            if opts.update_database {
                 if let Some(result) = results.get(0) {
                     match shows.get(&result.link) {
                         Some(s) => {
@@ -150,17 +140,19 @@ impl ParseImdb {
                                 new.title = Some(result.title.clone());
                                 new.rating = Some(result.rating);
                                 new.update_show(&self.mc.get_pool())?;
-                                output
-                                    .push(vec![format!("exists {} {} {}", show, s, result.rating)]);
+                                output.push(vec![format!(
+                                    "exists {} {} {}",
+                                    opts.show, s, result.rating
+                                )]);
                             }
                         }
                         None => {
-                            output.push(vec![format!("not exists {} {}", show, result)]);
+                            output.push(vec![format!("not exists {} {}", opts.show, result)]);
                             let istv = result.title.contains("TV Series")
                                 || result.title.contains("TV Mini-Series");
 
                             ImdbRatings {
-                                show: show.to_string(),
+                                show: opts.show.to_string(),
                                 title: Some(result.title.clone()),
                                 link: result.link.clone(),
                                 rating: Some(result.rating),
@@ -179,9 +171,9 @@ impl ParseImdb {
         } else if let Some(link) = link {
             output.push(vec![format!("Using {}", link)]);
             if let Some(result) = shows.get(&link) {
-                for episode in imdb_conn.parse_imdb_episode_list(&link, season)? {
+                for episode in imdb_conn.parse_imdb_episode_list(&link, opts.season)? {
                     output.push(vec![format!("{} {}", result, episode)]);
-                    if update_database {
+                    if opts.update_database {
                         let key = (episode.season, episode.episode);
                         if let Some(episodes) = &episodes {
                             let airdate = episode
@@ -207,7 +199,7 @@ impl ParseImdb {
                                 None => {
                                     output.push(vec![format!("not exists {} {}", result, episode)]);
                                     ImdbEpisodes {
-                                        show: show.to_string(),
+                                        show: opts.show.to_string(),
                                         title: result
                                             .title
                                             .clone()

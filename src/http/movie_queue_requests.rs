@@ -10,7 +10,7 @@ use crate::common::movie_collection::{
     ImdbSeason, MovieCollection, MovieCollectionDB, TvShowsResult,
 };
 use crate::common::movie_queue::{MovieQueueDB, MovieQueueResult};
-use crate::common::parse_imdb::ParseImdb;
+use crate::common::parse_imdb::{ParseImdb, ParseImdbOptions};
 use crate::common::pgpool::PgPool;
 use crate::common::trakt_utils::{
     get_watched_shows_db, get_watchlist_shows_db_map, TraktActions, TraktConnection, WatchListMap,
@@ -446,9 +446,32 @@ pub struct ParseImdbRequest {
     pub season: Option<i32>,
 }
 
+impl From<ParseImdbRequest> for ParseImdbOptions {
+    fn from(opts: ParseImdbRequest) -> Self {
+        ParseImdbOptions {
+            show: "".to_string(),
+            tv: opts.tv.unwrap_or(false),
+            imdb_link: opts.link,
+            all_seasons: opts.all.unwrap_or(false),
+            season: opts.season,
+            do_update: opts.update.unwrap_or(false),
+            update_database: opts.database.unwrap_or(false),
+        }
+    }
+}
+
 pub struct ImdbShowRequest {
     pub show: String,
     pub query: ParseImdbRequest,
+}
+
+impl From<ImdbShowRequest> for ParseImdbOptions {
+    fn from(opts: ImdbShowRequest) -> Self {
+        ParseImdbOptions {
+            show: opts.show,
+            ..opts.query.into()
+        }
+    }
 }
 
 impl Message for ImdbShowRequest {
@@ -467,15 +490,7 @@ impl Handler<ImdbShowRequest> for PgPool {
         let watchlist = get_watchlist_shows_db_map(&self)?;
 
         let output: Vec<_> = pi
-            .parse_imdb_worker(
-                &msg.show,
-                msg.query.tv.unwrap_or(false),
-                msg.query.link.clone(),
-                msg.query.all.unwrap_or(false),
-                msg.query.season,
-                msg.query.update.unwrap_or(false),
-                msg.query.database.unwrap_or(false),
-            )?
+            .parse_imdb_worker(&msg.into())?
             .into_iter()
             .map(|line| {
                 let mut imdb_url = "".to_string();

@@ -482,17 +482,22 @@ pub fn trakt_watched_seasons(
                 imdb_url: imdb_url.clone(),
             })
             .map(move |show_opt| {
-                let show = show_opt
-                    .map(|s| s.map(|t| t.show.clone()).unwrap_or_else(|| "".to_string()))
-                    .unwrap_or_else(|_| "".to_string());
+                let empty = || ("".to_string(), "".to_string());
+                let (show, link) = show_opt
+                    .map(|s| {
+                        s.map(|t| (t.show.clone(), t.link.clone()))
+                            .unwrap_or_else(empty)
+                    })
+                    .unwrap_or_else(|_| empty());
                 request
                     .state()
                     .db
                     .send(ImdbSeasonsRequest { show })
                     .from_err()
+                    .map(|res| (link, res))
             })
             .flatten()
-            .and_then(move |res| match res {
+            .and_then(move |(link, res)| match res {
                 Ok(entries) => {
                     let entries: Vec<_> = entries
                         .iter()
@@ -507,7 +512,7 @@ pub fn trakt_watched_seasons(
                                 s.nepisodes,
                                 button_add
                                     .replace("SHOW", &s.show)
-                                    .replace("LINK", &imdb_url)
+                                    .replace("LINK", &link)
                                     .replace("SEASON", &s.season.to_string())
                             )
                         })
