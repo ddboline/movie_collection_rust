@@ -1,11 +1,5 @@
 #![allow(clippy::needless_pass_by_value)]
 
-extern crate actix;
-extern crate actix_web;
-extern crate movie_collection_rust;
-extern crate rust_auth_server;
-extern crate subprocess;
-
 use subprocess::Exec;
 
 use movie_collection_rust::common::config::Config;

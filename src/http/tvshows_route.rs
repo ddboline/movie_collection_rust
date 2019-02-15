@@ -1,25 +1,14 @@
 #![allow(clippy::needless_pass_by_value)]
 
-extern crate actix;
-extern crate actix_web;
-extern crate futures;
-extern crate rust_auth_server;
-extern crate subprocess;
-
-use actix_web::{
-    http::StatusCode, AsyncResponder, FutureResponse, HttpRequest, HttpResponse,
-};
-use failure::{Error};
+use actix_web::{http::StatusCode, AsyncResponder, FutureResponse, HttpRequest, HttpResponse};
+use failure::Error;
 use futures::future::Future;
 use rust_auth_server::auth_handler::LoggedUser;
 use std::collections::HashMap;
 
-use super::send_unauthorized;
 use super::movie_queue_app::AppState;
-use super::movie_queue_requests::{
-    TvShowsRequest,
-    WatchlistShowsRequest,
-};
+use super::movie_queue_requests::{TvShowsRequest, WatchlistShowsRequest};
+use super::send_unauthorized;
 
 pub fn tvshows(user: LoggedUser, request: HttpRequest<AppState>) -> FutureResponse<HttpResponse> {
     if user.email != "ddboline@gmail.com" {

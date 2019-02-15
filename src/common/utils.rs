@@ -1,15 +1,3 @@
-extern crate amqp;
-extern crate chrono;
-extern crate failure;
-extern crate r2d2;
-extern crate r2d2_postgres;
-extern crate rand;
-extern crate rayon;
-extern crate reqwest;
-extern crate select;
-extern crate serde_json;
-extern crate subprocess;
-
 use amqp::{protocol, Basic, Channel, Options, Session, Table};
 use failure::{err_msg, Error};
 use rand::distributions::{Distribution, Uniform};

@@ -1,25 +1,18 @@
 #![allow(clippy::needless_pass_by_value)]
 
-extern crate actix;
-extern crate actix_web;
-extern crate futures;
-extern crate rust_auth_server;
-extern crate subprocess;
-
 use actix_web::{
     http::StatusCode, AsyncResponder, FutureResponse, HttpRequest, HttpResponse, Path,
 };
-use failure::{Error};
+use failure::Error;
 use futures::future::Future;
 use rust_auth_server::auth_handler::LoggedUser;
 
-use super::send_unauthorized;
 use super::movie_queue_app::AppState;
 use super::movie_queue_requests::{
-    ImdbRatingsRequest, ImdbSeasonsRequest,
-    WatchedActionRequest, WatchedListRequest,
+    ImdbRatingsRequest, ImdbSeasonsRequest, WatchedActionRequest, WatchedListRequest,
     WatchlistActionRequest, WatchlistShowsRequest,
 };
+use super::send_unauthorized;
 use crate::common::trakt_utils::{TraktActions, TraktConnection};
 
 pub fn trakt_watchlist(

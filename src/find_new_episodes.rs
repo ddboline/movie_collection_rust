@@ -1,10 +1,3 @@
-extern crate actix;
-extern crate actix_web;
-extern crate chrono;
-extern crate failure;
-extern crate movie_collection_rust;
-extern crate serde_json;
-
 use chrono::{Duration, Local};
 use clap::{App, Arg};
 use failure::Error;

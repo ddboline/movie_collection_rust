@@ -1,6 +1,3 @@
-extern crate clap;
-extern crate failure;
-
 use clap::{App, Arg};
 use failure::Error;
 

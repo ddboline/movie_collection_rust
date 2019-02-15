@@ -1,7 +1,3 @@
-extern crate failure;
-extern crate movie_collection_rust;
-extern crate rayon;
-
 use clap::{App, Arg};
 use failure::Error;
 use rayon::prelude::*;

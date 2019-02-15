@@ -1,23 +1,20 @@
 #![allow(clippy::needless_pass_by_value)]
 
-extern crate actix;
-extern crate actix_web;
-extern crate rust_auth_server;
-extern crate subprocess;
-
 use actix::sync::SyncArbiter;
 use actix::Addr;
 use actix_web::middleware::identity::{CookieIdentityPolicy, IdentityService};
 use actix_web::{http::Method, server, App};
 use chrono::Duration;
 
-use super::trakt_routes::{trakt_cal, trakt_watched_action, trakt_watched_list, trakt_watched_seasons, trakt_watchlist, trakt_watchlist_action,};
-use super::tvshows_route::tvshows;
 use super::movie_queue_routes::{
     imdb_show, movie_queue, movie_queue_delete, movie_queue_play, movie_queue_show,
-    movie_queue_transcode, movie_queue_transcode_directory, 
-    
+    movie_queue_transcode, movie_queue_transcode_directory,
 };
+use super::trakt_routes::{
+    trakt_cal, trakt_watched_action, trakt_watched_list, trakt_watched_seasons, trakt_watchlist,
+    trakt_watchlist_action,
+};
+use super::tvshows_route::tvshows;
 use crate::common::config::Config;
 use crate::common::pgpool::PgPool;
 

@@ -1,7 +1,3 @@
-extern crate dotenv;
-extern crate failure;
-extern crate movie_collection_rust;
-
 use clap::{App, Arg};
 use failure::{err_msg, Error};
 use std::io::{stdout, Write};

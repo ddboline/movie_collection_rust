@@ -1,7 +1,3 @@
-extern crate dotenv;
-extern crate failure;
-extern crate rayon;
-
 use failure::Error;
 use rayon::prelude::*;
 use std::collections::HashMap;

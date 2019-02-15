@@ -1,11 +1,3 @@
-extern crate chrono;
-extern crate failure;
-extern crate r2d2;
-extern crate r2d2_postgres;
-extern crate rayon;
-extern crate reqwest;
-extern crate select;
-
 use failure::{err_msg, Error};
 use rayon::prelude::*;
 use std::fmt;
@@ -64,14 +56,21 @@ impl MovieQueueDB {
     }
 
     pub fn remove_from_queue_by_idx(&self, idx: i32) -> Result<(), Error> {
-        let max_idx = self.get_max_queue_index()?;
+        let conn = self.pool.get()?;
+        let tran = conn.transaction()?;
+
+        let query = r#"SELECT max(idx) FROM movie_queue"#;
+        let max_idx: i32 = tran
+            .query(query, &[])?
+            .iter()
+            .nth(0)
+            .map(|r| r.get(0))
+            .unwrap_or(-1);
         if idx > max_idx || idx < 0 {
             return Ok(());
         }
         let diff = max_idx - idx;
 
-        let conn = self.pool.get()?;
-        let tran = conn.transaction()?;
         let query = r#"DELETE FROM movie_queue WHERE idx = $1"#;
         tran.execute(query, &[&idx])?;
 
@@ -108,7 +107,7 @@ impl MovieQueueDB {
         }
         let mc = MovieCollectionDB::with_pool(&self.pool);
         let collection_idx = match mc.get_collection_index(&path)? {
-            Some(idx) => idx,
+            Some(i) => i,
             None => {
                 mc.insert_into_collection(&path)?;
                 mc.get_collection_index(&path)?
@@ -130,11 +129,18 @@ impl MovieQueueDB {
             self.remove_from_queue_by_idx(current_idx)?;
         }
 
-        let max_idx = self.get_max_queue_index()?;
-        let diff = max_idx - idx + 1;
-
         let conn = self.pool.get()?;
         let tran = conn.transaction()?;
+
+        let query = r#"SELECT max(idx) FROM movie_queue"#;
+        let max_idx: i32 = tran
+            .query(query, &[])?
+            .iter()
+            .nth(0)
+            .map(|r| r.get(0))
+            .unwrap_or(-1);
+        let diff = max_idx - idx + 1;
+
         let query = r#"UPDATE movie_queue SET idx = idx + $1 WHERE idx >= $2"#;
         tran.execute(query, &[&diff, &idx])?;
 

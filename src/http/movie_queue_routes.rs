@@ -1,14 +1,7 @@
 #![allow(clippy::needless_pass_by_value)]
 
-extern crate actix;
-extern crate actix_web;
-extern crate futures;
-extern crate rust_auth_server;
-extern crate subprocess;
-
 use actix_web::{
-    http::StatusCode, AsyncResponder, FutureResponse, HttpRequest, HttpResponse, Path,
-    Query,
+    http::StatusCode, AsyncResponder, FutureResponse, HttpRequest, HttpResponse, Path, Query,
 };
 use failure::{err_msg, Error};
 use futures::future::Future;
@@ -16,12 +9,11 @@ use rust_auth_server::auth_handler::LoggedUser;
 use std::path;
 use subprocess::Exec;
 
-use super::send_unauthorized;
 use super::movie_queue_app::AppState;
 use super::movie_queue_requests::{
-    ImdbShowRequest, MoviePathRequest, MovieQueueRequest,
-    ParseImdbRequest, QueueDeleteRequest,
+    ImdbShowRequest, MoviePathRequest, MovieQueueRequest, ParseImdbRequest, QueueDeleteRequest,
 };
+use super::send_unauthorized;
 use crate::common::make_queue::movie_queue_http;
 use crate::common::utils::{map_result_vec, remcom_single_file};
 
@@ -249,7 +241,6 @@ pub fn movie_queue_play(
             .responder()
     }
 }
-
 
 pub fn imdb_show(
     path: Path<String>,

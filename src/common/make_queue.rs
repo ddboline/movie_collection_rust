@@ -1,9 +1,3 @@
-extern crate actix;
-extern crate actix_web;
-extern crate rayon;
-extern crate rust_auth_server;
-extern crate subprocess;
-
 use failure::Error;
 use rayon::prelude::*;
 
@@ -26,6 +20,7 @@ pub fn make_queue_worker(
     let mq = MovieQueueDB::with_pool(&mc.pool);
 
     let stdout = io::stdout();
+    println!("{:?}", add_files);
 
     if do_shows {
         for show in mc.print_tv_shows()? {
