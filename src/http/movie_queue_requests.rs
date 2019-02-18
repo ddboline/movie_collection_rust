@@ -519,7 +519,7 @@ impl Handler<TraktCalRequest> for PgPool {
                 let entry = format!(
                     "<tr><td>{}</td><td>{}</td><td>{}</td><td>{}</td>{}</tr>",
                     format!(
-                        r#"<a href="/list/trakt/watched/list/{}/{}>{}</a>"#,
+                        r#"<a href="/list/trakt/watched/list/{}/{}">{}</a>"#,
                         cal.link, cal.season, cal.show,
                     ),
                     format!(
