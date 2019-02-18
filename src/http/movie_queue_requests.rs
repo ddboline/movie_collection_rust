@@ -12,8 +12,8 @@ use crate::common::movie_queue::{MovieQueueDB, MovieQueueResult};
 use crate::common::parse_imdb::{ParseImdb, ParseImdbOptions};
 use crate::common::pgpool::PgPool;
 use crate::common::trakt_utils::{
-    get_watched_shows_db, get_watchlist_shows_db_map, TraktActions, TraktConnection, WatchListMap,
-    WatchListShow, WatchedEpisode, WatchedMovie, TraktCalEntryList,
+    get_watched_shows_db, get_watchlist_shows_db_map, TraktActions, TraktCalEntryList,
+    TraktConnection, WatchListMap, WatchListShow, WatchedEpisode, WatchedMovie,
 };
 use crate::common::utils::map_result_vec;
 

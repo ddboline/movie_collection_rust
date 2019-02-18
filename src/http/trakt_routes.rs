@@ -13,6 +13,7 @@ use super::movie_queue_requests::{
 };
 use super::send_unauthorized;
 use crate::common::trakt_utils::{TraktActions, TraktConnection};
+use crate::common::utils::option_string_wrapper;
 
 pub fn trakt_watchlist(
     user: LoggedUser,
@@ -256,8 +257,19 @@ pub fn trakt_cal(user: LoggedUser, request: HttpRequest<AppState>) -> FutureResp
             .from_err()
             .and_then(move |res| match res {
                 Ok(cal_list) => {
-                    let entries: Vec<_> = cal_list.into_iter().map(|s| format!("{}", s)).collect();
-                    let body = entries.join("\n");
+                    let body = include_str!("../../templates/watched_template.html");
+                    let entries: Vec<_> = cal_list.into_iter().map(|s| {
+                        format!(
+                            "<tr><td>{}</td><td>{}</td><td>{}</td><td>{}</td><td>{}</td><td>{}</td></tr>",
+                            s.show,
+                            s.link,
+                            s.season,
+                            s.episode,
+                            option_string_wrapper(&s.ep_link),
+                            s.airdate,
+                        )
+                    }).collect();
+                    let body = body.replace("BODY", &entries.join("\n"));
                     let resp = HttpResponse::build(StatusCode::OK)
                         .content_type("text/html; charset=utf-8")
                         .body(body);
