@@ -227,6 +227,11 @@ impl Handler<WatchedListRequest> for PgPool {
         let show = ImdbRatings::get_show_by_link(&msg.imdb_url, &self)?
             .ok_or_else(|| err_msg("Show Doesn't exist"))?;
 
+        let body = body
+            .replace("SHOW", &show.show)
+            .replace("LINK", &show.link)
+            .replace("SEASON", &msg.season.to_string());
+
         let watched_episodes_db: HashSet<i32> =
             get_watched_shows_db(&self, &show.show, Some(msg.season))?
                 .into_iter()
