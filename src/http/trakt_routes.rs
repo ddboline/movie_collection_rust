@@ -255,24 +255,8 @@ pub fn trakt_cal(user: LoggedUser, request: HttpRequest<AppState>) -> FutureResp
             .send(TraktCalRequest {})
             .from_err()
             .and_then(move |res| match res {
-                Ok(cal_list) => {
+                Ok(entries) => {
                     let body = include_str!("../../templates/watched_template.html");
-                    let entries: Vec<_> = cal_list.into_iter().map(|s| {
-                        format!(
-                            "<tr><td>{}</td><td>{}</td><td>{}</td><td>{}</td></tr>",
-                            s.show,
-                            format!(r#"<a href="https://www.imdb.com/title/{}">imdb</a>"#, s.link),
-                            match s.ep_link {
-                                Some(link) => {
-                                    format!(r#"<a href="https://www.imdb.com/title/{}">{} {}</a>"#, link,
-                                        s.season, s.episode,
-                                    )
-                                },
-                                None => {format!("{} {}", s.season, s.episode,)},
-                            },
-                            s.airdate,
-                        )
-                    }).collect();
                     let body = body.replace("BODY", &entries.join("\n"));
                     let resp = HttpResponse::build(StatusCode::OK)
                         .content_type("text/html; charset=utf-8")

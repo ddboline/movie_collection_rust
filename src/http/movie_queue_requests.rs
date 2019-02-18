@@ -12,7 +12,7 @@ use crate::common::movie_queue::{MovieQueueDB, MovieQueueResult};
 use crate::common::parse_imdb::{ParseImdb, ParseImdbOptions};
 use crate::common::pgpool::PgPool;
 use crate::common::trakt_utils::{
-    get_watched_shows_db, get_watchlist_shows_db_map, TraktActions, TraktCalEntryList,
+    get_watched_shows_db, get_watchlist_shows_db_map, TraktActions,
     TraktConnection, WatchListMap, WatchListShow, WatchedEpisode, WatchedMovie,
 };
 use crate::common::utils::map_result_vec;
@@ -487,13 +487,63 @@ impl Handler<ImdbShowRequest> for PgPool {
 pub struct TraktCalRequest {}
 
 impl Message for TraktCalRequest {
-    type Result = Result<TraktCalEntryList, Error>;
+    type Result = Result<Vec<String>, Error>;
 }
 
 impl Handler<TraktCalRequest> for PgPool {
-    type Result = Result<TraktCalEntryList, Error>;
+    type Result = Result<Vec<String>, Error>;
 
     fn handle(&mut self, _: TraktCalRequest, _: &mut Self::Context) -> Self::Result {
-        TraktConnection::new().get_calendar()
+        let button_add = r#"<td><button type="submit" id="ID" onclick="imdb_update('SHOW', 'LINK', SEASON);">update database</button></td>"#;
+        let cal_list = TraktConnection::new().get_calendar()?;
+        let entries: Vec<Result<_, Error>> = cal_list
+            .into_iter()
+            .map(|cal| {
+                let show = match ImdbRatings::get_show_by_link(&cal.link, &self)? {
+                    Some(s) => s.show,
+                    None => "".to_string(),
+                };
+                let exists = if !show.is_empty() {
+                    ImdbEpisodes {
+                        show: show.clone(),
+                        season: cal.season,
+                        episode: cal.episode,
+                        ..Default::default()
+                    }
+                    .get_index(&self)?
+                    .is_some()
+                } else {
+                    false
+                };
+
+                let entry = format!(
+                    "<tr><td>{}</td><td>{}</td><td>{}</td><td>{}</td>{}</tr>",
+                    cal.show,
+                    format!(
+                        r#"<a href="https://www.imdb.com/title/{}">imdb</a>"#,
+                        cal.link
+                    ),
+                    match cal.ep_link {
+                        Some(link) => format!(
+                            r#"<a href="https://www.imdb.com/title/{}">{} {}</a>"#,
+                            link, cal.season, cal.episode,
+                        ),
+                        None => format!("{} {}", cal.season, cal.episode,),
+                    },
+                    cal.airdate,
+                    if !exists {
+                        button_add
+                            .replace("SHOW", &show)
+                            .replace("LINK", &cal.link)
+                            .replace("SEASON", &cal.season.to_string())
+                    } else {
+                        "".to_string()
+                    },
+                );
+                Ok(entry)
+            })
+            .collect();
+        let entries = map_result_vec(entries)?;
+        Ok(entries)
     }
 }
