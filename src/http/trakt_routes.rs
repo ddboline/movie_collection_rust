@@ -256,7 +256,8 @@ pub fn trakt_cal(user: LoggedUser, request: HttpRequest<AppState>) -> FutureResp
             .from_err()
             .and_then(move |res| match res {
                 Ok(entries) => {
-                    let body = include_str!("../../templates/watched_template.html");
+                    let body = include_str!("../../templates/watched_template.html")
+                        .replace("PREVIOUS", "/list/tvshows");
                     let body = body.replace("BODY", &entries.join("\n"));
                     let resp = HttpResponse::build(StatusCode::OK)
                         .content_type("text/html; charset=utf-8")
