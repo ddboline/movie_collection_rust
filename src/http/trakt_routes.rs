@@ -13,7 +13,6 @@ use super::movie_queue_requests::{
 };
 use super::send_unauthorized;
 use crate::common::trakt_utils::{TraktActions, TraktConnection};
-use crate::common::utils::option_string_wrapper;
 
 pub fn trakt_watchlist(
     user: LoggedUser,
@@ -260,12 +259,17 @@ pub fn trakt_cal(user: LoggedUser, request: HttpRequest<AppState>) -> FutureResp
                     let body = include_str!("../../templates/watched_template.html");
                     let entries: Vec<_> = cal_list.into_iter().map(|s| {
                         format!(
-                            "<tr><td>{}</td><td>{}</td><td>{}</td><td>{}</td><td>{}</td><td>{}</td></tr>",
+                            "<tr><td>{}</td><td>{}</td><td>{}</td><td>{}</td></tr>",
                             s.show,
-                            s.link,
-                            s.season,
-                            s.episode,
-                            option_string_wrapper(&s.ep_link),
+                            format!(r#"<a href="https://www.imdb.com/title/{}">imdb</a>"#, s.link),
+                            match s.ep_link {
+                                Some(link) => {
+                                    format!(r#"<a href="https://www.imdb.com/title/{}">{} {}</a>"#, link,
+                                        s.season, s.episode,
+                                    )
+                                },
+                                None => {format!("{} {}", s.season, s.episode,)},
+                            },
                             s.airdate,
                         )
                     }).collect();
