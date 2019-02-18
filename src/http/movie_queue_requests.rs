@@ -13,7 +13,7 @@ use crate::common::parse_imdb::{ParseImdb, ParseImdbOptions};
 use crate::common::pgpool::PgPool;
 use crate::common::trakt_utils::{
     get_watched_shows_db, get_watchlist_shows_db_map, TraktActions, TraktConnection, WatchListMap,
-    WatchListShow, WatchedEpisode, WatchedMovie,
+    WatchListShow, WatchedEpisode, WatchedMovie, TraktCalEntryList,
 };
 use crate::common::utils::map_result_vec;
 
@@ -481,5 +481,19 @@ impl Handler<ImdbShowRequest> for PgPool {
 
         let body = body.replace("BODY", &output.join("\n"));
         Ok(body)
+    }
+}
+
+pub struct TraktCalRequest {}
+
+impl Message for TraktCalRequest {
+    type Result = Result<TraktCalEntryList, Error>;
+}
+
+impl Handler<TraktCalRequest> for PgPool {
+    type Result = Result<TraktCalEntryList, Error>;
+
+    fn handle(&mut self, _: TraktCalRequest, _: &mut Self::Context) -> Self::Result {
+        TraktConnection::new().get_calendar()
     }
 }

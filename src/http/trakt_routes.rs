@@ -3,14 +3,13 @@
 use actix_web::{
     http::StatusCode, AsyncResponder, FutureResponse, HttpRequest, HttpResponse, Path,
 };
-use failure::Error;
 use futures::future::Future;
 use rust_auth_server::auth_handler::LoggedUser;
 
 use super::movie_queue_app::AppState;
 use super::movie_queue_requests::{
-    ImdbRatingsRequest, ImdbSeasonsRequest, WatchedActionRequest, WatchedListRequest,
-    WatchlistActionRequest, WatchlistShowsRequest,
+    ImdbRatingsRequest, ImdbSeasonsRequest, TraktCalRequest, WatchedActionRequest,
+    WatchedListRequest, WatchlistActionRequest, WatchlistShowsRequest,
 };
 use super::send_unauthorized;
 use crate::common::trakt_utils::{TraktActions, TraktConnection};
@@ -246,13 +245,26 @@ pub fn trakt_watched_action(
     }
 }
 
-pub fn trakt_cal(user: LoggedUser) -> Result<HttpResponse, Error> {
+pub fn trakt_cal(user: LoggedUser, request: HttpRequest<AppState>) -> FutureResponse<HttpResponse> {
     if user.email != "ddboline@gmail.com" {
-        return Ok(HttpResponse::Unauthorized().json("Unauthorized"));
+        send_unauthorized(request)
+    } else {
+        request
+            .state()
+            .db
+            .send(TraktCalRequest {})
+            .from_err()
+            .and_then(move |res| match res {
+                Ok(cal_list) => {
+                    let entries: Vec<_> = cal_list.into_iter().map(|s| format!("{}", s)).collect();
+                    let body = entries.join("\n");
+                    let resp = HttpResponse::build(StatusCode::OK)
+                        .content_type("text/html; charset=utf-8")
+                        .body(body);
+                    Ok(resp)
+                }
+                Err(err) => Err(err.into()),
+            })
+            .responder()
     }
-    let body = "";
-    let resp = HttpResponse::build(StatusCode::OK)
-        .content_type("text/html; charset=utf-8")
-        .body(body);
-    Ok(resp)
 }
