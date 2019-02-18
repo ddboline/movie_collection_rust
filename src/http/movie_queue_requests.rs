@@ -12,8 +12,8 @@ use crate::common::movie_queue::{MovieQueueDB, MovieQueueResult};
 use crate::common::parse_imdb::{ParseImdb, ParseImdbOptions};
 use crate::common::pgpool::PgPool;
 use crate::common::trakt_utils::{
-    get_watched_shows_db, get_watchlist_shows_db_map, TraktActions,
-    TraktConnection, WatchListMap, WatchListShow, WatchedEpisode, WatchedMovie,
+    get_watched_shows_db, get_watchlist_shows_db_map, TraktActions, TraktConnection, WatchListMap,
+    WatchListShow, WatchedEpisode, WatchedMovie,
 };
 use crate::common::utils::map_result_vec;
 
@@ -518,7 +518,10 @@ impl Handler<TraktCalRequest> for PgPool {
 
                 let entry = format!(
                     "<tr><td>{}</td><td>{}</td><td>{}</td><td>{}</td>{}</tr>",
-                    cal.show,
+                    format!(
+                        r#"<a href="/list/trakt/watched/list/{}/{}>{}</a>"#,
+                        cal.link, cal.season, cal.show,
+                    ),
                     format!(
                         r#"<a href="https://www.imdb.com/title/{}">imdb</a>"#,
                         cal.link
