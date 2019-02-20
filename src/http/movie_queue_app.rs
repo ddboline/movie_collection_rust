@@ -41,6 +41,9 @@ pub fn start_app(config: Config) {
                     .max_age(Duration::days(1))
                     .secure(false), // this can only be true if you have https
             ))
+            .resource("/list/cal", |r| {
+                r.method(Method::GET).with(find_new_episodes)
+            })
             .resource("/list/tvshows", |r| r.method(Method::GET).with(tvshows))
             .resource("/list/delete/{path}", |r| {
                 r.method(Method::GET).with(movie_queue_delete)
@@ -71,14 +74,11 @@ pub fn start_app(config: Config) {
                 "/list/trakt/watched/{action}/{imdb_url}/{season}/{episode}",
                 |r| r.method(Method::GET).with(trakt_watched_action),
             )
-            .resource("/list/{show}", |r| {
-                r.method(Method::GET).with(movie_queue_show)
-            })
             .resource("/list/imdb/{show}", |r| {
                 r.method(Method::GET).with(imdb_show)
             })
-            .resource("/list/cal", |r| {
-                r.method(Method::GET).with(find_new_episodes)
+            .resource("/list/{show}", |r| {
+                r.method(Method::GET).with(movie_queue_show)
             })
             .resource("/list/", |r| r.method(Method::GET).with(movie_queue))
             .resource("/list", |r| r.method(Method::GET).with(movie_queue))
