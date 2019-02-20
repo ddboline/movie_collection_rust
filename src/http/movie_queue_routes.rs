@@ -11,7 +11,8 @@ use subprocess::Exec;
 
 use super::movie_queue_app::AppState;
 use super::movie_queue_requests::{
-    ImdbShowRequest, MoviePathRequest, MovieQueueRequest, ParseImdbRequest, QueueDeleteRequest,
+    FindNewEpisodeRequest, ImdbShowRequest, MoviePathRequest, MovieQueueRequest, ParseImdbRequest,
+    QueueDeleteRequest,
 };
 use super::send_unauthorized;
 use crate::common::make_queue::movie_queue_http;
@@ -261,6 +262,35 @@ pub fn imdb_show(
             .from_err()
             .and_then(move |res| match res {
                 Ok(body) => {
+                    let resp = HttpResponse::build(StatusCode::OK)
+                        .content_type("text/html; charset=utf-8")
+                        .body(body);
+                    Ok(resp)
+                }
+                Err(err) => Err(err.into()),
+            })
+            .responder()
+    }
+}
+
+pub fn find_new_episodes(
+    query: Query<FindNewEpisodeRequest>,
+    user: LoggedUser,
+    request: HttpRequest<AppState>,
+) -> FutureResponse<HttpResponse> {
+    if user.email != "ddboline@gmail.com" {
+        send_unauthorized(request)
+    } else {
+        request
+            .state()
+            .db
+            .send(query.into_inner())
+            .from_err()
+            .and_then(move |res| match res {
+                Ok(entries) => {
+                    let body = include_str!("../../templates/watched_template.html")
+                        .replace("PREVIOUS", "/list/tvshows");
+                    let body = body.replace("BODY", &entries.join("\n"));
                     let resp = HttpResponse::build(StatusCode::OK)
                         .content_type("text/html; charset=utf-8")
                         .body(body);

@@ -9,6 +9,7 @@ use std::collections::HashMap;
 use super::movie_queue_app::AppState;
 use super::movie_queue_requests::{TvShowsRequest, WatchlistShowsRequest};
 use super::send_unauthorized;
+use crate::common::tv_show_source::TvShowSource;
 
 pub fn tvshows(user: LoggedUser, request: HttpRequest<AppState>) -> FutureResponse<HttpResponse> {
     if user.email != "ddboline@gmail.com" {
@@ -51,8 +52,8 @@ pub fn tvshows(user: LoggedUser, request: HttpRequest<AppState>) -> FutureRespon
 }
 
 fn process_shows(
-    tvshows: HashMap<String, (String, String, String, Option<String>)>,
-    watchlist: HashMap<String, (String, String, String, Option<String>)>,
+    tvshows: HashMap<String, (String, String, String, Option<TvShowSource>)>,
+    watchlist: HashMap<String, (String, String, String, Option<TvShowSource>)>,
 ) -> Result<Vec<String>, Error> {
     let watchlist_shows: Vec<_> = watchlist
         .iter()
@@ -88,10 +89,10 @@ fn process_shows(
                     )
                 },
                 link,
-                match source.as_ref().map(|s| s.as_str()) {
-                    Some("netflix") => r#"<a href="https://netflix.com">netflix</a>"#,
-                    Some("hulu") => r#"<a href="https://hulu.com">netflix</a>"#,
-                    Some("amazon") => r#"<a href="https://amazon.com">netflix</a>"#,
+                match source {
+                    Some(TvShowSource::Netflix) => r#"<a href="https://netflix.com">netflix</a>"#,
+                    Some(TvShowSource::Hulu) => r#"<a href="https://hulu.com">hulu</a>"#,
+                    Some(TvShowSource::Amazon) => r#"<a href="https://amazon.com">amazon</a>"#,
                     _ => "",
                 },
                 if has_watchlist {

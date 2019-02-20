@@ -1,11 +1,12 @@
-use chrono::{Duration, Local};
 use clap::{App, Arg};
 use failure::Error;
 use std::io;
 use std::io::Write;
 
-use movie_collection_rust::common::movie_collection::{MovieCollection, MovieCollectionDB};
-use movie_collection_rust::common::movie_queue::MovieQueueDB;
+use movie_collection_rust::common::movie_collection::{
+    MovieCollection, MovieCollectionDB,
+};
+use movie_collection_rust::common::tv_show_source::TvShowSource;
 use movie_collection_rust::common::utils::get_version_number;
 
 fn find_new_episodes() -> Result<(), Error> {
@@ -35,42 +36,25 @@ fn find_new_episodes() -> Result<(), Error> {
         .map(|v| v.map(|s| s.to_string()).collect())
         .unwrap_or_else(Vec::new);
 
+    let source: Option<TvShowSource> = match source {
+        Some(s) => s.parse().ok(),
+        None => None,
+    };
+
     let source = if shows.is_empty() {
         source
     } else {
-        Some("all".to_string())
+        Some(TvShowSource::All)
     };
 
-    let mindate = Local::today() + Duration::days(-14);
-    let maxdate = Local::today() + Duration::days(7);
-
     let mc = MovieCollectionDB::new();
-    let mq = MovieQueueDB::with_pool(&mc.pool);
+
+    let output = mc.find_new_episodes(&source, &shows)?;
 
     let stdout = io::stdout();
 
-    'outer: for epi in mc.get_new_episodes(mindate.naive_local(), maxdate.naive_local(), source)? {
-        for s in mq.print_movie_queue(&[epi.show.clone()])? {
-            if let Some(show) = &s.show {
-                if let Some(season) = &s.season {
-                    if let Some(episode) = &s.episode {
-                        if (show == &epi.show)
-                            && (season == &epi.season)
-                            && (episode == &epi.episode)
-                        {
-                            continue 'outer;
-                        }
-                    }
-                }
-            }
-        }
-        if !shows.is_empty() && shows.iter().any(|s| &epi.show != s) {
-            continue;
-        }
-
-        {
-            writeln!(stdout.lock(), "{}", epi)?;
-        }
+    for epi in output {
+        writeln!(stdout.lock(), "{}", epi)?;
     }
 
     Ok(())

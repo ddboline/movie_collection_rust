@@ -12,6 +12,7 @@ use crate::common::imdb_episodes::ImdbEpisodes;
 use crate::common::imdb_ratings::ImdbRatings;
 use crate::common::movie_collection::{MovieCollection, MovieCollectionDB};
 use crate::common::pgpool::PgPool;
+use crate::common::tv_show_source::TvShowSource;
 use crate::common::utils::{map_result_vec, option_string_wrapper, ExponentialRetry};
 
 #[derive(Clone)]
@@ -298,7 +299,7 @@ pub fn get_watchlist_shows_db(pool: &PgPool) -> Result<HashMap<String, WatchList
     Ok(watchlist)
 }
 
-pub type WatchListMap = HashMap<String, (String, WatchListShow, Option<String>)>;
+pub type WatchListMap = HashMap<String, (String, WatchListShow, Option<TvShowSource>)>;
 
 pub fn get_watchlist_shows_db_map(pool: &PgPool) -> Result<WatchListMap, Error> {
     let query = r#"
@@ -316,6 +317,12 @@ pub fn get_watchlist_shows_db_map(pool: &PgPool) -> Result<WatchListMap, Error> 
             let title: String = row.get(2);
             let year: i32 = row.get(3);
             let source: Option<String> = row.get(4);
+
+            let source: Option<TvShowSource> = match source {
+                Some(s) => s.parse().ok(),
+                None => None,
+            };
+
             (
                 link.clone(),
                 (show, WatchListShow { link, title, year }, source),

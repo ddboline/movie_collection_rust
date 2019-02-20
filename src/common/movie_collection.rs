@@ -1,4 +1,5 @@
-use chrono::NaiveDate;
+use chrono::{Duration, Local, NaiveDate};
+
 use failure::{err_msg, Error};
 use rayon::prelude::*;
 use std::collections::{HashMap, HashSet};
@@ -12,6 +13,7 @@ use crate::common::imdb_episodes::ImdbEpisodes;
 use crate::common::imdb_ratings::ImdbRatings;
 use crate::common::movie_queue::MovieQueueDB;
 use crate::common::pgpool::PgPool;
+use crate::common::tv_show_source::TvShowSource;
 use crate::common::utils::{
     map_result_vec, option_string_wrapper, parse_file_stem, walk_directory,
 };
@@ -54,7 +56,7 @@ pub struct TvShowsResult {
     pub link: String,
     pub count: i64,
     pub title: String,
-    pub source: Option<String>,
+    pub source: Option<TvShowSource>,
 }
 
 impl fmt::Display for TvShowsResult {
@@ -65,7 +67,10 @@ impl fmt::Display for TvShowsResult {
             self.show,
             self.link,
             self.count,
-            option_string_wrapper(&self.source),
+            self.source
+                .as_ref()
+                .map(|s| s.to_string())
+                .unwrap_or("".to_string()),
         )
     }
 }
@@ -636,6 +641,11 @@ pub trait MovieCollection: Send + Sync {
                 let istv: bool = row.get(4);
                 let source: Option<String> = row.get(5);
 
+                let source: Option<TvShowSource> = match source {
+                    Some(s) => s.parse().ok(),
+                    None => None,
+                };
+
                 (
                     link.clone(),
                     ImdbRatings {
@@ -674,6 +684,12 @@ pub trait MovieCollection: Send + Sync {
                 let title: String = row.get(2);
                 let source: Option<String> = row.get(3);
                 let count: i64 = row.get(4);
+
+                let source: Option<TvShowSource> = match source {
+                    Some(s) => s.parse().ok(),
+                    None => None,
+                };
+
                 TvShowsResult {
                     show,
                     link,
@@ -690,7 +706,7 @@ pub trait MovieCollection: Send + Sync {
         &self,
         mindate: NaiveDate,
         maxdate: NaiveDate,
-        source: Option<String>,
+        source: &Option<TvShowSource>,
     ) -> Result<Vec<NewEpisodesResult>, Error> {
         let query = r#"
             WITH active_links AS (
@@ -726,13 +742,8 @@ pub trait MovieCollection: Send + Sync {
             ORDER BY d.airdate, c.show, d.season, d.episode
         "#;
         let query: String = match source {
-            Some(source) => {
-                if source.as_str() == "all" {
-                    query.to_string()
-                } else {
-                    format!("{} AND c.source = '{}'", query, source)
-                }
-            }
+            Some(TvShowSource::All) => query.to_string(),
+            Some(s) => format!("{} AND c.source = '{}'", query, s),
             None => format!("{} AND c.source is null", query),
         };
         let query = format!("{} {}", query, groupby);
@@ -768,5 +779,42 @@ pub trait MovieCollection: Send + Sync {
             })
             .collect();
         Ok(results)
+    }
+
+    fn find_new_episodes(
+        &self,
+        source: &Option<TvShowSource>,
+        shows: &[String],
+    ) -> Result<Vec<NewEpisodesResult>, Error> {
+        let mindate = Local::today() + Duration::days(-14);
+        let maxdate = Local::today() + Duration::days(7);
+
+        let mq = MovieQueueDB::with_pool(&self.get_pool());
+
+        let mut output = Vec::new();
+
+        'outer: for epi in
+            self.get_new_episodes(mindate.naive_local(), maxdate.naive_local(), source)?
+        {
+            for s in mq.print_movie_queue(&[epi.show.clone()])? {
+                if let Some(show) = &s.show {
+                    if let Some(season) = &s.season {
+                        if let Some(episode) = &s.episode {
+                            if (show == &epi.show)
+                                && (season == &epi.season)
+                                && (episode == &epi.episode)
+                            {
+                                continue 'outer;
+                            }
+                        }
+                    }
+                }
+            }
+            if !shows.is_empty() && shows.iter().any(|s| &epi.show != s) {
+                continue;
+            }
+            output.push(epi);
+        }
+        Ok(output)
     }
 }

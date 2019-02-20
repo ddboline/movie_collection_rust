@@ -13,6 +13,7 @@ use super::movie_queue_requests::{
 };
 use super::send_unauthorized;
 use crate::common::trakt_utils::{TraktActions, TraktConnection};
+use crate::common::tv_show_source::TvShowSource;
 
 pub fn trakt_watchlist(
     user: LoggedUser,
@@ -49,12 +50,14 @@ pub fn trakt_watchlist(
                                     link, title
                                 ),
                                 link,
-                                match source.as_ref().map(|s| s.as_str()) {
-                                    Some("netflix") => {
+                                match source {
+                                    Some(TvShowSource::Netflix) => {
                                         r#"<td><a href="https://netflix.com">netflix</a>"#
                                     }
-                                    Some("hulu") => r#"<td><a href="https://hulu.com">netflix</a>"#,
-                                    Some("amazon") => {
+                                    Some(TvShowSource::Hulu) => {
+                                        r#"<td><a href="https://hulu.com">netflix</a>"#
+                                    }
+                                    Some(TvShowSource::Amazon) => {
                                         r#"<td><a href="https://amazon.com">netflix</a>"#
                                     }
                                     _ => "",

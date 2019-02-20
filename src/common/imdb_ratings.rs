@@ -2,6 +2,7 @@ use failure::Error;
 use std::fmt;
 
 use crate::common::pgpool::PgPool;
+use crate::common::tv_show_source::TvShowSource;
 use crate::common::utils::option_string_wrapper;
 
 #[derive(Default, Clone, Debug)]
@@ -12,7 +13,7 @@ pub struct ImdbRatings {
     pub link: String,
     pub rating: Option<f64>,
     pub istv: Option<bool>,
-    pub source: Option<String>,
+    pub source: Option<TvShowSource>,
 }
 
 impl fmt::Display for ImdbRatings {
@@ -25,7 +26,10 @@ impl fmt::Display for ImdbRatings {
             self.link,
             self.rating.unwrap_or(-1.0),
             self.istv.unwrap_or(false),
-            option_string_wrapper(&self.source),
+            self.source
+                .as_ref()
+                .map(|s| s.to_string())
+                .unwrap_or("".to_string()),
         )
     }
 }
@@ -38,6 +42,7 @@ impl ImdbRatings {
             VALUES
             ($1, $2, $3, $4, $5, $6)
         "#;
+        let source = self.source.as_ref().map(|s| s.to_string());
         pool.get()?.execute(
             query,
             &[
@@ -46,7 +51,7 @@ impl ImdbRatings {
                 &self.link,
                 &self.rating,
                 &self.istv,
-                &self.source,
+                &source,
             ],
         )?;
         Ok(())
@@ -75,6 +80,10 @@ impl ImdbRatings {
             let rating: Option<f64> = row.get(4);
             let istv: Option<bool> = row.get(5);
             let source: Option<String> = row.get(6);
+            let source: Option<TvShowSource> = match source {
+                Some(s) => s.parse().ok(),
+                None => None,
+            };
             return Ok(Some(ImdbRatings {
                 index,
                 show,
@@ -96,7 +105,10 @@ impl ImdbRatings {
             self.link.clone(),
             self.rating.unwrap_or(-1.0).to_string(),
             self.istv.unwrap_or(false).to_string(),
-            option_string_wrapper(&self.source).to_string(),
+            self.source
+                .as_ref()
+                .map(|s| s.to_string())
+                .unwrap_or("".to_string()),
         ]
     }
 }

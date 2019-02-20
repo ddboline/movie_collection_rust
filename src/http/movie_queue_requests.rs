@@ -1,4 +1,5 @@
 use actix::{Handler, Message};
+use chrono::{Duration, Local};
 use failure::{err_msg, Error};
 use std::collections::{HashMap, HashSet};
 use std::path;
@@ -15,6 +16,7 @@ use crate::common::trakt_utils::{
     get_watched_shows_db, get_watchlist_shows_db_map, TraktActions, TraktConnection, WatchListMap,
     WatchListShow, WatchedEpisode, WatchedMovie,
 };
+use crate::common::tv_show_source::TvShowSource;
 use crate::common::utils::map_result_vec;
 
 pub struct TvShowsRequest {}
@@ -294,7 +296,7 @@ impl Handler<WatchedListRequest> for PgPool {
                     show.show,
                     entry,
                     format!(
-                        r#"<a href="https://www.imdb.com/title/{}">s{} e{}</a>"#,
+                        r#"<a href="https://www.imdb.com/title/{}">s{} ep{}</a>"#,
                         s.epurl, msg.season, s.episode,
                     ),
                     format!(
@@ -548,5 +550,90 @@ impl Handler<TraktCalRequest> for PgPool {
             .collect();
         let entries = map_result_vec(entries)?;
         Ok(entries)
+    }
+}
+
+#[derive(Serialize, Deserialize)]
+pub struct FindNewEpisodeRequest {
+    pub source: Option<TvShowSource>,
+    pub shows: Option<String>,
+}
+
+impl Message for FindNewEpisodeRequest {
+    type Result = Result<Vec<String>, Error>;
+}
+
+impl Handler<FindNewEpisodeRequest> for PgPool {
+    type Result = Result<Vec<String>, Error>;
+
+    fn handle(&mut self, msg: FindNewEpisodeRequest, _: &mut Self::Context) -> Self::Result {
+        let mc = MovieCollectionDB::with_pool(&self);
+        let shows_filter: Option<HashSet<String>> = msg
+            .shows
+            .map(|s| s.split(",").map(|s| s.to_string()).collect());
+
+        let mindate = (Local::today() + Duration::days(-14)).naive_local();
+        let maxdate = (Local::today() + Duration::days(7)).naive_local();
+
+        let mq = MovieQueueDB::with_pool(&self);
+
+        let episodes = mc.get_new_episodes(mindate, maxdate, &msg.source)?;
+
+        let shows: HashSet<String> = episodes
+            .iter()
+            .filter_map(|s| {
+                let show = s.to_string();
+                shows_filter.as_ref().map(|f| if f.contains(&show) {Some(show)} else {None}).unwrap_or(None)
+            })
+            .collect();
+
+        let mut queue = Vec::new();
+
+        for show in shows {
+            for s in mq.print_movie_queue(&[show])? {
+                if let Some(u) = mc.get_collection_index(&s.path)? {
+                    queue.push((
+                        (
+                            s.show
+                                .as_ref()
+                                .map(|v| v.to_string())
+                                .unwrap_or_else(|| "".to_string()),
+                            s.season.unwrap_or(-1),
+                            s.episode.unwrap_or(-1),
+                        ),
+                        u,
+                    ));
+                }
+            }
+        }
+
+        let queue: HashMap<(String, i32, i32), i32> = queue.into_iter().collect();
+
+        let output = episodes
+            .into_iter()
+            .map(|epi| {
+                let show = epi.show.clone();
+                format!(
+                    "<tr><td>{}</td><td>{}</td><td>{}</td><td>{}</td><td>{}</td></tr>",
+                    epi.title,
+                    match queue.get(&(show, epi.season, epi.episode)) {
+                        Some(idx) => format!(
+                            "<a href={}>{}</a>",
+                            &format!(r#""{}/{}""#, "/list/play", idx),
+                            epi.eptitle
+                        ),
+                        None => epi.eptitle.to_string(),
+                    },
+                    format!(
+                        r#"<a href="https://www.imdb.com/title/{}">s{} ep{}</a>"#,
+                        epi.epurl, epi.season, epi.episode
+                    ),
+                    format!("rating: {:0.1} / {:0.1}", epi.rating, epi.eprating),
+                    epi.airdate,
+                )
+            })
+            .collect();
+
+        Ok(output)
     }
 }

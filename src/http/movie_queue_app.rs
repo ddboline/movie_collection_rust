@@ -7,8 +7,8 @@ use actix_web::{http::Method, server, App};
 use chrono::Duration;
 
 use super::movie_queue_routes::{
-    imdb_show, movie_queue, movie_queue_delete, movie_queue_play, movie_queue_show,
-    movie_queue_transcode, movie_queue_transcode_directory,
+    find_new_episodes, imdb_show, movie_queue, movie_queue_delete, movie_queue_play,
+    movie_queue_show, movie_queue_transcode, movie_queue_transcode_directory,
 };
 use super::trakt_routes::{
     trakt_cal, trakt_watched_action, trakt_watched_list, trakt_watched_seasons, trakt_watchlist,
@@ -77,6 +77,10 @@ pub fn start_app(config: Config) {
             .resource("/list/imdb/{show}", |r| {
                 r.method(Method::GET).with(imdb_show)
             })
+            .resource("/list/cal", |r| {
+                r.method(Method::GET).with(find_new_episodes)
+            })
+            .resource("/list/", |r| r.method(Method::GET).with(movie_queue))
             .resource("/list", |r| r.method(Method::GET).with(movie_queue))
     })
     .bind(&format!("127.0.0.1:{}", port))
