@@ -29,7 +29,7 @@ impl fmt::Display for ImdbRatings {
             self.source
                 .as_ref()
                 .map(|s| s.to_string())
-                .unwrap_or("".to_string()),
+                .unwrap_or_else(|| "".to_string()),
         )
     }
 }
@@ -108,7 +108,7 @@ impl ImdbRatings {
             self.source
                 .as_ref()
                 .map(|s| s.to_string())
-                .unwrap_or("".to_string()),
+                .unwrap_or_else(|| "".to_string()),
         ]
     }
 }

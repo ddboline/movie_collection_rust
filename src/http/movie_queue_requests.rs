@@ -570,7 +570,7 @@ impl Handler<FindNewEpisodeRequest> for PgPool {
         let mc = MovieCollectionDB::with_pool(&self);
         let shows_filter: Option<HashSet<String>> = msg
             .shows
-            .map(|s| s.split(",").map(|s| s.to_string()).collect());
+            .map(|s| s.split(',').map(|s| s.to_string()).collect());
 
         let mindate = (Local::today() + Duration::days(-14)).naive_local();
         let maxdate = (Local::today() + Duration::days(7)).naive_local();
