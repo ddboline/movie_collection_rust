@@ -583,7 +583,10 @@ impl Handler<FindNewEpisodeRequest> for PgPool {
             .iter()
             .filter_map(|s| {
                 let show = s.to_string();
-                shows_filter.as_ref().map(|f| if f.contains(&show) {Some(show)} else {None}).unwrap_or(None)
+                shows_filter
+                    .as_ref()
+                    .map(|f| if f.contains(&show) { Some(show) } else { None })
+                    .unwrap_or(None)
             })
             .collect();
 
@@ -615,7 +618,10 @@ impl Handler<FindNewEpisodeRequest> for PgPool {
                 let show = epi.show.clone();
                 format!(
                     "<tr><td>{}</td><td>{}</td><td>{}</td><td>{}</td><td>{}</td></tr>",
-                    epi.title,
+                    format!(
+                        r#"<a href="/list/trakt/watched/list/{}/{}">{}</a>"#,
+                        epi.link, epi.season, epi.title
+                    ),
                     match queue.get(&(show, epi.season, epi.episode)) {
                         Some(idx) => format!(
                             "<a href={}>{}</a>",

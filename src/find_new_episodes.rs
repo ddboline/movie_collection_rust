@@ -3,9 +3,7 @@ use failure::Error;
 use std::io;
 use std::io::Write;
 
-use movie_collection_rust::common::movie_collection::{
-    MovieCollection, MovieCollectionDB,
-};
+use movie_collection_rust::common::movie_collection::{MovieCollection, MovieCollectionDB};
 use movie_collection_rust::common::tv_show_source::TvShowSource;
 use movie_collection_rust::common::utils::get_version_number;
 
