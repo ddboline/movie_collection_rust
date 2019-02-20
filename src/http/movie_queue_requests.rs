@@ -584,11 +584,17 @@ impl Handler<FindNewEpisodeRequest> for PgPool {
         let shows: HashSet<String> = episodes
             .iter()
             .filter_map(|s| {
-                let show = s.to_string();
-                shows_filter
-                    .as_ref()
-                    .map(|f| if f.contains(&show) { Some(show) } else { None })
-                    .unwrap_or(None)
+                let show = s.show.to_string();
+                match shows_filter.as_ref() {
+                    Some(f) => {
+                        if f.contains(&show) {
+                            Some(show)
+                        } else {
+                            None
+                        }
+                    }
+                    None => Some(show),
+                }
             })
             .collect();
 
