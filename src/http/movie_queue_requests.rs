@@ -567,6 +567,8 @@ impl Handler<FindNewEpisodeRequest> for PgPool {
     type Result = Result<Vec<String>, Error>;
 
     fn handle(&mut self, msg: FindNewEpisodeRequest, _: &mut Self::Context) -> Self::Result {
+        let button_add = r#"<td><button type="submit" id="ID" onclick="imdb_update('SHOW', 'LINK', SEASON);">update database</button></td>"#;
+
         let mc = MovieCollectionDB::with_pool(&self);
         let shows_filter: Option<HashSet<String>> = msg
             .shows
@@ -617,7 +619,7 @@ impl Handler<FindNewEpisodeRequest> for PgPool {
             .map(|epi| {
                 let show = epi.show.clone();
                 format!(
-                    "<tr><td>{}</td><td>{}</td><td>{}</td><td>{}</td><td>{}</td></tr>",
+                    "<tr><td>{}</td><td>{}</td><td>{}</td><td>{}</td><td>{}</td>{}</tr>",
                     format!(
                         r#"<a href="/list/trakt/watched/list/{}/{}">{}</a>"#,
                         epi.link, epi.season, epi.title
@@ -634,8 +636,12 @@ impl Handler<FindNewEpisodeRequest> for PgPool {
                         r#"<a href="https://www.imdb.com/title/{}">s{} ep{}</a>"#,
                         epi.epurl, epi.season, epi.episode
                     ),
-                    format!("rating: {:0.1} / {:0.1}", epi.rating, epi.eprating),
+                    format!("rating: {:0.1} / {:0.1}", epi.eprating, epi.rating,),
                     epi.airdate,
+                    button_add
+                        .replace("SHOW", &epi.show)
+                        .replace("LINK", &epi.link)
+                        .replace("SEASON", &epi.season.to_string()),
                 )
             })
             .collect();
