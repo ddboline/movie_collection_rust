@@ -19,12 +19,12 @@ dotenv = "*"
 amqp = {version="*", default_features=false}
 select = "*"
 reqwest = "*"
-chrono = "*"
+chrono = { version = "0.4", features = ["serde"] }
 rand = "0.6"
 actix = "*"
 actix-web = "*"
-rust_auth_server = {git = "https://github.com/ddboline/rust-auth-server.git", tag="0.1.2"}
 futures = "*"
+jsonwebtoken = "5.0"
 
 [lib]
 name = "movie_collection_rust"

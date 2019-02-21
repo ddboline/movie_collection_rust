@@ -3,9 +3,9 @@
 use actix_web::{http::StatusCode, AsyncResponder, FutureResponse, HttpRequest, HttpResponse};
 use failure::Error;
 use futures::future::Future;
-use rust_auth_server::auth_handler::LoggedUser;
 use std::collections::HashMap;
 
+use super::logged_user::LoggedUser;
 use super::movie_queue_app::AppState;
 use super::movie_queue_requests::{TvShowsRequest, WatchlistShowsRequest};
 use super::send_unauthorized;

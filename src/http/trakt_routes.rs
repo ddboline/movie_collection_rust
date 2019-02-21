@@ -4,8 +4,8 @@ use actix_web::{
     http::StatusCode, AsyncResponder, FutureResponse, HttpRequest, HttpResponse, Path,
 };
 use futures::future::Future;
-use rust_auth_server::auth_handler::LoggedUser;
 
+use super::logged_user::LoggedUser;
 use super::movie_queue_app::AppState;
 use super::movie_queue_requests::{
     ImdbRatingsRequest, ImdbSeasonsRequest, TraktCalRequest, WatchedActionRequest,
