@@ -139,7 +139,8 @@ impl MovieQueueDB {
             .nth(0)
             .map(|r| r.get(0))
             .unwrap_or(-1);
-        let diff = max_idx - idx + 1;
+        let diff = max_idx - idx + 2;
+        println!("{} {} {}", max_idx, idx, diff);
 
         let query = r#"UPDATE movie_queue SET idx = idx + $1 WHERE idx >= $2"#;
         tran.execute(query, &[&diff, &idx])?;
