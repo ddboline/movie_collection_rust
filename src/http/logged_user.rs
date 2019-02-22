@@ -35,7 +35,7 @@ fn get_secret() -> String {
     env::var("JWT_SECRET").unwrap_or_else(|_| "my secret".into())
 }
 
-#[derive(Debug, Serialize, Deserialize, PartialEq, Eq, Hash)]
+#[derive(Debug, Serialize, Deserialize, PartialEq, Eq, Hash, Clone)]
 pub struct LoggedUser {
     pub email: String,
 }
@@ -73,7 +73,7 @@ pub fn decode_token(token: &str) -> Result<LoggedUser, ServiceError> {
         .map_err(|_err| ServiceError::Unauthorized)?
 }
 
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, Default)]
 pub struct AuthorizedUsers(Arc<RwLock<HashSet<LoggedUser>>>);
 
 impl AuthorizedUsers {
@@ -81,27 +81,19 @@ impl AuthorizedUsers {
         AuthorizedUsers(Arc::new(RwLock::new(HashSet::new())))
     }
 
-    pub fn try_is_authorized(&self, user: &LoggedUser) -> bool {
-        if let Ok(user_list) = self.0.try_read() {
+    pub fn is_authorized(&self, user: &LoggedUser) -> bool {
+        if let Ok(user_list) = self.0.read() {
             user_list.contains(user)
         } else {
             false
         }
     }
 
-    pub fn is_authorized(&self, user: LoggedUser, pool: &PgPool) -> Result<bool, Error> {
-        if let Ok(user_list) = self.0.read() {
-            if user_list.contains(&user) {
-                return Ok(true);
-            }
+    pub fn store_auth(&self, user: LoggedUser) -> Result<(), Error> {
+        if let Ok(mut user_list) = self.0.write() {
+            user_list.insert(user);
+            return Ok(());
         }
-        user.is_authorized(pool).map(|is_auth| {
-            if is_auth {
-                if let Ok(mut user_list) = self.0.write() {
-                    user_list.insert(user);
-                }
-            }
-            is_auth
-        })
+        return Err(err_msg("Failed to store credentials"));
     }
 }

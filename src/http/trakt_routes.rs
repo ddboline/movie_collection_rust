@@ -67,20 +67,23 @@ pub fn trakt_watchlist(
 ) -> FutureResponse<HttpResponse> {
     let fut = request.state().db.send(WatchlistShowsRequest {}).from_err();
 
-    if request.state().user_list.try_is_authorized(&user) {
+    if request.state().user_list.is_authorized(&user) {
         fut.and_then(move |res| match res {
             Ok(shows) => watchlist_worker(shows),
             Err(err) => Err(err.into()),
         })
         .responder()
     } else {
-        get_auth_fut(user, &request)
+        get_auth_fut(&user, &request)
             .join(fut)
             .and_then(move |(res0, res1)| match res0 {
-                Ok(true) => match res1 {
-                    Ok(shows) => watchlist_worker(shows),
-                    Err(err) => Err(err.into()),
-                },
+                Ok(true) => {
+                    request.state().user_list.store_auth(user)?;
+                    match res1 {
+                        Ok(shows) => watchlist_worker(shows),
+                        Err(err) => Err(err.into()),
+                    }
+                }
                 Ok(false) => Ok(unauthbody()),
                 Err(err) => Err(err.into()),
             })
@@ -122,20 +125,23 @@ pub fn trakt_watchlist_action(
         })
         .from_err();
 
-    if request.state().user_list.try_is_authorized(&user) {
+    if request.state().user_list.is_authorized(&user) {
         fut.and_then(move |res| match res {
             Ok(_) => watchlist_action_worker(action, &imdb_url),
             Err(err) => Err(err.into()),
         })
         .responder()
     } else {
-        get_auth_fut(user, &request)
+        get_auth_fut(&user, &request)
             .join(fut)
             .and_then(move |(res0, res1)| match res0 {
-                Ok(true) => match res1 {
-                    Ok(_) => watchlist_action_worker(action, &imdb_url),
-                    Err(err) => Err(err.into()),
-                },
+                Ok(true) => {
+                    request.state().user_list.store_auth(user)?;
+                    match res1 {
+                        Ok(_) => watchlist_action_worker(action, &imdb_url),
+                        Err(err) => Err(err.into()),
+                    }
+                }
                 Ok(false) => Ok(unauthbody()),
                 Err(err) => Err(err.into()),
             })
@@ -210,20 +216,23 @@ pub fn trakt_watched_seasons(
         })
         .flatten();
 
-    if request.state().user_list.try_is_authorized(&user) {
+    if request.state().user_list.is_authorized(&user) {
         fut.and_then(move |(link, res)| match res {
             Ok(entries) => trakt_watched_seasons_worker(&link, &imdb_url, &entries),
             Err(err) => Err(err.into()),
         })
         .responder()
     } else {
-        get_auth_fut(user, &request)
+        get_auth_fut(&user, &request)
             .join(fut)
             .and_then(move |(res0, (link, res))| match res0 {
-                Ok(true) => match res {
-                    Ok(entries) => trakt_watched_seasons_worker(&link, &imdb_url, &entries),
-                    Err(err) => Err(err.into()),
-                },
+                Ok(true) => {
+                    request.state().user_list.store_auth(user)?;
+                    match res {
+                        Ok(entries) => trakt_watched_seasons_worker(&link, &imdb_url, &entries),
+                        Err(err) => Err(err.into()),
+                    }
+                }
                 Ok(false) => Ok(unauthbody()),
                 Err(err) => Err(err.into()),
             })
@@ -244,20 +253,23 @@ pub fn trakt_watched_list(
         .send(WatchedListRequest { imdb_url, season })
         .from_err();
 
-    if request.state().user_list.try_is_authorized(&user) {
+    if request.state().user_list.is_authorized(&user) {
         fut.and_then(move |res| match res {
             Ok(body) => Ok(form_http_response(body)),
             Err(err) => Err(err.into()),
         })
         .responder()
     } else {
-        get_auth_fut(user, &request)
+        get_auth_fut(&user, &request)
             .join(fut)
             .and_then(move |(res0, res1)| match res0 {
-                Ok(true) => match res1 {
-                    Ok(body) => Ok(form_http_response(body)),
-                    Err(err) => Err(err.into()),
-                },
+                Ok(true) => {
+                    request.state().user_list.store_auth(user)?;
+                    match res1 {
+                        Ok(body) => Ok(form_http_response(body)),
+                        Err(err) => Err(err.into()),
+                    }
+                }
                 Ok(false) => Ok(unauthbody()),
                 Err(err) => Err(err.into()),
             })
@@ -283,20 +295,23 @@ pub fn trakt_watched_action(
         })
         .from_err();
 
-    if request.state().user_list.try_is_authorized(&user) {
+    if request.state().user_list.is_authorized(&user) {
         fut.and_then(move |res| match res {
             Ok(body) => Ok(form_http_response(body)),
             Err(err) => Err(err.into()),
         })
         .responder()
     } else {
-        get_auth_fut(user, &request)
+        get_auth_fut(&user, &request)
             .join(fut)
             .and_then(move |(res0, res1)| match res0 {
-                Ok(true) => match res1 {
-                    Ok(body) => Ok(form_http_response(body)),
-                    Err(err) => Err(err.into()),
-                },
+                Ok(true) => {
+                    request.state().user_list.store_auth(user)?;
+                    match res1 {
+                        Ok(body) => Ok(form_http_response(body)),
+                        Err(err) => Err(err.into()),
+                    }
+                }
                 Ok(false) => Ok(unauthbody()),
                 Err(err) => Err(err.into()),
             })
@@ -317,20 +332,23 @@ fn trakt_cal_worker(entries: &[String]) -> Result<HttpResponse, actix_web::Error
 pub fn trakt_cal(user: LoggedUser, request: HttpRequest<AppState>) -> FutureResponse<HttpResponse> {
     let fut = request.state().db.send(TraktCalRequest {}).from_err();
 
-    if request.state().user_list.try_is_authorized(&user) {
+    if request.state().user_list.is_authorized(&user) {
         fut.and_then(move |res| match res {
             Ok(entries) => trakt_cal_worker(&entries),
             Err(err) => Err(err.into()),
         })
         .responder()
     } else {
-        get_auth_fut(user, &request)
+        get_auth_fut(&user, &request)
             .join(fut)
             .and_then(move |(res0, res1)| match res0 {
-                Ok(true) => match res1 {
-                    Ok(entries) => trakt_cal_worker(&entries),
-                    Err(err) => Err(err.into()),
-                },
+                Ok(true) => {
+                    request.state().user_list.store_auth(user)?;
+                    match res1 {
+                        Ok(entries) => trakt_cal_worker(&entries),
+                        Err(err) => Err(err.into()),
+                    }
+                }
                 Ok(false) => Ok(unauthbody()),
                 Err(err) => Err(err.into()),
             })

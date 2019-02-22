@@ -4,7 +4,7 @@ use failure::{err_msg, Error};
 use std::collections::{HashMap, HashSet};
 use std::path;
 
-use super::logged_user::{AuthorizedUsers, LoggedUser};
+use super::logged_user::{LoggedUser};
 use crate::common::imdb_episodes::ImdbEpisodes;
 use crate::common::imdb_ratings::ImdbRatings;
 use crate::common::movie_collection::{
@@ -659,7 +659,6 @@ impl Handler<FindNewEpisodeRequest> for PgPool {
 
 pub struct AuthorizedUserRequest {
     pub user: LoggedUser,
-    pub user_list: AuthorizedUsers,
 }
 
 impl Message for AuthorizedUserRequest {
@@ -669,6 +668,6 @@ impl Message for AuthorizedUserRequest {
 impl Handler<AuthorizedUserRequest> for PgPool {
     type Result = Result<bool, Error>;
     fn handle(&mut self, msg: AuthorizedUserRequest, _: &mut Self::Context) -> Self::Result {
-        msg.user_list.is_authorized(msg.user, self)
+        msg.user.is_authorized(self)
     }
 }

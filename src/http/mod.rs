@@ -15,16 +15,13 @@ fn unauthbody() -> HttpResponse {
 }
 
 fn get_auth_fut(
-    user: logged_user::LoggedUser,
+    user: &logged_user::LoggedUser,
     request: &HttpRequest<AppState>,
 ) -> impl Future<Item = Result<bool, failure::Error>, Error = actix_web::Error> {
     request
         .state()
         .db
-        .send(movie_queue_requests::AuthorizedUserRequest {
-            user,
-            user_list: request.state().user_list.clone(),
-        })
+        .send(movie_queue_requests::AuthorizedUserRequest { user: user.clone() })
         .from_err()
 }
 

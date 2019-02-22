@@ -46,20 +46,23 @@ pub fn tvshows(user: LoggedUser, request: HttpRequest<AppState>) -> FutureRespon
         .from_err()
         .join(request.state().db.send(WatchlistShowsRequest {}).from_err());
 
-    if request.state().user_list.try_is_authorized(&user) {
+    if request.state().user_list.is_authorized(&user) {
         fut.and_then(move |(res0, res1)| match res0 {
             Ok(tvshows) => tvshows_worker(res1, tvshows),
             Err(err) => Err(err.into()),
         })
         .responder()
     } else {
-        get_auth_fut(user, &request)
+        get_auth_fut(&user, &request)
             .join(fut)
             .and_then(move |(res, (res0, res1))| match res {
-                Ok(true) => match res0 {
-                    Ok(tvshows) => tvshows_worker(res1, tvshows),
-                    Err(err) => Err(err.into()),
-                },
+                Ok(true) => {
+                    request.state().user_list.store_auth(user)?;
+                    match res0 {
+                        Ok(tvshows) => tvshows_worker(res1, tvshows),
+                        Err(err) => Err(err.into()),
+                    }
+                }
                 Ok(false) => Ok(unauthbody()),
                 Err(err) => Err(err.into()),
             })
