@@ -14,8 +14,9 @@ use super::movie_queue_requests::{
     FindNewEpisodeRequest, ImdbShowRequest, MoviePathRequest, MovieQueueRequest, ParseImdbRequest,
     QueueDeleteRequest,
 };
-use super::send_unauthorized;
+use super::{form_http_response, get_auth_fut, unauthbody};
 use crate::common::make_queue::movie_queue_http;
+use crate::common::movie_queue::MovieQueueResult;
 use crate::common::utils::{map_result_vec, remcom_single_file};
 
 fn movie_queue_body(patterns: &[String], entries: &[String]) -> String {
@@ -29,29 +30,45 @@ fn movie_queue_body(patterns: &[String], entries: &[String]) -> String {
     body.replace("BODY", &entries.join("\n"))
 }
 
+fn queue_body_resp(
+    patterns: &[String],
+    queue: &[MovieQueueResult],
+) -> Result<HttpResponse, actix_web::error::Error> {
+    let entries = movie_queue_http(queue)?;
+    let body = movie_queue_body(patterns, &entries);
+    let resp = HttpResponse::build(StatusCode::OK)
+        .content_type("text/html; charset=utf-8")
+        .body(body);
+    Ok(resp)
+}
+
 pub fn movie_queue(
     user: LoggedUser,
     request: HttpRequest<AppState>,
 ) -> FutureResponse<HttpResponse> {
-    if user.email != "ddboline@gmail.com" {
-        send_unauthorized(request)
+    let fut = request
+        .state()
+        .db
+        .send(MovieQueueRequest {
+            patterns: Vec::new(),
+        })
+        .from_err();
+
+    if request.state().user_list.try_is_authorized(&user) {
+        fut.and_then(move |r| match r {
+            Ok(queue) => queue_body_resp(&[], &queue),
+            Err(err) => Err(err.into()),
+        })
+        .responder()
     } else {
-        request
-            .state()
-            .db
-            .send(MovieQueueRequest {
-                patterns: Vec::new(),
-            })
-            .from_err()
-            .and_then(move |res| match res {
-                Ok(queue) => {
-                    let entries = movie_queue_http(&queue)?;
-                    let body = movie_queue_body(&[], &entries);
-                    let resp = HttpResponse::build(StatusCode::OK)
-                        .content_type("text/html; charset=utf-8")
-                        .body(body);
-                    Ok(resp)
-                }
+        get_auth_fut(user, &request)
+            .join(fut)
+            .and_then(move |(res0, res1)| match res0 {
+                Ok(true) => match res1 {
+                    Ok(queue) => queue_body_resp(&[], &queue),
+                    Err(err) => Err(err.into()),
+                },
+                Ok(false) => Ok(unauthbody()),
                 Err(err) => Err(err.into()),
             })
             .responder()
@@ -63,27 +80,32 @@ pub fn movie_queue_show(
     user: LoggedUser,
     request: HttpRequest<AppState>,
 ) -> FutureResponse<HttpResponse> {
-    if user.email != "ddboline@gmail.com" {
-        send_unauthorized(request)
+    let path = path.into_inner();
+    let patterns = vec![path];
+
+    let fut = request
+        .state()
+        .db
+        .send(MovieQueueRequest {
+            patterns: patterns.clone(),
+        })
+        .from_err();
+
+    if request.state().user_list.try_is_authorized(&user) {
+        fut.and_then(move |res| match res {
+            Ok(queue) => queue_body_resp(&patterns, &queue),
+            Err(err) => Err(err.into()),
+        })
+        .responder()
     } else {
-        let path = path.into_inner();
-        let patterns = vec![path];
-        request
-            .state()
-            .db
-            .send(MovieQueueRequest {
-                patterns: patterns.clone(),
-            })
-            .from_err()
-            .and_then(move |res| match res {
-                Ok(queue) => {
-                    let entries = movie_queue_http(&queue)?;
-                    let body = movie_queue_body(&patterns, &entries);
-                    let resp = HttpResponse::build(StatusCode::OK)
-                        .content_type("text/html; charset=utf-8")
-                        .body(body);
-                    Ok(resp)
-                }
+        get_auth_fut(user, &request)
+            .join(fut)
+            .and_then(move |(res0, res1)| match res0 {
+                Ok(true) => match res1 {
+                    Ok(queue) => queue_body_resp(&patterns, &queue),
+                    Err(err) => Err(err.into()),
+                },
+                Ok(false) => Ok(unauthbody()),
                 Err(err) => Err(err.into()),
             })
             .responder()
@@ -95,27 +117,51 @@ pub fn movie_queue_delete(
     user: LoggedUser,
     request: HttpRequest<AppState>,
 ) -> FutureResponse<HttpResponse> {
-    if user.email != "ddboline@gmail.com" {
-        send_unauthorized(request)
-    } else {
-        let path = path.into_inner();
+    let path = path.into_inner();
 
-        request
-            .state()
-            .db
-            .send(QueueDeleteRequest { path: path.clone() })
-            .from_err()
-            .and_then(move |res| match res {
-                Ok(_) => {
-                    let resp = HttpResponse::build(StatusCode::OK)
-                        .content_type("text/html; charset=utf-8")
-                        .body(path);
-                    Ok(resp)
-                }
+    let fut = request
+        .state()
+        .db
+        .send(QueueDeleteRequest { path: path.clone() })
+        .from_err();
+
+    if request.state().user_list.try_is_authorized(&user) {
+        fut.and_then(move |res| match res {
+            Ok(_) => Ok(form_http_response(path)),
+            Err(err) => Err(err.into()),
+        })
+        .responder()
+    } else {
+        get_auth_fut(user, &request)
+            .join(fut)
+            .and_then(move |(res0, res1)| match res0 {
+                Ok(true) => match res1 {
+                    Ok(_) => Ok(form_http_response(path)),
+                    Err(err) => Err(err.into()),
+                },
+                Ok(false) => Ok(unauthbody()),
                 Err(err) => Err(err.into()),
             })
             .responder()
     }
+}
+
+fn transcode_worker(
+    directory: Option<String>,
+    entries: &[MovieQueueResult],
+) -> Result<HttpResponse, actix_web::Error> {
+    let entries: Vec<Result<_, Error>> = entries
+        .iter()
+        .map(|entry| {
+            remcom_single_file(&entry.path, &directory, false)?;
+            Ok(format!("{}", entry))
+        })
+        .collect();
+    let entries = map_result_vec(entries)?;
+    let resp = HttpResponse::build(StatusCode::OK)
+        .content_type("text/html; charset=utf-8")
+        .body(entries.join("\n"));
+    Ok(resp)
 }
 
 pub fn movie_queue_transcode(
@@ -123,35 +169,32 @@ pub fn movie_queue_transcode(
     user: LoggedUser,
     request: HttpRequest<AppState>,
 ) -> FutureResponse<HttpResponse> {
-    if user.email != "ddboline@gmail.com" {
-        send_unauthorized(request)
+    let path = path.into_inner();
+    let patterns = vec![path];
+
+    let fut = request
+        .state()
+        .db
+        .send(MovieQueueRequest {
+            patterns: patterns.clone(),
+        })
+        .from_err();
+
+    if request.state().user_list.try_is_authorized(&user) {
+        fut.and_then(move |res| match res {
+            Ok(entries) => transcode_worker(None, &entries),
+            Err(err) => Err(err.into()),
+        })
+        .responder()
     } else {
-        let path = path.into_inner();
-
-        let patterns = vec![path];
-
-        request
-            .state()
-            .db
-            .send(MovieQueueRequest {
-                patterns: patterns.clone(),
-            })
-            .from_err()
-            .and_then(move |res| match res {
-                Ok(entries) => {
-                    let entries: Vec<Result<_, Error>> = entries
-                        .iter()
-                        .map(|entry| {
-                            remcom_single_file(&entry.path, &None, false)?;
-                            Ok(format!("{}", entry))
-                        })
-                        .collect();
-                    let entries = map_result_vec(entries)?;
-                    let resp = HttpResponse::build(StatusCode::OK)
-                        .content_type("text/html; charset=utf-8")
-                        .body(entries.join("\n"));
-                    Ok(resp)
-                }
+        get_auth_fut(user, &request)
+            .join(fut)
+            .and_then(move |(res0, res1)| match res0 {
+                Ok(true) => match res1 {
+                    Ok(entries) => transcode_worker(None, &entries),
+                    Err(err) => Err(err.into()),
+                },
+                Ok(false) => Ok(unauthbody()),
                 Err(err) => Err(err.into()),
             })
             .responder()
@@ -163,41 +206,57 @@ pub fn movie_queue_transcode_directory(
     user: LoggedUser,
     request: HttpRequest<AppState>,
 ) -> FutureResponse<HttpResponse> {
-    if user.email != "ddboline@gmail.com" {
-        send_unauthorized(request)
+    let (directory, file) = path.into_inner();
+    let patterns = vec![file];
+
+    let fut = request
+        .state()
+        .db
+        .send(MovieQueueRequest {
+            patterns: patterns.clone(),
+        })
+        .from_err();
+
+    if request.state().user_list.try_is_authorized(&user) {
+        fut.and_then(move |res| match res {
+            Ok(entries) => transcode_worker(Some(directory), &entries),
+            Err(err) => Err(err.into()),
+        })
+        .responder()
     } else {
-        let (directory, file) = path.into_inner();
-
-        let patterns = vec![file];
-
-        request
-            .state()
-            .db
-            .send(MovieQueueRequest {
-                patterns: patterns.clone(),
-            })
-            .from_err()
-            .and_then(move |res| match res {
-                Ok(entries) => {
-                    let entries: Vec<Result<_, Error>> = entries
-                        .iter()
-                        .map(|entry| {
-                            remcom_single_file(&entry.path, &Some(directory.clone()), false)?;
-                            Ok(format!("{}", entry))
-                        })
-                        .collect();
-
-                    let entries = map_result_vec(entries)?;
-
-                    let resp = HttpResponse::build(StatusCode::OK)
-                        .content_type("text/html; charset=utf-8")
-                        .body(entries.join("\n"));
-                    Ok(resp)
-                }
+        get_auth_fut(user, &request)
+            .join(fut)
+            .and_then(move |(res0, res1)| match res0 {
+                Ok(true) => match res1 {
+                    Ok(entries) => transcode_worker(Some(directory), &entries),
+                    Err(err) => Err(err.into()),
+                },
+                Ok(false) => Ok(unauthbody()),
                 Err(err) => Err(err.into()),
             })
             .responder()
     }
+}
+
+fn play_worker(full_path: String) -> Result<HttpResponse, actix_web::Error> {
+    let path = path::Path::new(&full_path);
+    let file_name = path.file_name().unwrap().to_str().unwrap();
+    let url = format!("/videos/partial/{}", file_name);
+
+    let body = include_str!("../../templates/video_template.html").replace("VIDEO", &url);
+
+    let command = format!("rm -f /var/www/html/videos/partial/{}", file_name);
+    Exec::shell(&command).join().map_err(err_msg)?;
+    let command = format!(
+        "ln -s {} /var/www/html/videos/partial/{}",
+        full_path, file_name
+    );
+    Exec::shell(&command).join().map_err(err_msg)?;
+
+    let resp = HttpResponse::build(StatusCode::OK)
+        .content_type("text/html; charset=utf-8")
+        .body(body);
+    Ok(resp)
 }
 
 pub fn movie_queue_play(
@@ -205,38 +264,25 @@ pub fn movie_queue_play(
     user: LoggedUser,
     request: HttpRequest<AppState>,
 ) -> FutureResponse<HttpResponse> {
-    if user.email != "ddboline@gmail.com" {
-        send_unauthorized(request)
+    let idx = idx.into_inner();
+
+    let fut = request.state().db.send(MoviePathRequest { idx }).from_err();
+
+    if request.state().user_list.try_is_authorized(&user) {
+        fut.and_then(move |res| match res {
+            Ok(full_path) => play_worker(full_path),
+            Err(err) => Err(err.into()),
+        })
+        .responder()
     } else {
-        let idx = idx.into_inner();
-
-        request
-            .state()
-            .db
-            .send(MoviePathRequest { idx })
-            .from_err()
-            .and_then(move |res| match res {
-                Ok(full_path) => {
-                    let path = path::Path::new(&full_path);
-                    let file_name = path.file_name().unwrap().to_str().unwrap();
-                    let url = format!("/videos/partial/{}", file_name);
-
-                    let body =
-                        include_str!("../../templates/video_template.html").replace("VIDEO", &url);
-
-                    let command = format!("rm -f /var/www/html/videos/partial/{}", file_name);
-                    Exec::shell(&command).join().map_err(err_msg)?;
-                    let command = format!(
-                        "ln -s {} /var/www/html/videos/partial/{}",
-                        full_path, file_name
-                    );
-                    Exec::shell(&command).join().map_err(err_msg)?;
-
-                    let resp = HttpResponse::build(StatusCode::OK)
-                        .content_type("text/html; charset=utf-8")
-                        .body(body);
-                    Ok(resp)
-                }
+        get_auth_fut(user, &request)
+            .join(fut)
+            .and_then(move |(res0, res1)| match res0 {
+                Ok(true) => match res1 {
+                    Ok(full_path) => play_worker(full_path),
+                    Err(err) => Err(err.into()),
+                },
+                Ok(false) => Ok(unauthbody()),
                 Err(err) => Err(err.into()),
             })
             .responder()
@@ -249,28 +295,44 @@ pub fn imdb_show(
     user: LoggedUser,
     request: HttpRequest<AppState>,
 ) -> FutureResponse<HttpResponse> {
-    if user.email != "ddboline@gmail.com" {
-        send_unauthorized(request)
-    } else {
-        let show = path.into_inner();
-        let query = query.into_inner();
+    let show = path.into_inner();
+    let query = query.into_inner();
 
-        request
-            .state()
-            .db
-            .send(ImdbShowRequest { show, query })
-            .from_err()
-            .and_then(move |res| match res {
-                Ok(body) => {
-                    let resp = HttpResponse::build(StatusCode::OK)
-                        .content_type("text/html; charset=utf-8")
-                        .body(body);
-                    Ok(resp)
-                }
+    let fut = request
+        .state()
+        .db
+        .send(ImdbShowRequest { show, query })
+        .from_err();
+
+    if request.state().user_list.try_is_authorized(&user) {
+        fut.and_then(move |res| match res {
+            Ok(body) => Ok(form_http_response(body)),
+            Err(err) => Err(err.into()),
+        })
+        .responder()
+    } else {
+        get_auth_fut(user, &request)
+            .join(fut)
+            .and_then(move |(res0, res1)| match res0 {
+                Ok(true) => match res1 {
+                    Ok(body) => Ok(form_http_response(body)),
+                    Err(err) => Err(err.into()),
+                },
+                Ok(false) => Ok(unauthbody()),
                 Err(err) => Err(err.into()),
             })
             .responder()
     }
+}
+
+fn new_episode_worker(entries: &[String]) -> Result<HttpResponse, actix_web::Error> {
+    let body =
+        include_str!("../../templates/watched_template.html").replace("PREVIOUS", "/list/tvshows");
+    let body = body.replace("BODY", &entries.join("\n"));
+    let resp = HttpResponse::build(StatusCode::OK)
+        .content_type("text/html; charset=utf-8")
+        .body(body);
+    Ok(resp)
 }
 
 pub fn find_new_episodes(
@@ -278,24 +340,23 @@ pub fn find_new_episodes(
     user: LoggedUser,
     request: HttpRequest<AppState>,
 ) -> FutureResponse<HttpResponse> {
-    if user.email != "ddboline@gmail.com" {
-        send_unauthorized(request)
+    let fut = request.state().db.send(query.into_inner()).from_err();
+
+    if request.state().user_list.try_is_authorized(&user) {
+        fut.and_then(move |res| match res {
+            Ok(entries) => new_episode_worker(&entries),
+            Err(err) => Err(err.into()),
+        })
+        .responder()
     } else {
-        request
-            .state()
-            .db
-            .send(query.into_inner())
-            .from_err()
-            .and_then(move |res| match res {
-                Ok(entries) => {
-                    let body = include_str!("../../templates/watched_template.html")
-                        .replace("PREVIOUS", "/list/tvshows");
-                    let body = body.replace("BODY", &entries.join("\n"));
-                    let resp = HttpResponse::build(StatusCode::OK)
-                        .content_type("text/html; charset=utf-8")
-                        .body(body);
-                    Ok(resp)
-                }
+        get_auth_fut(user, &request)
+            .join(fut)
+            .and_then(move |(res0, res1)| match res0 {
+                Ok(true) => match res1 {
+                    Ok(entries) => new_episode_worker(&entries),
+                    Err(err) => Err(err.into()),
+                },
+                Ok(false) => Ok(unauthbody()),
                 Err(err) => Err(err.into()),
             })
             .responder()

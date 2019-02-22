@@ -6,14 +6,30 @@ pub mod movie_queue_routes;
 pub mod trakt_routes;
 pub mod tvshows_route;
 
-use actix_web::{AsyncResponder, FutureResponse, HttpMessage, HttpRequest, HttpResponse};
+use actix_web::{HttpRequest, HttpResponse};
 use futures::Future;
 use movie_queue_app::AppState;
 
-fn send_unauthorized(request: HttpRequest<AppState>) -> FutureResponse<HttpResponse> {
+fn unauthbody() -> HttpResponse {
+    HttpResponse::Unauthorized().json("Unauthorized")
+}
+
+fn get_auth_fut(
+    user: logged_user::LoggedUser,
+    request: &HttpRequest<AppState>,
+) -> impl Future<Item = Result<bool, failure::Error>, Error = actix_web::Error> {
     request
-        .body()
+        .state()
+        .db
+        .send(movie_queue_requests::AuthorizedUserRequest {
+            user,
+            user_list: request.state().user_list.clone(),
+        })
         .from_err()
-        .and_then(move |_| Ok(HttpResponse::Unauthorized().json("Unauthorized")))
-        .responder()
+}
+
+fn form_http_response(body: String) -> HttpResponse {
+    HttpResponse::build(actix_web::http::StatusCode::OK)
+        .content_type("text/html; charset=utf-8")
+        .body(body)
 }

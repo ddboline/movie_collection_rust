@@ -8,43 +8,59 @@ use std::collections::HashMap;
 use super::logged_user::LoggedUser;
 use super::movie_queue_app::AppState;
 use super::movie_queue_requests::{TvShowsRequest, WatchlistShowsRequest};
-use super::send_unauthorized;
+use super::{get_auth_fut, unauthbody};
+use crate::common::movie_collection::TvShowsResult;
+use crate::common::trakt_utils::WatchListShow;
 use crate::common::tv_show_source::TvShowSource;
 
+fn tvshows_worker(
+    res1: Result<HashMap<String, (String, WatchListShow, Option<TvShowSource>)>, Error>,
+    tvshows: Vec<TvShowsResult>,
+) -> Result<HttpResponse, actix_web::Error> {
+    let tvshows: HashMap<String, _> = tvshows
+        .into_iter()
+        .map(|s| (s.link.clone(), (s.show, s.title, s.link, s.source)))
+        .collect();
+    let watchlist: HashMap<String, _> = res1.map(|w| {
+        w.into_iter()
+            .map(|(link, (show, s, source))| (link, (show, s.title, s.link, source)))
+            .collect()
+    })?;
+
+    let shows = process_shows(tvshows, watchlist)?;
+
+    let body =
+        include_str!("../../templates/tvshows_template.html").replace("BODY", &shows.join("\n"));
+
+    let resp = HttpResponse::build(StatusCode::OK)
+        .content_type("text/html; charset=utf-8")
+        .body(body);
+    Ok(resp)
+}
+
 pub fn tvshows(user: LoggedUser, request: HttpRequest<AppState>) -> FutureResponse<HttpResponse> {
-    if user.email != "ddboline@gmail.com" {
-        send_unauthorized(request)
+    let fut = request
+        .state()
+        .db
+        .send(TvShowsRequest {})
+        .from_err()
+        .join(request.state().db.send(WatchlistShowsRequest {}).from_err());
+
+    if request.state().user_list.try_is_authorized(&user) {
+        fut.and_then(move |(res0, res1)| match res0 {
+            Ok(tvshows) => tvshows_worker(res1, tvshows),
+            Err(err) => Err(err.into()),
+        })
+        .responder()
     } else {
-        request
-            .state()
-            .db
-            .send(TvShowsRequest {})
-            .from_err()
-            .join(request.state().db.send(WatchlistShowsRequest {}).from_err())
-            .and_then(move |(res0, res1)| match res0 {
-                Ok(tvshows) => {
-                    let tvshows: HashMap<String, _> = tvshows
-                        .into_iter()
-                        .map(|s| (s.link.clone(), (s.show, s.title, s.link, s.source)))
-                        .collect();
-                    let watchlist: HashMap<String, _> = res1.map(|w| {
-                        w.into_iter()
-                            .map(|(link, (show, s, source))| {
-                                (link, (show, s.title, s.link, source))
-                            })
-                            .collect()
-                    })?;
-
-                    let shows = process_shows(tvshows, watchlist)?;
-
-                    let body = include_str!("../../templates/tvshows_template.html")
-                        .replace("BODY", &shows.join("\n"));
-
-                    let resp = HttpResponse::build(StatusCode::OK)
-                        .content_type("text/html; charset=utf-8")
-                        .body(body);
-                    Ok(resp)
-                }
+        get_auth_fut(user, &request)
+            .join(fut)
+            .and_then(move |(res, (res0, res1))| match res {
+                Ok(true) => match res0 {
+                    Ok(tvshows) => tvshows_worker(res1, tvshows),
+                    Err(err) => Err(err.into()),
+                },
+                Ok(false) => Ok(unauthbody()),
                 Err(err) => Err(err.into()),
             })
             .responder()
