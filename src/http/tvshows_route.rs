@@ -5,10 +5,10 @@ use failure::Error;
 use futures::future::Future;
 use std::collections::HashMap;
 
+use super::authenticated_response;
 use super::logged_user::LoggedUser;
 use super::movie_queue_app::AppState;
 use super::movie_queue_requests::{TvShowsRequest, WatchlistShowsRequest};
-use super::{get_auth_fut, unauthbody};
 use crate::common::movie_collection::TvShowsResult;
 use crate::common::trakt_utils::WatchListShow;
 use crate::common::tv_show_source::TvShowSource;
@@ -51,16 +51,7 @@ pub fn tvshows(user: LoggedUser, request: HttpRequest<AppState>) -> FutureRespon
         })
         .responder();
 
-    if request.state().user_list.is_authorized(&user) {
-        resp
-    } else {
-        get_auth_fut(&user, &request)
-            .and_then(move |res| match res {
-                Ok(true) => resp,
-                _ => unauthbody(),
-            })
-            .responder()
-    }
+    authenticated_response(&user, &request, resp)
 }
 
 fn process_shows(

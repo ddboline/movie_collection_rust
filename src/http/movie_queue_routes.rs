@@ -14,7 +14,7 @@ use super::movie_queue_requests::{
     FindNewEpisodeRequest, ImdbShowRequest, MoviePathRequest, MovieQueueRequest, ParseImdbRequest,
     QueueDeleteRequest,
 };
-use super::{form_http_response, get_auth_fut, unauthbody};
+use super::{authenticated_response, form_http_response};
 use crate::common::make_queue::movie_queue_http;
 use crate::common::movie_queue::MovieQueueResult;
 use crate::common::utils::{map_result_vec, remcom_single_file};
@@ -59,16 +59,7 @@ pub fn movie_queue(
         })
         .responder();
 
-    if request.state().user_list.is_authorized(&user) {
-        resp
-    } else {
-        get_auth_fut(&user, &request)
-            .and_then(move |res| match res {
-                Ok(true) => resp,
-                _ => unauthbody(),
-            })
-            .responder()
-    }
+    authenticated_response(&user, &request, resp)
 }
 
 pub fn movie_queue_show(
@@ -92,16 +83,7 @@ pub fn movie_queue_show(
         })
         .responder();
 
-    if request.state().user_list.is_authorized(&user) {
-        resp
-    } else {
-        get_auth_fut(&user, &request)
-            .and_then(move |res| match res {
-                Ok(true) => resp,
-                _ => unauthbody(),
-            })
-            .responder()
-    }
+    authenticated_response(&user, &request, resp)
 }
 
 pub fn movie_queue_delete(
@@ -122,16 +104,7 @@ pub fn movie_queue_delete(
         })
         .responder();
 
-    if request.state().user_list.is_authorized(&user) {
-        resp
-    } else {
-        get_auth_fut(&user, &request)
-            .and_then(move |res| match res {
-                Ok(true) => resp,
-                _ => unauthbody(),
-            })
-            .responder()
-    }
+    authenticated_response(&user, &request, resp)
 }
 
 fn transcode_worker(
@@ -173,16 +146,7 @@ pub fn movie_queue_transcode(
         })
         .responder();
 
-    if request.state().user_list.is_authorized(&user) {
-        resp
-    } else {
-        get_auth_fut(&user, &request)
-            .and_then(move |res| match res {
-                Ok(true) => resp,
-                _ => unauthbody(),
-            })
-            .responder()
-    }
+    authenticated_response(&user, &request, resp)
 }
 
 pub fn movie_queue_transcode_directory(
@@ -206,16 +170,7 @@ pub fn movie_queue_transcode_directory(
         })
         .responder();
 
-    if request.state().user_list.is_authorized(&user) {
-        resp
-    } else {
-        get_auth_fut(&user, &request)
-            .and_then(move |res| match res {
-                Ok(true) => resp,
-                _ => unauthbody(),
-            })
-            .responder()
-    }
+    authenticated_response(&user, &request, resp)
 }
 
 fn play_worker(full_path: String) -> Result<HttpResponse, actix_web::Error> {
@@ -257,16 +212,7 @@ pub fn movie_queue_play(
         })
         .responder();
 
-    if request.state().user_list.is_authorized(&user) {
-        resp
-    } else {
-        get_auth_fut(&user, &request)
-            .and_then(move |res| match res {
-                Ok(true) => resp,
-                _ => unauthbody(),
-            })
-            .responder()
-    }
+    authenticated_response(&user, &request, resp)
 }
 
 pub fn imdb_show(
@@ -289,16 +235,7 @@ pub fn imdb_show(
         })
         .responder();
 
-    if request.state().user_list.is_authorized(&user) {
-        resp
-    } else {
-        get_auth_fut(&user, &request)
-            .and_then(move |res| match res {
-                Ok(true) => resp,
-                _ => unauthbody(),
-            })
-            .responder()
-    }
+    authenticated_response(&user, &request, resp)
 }
 
 fn new_episode_worker(entries: &[String]) -> Result<HttpResponse, actix_web::Error> {
@@ -327,14 +264,5 @@ pub fn find_new_episodes(
         })
         .responder();
 
-    if request.state().user_list.is_authorized(&user) {
-        resp
-    } else {
-        get_auth_fut(&user, &request)
-            .and_then(move |res| match res {
-                Ok(true) => resp,
-                _ => unauthbody(),
-            })
-            .responder()
-    }
+    authenticated_response(&user, &request, resp)
 }

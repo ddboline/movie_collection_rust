@@ -12,7 +12,7 @@ use super::movie_queue_requests::{
     ImdbRatingsRequest, ImdbSeasonsRequest, TraktCalRequest, WatchedActionRequest,
     WatchedListRequest, WatchlistActionRequest, WatchlistShowsRequest,
 };
-use super::{form_http_response, get_auth_fut, unauthbody};
+use super::{authenticated_response, form_http_response};
 use crate::common::movie_collection::ImdbSeason;
 use crate::common::trakt_utils::{TraktActions, TraktConnection, WatchListShow};
 use crate::common::tv_show_source::TvShowSource;
@@ -76,16 +76,7 @@ pub fn trakt_watchlist(
         })
         .responder();
 
-    if request.state().user_list.is_authorized(&user) {
-        resp
-    } else {
-        get_auth_fut(&user, &request)
-            .and_then(move |res| match res {
-                Ok(true) => resp,
-                _ => unauthbody(),
-            })
-            .responder()
-    }
+    authenticated_response(&user, &request, resp)
 }
 
 fn watchlist_action_worker(
@@ -127,16 +118,7 @@ pub fn trakt_watchlist_action(
         })
         .responder();
 
-    if request.state().user_list.is_authorized(&user) {
-        resp
-    } else {
-        get_auth_fut(&user, &request)
-            .and_then(move |res| match res {
-                Ok(true) => resp,
-                _ => unauthbody(),
-            })
-            .responder()
-    }
+    authenticated_response(&user, &request, resp)
 }
 
 fn trakt_watched_seasons_worker(
@@ -211,16 +193,7 @@ pub fn trakt_watched_seasons(
         })
         .responder();
 
-    if request.state().user_list.is_authorized(&user) {
-        resp
-    } else {
-        get_auth_fut(&user, &request)
-            .and_then(move |res| match res {
-                Ok(true) => resp,
-                _ => unauthbody(),
-            })
-            .responder()
-    }
+    authenticated_response(&user, &request, resp)
 }
 
 pub fn trakt_watched_list(
@@ -241,16 +214,7 @@ pub fn trakt_watched_list(
         })
         .responder();
 
-    if request.state().user_list.is_authorized(&user) {
-        resp
-    } else {
-        get_auth_fut(&user, &request)
-            .and_then(move |res| match res {
-                Ok(true) => resp,
-                _ => unauthbody(),
-            })
-            .responder()
-    }
+    authenticated_response(&user, &request, resp)
 }
 
 pub fn trakt_watched_action(
@@ -276,16 +240,7 @@ pub fn trakt_watched_action(
         })
         .responder();
 
-    if request.state().user_list.is_authorized(&user) {
-        resp
-    } else {
-        get_auth_fut(&user, &request)
-            .and_then(move |res| match res {
-                Ok(true) => resp,
-                _ => unauthbody(),
-            })
-            .responder()
-    }
+    authenticated_response(&user, &request, resp)
 }
 
 fn trakt_cal_worker(entries: &[String]) -> Result<HttpResponse, actix_web::Error> {
@@ -310,14 +265,5 @@ pub fn trakt_cal(user: LoggedUser, request: HttpRequest<AppState>) -> FutureResp
         })
         .responder();
 
-    if request.state().user_list.is_authorized(&user) {
-        resp
-    } else {
-        get_auth_fut(&user, &request)
-            .and_then(move |res| match res {
-                Ok(true) => resp,
-                _ => unauthbody(),
-            })
-            .responder()
-    }
+    authenticated_response(&user, &request, resp)
 }
