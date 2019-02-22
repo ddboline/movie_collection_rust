@@ -13,8 +13,10 @@ use crate::common::movie_collection::TvShowsResult;
 use crate::common::trakt_utils::WatchListShow;
 use crate::common::tv_show_source::TvShowSource;
 
+type TvShowsMap = HashMap<String, (String, WatchListShow, Option<TvShowSource>)>;
+
 fn tvshows_worker(
-    res1: Result<HashMap<String, (String, WatchListShow, Option<TvShowSource>)>, Error>,
+    res1: Result<TvShowsMap, Error>,
     tvshows: Vec<TvShowsResult>,
 ) -> Result<HttpResponse, actix_web::Error> {
     let tvshows: HashMap<String, _> = tvshows
