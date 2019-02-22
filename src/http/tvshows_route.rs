@@ -39,32 +39,25 @@ fn tvshows_worker(
 }
 
 pub fn tvshows(user: LoggedUser, request: HttpRequest<AppState>) -> FutureResponse<HttpResponse> {
-    let fut = request
+    let resp = request
         .state()
         .db
         .send(TvShowsRequest {})
         .from_err()
-        .join(request.state().db.send(WatchlistShowsRequest {}).from_err());
-
-    if request.state().user_list.is_authorized(&user) {
-        fut.and_then(move |(res0, res1)| match res0 {
+        .join(request.state().db.send(WatchlistShowsRequest {}).from_err())
+        .and_then(move |(res0, res1)| match res0 {
             Ok(tvshows) => tvshows_worker(res1, tvshows),
             Err(err) => Err(err.into()),
         })
-        .responder()
+        .responder();
+
+    if request.state().user_list.is_authorized(&user) {
+        resp
     } else {
         get_auth_fut(&user, &request)
-            .join(fut)
-            .and_then(move |(res, (res0, res1))| match res {
-                Ok(true) => {
-                    request.state().user_list.store_auth(user)?;
-                    match res0 {
-                        Ok(tvshows) => tvshows_worker(res1, tvshows),
-                        Err(err) => Err(err.into()),
-                    }
-                }
-                Ok(false) => Ok(unauthbody()),
-                Err(err) => Err(err.into()),
+            .and_then(move |res| match res {
+                Ok(true) => resp,
+                _ => unauthbody(),
             })
             .responder()
     }

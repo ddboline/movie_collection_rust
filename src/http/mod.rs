@@ -6,12 +6,12 @@ pub mod movie_queue_routes;
 pub mod trakt_routes;
 pub mod tvshows_route;
 
-use actix_web::{HttpRequest, HttpResponse};
-use futures::Future;
+use actix_web::{HttpRequest, HttpResponse, AsyncResponder};
+use futures::{Future, lazy};
 use movie_queue_app::AppState;
 
-fn unauthbody() -> HttpResponse {
-    HttpResponse::Unauthorized().json("Unauthorized")
+fn unauthbody() -> actix_web::FutureResponse<HttpResponse> {
+    lazy(|| Ok(HttpResponse::Unauthorized().json("Unauthorized"))).responder()
 }
 
 fn get_auth_fut(

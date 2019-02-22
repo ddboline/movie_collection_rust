@@ -46,33 +46,26 @@ pub fn movie_queue(
     user: LoggedUser,
     request: HttpRequest<AppState>,
 ) -> FutureResponse<HttpResponse> {
-    let fut = request
+    let resp = request
         .state()
         .db
         .send(MovieQueueRequest {
             patterns: Vec::new(),
         })
-        .from_err();
-
-    if request.state().user_list.is_authorized(&user) {
-        fut.and_then(move |r| match r {
+        .from_err()
+        .and_then(move |r| match r {
             Ok(queue) => queue_body_resp(&[], &queue),
             Err(err) => Err(err.into()),
         })
-        .responder()
+        .responder();
+
+    if request.state().user_list.is_authorized(&user) {
+        resp
     } else {
         get_auth_fut(&user, &request)
-            .join(fut)
-            .and_then(move |(res0, res1)| match res0 {
-                Ok(true) => {
-                    request.state().user_list.store_auth(user)?;
-                    match res1 {
-                        Ok(queue) => queue_body_resp(&[], &queue),
-                        Err(err) => Err(err.into()),
-                    }
-                }
-                Ok(false) => Ok(unauthbody()),
-                Err(err) => Err(err.into()),
+            .and_then(move |res| match res {
+                Ok(true) => resp,
+                _ => unauthbody(),
             })
             .responder()
     }
@@ -86,33 +79,26 @@ pub fn movie_queue_show(
     let path = path.into_inner();
     let patterns = vec![path];
 
-    let fut = request
+    let resp = request
         .state()
         .db
         .send(MovieQueueRequest {
             patterns: patterns.clone(),
         })
-        .from_err();
-
-    if request.state().user_list.is_authorized(&user) {
-        fut.and_then(move |res| match res {
+        .from_err()
+        .and_then(move |res| match res {
             Ok(queue) => queue_body_resp(&patterns, &queue),
             Err(err) => Err(err.into()),
         })
-        .responder()
+        .responder();
+
+    if request.state().user_list.is_authorized(&user) {
+        resp
     } else {
         get_auth_fut(&user, &request)
-            .join(fut)
-            .and_then(move |(res0, res1)| match res0 {
-                Ok(true) => {
-                    request.state().user_list.store_auth(user)?;
-                    match res1 {
-                        Ok(queue) => queue_body_resp(&patterns, &queue),
-                        Err(err) => Err(err.into()),
-                    }
-                }
-                Ok(false) => Ok(unauthbody()),
-                Err(err) => Err(err.into()),
+            .and_then(move |res| match res {
+                Ok(true) => resp,
+                _ => unauthbody(),
             })
             .responder()
     }
@@ -125,31 +111,24 @@ pub fn movie_queue_delete(
 ) -> FutureResponse<HttpResponse> {
     let path = path.into_inner();
 
-    let fut = request
+    let resp = request
         .state()
         .db
         .send(QueueDeleteRequest { path: path.clone() })
-        .from_err();
-
-    if request.state().user_list.is_authorized(&user) {
-        fut.and_then(move |res| match res {
+        .from_err()
+        .and_then(move |res| match res {
             Ok(_) => Ok(form_http_response(path)),
             Err(err) => Err(err.into()),
         })
-        .responder()
+        .responder();
+
+    if request.state().user_list.is_authorized(&user) {
+        resp
     } else {
         get_auth_fut(&user, &request)
-            .join(fut)
-            .and_then(move |(res0, res1)| match res0 {
-                Ok(true) => {
-                    request.state().user_list.store_auth(user)?;
-                    match res1 {
-                        Ok(_) => Ok(form_http_response(path)),
-                        Err(err) => Err(err.into()),
-                    }
-                }
-                Ok(false) => Ok(unauthbody()),
-                Err(err) => Err(err.into()),
+            .and_then(move |res| match res {
+                Ok(true) => resp,
+                _ => unauthbody(),
             })
             .responder()
     }
@@ -181,33 +160,26 @@ pub fn movie_queue_transcode(
     let path = path.into_inner();
     let patterns = vec![path];
 
-    let fut = request
+    let resp = request
         .state()
         .db
         .send(MovieQueueRequest {
             patterns: patterns.clone(),
         })
-        .from_err();
-
-    if request.state().user_list.is_authorized(&user) {
-        fut.and_then(move |res| match res {
+        .from_err()
+        .and_then(move |res| match res {
             Ok(entries) => transcode_worker(None, &entries),
             Err(err) => Err(err.into()),
         })
-        .responder()
+        .responder();
+
+    if request.state().user_list.is_authorized(&user) {
+        resp
     } else {
         get_auth_fut(&user, &request)
-            .join(fut)
-            .and_then(move |(res0, res1)| match res0 {
-                Ok(true) => {
-                    request.state().user_list.store_auth(user)?;
-                    match res1 {
-                        Ok(entries) => transcode_worker(None, &entries),
-                        Err(err) => Err(err.into()),
-                    }
-                }
-                Ok(false) => Ok(unauthbody()),
-                Err(err) => Err(err.into()),
+            .and_then(move |res| match res {
+                Ok(true) => resp,
+                _ => unauthbody(),
             })
             .responder()
     }
@@ -221,33 +193,26 @@ pub fn movie_queue_transcode_directory(
     let (directory, file) = path.into_inner();
     let patterns = vec![file];
 
-    let fut = request
+    let resp = request
         .state()
         .db
         .send(MovieQueueRequest {
             patterns: patterns.clone(),
         })
-        .from_err();
-
-    if request.state().user_list.is_authorized(&user) {
-        fut.and_then(move |res| match res {
+        .from_err()
+        .and_then(move |res| match res {
             Ok(entries) => transcode_worker(Some(directory), &entries),
             Err(err) => Err(err.into()),
         })
-        .responder()
+        .responder();
+
+    if request.state().user_list.is_authorized(&user) {
+        resp
     } else {
         get_auth_fut(&user, &request)
-            .join(fut)
-            .and_then(move |(res0, res1)| match res0 {
-                Ok(true) => {
-                    request.state().user_list.store_auth(user)?;
-                    match res1 {
-                        Ok(entries) => transcode_worker(Some(directory), &entries),
-                        Err(err) => Err(err.into()),
-                    }
-                }
-                Ok(false) => Ok(unauthbody()),
-                Err(err) => Err(err.into()),
+            .and_then(move |res| match res {
+                Ok(true) => resp,
+                _ => unauthbody(),
             })
             .responder()
     }
@@ -281,27 +246,24 @@ pub fn movie_queue_play(
 ) -> FutureResponse<HttpResponse> {
     let idx = idx.into_inner();
 
-    let fut = request.state().db.send(MoviePathRequest { idx }).from_err();
-
-    if request.state().user_list.is_authorized(&user) {
-        fut.and_then(move |res| match res {
+    let resp = request
+        .state()
+        .db
+        .send(MoviePathRequest { idx })
+        .from_err()
+        .and_then(move |res| match res {
             Ok(full_path) => play_worker(full_path),
             Err(err) => Err(err.into()),
         })
-        .responder()
+        .responder();
+
+    if request.state().user_list.is_authorized(&user) {
+        resp
     } else {
         get_auth_fut(&user, &request)
-            .join(fut)
-            .and_then(move |(res0, res1)| match res0 {
-                Ok(true) => {
-                    request.state().user_list.store_auth(user)?;
-                    match res1 {
-                        Ok(full_path) => play_worker(full_path),
-                        Err(err) => Err(err.into()),
-                    }
-                }
-                Ok(false) => Ok(unauthbody()),
-                Err(err) => Err(err.into()),
+            .and_then(move |res| match res {
+                Ok(true) => resp,
+                _ => unauthbody(),
             })
             .responder()
     }
@@ -316,31 +278,24 @@ pub fn imdb_show(
     let show = path.into_inner();
     let query = query.into_inner();
 
-    let fut = request
+    let resp = request
         .state()
         .db
         .send(ImdbShowRequest { show, query })
-        .from_err();
-
-    if request.state().user_list.is_authorized(&user) {
-        fut.and_then(move |res| match res {
+        .from_err()
+        .and_then(move |res| match res {
             Ok(body) => Ok(form_http_response(body)),
             Err(err) => Err(err.into()),
         })
-        .responder()
+        .responder();
+
+    if request.state().user_list.is_authorized(&user) {
+        resp
     } else {
         get_auth_fut(&user, &request)
-            .join(fut)
-            .and_then(move |(res0, res1)| match res0 {
-                Ok(true) => {
-                    request.state().user_list.store_auth(user)?;
-                    match res1 {
-                        Ok(body) => Ok(form_http_response(body)),
-                        Err(err) => Err(err.into()),
-                    }
-                }
-                Ok(false) => Ok(unauthbody()),
-                Err(err) => Err(err.into()),
+            .and_then(move |res| match res {
+                Ok(true) => resp,
+                _ => unauthbody(),
             })
             .responder()
     }
@@ -361,27 +316,24 @@ pub fn find_new_episodes(
     user: LoggedUser,
     request: HttpRequest<AppState>,
 ) -> FutureResponse<HttpResponse> {
-    let fut = request.state().db.send(query.into_inner()).from_err();
-
-    if request.state().user_list.is_authorized(&user) {
-        fut.and_then(move |res| match res {
+    let resp = request
+        .state()
+        .db
+        .send(query.into_inner())
+        .from_err()
+        .and_then(move |res| match res {
             Ok(entries) => new_episode_worker(&entries),
             Err(err) => Err(err.into()),
         })
-        .responder()
+        .responder();
+
+    if request.state().user_list.is_authorized(&user) {
+        resp
     } else {
         get_auth_fut(&user, &request)
-            .join(fut)
-            .and_then(move |(res0, res1)| match res0 {
-                Ok(true) => {
-                    request.state().user_list.store_auth(user)?;
-                    match res1 {
-                        Ok(entries) => new_episode_worker(&entries),
-                        Err(err) => Err(err.into()),
-                    }
-                }
-                Ok(false) => Ok(unauthbody()),
-                Err(err) => Err(err.into()),
+            .and_then(move |res| match res {
+                Ok(true) => resp,
+                _ => unauthbody(),
             })
             .responder()
     }
