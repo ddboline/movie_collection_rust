@@ -507,14 +507,15 @@ impl Handler<TraktCalRequest> for PgPool {
                     None => "".to_string(),
                 };
                 let exists = if !show.is_empty() {
-                    let idx = ImdbEpisodes {
+                    let idx_opt = ImdbEpisodes {
                         show: show.clone(),
                         season: cal.season,
                         episode: cal.episode,
                         ..Default::default()
                     }
                     .get_index(&self)?;
-                    match idx {
+
+                    match idx_opt {
                         Some(idx) => ImdbEpisodes::from_index(idx, &self)?,
                         None => None,
                     }
