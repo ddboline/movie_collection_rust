@@ -72,6 +72,38 @@ impl ImdbEpisodes {
         }
     }
 
+    pub fn from_index(idx: i32, pool: &PgPool) -> Result<Option<ImdbEpisodes>, Error> {
+        let query = r#"
+            SELECT show, season, episode, airdate, rating, eptitle, epurl
+            FROM imdb_episodes
+            WHERE idx = $1"#;
+        if let Some(row) = pool.get()?.query(query, &[&idx])?.iter().nth(0) {
+            let show: String = row.get(0);
+            let title: String = row.get(1);
+            let season: i32 = row.get(2);
+            let episode: i32 = row.get(3);
+            let airdate: NaiveDate = row.get(4);
+            let rating: f64 = row.get(5);
+            let eptitle: String = row.get(6);
+            let epurl: String = row.get(7);
+
+            let epi = ImdbEpisodes {
+                show,
+                title,
+                season,
+                episode,
+                airdate,
+                rating,
+                eptitle,
+                epurl,
+            };
+
+            Ok(Some(epi))
+        } else {
+            Ok(None)
+        }
+    }
+
     pub fn insert_episode(&self, pool: &PgPool) -> Result<(), Error> {
         let query = r#"
             INSERT INTO imdb_episodes

@@ -507,16 +507,19 @@ impl Handler<TraktCalRequest> for PgPool {
                     None => "".to_string(),
                 };
                 let exists = if !show.is_empty() {
-                    ImdbEpisodes {
+                    let idx = ImdbEpisodes {
                         show: show.clone(),
                         season: cal.season,
                         episode: cal.episode,
                         ..Default::default()
                     }
-                    .get_index(&self)?
-                    .is_some()
+                    .get_index(&self)?;
+                    match idx {
+                        Some(idx) => ImdbEpisodes::from_index(idx, &self)?,
+                        None => None,
+                    }
                 } else {
-                    false
+                    None
                 };
 
                 let entry = format!(
@@ -534,10 +537,16 @@ impl Handler<TraktCalRequest> for PgPool {
                             r#"<a href="https://www.imdb.com/title/{}">{} {}</a>"#,
                             link, cal.season, cal.episode,
                         ),
-                        None => format!("{} {}", cal.season, cal.episode,),
+                        None => match &exists {
+                            Some(link) => format!(
+                                r#"<a href="https://www.imdb.com/title/{}">{} {}</a>"#,
+                                link, cal.season, cal.episode,
+                            ),
+                            None => format!("{} {}", cal.season, cal.episode,),
+                        },
                     },
                     cal.airdate,
-                    if !exists {
+                    if !exists.is_some() {
                         button_add
                             .replace("SHOW", &show)
                             .replace("LINK", &cal.link)
