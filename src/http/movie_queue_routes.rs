@@ -46,20 +46,21 @@ pub fn movie_queue(
     user: LoggedUser,
     request: HttpRequest<AppState>,
 ) -> FutureResponse<HttpResponse> {
-    let resp = request
-        .state()
-        .db
-        .send(MovieQueueRequest {
-            patterns: Vec::new(),
-        })
-        .from_err()
-        .and_then(move |r| match r {
-            Ok(queue) => queue_body_resp(&[], &queue),
-            Err(err) => Err(err.into()),
-        })
-        .responder();
+    let resp = move |req: HttpRequest<AppState>| {
+        req.state()
+            .db
+            .send(MovieQueueRequest {
+                patterns: Vec::new(),
+            })
+            .from_err()
+            .and_then(move |r| match r {
+                Ok(queue) => queue_body_resp(&[], &queue),
+                Err(err) => Err(err.into()),
+            })
+            .responder()
+    };
 
-    authenticated_response(&user, &request, resp)
+    authenticated_response(&user, request, resp)
 }
 
 pub fn movie_queue_show(
@@ -70,20 +71,21 @@ pub fn movie_queue_show(
     let path = path.into_inner();
     let patterns = vec![path];
 
-    let resp = request
-        .state()
-        .db
-        .send(MovieQueueRequest {
-            patterns: patterns.clone(),
-        })
-        .from_err()
-        .and_then(move |res| match res {
-            Ok(queue) => queue_body_resp(&patterns, &queue),
-            Err(err) => Err(err.into()),
-        })
-        .responder();
+    let resp = move |req: HttpRequest<AppState>| {
+        req.state()
+            .db
+            .send(MovieQueueRequest {
+                patterns: patterns.clone(),
+            })
+            .from_err()
+            .and_then(move |res| match res {
+                Ok(queue) => queue_body_resp(&patterns, &queue),
+                Err(err) => Err(err.into()),
+            })
+            .responder()
+    };
 
-    authenticated_response(&user, &request, resp)
+    authenticated_response(&user, request, resp)
 }
 
 pub fn movie_queue_delete(
@@ -93,18 +95,19 @@ pub fn movie_queue_delete(
 ) -> FutureResponse<HttpResponse> {
     let path = path.into_inner();
 
-    let resp = request
-        .state()
-        .db
-        .send(QueueDeleteRequest { path: path.clone() })
-        .from_err()
-        .and_then(move |res| match res {
-            Ok(_) => Ok(form_http_response(path)),
-            Err(err) => Err(err.into()),
-        })
-        .responder();
+    let resp = move |req: HttpRequest<AppState>| {
+        req.state()
+            .db
+            .send(QueueDeleteRequest { path: path.clone() })
+            .from_err()
+            .and_then(move |res| match res {
+                Ok(_) => Ok(form_http_response(path)),
+                Err(err) => Err(err.into()),
+            })
+            .responder()
+    };
 
-    authenticated_response(&user, &request, resp)
+    authenticated_response(&user, request, resp)
 }
 
 fn transcode_worker(
@@ -133,20 +136,21 @@ pub fn movie_queue_transcode(
     let path = path.into_inner();
     let patterns = vec![path];
 
-    let resp = request
-        .state()
-        .db
-        .send(MovieQueueRequest {
-            patterns: patterns.clone(),
-        })
-        .from_err()
-        .and_then(move |res| match res {
-            Ok(entries) => transcode_worker(None, &entries),
-            Err(err) => Err(err.into()),
-        })
-        .responder();
+    let resp = move |req: HttpRequest<AppState>| {
+        req.state()
+            .db
+            .send(MovieQueueRequest {
+                patterns: patterns.clone(),
+            })
+            .from_err()
+            .and_then(move |res| match res {
+                Ok(entries) => transcode_worker(None, &entries),
+                Err(err) => Err(err.into()),
+            })
+            .responder()
+    };
 
-    authenticated_response(&user, &request, resp)
+    authenticated_response(&user, request, resp)
 }
 
 pub fn movie_queue_transcode_directory(
@@ -157,20 +161,21 @@ pub fn movie_queue_transcode_directory(
     let (directory, file) = path.into_inner();
     let patterns = vec![file];
 
-    let resp = request
-        .state()
-        .db
-        .send(MovieQueueRequest {
-            patterns: patterns.clone(),
-        })
-        .from_err()
-        .and_then(move |res| match res {
-            Ok(entries) => transcode_worker(Some(directory), &entries),
-            Err(err) => Err(err.into()),
-        })
-        .responder();
+    let resp = move |req: HttpRequest<AppState>| {
+        req.state()
+            .db
+            .send(MovieQueueRequest {
+                patterns: patterns.clone(),
+            })
+            .from_err()
+            .and_then(move |res| match res {
+                Ok(entries) => transcode_worker(Some(directory), &entries),
+                Err(err) => Err(err.into()),
+            })
+            .responder()
+    };
 
-    authenticated_response(&user, &request, resp)
+    authenticated_response(&user, request, resp)
 }
 
 fn play_worker(full_path: String) -> Result<HttpResponse, actix_web::Error> {
@@ -201,18 +206,19 @@ pub fn movie_queue_play(
 ) -> FutureResponse<HttpResponse> {
     let idx = idx.into_inner();
 
-    let resp = request
-        .state()
-        .db
-        .send(MoviePathRequest { idx })
-        .from_err()
-        .and_then(move |res| match res {
-            Ok(full_path) => play_worker(full_path),
-            Err(err) => Err(err.into()),
-        })
-        .responder();
+    let resp = move |req: HttpRequest<AppState>| {
+        req.state()
+            .db
+            .send(MoviePathRequest { idx })
+            .from_err()
+            .and_then(move |res| match res {
+                Ok(full_path) => play_worker(full_path),
+                Err(err) => Err(err.into()),
+            })
+            .responder()
+    };
 
-    authenticated_response(&user, &request, resp)
+    authenticated_response(&user, request, resp)
 }
 
 pub fn imdb_show(
@@ -224,18 +230,19 @@ pub fn imdb_show(
     let show = path.into_inner();
     let query = query.into_inner();
 
-    let resp = request
-        .state()
-        .db
-        .send(ImdbShowRequest { show, query })
-        .from_err()
-        .and_then(move |res| match res {
-            Ok(body) => Ok(form_http_response(body)),
-            Err(err) => Err(err.into()),
-        })
-        .responder();
+    let resp = move |req: HttpRequest<AppState>| {
+        req.state()
+            .db
+            .send(ImdbShowRequest { show, query })
+            .from_err()
+            .and_then(move |res| match res {
+                Ok(body) => Ok(form_http_response(body)),
+                Err(err) => Err(err.into()),
+            })
+            .responder()
+    };
 
-    authenticated_response(&user, &request, resp)
+    authenticated_response(&user, request, resp)
 }
 
 fn new_episode_worker(entries: &[String]) -> Result<HttpResponse, actix_web::Error> {
@@ -253,16 +260,17 @@ pub fn find_new_episodes(
     user: LoggedUser,
     request: HttpRequest<AppState>,
 ) -> FutureResponse<HttpResponse> {
-    let resp = request
-        .state()
-        .db
-        .send(query.into_inner())
-        .from_err()
-        .and_then(move |res| match res {
-            Ok(entries) => new_episode_worker(&entries),
-            Err(err) => Err(err.into()),
-        })
-        .responder();
+    let resp = move |req: HttpRequest<AppState>| {
+        req.state()
+            .db
+            .send(query.into_inner())
+            .from_err()
+            .and_then(move |res| match res {
+                Ok(entries) => new_episode_worker(&entries),
+                Err(err) => Err(err.into()),
+            })
+            .responder()
+    };
 
-    authenticated_response(&user, &request, resp)
+    authenticated_response(&user, request, resp)
 }

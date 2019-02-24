@@ -32,17 +32,20 @@ fn unauthbody() -> FutureResponse<HttpResponse> {
     lazy(|| Ok(HttpResponse::Unauthorized().json("Unauthorized"))).responder()
 }
 
-fn authenticated_response(
+fn authenticated_response<T: 'static>(
     user: &LoggedUser,
-    request: &HttpRequest<AppState>,
-    resp: FutureResponse<HttpResponse>,
-) -> FutureResponse<HttpResponse> {
+    request: HttpRequest<AppState>,
+    resp: T,
+) -> FutureResponse<HttpResponse>
+where
+    T: FnOnce(HttpRequest<AppState>) -> FutureResponse<HttpResponse>,
+{
     if request.state().user_list.is_authorized(&user) {
-        resp
+        resp(request)
     } else {
         get_auth_fut(&user, &request)
             .and_then(move |res| match res {
-                Ok(true) => resp,
+                Ok(true) => resp(request),
                 _ => unauthbody(),
             })
             .responder()

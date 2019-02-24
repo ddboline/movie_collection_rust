@@ -65,18 +65,19 @@ pub fn trakt_watchlist(
     user: LoggedUser,
     request: HttpRequest<AppState>,
 ) -> FutureResponse<HttpResponse> {
-    let resp = request
-        .state()
-        .db
-        .send(WatchlistShowsRequest {})
-        .from_err()
-        .and_then(move |res| match res {
-            Ok(shows) => watchlist_worker(shows),
-            Err(err) => Err(err.into()),
-        })
-        .responder();
+    let resp = move |req: HttpRequest<AppState>| {
+        req.state()
+            .db
+            .send(WatchlistShowsRequest {})
+            .from_err()
+            .and_then(move |res| match res {
+                Ok(shows) => watchlist_worker(shows),
+                Err(err) => Err(err.into()),
+            })
+            .responder()
+    };
 
-    authenticated_response(&user, &request, resp)
+    authenticated_response(&user, request, resp)
 }
 
 fn watchlist_action_worker(
@@ -104,21 +105,22 @@ pub fn trakt_watchlist_action(
     let (action, imdb_url) = path.into_inner();
     let action = TraktActions::from_command(&action);
 
-    let resp = request
-        .state()
-        .db
-        .send(WatchlistActionRequest {
-            action: action.clone(),
-            imdb_url: imdb_url.clone(),
-        })
-        .from_err()
-        .and_then(move |res| match res {
-            Ok(_) => watchlist_action_worker(action, &imdb_url),
-            Err(err) => Err(err.into()),
-        })
-        .responder();
+    let resp = move |req: HttpRequest<AppState>| {
+        req.state()
+            .db
+            .send(WatchlistActionRequest {
+                action: action.clone(),
+                imdb_url: imdb_url.clone(),
+            })
+            .from_err()
+            .and_then(move |res| match res {
+                Ok(_) => watchlist_action_worker(action, &imdb_url),
+                Err(err) => Err(err.into()),
+            })
+            .responder()
+    };
 
-    authenticated_response(&user, &request, resp)
+    authenticated_response(&user, request, resp)
 }
 
 fn trakt_watched_seasons_worker(
@@ -165,35 +167,36 @@ pub fn trakt_watched_seasons(
 
     let request_clone = request.clone();
 
-    let resp = request
-        .state()
-        .db
-        .send(ImdbRatingsRequest {
-            imdb_url: imdb_url.clone(),
-        })
-        .map(move |show_opt| {
-            let empty = || ("".to_string(), "".to_string());
-            let (show, link) = show_opt
-                .map(|s| {
-                    s.map(|t| (t.show.clone(), t.link.clone()))
-                        .unwrap_or_else(empty)
-                })
-                .unwrap_or_else(|_| empty());
-            request_clone
-                .state()
-                .db
-                .send(ImdbSeasonsRequest { show })
-                .from_err()
-                .map(|res| (link, res))
-        })
-        .flatten()
-        .and_then(move |(link, res)| match res {
-            Ok(entries) => trakt_watched_seasons_worker(&link, &imdb_url, &entries),
-            Err(err) => Err(err.into()),
-        })
-        .responder();
+    let resp = move |req: HttpRequest<AppState>| {
+        req.state()
+            .db
+            .send(ImdbRatingsRequest {
+                imdb_url: imdb_url.clone(),
+            })
+            .map(move |show_opt| {
+                let empty = || ("".to_string(), "".to_string());
+                let (show, link) = show_opt
+                    .map(|s| {
+                        s.map(|t| (t.show.clone(), t.link.clone()))
+                            .unwrap_or_else(empty)
+                    })
+                    .unwrap_or_else(|_| empty());
+                request_clone
+                    .state()
+                    .db
+                    .send(ImdbSeasonsRequest { show })
+                    .from_err()
+                    .map(|res| (link, res))
+            })
+            .flatten()
+            .and_then(move |(link, res)| match res {
+                Ok(entries) => trakt_watched_seasons_worker(&link, &imdb_url, &entries),
+                Err(err) => Err(err.into()),
+            })
+            .responder()
+    };
 
-    authenticated_response(&user, &request, resp)
+    authenticated_response(&user, request, resp)
 }
 
 pub fn trakt_watched_list(
@@ -203,18 +206,19 @@ pub fn trakt_watched_list(
 ) -> FutureResponse<HttpResponse> {
     let (imdb_url, season) = path.into_inner();
 
-    let resp = request
-        .state()
-        .db
-        .send(WatchedListRequest { imdb_url, season })
-        .from_err()
-        .and_then(move |res| match res {
-            Ok(body) => Ok(form_http_response(body)),
-            Err(err) => Err(err.into()),
-        })
-        .responder();
+    let resp = move |req: HttpRequest<AppState>| {
+        req.state()
+            .db
+            .send(WatchedListRequest { imdb_url, season })
+            .from_err()
+            .and_then(move |res| match res {
+                Ok(body) => Ok(form_http_response(body)),
+                Err(err) => Err(err.into()),
+            })
+            .responder()
+    };
 
-    authenticated_response(&user, &request, resp)
+    authenticated_response(&user, request, resp)
 }
 
 pub fn trakt_watched_action(
@@ -224,23 +228,24 @@ pub fn trakt_watched_action(
 ) -> FutureResponse<HttpResponse> {
     let (action, imdb_url, season, episode) = path.into_inner();
 
-    let resp = request
-        .state()
-        .db
-        .send(WatchedActionRequest {
-            action: TraktActions::from_command(&action),
-            imdb_url,
-            season,
-            episode,
-        })
-        .from_err()
-        .and_then(move |res| match res {
-            Ok(body) => Ok(form_http_response(body)),
-            Err(err) => Err(err.into()),
-        })
-        .responder();
+    let resp = move |req: HttpRequest<AppState>| {
+        req.state()
+            .db
+            .send(WatchedActionRequest {
+                action: TraktActions::from_command(&action),
+                imdb_url,
+                season,
+                episode,
+            })
+            .from_err()
+            .and_then(move |res| match res {
+                Ok(body) => Ok(form_http_response(body)),
+                Err(err) => Err(err.into()),
+            })
+            .responder()
+    };
 
-    authenticated_response(&user, &request, resp)
+    authenticated_response(&user, request, resp)
 }
 
 fn trakt_cal_worker(entries: &[String]) -> Result<HttpResponse, actix_web::Error> {
@@ -254,16 +259,17 @@ fn trakt_cal_worker(entries: &[String]) -> Result<HttpResponse, actix_web::Error
 }
 
 pub fn trakt_cal(user: LoggedUser, request: HttpRequest<AppState>) -> FutureResponse<HttpResponse> {
-    let resp = request
-        .state()
-        .db
-        .send(TraktCalRequest {})
-        .from_err()
-        .and_then(move |res| match res {
-            Ok(entries) => trakt_cal_worker(&entries),
-            Err(err) => Err(err.into()),
-        })
-        .responder();
+    let resp = move |req: HttpRequest<AppState>| {
+        req.state()
+            .db
+            .send(TraktCalRequest {})
+            .from_err()
+            .and_then(move |res| match res {
+                Ok(entries) => trakt_cal_worker(&entries),
+                Err(err) => Err(err.into()),
+            })
+            .responder()
+    };
 
-    authenticated_response(&user, &request, resp)
+    authenticated_response(&user, request, resp)
 }

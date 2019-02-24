@@ -41,19 +41,20 @@ fn tvshows_worker(
 }
 
 pub fn tvshows(user: LoggedUser, request: HttpRequest<AppState>) -> FutureResponse<HttpResponse> {
-    let resp = request
-        .state()
-        .db
-        .send(TvShowsRequest {})
-        .from_err()
-        .join(request.state().db.send(WatchlistShowsRequest {}).from_err())
-        .and_then(move |(res0, res1)| match res0 {
-            Ok(tvshows) => tvshows_worker(res1, tvshows),
-            Err(err) => Err(err.into()),
-        })
-        .responder();
+    let resp = move |req: HttpRequest<AppState>| {
+        req.state()
+            .db
+            .send(TvShowsRequest {})
+            .from_err()
+            .join(req.state().db.send(WatchlistShowsRequest {}).from_err())
+            .and_then(move |(res0, res1)| match res0 {
+                Ok(tvshows) => tvshows_worker(res1, tvshows),
+                Err(err) => Err(err.into()),
+            })
+            .responder()
+    };
 
-    authenticated_response(&user, &request, resp)
+    authenticated_response(&user, request, resp)
 }
 
 fn process_shows(
