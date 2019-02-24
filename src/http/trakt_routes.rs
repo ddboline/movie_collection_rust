@@ -108,13 +108,10 @@ pub fn trakt_watchlist_action(
     let resp = move |req: HttpRequest<AppState>| {
         req.state()
             .db
-            .send(WatchlistActionRequest {
-                action: action.clone(),
-                imdb_url: imdb_url.clone(),
-            })
+            .send(WatchlistActionRequest { action, imdb_url })
             .from_err()
             .and_then(move |res| match res {
-                Ok(_) => watchlist_action_worker(action, &imdb_url),
+                Ok(imdb_url) => watchlist_action_worker(action, &imdb_url),
                 Err(err) => Err(err.into()),
             })
             .responder()
@@ -165,31 +162,26 @@ pub fn trakt_watched_seasons(
 ) -> FutureResponse<HttpResponse> {
     let imdb_url = path.into_inner();
 
-    let request_clone = request.clone();
-
     let resp = move |req: HttpRequest<AppState>| {
         req.state()
             .db
-            .send(ImdbRatingsRequest {
-                imdb_url: imdb_url.clone(),
-            })
+            .send(ImdbRatingsRequest { imdb_url })
             .map(move |show_opt| {
-                let empty = || ("".to_string(), "".to_string());
-                let (show, link) = show_opt
+                let empty = || ("".to_string(), "".to_string(), "".to_string());
+                let (imdb_url, show, link) = show_opt
                     .map(|s| {
-                        s.map(|t| (t.show.clone(), t.link.clone()))
+                        s.map(|(imdb_url, t)| (imdb_url, t.show.clone(), t.link.clone()))
                             .unwrap_or_else(empty)
                     })
                     .unwrap_or_else(|_| empty());
-                request_clone
-                    .state()
+                req.state()
                     .db
                     .send(ImdbSeasonsRequest { show })
                     .from_err()
-                    .map(|res| (link, res))
+                    .map(|res| (imdb_url, link, res))
             })
             .flatten()
-            .and_then(move |(link, res)| match res {
+            .and_then(move |(imdb_url, link, res)| match res {
                 Ok(entries) => trakt_watched_seasons_worker(&link, &imdb_url, &entries),
                 Err(err) => Err(err.into()),
             })

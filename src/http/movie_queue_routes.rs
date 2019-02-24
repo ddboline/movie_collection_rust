@@ -54,7 +54,7 @@ pub fn movie_queue(
             })
             .from_err()
             .and_then(move |r| match r {
-                Ok(queue) => queue_body_resp(&[], &queue),
+                Ok((queue, _)) => queue_body_resp(&[], &queue),
                 Err(err) => Err(err.into()),
             })
             .responder()
@@ -74,12 +74,10 @@ pub fn movie_queue_show(
     let resp = move |req: HttpRequest<AppState>| {
         req.state()
             .db
-            .send(MovieQueueRequest {
-                patterns: patterns.clone(),
-            })
+            .send(MovieQueueRequest { patterns })
             .from_err()
             .and_then(move |res| match res {
-                Ok(queue) => queue_body_resp(&patterns, &queue),
+                Ok((queue, patterns)) => queue_body_resp(&patterns, &queue),
                 Err(err) => Err(err.into()),
             })
             .responder()
@@ -98,10 +96,10 @@ pub fn movie_queue_delete(
     let resp = move |req: HttpRequest<AppState>| {
         req.state()
             .db
-            .send(QueueDeleteRequest { path: path.clone() })
+            .send(QueueDeleteRequest { path })
             .from_err()
             .and_then(move |res| match res {
-                Ok(_) => Ok(form_http_response(path)),
+                Ok(path) => Ok(form_http_response(path)),
                 Err(err) => Err(err.into()),
             })
             .responder()
@@ -139,12 +137,10 @@ pub fn movie_queue_transcode(
     let resp = move |req: HttpRequest<AppState>| {
         req.state()
             .db
-            .send(MovieQueueRequest {
-                patterns: patterns.clone(),
-            })
+            .send(MovieQueueRequest { patterns })
             .from_err()
             .and_then(move |res| match res {
-                Ok(entries) => transcode_worker(None, &entries),
+                Ok((entries, _)) => transcode_worker(None, &entries),
                 Err(err) => Err(err.into()),
             })
             .responder()
@@ -164,12 +160,10 @@ pub fn movie_queue_transcode_directory(
     let resp = move |req: HttpRequest<AppState>| {
         req.state()
             .db
-            .send(MovieQueueRequest {
-                patterns: patterns.clone(),
-            })
+            .send(MovieQueueRequest { patterns })
             .from_err()
             .and_then(move |res| match res {
-                Ok(entries) => transcode_worker(Some(directory), &entries),
+                Ok((entries, _)) => transcode_worker(Some(directory), &entries),
                 Err(err) => Err(err.into()),
             })
             .responder()

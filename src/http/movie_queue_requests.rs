@@ -53,17 +53,16 @@ pub struct QueueDeleteRequest {
 }
 
 impl Message for QueueDeleteRequest {
-    type Result = Result<(), Error>;
+    type Result = Result<String, Error>;
 }
 
 impl Handler<QueueDeleteRequest> for PgPool {
-    type Result = Result<(), Error>;
+    type Result = Result<String, Error>;
     fn handle(&mut self, msg: QueueDeleteRequest, _: &mut Self::Context) -> Self::Result {
         if path::Path::new(&msg.path).exists() {
-            MovieQueueDB::with_pool(&self).remove_from_queue_by_path(&msg.path)
-        } else {
-            Ok(())
+            MovieQueueDB::with_pool(&self).remove_from_queue_by_path(&msg.path)?;
         }
+        Ok(msg.path)
     }
 }
 
@@ -72,14 +71,15 @@ pub struct MovieQueueRequest {
 }
 
 impl Message for MovieQueueRequest {
-    type Result = Result<Vec<MovieQueueResult>, Error>;
+    type Result = Result<(Vec<MovieQueueResult>, Vec<String>), Error>;
 }
 
 impl Handler<MovieQueueRequest> for PgPool {
-    type Result = Result<Vec<MovieQueueResult>, Error>;
+    type Result = Result<(Vec<MovieQueueResult>, Vec<String>), Error>;
 
     fn handle(&mut self, msg: MovieQueueRequest, _: &mut Self::Context) -> Self::Result {
-        MovieQueueDB::with_pool(&self).print_movie_queue(&msg.patterns)
+        let queue = MovieQueueDB::with_pool(&self).print_movie_queue(&msg.patterns)?;
+        Ok((queue, msg.patterns))
     }
 }
 
@@ -104,14 +104,14 @@ pub struct ImdbRatingsRequest {
 }
 
 impl Message for ImdbRatingsRequest {
-    type Result = Result<Option<ImdbRatings>, Error>;
+    type Result = Result<Option<(String, ImdbRatings)>, Error>;
 }
 
 impl Handler<ImdbRatingsRequest> for PgPool {
-    type Result = Result<Option<ImdbRatings>, Error>;
+    type Result = Result<Option<(String, ImdbRatings)>, Error>;
 
     fn handle(&mut self, msg: ImdbRatingsRequest, _: &mut Self::Context) -> Self::Result {
-        ImdbRatings::get_show_by_link(&msg.imdb_url, &self)
+        ImdbRatings::get_show_by_link(&msg.imdb_url, &self).map(|s| s.map(|sh| (msg.imdb_url, sh)))
     }
 }
 
@@ -141,11 +141,11 @@ pub struct WatchlistActionRequest {
 }
 
 impl Message for WatchlistActionRequest {
-    type Result = Result<(), Error>;
+    type Result = Result<String, Error>;
 }
 
 impl Handler<WatchlistActionRequest> for PgPool {
-    type Result = Result<(), Error>;
+    type Result = Result<String, Error>;
 
     fn handle(&mut self, msg: WatchlistActionRequest, _: &mut Self::Context) -> Self::Result {
         let ti = TraktConnection::new();
@@ -156,16 +156,15 @@ impl Handler<WatchlistActionRequest> for PgPool {
                 if let Some(show) = ti.get_watchlist_shows()?.get(&msg.imdb_url) {
                     show.insert_show(&mc.pool)?;
                 }
-                Ok(())
             }
             TraktActions::Remove => {
                 if let Some(show) = WatchListShow::get_show_by_link(&msg.imdb_url, &mc.pool)? {
                     show.delete_show(&mc.pool)?;
                 }
-                Ok(())
             }
-            _ => Ok(()),
+            _ => {}
         }
+        Ok(msg.imdb_url)
     }
 }
 

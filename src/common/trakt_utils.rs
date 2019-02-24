@@ -15,7 +15,7 @@ use crate::common::pgpool::PgPool;
 use crate::common::tv_show_source::TvShowSource;
 use crate::common::utils::{map_result_vec, option_string_wrapper, ExponentialRetry};
 
-#[derive(Clone)]
+#[derive(Clone, Copy)]
 pub enum TraktActions {
     None,
     List,
