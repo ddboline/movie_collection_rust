@@ -844,7 +844,7 @@ fn watched_list(mc: &MovieCollectionDB, show: Option<&String>, season: i32) -> R
 
 pub fn trakt_app_parse(
     trakt_command: &TraktCommands,
-    trakt_action: &TraktActions,
+    trakt_action: TraktActions,
     show: Option<&String>,
     season: i32,
     episode: &[i32],

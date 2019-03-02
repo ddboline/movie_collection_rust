@@ -63,7 +63,7 @@ fn trakt_app() -> Result<(), Error> {
     } else {
         trakt_app_parse(
             &trakt_command,
-            &trakt_action,
+            trakt_action,
             show.as_ref(),
             season,
             &episode,

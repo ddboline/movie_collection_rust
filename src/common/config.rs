@@ -52,7 +52,7 @@ impl Config {
         config.pgurl = var("PGURL").expect("No PGURL specified");
 
         config.movie_dirs = var("MOVIEDIRS")
-            .expect("MOVIEDIRS env variable not set")
+            .unwrap_or_else(|_| "".to_string())
             .split(',')
             .filter_map(|d| {
                 if Path::new(d).exists() {

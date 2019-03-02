@@ -501,6 +501,10 @@ pub trait MovieCollection: Send + Sync {
             .map(|d| walk_directory(&d, &self.get_config().suffixes))
             .collect();
 
+        if file_list.is_empty() {
+            return Ok(());
+        }
+
         let file_list: HashSet<_> = map_result_vec(file_list)?.into_iter().flatten().collect();
 
         let episode_list: HashSet<_> = file_list

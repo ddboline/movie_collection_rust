@@ -22,12 +22,20 @@ pub fn option_string_wrapper(s: &Option<String>) -> &str {
     s.as_ref().map(|s| s.as_str()).unwrap_or("")
 }
 
-pub fn map_result_vec<T, E>(input: Vec<Result<T, E>>) -> Result<Vec<T>, E> {
+pub fn map_result_vec<T>(input: Vec<Result<T, Error>>) -> Result<Vec<T>, Error> {
     let mut output: Vec<T> = Vec::new();
+    let mut errors: Vec<_> = Vec::new();
     for item in input {
-        output.push(item?);
+        match item {
+            Ok(i) => output.push(i),
+            Err(e) => errors.push(format!("{}", e)),
+        }
     }
-    Ok(output)
+    if !errors.is_empty() {
+        Err(err_msg(errors.join("\n")))
+    } else {
+        Ok(output)
+    }
 }
 
 pub fn walk_directory(path: &str, match_strs: &[String]) -> Result<Vec<String>, Error> {

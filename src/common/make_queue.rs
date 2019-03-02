@@ -1,4 +1,4 @@
-use failure::Error;
+use failure::{err_msg, Error};
 use rayon::prelude::*;
 
 use std::io;
@@ -88,7 +88,10 @@ pub fn movie_queue_http(queue: &[MovieQueueResult]) -> Result<Vec<String>, Error
         .par_iter()
         .map(|row| {
             let path = path::Path::new(&row.path);
-            let ext = path.extension().unwrap().to_str().unwrap();
+            let ext = path.extension()
+                .ok_or_else(|| err_msg("Cannot determine extension"))?
+                .to_str()
+                .ok_or_else(|| err_msg("Failed conversion to UTF-8"))?;
             let file_name = path
                 .file_name()
                 .unwrap()

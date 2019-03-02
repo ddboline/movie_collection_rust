@@ -13,21 +13,6 @@ fn transcode_avi() -> Result<(), Error> {
 
     let config = Config::with_config();
 
-    let env_file = format!(
-        "{}/.config/movie_collection_rust/config.env",
-        config.home_dir
-    );
-
-    if Path::new("config.env").exists() {
-        dotenv::from_filename("config.env").ok();
-    } else if Path::new(&env_file).exists() {
-        dotenv::from_path(&env_file).ok();
-    } else if Path::new("config.env").exists() {
-        dotenv::from_filename("config.env").ok();
-    } else {
-        dotenv::dotenv().ok();
-    }
-
     let matches = App::new("Transcode AVI")
         .version(get_version_number().as_str())
         .author("Daniel Boline <ddboline@gmail.com>")
