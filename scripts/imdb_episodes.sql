@@ -8,5 +8,6 @@ CREATE TABLE IF NOT EXISTS imdb_episodes (
     epurl text,
     airdate date,
     rating numeric(3, 1),
-    eptitle text
+    eptitle text,
+    last_modified timestamp with time zone
 );

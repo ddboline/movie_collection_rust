@@ -7,5 +7,6 @@ CREATE TABLE IF NOT EXISTS imdb_ratings (
     link text,
     rating double precision,
     istv bool,
-    source text
+    source text,
+    last_modified timestamp with time zone
 );
