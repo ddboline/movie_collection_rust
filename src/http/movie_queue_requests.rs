@@ -1,5 +1,5 @@
 use actix::{Handler, Message};
-use chrono::{Duration, Local};
+use chrono::{Duration, Local, NaiveDateTime};
 use failure::{err_msg, Error};
 use std::collections::{HashMap, HashSet};
 use std::path;
@@ -8,7 +8,8 @@ use super::logged_user::LoggedUser;
 use crate::common::imdb_episodes::ImdbEpisodes;
 use crate::common::imdb_ratings::ImdbRatings;
 use crate::common::movie_collection::{
-    ImdbSeason, MovieCollection, MovieCollectionDB, TvShowsResult,
+    ImdbSeason, MovieCollection, MovieCollectionDB, MovieCollectionRow,
+    TvShowsResult,
 };
 use crate::common::movie_queue::{MovieQueueDB, MovieQueueResult};
 use crate::common::parse_imdb::{ParseImdb, ParseImdbOptions};
@@ -678,5 +679,75 @@ impl Handler<AuthorizedUserRequest> for PgPool {
     type Result = Result<bool, Error>;
     fn handle(&mut self, msg: AuthorizedUserRequest, _: &mut Self::Context) -> Self::Result {
         msg.user.is_authorized(self)
+    }
+}
+
+#[derive(Serialize, Deserialize)]
+pub struct ImdbEpisodesSyncRequest {
+    pub start_timestamp: NaiveDateTime,
+}
+
+impl Message for ImdbEpisodesSyncRequest {
+    type Result = Result<Vec<ImdbEpisodes>, Error>;
+}
+
+impl Handler<ImdbEpisodesSyncRequest> for PgPool {
+    type Result = Result<Vec<ImdbEpisodes>, Error>;
+
+    fn handle(&mut self, msg: ImdbEpisodesSyncRequest, _: &mut Self::Context) -> Self::Result {
+        ImdbEpisodes::get_episodes_after_timestamp(msg.start_timestamp, &self)
+    }
+}
+
+#[derive(Serialize, Deserialize)]
+pub struct ImdbRatingsSyncRequest {
+    pub start_timestamp: NaiveDateTime,
+}
+
+impl Message for ImdbRatingsSyncRequest {
+    type Result = Result<Vec<ImdbRatings>, Error>;
+}
+
+impl Handler<ImdbRatingsSyncRequest> for PgPool {
+    type Result = Result<Vec<ImdbRatings>, Error>;
+
+    fn handle(&mut self, msg: ImdbRatingsSyncRequest, _: &mut Self::Context) -> Self::Result {
+        ImdbRatings::get_shows_after_timestamp(msg.start_timestamp, &self)
+    }
+}
+
+#[derive(Serialize, Deserialize)]
+pub struct MovieQueueSyncRequest {
+    pub start_timestamp: NaiveDateTime,
+}
+
+impl Message for MovieQueueSyncRequest {
+    type Result = Result<Vec<MovieQueueResult>, Error>;
+}
+
+impl Handler<MovieQueueSyncRequest> for PgPool {
+    type Result = Result<Vec<MovieQueueResult>, Error>;
+
+    fn handle(&mut self, msg: MovieQueueSyncRequest, _: &mut Self::Context) -> Self::Result {
+        let mq = MovieQueueDB::with_pool(&self);
+        mq.get_queue_after_timestamp(msg.start_timestamp)
+    }
+}
+
+#[derive(Serialize, Deserialize)]
+pub struct MovieCollectionSyncRequest {
+    pub start_timestamp: NaiveDateTime,
+}
+
+impl Message for MovieCollectionSyncRequest {
+    type Result = Result<Vec<MovieCollectionRow>, Error>;
+}
+
+impl Handler<MovieCollectionSyncRequest> for PgPool {
+    type Result = Result<Vec<MovieCollectionRow>, Error>;
+
+    fn handle(&mut self, msg: MovieCollectionSyncRequest, _: &mut Self::Context) -> Self::Result {
+        let mc = MovieCollectionDB::with_pool(&self);
+        mc.get_collection_after_timestamp(msg.start_timestamp)
     }
 }

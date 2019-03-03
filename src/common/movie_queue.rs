@@ -1,3 +1,4 @@
+use chrono::NaiveDateTime;
 use failure::{err_msg, Error};
 use rayon::prelude::*;
 use std::fmt;
@@ -8,7 +9,7 @@ use crate::common::movie_collection::{MovieCollection, MovieCollectionDB};
 use crate::common::pgpool::PgPool;
 use crate::common::utils::{map_result_vec, option_string_wrapper, parse_file_stem};
 
-#[derive(Default)]
+#[derive(Default, Serialize)]
 pub struct MovieQueueResult {
     pub idx: i32,
     pub path: String,
@@ -74,10 +75,18 @@ impl MovieQueueDB {
         let query = r#"DELETE FROM movie_queue WHERE idx = $1"#;
         tran.execute(query, &[&idx])?;
 
-        let query = r#"UPDATE movie_queue SET idx = idx + $1 WHERE idx > $2"#;
+        let query = r#"
+            UPDATE movie_queue
+            SET idx = idx + $1, last_modified = now()
+            WHERE idx > $2
+        "#;
         tran.execute(query, &[&diff, &idx])?;
 
-        let query = r#"UPDATE movie_queue SET idx = idx - $1 - 1 WHERE idx > $2"#;
+        let query = r#"
+            UPDATE movie_queue
+            SET idx = idx - $1 - 1, last_modified = now()
+            WHERE idx > $2
+        "#;
         tran.execute(query, &[&diff, &idx])?;
 
         tran.commit().map_err(err_msg)
@@ -142,13 +151,24 @@ impl MovieQueueDB {
         let diff = max_idx - idx + 2;
         println!("{} {} {}", max_idx, idx, diff);
 
-        let query = r#"UPDATE movie_queue SET idx = idx + $1 WHERE idx >= $2"#;
+        let query = r#"
+            UPDATE movie_queue
+            SET idx = idx + $1, last_modified = now()
+            WHERE idx >= $2
+        "#;
         tran.execute(query, &[&diff, &idx])?;
 
-        let query = r#"INSERT INTO movie_queue (idx, collection_idx) VALUES ($1, $2)"#;
+        let query = r#"
+            INSERT INTO movie_queue (idx, collection_idx, last_modified)
+            VALUES ($1, $2, now())
+        "#;
         tran.execute(query, &[&idx, &collection_idx])?;
 
-        let query = r#"UPDATE movie_queue SET idx = idx - $1 + 1 WHERE idx > $2"#;
+        let query = r#"
+            UPDATE movie_queue
+            SET idx = idx - $1 + 1, last_modified = now()
+            WHERE idx > $2
+        "#;
         tran.execute(query, &[&diff, &idx])?;
 
         tran.commit().map_err(err_msg)
@@ -234,5 +254,33 @@ impl MovieQueueDB {
         let mut results = map_result_vec(results)?;
         results.sort_by_key(|r| r.idx);
         Ok(results)
+    }
+
+    pub fn get_queue_after_timestamp(
+        &self,
+        timestamp: NaiveDateTime,
+    ) -> Result<Vec<MovieQueueResult>, Error> {
+        let query = r#"
+            SELECT a.idx, b.path
+            FROM movie_queue a
+            JOIN movie_collection b ON a.collection_idx = b.idx
+            WHERE last_modified >= $1
+        "#;
+        let queue: Vec<_> = self
+            .pool
+            .get()?
+            .query(query, &[&timestamp])?
+            .iter()
+            .map(|row| {
+                let idx: i32 = row.get(0);
+                let path: String = row.get(1);
+                MovieQueueResult {
+                    idx,
+                    path,
+                    ..Default::default()
+                }
+            })
+            .collect();
+        Ok(queue)
     }
 }

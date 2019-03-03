@@ -8,8 +8,9 @@ use chrono::Duration;
 
 use super::logged_user::AuthorizedUsers;
 use super::movie_queue_routes::{
-    find_new_episodes, imdb_show, movie_queue, movie_queue_delete, movie_queue_play,
-    movie_queue_show, movie_queue_transcode, movie_queue_transcode_directory,
+    find_new_episodes, imdb_episodes_route, imdb_ratings_route, imdb_show, movie_collection_route,
+    movie_queue, movie_queue_delete, movie_queue_play, movie_queue_route, movie_queue_show,
+    movie_queue_transcode, movie_queue_transcode_directory,
 };
 use super::trakt_routes::{
     trakt_cal, trakt_watched_action, trakt_watched_list, trakt_watched_seasons, trakt_watchlist,
@@ -80,6 +81,18 @@ pub fn start_app(config: Config) {
             "/list/trakt/watched/{action}/{imdb_url}/{season}/{episode}",
             |r| r.method(Method::GET).with(trakt_watched_action),
         )
+        .resource("/list/imdb_episdes",
+            |r| r.method(Method::GET).with(imdb_episodes_route)
+        )
+        .resource("/list/imdb_ratings", |r| {
+            r.method(Method::GET).with(imdb_ratings_route)
+        })
+        .resource("/list/movie_queue", |r| {
+            r.method(Method::GET).with(movie_queue_route)
+        })
+        .resource("/list/movie_collection", |r| {
+            r.method(Method::GET).with(movie_collection_route)
+        })
         .resource("/list/imdb/{show}", |r| {
             r.method(Method::GET).with(imdb_show)
         })

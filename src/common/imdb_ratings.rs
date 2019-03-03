@@ -1,3 +1,4 @@
+use chrono::NaiveDateTime;
 use failure::Error;
 use std::fmt;
 
@@ -5,7 +6,7 @@ use crate::common::pgpool::PgPool;
 use crate::common::tv_show_source::TvShowSource;
 use crate::common::utils::option_string_wrapper;
 
-#[derive(Default, Clone, Debug)]
+#[derive(Default, Clone, Debug, Serialize)]
 pub struct ImdbRatings {
     pub index: i32,
     pub show: String,
@@ -38,9 +39,9 @@ impl ImdbRatings {
     pub fn insert_show(&self, pool: &PgPool) -> Result<(), Error> {
         let query = r#"
             INSERT INTO imdb_ratings
-            (show, title, link, rating, istv, source)
+            (show, title, link, rating, istv, source, last_modified)
             VALUES
-            ($1, $2, $3, $4, $5, $6)
+            ($1, $2, $3, $4, $5, $6, now())
         "#;
         let source = self.source.as_ref().map(|s| s.to_string());
         pool.get()?.execute(
@@ -59,7 +60,9 @@ impl ImdbRatings {
 
     pub fn update_show(&self, pool: &PgPool) -> Result<(), Error> {
         let query = r#"
-            UPDATE imdb_ratings SET rating=$1,title=$2 WHERE show=$3
+            UPDATE imdb_ratings
+            SET rating=$1,title=$2,last_modified=now()
+            WHERE show=$3
         "#;
         pool.get()?
             .execute(query, &[&self.rating, &self.title, &self.show])?;
@@ -96,6 +99,45 @@ impl ImdbRatings {
         } else {
             Ok(None)
         }
+    }
+
+    pub fn get_shows_after_timestamp(
+        timestamp: NaiveDateTime,
+        pool: &PgPool,
+    ) -> Result<Vec<ImdbRatings>, Error> {
+        let query = r#"
+            SELECT index, show, title, link, rating, istv, source
+            FROM imdb_ratings
+            WHERE last_modified >= $1
+        "#;
+        let shows: Vec<_> = pool
+            .get()?
+            .query(query, &[&timestamp])?
+            .iter()
+            .map(|row| {
+                let index: i32 = row.get(0);
+                let show: String = row.get(1);
+                let title: Option<String> = row.get(2);
+                let link: String = row.get(3);
+                let rating: Option<f64> = row.get(4);
+                let istv: Option<bool> = row.get(5);
+                let source: Option<String> = row.get(6);
+                let source: Option<TvShowSource> = match source {
+                    Some(s) => s.parse().ok(),
+                    None => None,
+                };
+                ImdbRatings {
+                    index,
+                    show,
+                    title,
+                    link,
+                    rating,
+                    istv,
+                    source,
+                }
+            })
+            .collect();
+        Ok(shows)
     }
 
     pub fn get_string_vec(&self) -> Vec<String> {

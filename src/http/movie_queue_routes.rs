@@ -11,10 +11,11 @@ use subprocess::Exec;
 use super::logged_user::LoggedUser;
 use super::movie_queue_app::AppState;
 use super::movie_queue_requests::{
-    FindNewEpisodeRequest, ImdbShowRequest, MoviePathRequest, MovieQueueRequest, ParseImdbRequest,
-    QueueDeleteRequest,
+    FindNewEpisodeRequest, ImdbEpisodesSyncRequest, ImdbRatingsSyncRequest, ImdbShowRequest,
+    MovieCollectionSyncRequest, MoviePathRequest, MovieQueueRequest, MovieQueueSyncRequest,
+    ParseImdbRequest, QueueDeleteRequest,
 };
-use super::{authenticated_response, form_http_response};
+use super::{authenticated_response, form_http_response, to_json};
 use crate::common::make_queue::movie_queue_http;
 use crate::common::movie_queue::MovieQueueResult;
 use crate::common::utils::{map_result_vec, remcom_single_file};
@@ -261,6 +262,86 @@ pub fn find_new_episodes(
             .from_err()
             .and_then(move |res| match res {
                 Ok(entries) => new_episode_worker(&entries),
+                Err(err) => Err(err.into()),
+            })
+            .responder()
+    };
+
+    authenticated_response(&user, request, resp)
+}
+
+pub fn imdb_episodes_route(
+    query: Query<ImdbEpisodesSyncRequest>,
+    user: LoggedUser,
+    request: HttpRequest<AppState>,
+) -> FutureResponse<HttpResponse> {
+    let resp = move |req: HttpRequest<AppState>| {
+        req.state()
+            .db
+            .send(query.into_inner())
+            .from_err()
+            .and_then(move |res| match res {
+                Ok(episodes) => to_json(&req, &episodes),
+                Err(err) => Err(err.into()),
+            })
+            .responder()
+    };
+
+    authenticated_response(&user, request, resp)
+}
+
+pub fn imdb_ratings_route(
+    query: Query<ImdbRatingsSyncRequest>,
+    user: LoggedUser,
+    request: HttpRequest<AppState>,
+) -> FutureResponse<HttpResponse> {
+    let resp = move |req: HttpRequest<AppState>| {
+        req.state()
+            .db
+            .send(query.into_inner())
+            .from_err()
+            .and_then(move |res| match res {
+                Ok(shows) => to_json(&req, &shows),
+                Err(err) => Err(err.into()),
+            })
+            .responder()
+    };
+
+    authenticated_response(&user, request, resp)
+}
+
+pub fn movie_queue_route(
+    query: Query<MovieQueueSyncRequest>,
+    user: LoggedUser,
+    request: HttpRequest<AppState>,
+) -> FutureResponse<HttpResponse> {
+    let resp = move |req: HttpRequest<AppState>| {
+        req.state()
+            .db
+            .send(query.into_inner())
+            .from_err()
+            .and_then(move |res| match res {
+                Ok(queue) => to_json(&req, &queue),
+                Err(err) => Err(err.into()),
+            })
+            .responder()
+    };
+
+    authenticated_response(&user, request, resp)
+}
+
+pub fn movie_collection_route(
+    query: Query<MovieCollectionSyncRequest>,
+    user: LoggedUser,
+    request: HttpRequest<AppState>,
+) -> FutureResponse<HttpResponse> {
+    let resp = move |req: HttpRequest<AppState>| {
+        req.state()
+            .db
+            .send(query.into_inner())
+            .from_err()
+            .and_then(move |res| match res {
+                Ok(collection) => to_json(&req, &collection),
                 Err(err) => Err(err.into()),
             })
             .responder()
