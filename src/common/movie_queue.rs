@@ -1,4 +1,4 @@
-use chrono::NaiveDateTime;
+use chrono::{DateTime, Utc};
 use failure::{err_msg, Error};
 use rayon::prelude::*;
 use std::fmt;
@@ -258,13 +258,13 @@ impl MovieQueueDB {
 
     pub fn get_queue_after_timestamp(
         &self,
-        timestamp: NaiveDateTime,
+        timestamp: DateTime<Utc>,
     ) -> Result<Vec<MovieQueueResult>, Error> {
         let query = r#"
             SELECT a.idx, b.path
             FROM movie_queue a
             JOIN movie_collection b ON a.collection_idx = b.idx
-            WHERE last_modified >= $1
+            WHERE a.last_modified >= $1
         "#;
         let queue: Vec<_> = self
             .pool

@@ -1,4 +1,4 @@
-use chrono::{NaiveDate, NaiveDateTime};
+use chrono::{NaiveDate, DateTime, Utc};
 use failure::Error;
 use std::fmt;
 
@@ -107,7 +107,7 @@ impl ImdbEpisodes {
     }
 
     pub fn get_episodes_after_timestamp(
-        timestamp: NaiveDateTime,
+        timestamp: DateTime<Utc>,
         pool: &PgPool,
     ) -> Result<Vec<ImdbEpisodes>, Error> {
         let query = r#"

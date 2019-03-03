@@ -81,9 +81,9 @@ pub fn start_app(config: Config) {
             "/list/trakt/watched/{action}/{imdb_url}/{season}/{episode}",
             |r| r.method(Method::GET).with(trakt_watched_action),
         )
-        .resource("/list/imdb_episdes",
-            |r| r.method(Method::GET).with(imdb_episodes_route)
-        )
+        .resource("/list/imdb_episodes", |r| {
+            r.method(Method::GET).with(imdb_episodes_route)
+        })
         .resource("/list/imdb_ratings", |r| {
             r.method(Method::GET).with(imdb_ratings_route)
         })

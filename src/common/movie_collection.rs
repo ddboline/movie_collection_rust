@@ -1,4 +1,4 @@
-use chrono::{Duration, Local, NaiveDate, NaiveDateTime};
+use chrono::{Duration, Local, NaiveDate, DateTime, Utc};
 
 use failure::{err_msg, Error};
 use rayon::prelude::*;
@@ -839,7 +839,7 @@ pub trait MovieCollection: Send + Sync {
 
     fn get_collection_after_timestamp(
         &self,
-        timestamp: NaiveDateTime,
+        timestamp: DateTime<Utc>,
     ) -> Result<Vec<MovieCollectionRow>, Error> {
         let query = r#"
             SELECT idx, path, show
@@ -855,11 +855,7 @@ pub trait MovieCollection: Send + Sync {
                 let idx: i32 = row.get(0);
                 let path: String = row.get(1);
                 let show: String = row.get(2);
-                MovieCollectionRow {
-                    idx,
-                    path,
-                    show,
-                }
+                MovieCollectionRow { idx, path, show }
             })
             .collect();
         Ok(queue)

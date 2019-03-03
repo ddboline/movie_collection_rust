@@ -1,5 +1,5 @@
 use actix::{Handler, Message};
-use chrono::{Duration, Local, NaiveDateTime};
+use chrono::{Duration, Local, Utc, DateTime};
 use failure::{err_msg, Error};
 use std::collections::{HashMap, HashSet};
 use std::path;
@@ -8,8 +8,7 @@ use super::logged_user::LoggedUser;
 use crate::common::imdb_episodes::ImdbEpisodes;
 use crate::common::imdb_ratings::ImdbRatings;
 use crate::common::movie_collection::{
-    ImdbSeason, MovieCollection, MovieCollectionDB, MovieCollectionRow,
-    TvShowsResult,
+    ImdbSeason, MovieCollection, MovieCollectionDB, MovieCollectionRow, TvShowsResult,
 };
 use crate::common::movie_queue::{MovieQueueDB, MovieQueueResult};
 use crate::common::parse_imdb::{ParseImdb, ParseImdbOptions};
@@ -682,9 +681,9 @@ impl Handler<AuthorizedUserRequest> for PgPool {
     }
 }
 
-#[derive(Serialize, Deserialize)]
+#[derive(Serialize, Deserialize, Debug)]
 pub struct ImdbEpisodesSyncRequest {
-    pub start_timestamp: NaiveDateTime,
+    pub start_timestamp: DateTime<Utc>,
 }
 
 impl Message for ImdbEpisodesSyncRequest {
@@ -701,7 +700,7 @@ impl Handler<ImdbEpisodesSyncRequest> for PgPool {
 
 #[derive(Serialize, Deserialize)]
 pub struct ImdbRatingsSyncRequest {
-    pub start_timestamp: NaiveDateTime,
+    pub start_timestamp: DateTime<Utc>,
 }
 
 impl Message for ImdbRatingsSyncRequest {
@@ -718,7 +717,7 @@ impl Handler<ImdbRatingsSyncRequest> for PgPool {
 
 #[derive(Serialize, Deserialize)]
 pub struct MovieQueueSyncRequest {
-    pub start_timestamp: NaiveDateTime,
+    pub start_timestamp: DateTime<Utc>,
 }
 
 impl Message for MovieQueueSyncRequest {
@@ -736,7 +735,7 @@ impl Handler<MovieQueueSyncRequest> for PgPool {
 
 #[derive(Serialize, Deserialize)]
 pub struct MovieCollectionSyncRequest {
-    pub start_timestamp: NaiveDateTime,
+    pub start_timestamp: DateTime<Utc>,
 }
 
 impl Message for MovieCollectionSyncRequest {

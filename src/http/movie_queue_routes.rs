@@ -281,8 +281,13 @@ pub fn imdb_episodes_route(
             .send(query.into_inner())
             .from_err()
             .and_then(move |res| match res {
-                Ok(episodes) => to_json(&req, &episodes),
-                Err(err) => Err(err.into()),
+                Ok(episodes) => {
+                    to_json(&req, &episodes)
+                },
+                Err(err) => {
+                    println!("{}", err);
+                    Err(err.into())
+                },
             })
             .responder()
     };
@@ -322,7 +327,10 @@ pub fn movie_queue_route(
             .from_err()
             .and_then(move |res| match res {
                 Ok(queue) => to_json(&req, &queue),
-                Err(err) => Err(err.into()),
+                Err(err) => {
+                    println!("{}", err);
+                    Err(err.into())
+                },
             })
             .responder()
     };
