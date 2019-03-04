@@ -1,7 +1,7 @@
 #![allow(clippy::needless_pass_by_value)]
 
 use actix_web::{
-    http::StatusCode, AsyncResponder, FutureResponse, HttpRequest, HttpResponse, Path, Query,
+    http::StatusCode, AsyncResponder, FutureResponse, HttpRequest, HttpResponse, Json, Path, Query,
 };
 use failure::{err_msg, Error};
 use futures::future::Future;
@@ -11,9 +11,10 @@ use subprocess::Exec;
 use super::logged_user::LoggedUser;
 use super::movie_queue_app::AppState;
 use super::movie_queue_requests::{
-    FindNewEpisodeRequest, ImdbEpisodesSyncRequest, ImdbRatingsSyncRequest, ImdbShowRequest,
-    MovieCollectionSyncRequest, MoviePathRequest, MovieQueueRequest, MovieQueueSyncRequest,
-    ParseImdbRequest, QueueDeleteRequest,
+    FindNewEpisodeRequest, ImdbEpisodesSyncRequest, ImdbEpisodesUpdateRequest,
+    ImdbRatingsSyncRequest, ImdbRatingsUpdateRequest, ImdbShowRequest, MovieCollectionSyncRequest,
+    MovieCollectionUpdateRequest, MoviePathRequest, MovieQueueRequest, MovieQueueSyncRequest,
+    MovieQueueUpdateRequest, ParseImdbRequest, QueueDeleteRequest,
 };
 use super::{authenticated_response, form_http_response, to_json};
 use crate::common::make_queue::movie_queue_http;
@@ -281,13 +282,32 @@ pub fn imdb_episodes_route(
             .send(query.into_inner())
             .from_err()
             .and_then(move |res| match res {
-                Ok(episodes) => {
-                    to_json(&req, &episodes)
-                },
+                Ok(episodes) => to_json(&req, &episodes),
                 Err(err) => {
                     println!("{}", err);
                     Err(err.into())
-                },
+                }
+            })
+            .responder()
+    };
+
+    authenticated_response(&user, request, resp)
+}
+
+pub fn imdb_episodes_update(
+    data: Json<ImdbEpisodesUpdateRequest>,
+    user: LoggedUser,
+    request: HttpRequest<AppState>,
+) -> FutureResponse<HttpResponse> {
+    let episodes = data.into_inner();
+    let resp = move |req: HttpRequest<AppState>| {
+        req.state()
+            .db
+            .send(episodes)
+            .from_err()
+            .and_then(move |res| match res {
+                Ok(_) => Ok(form_http_response("Success".to_string())),
+                Err(err) => Err(err.into()),
             })
             .responder()
     };
@@ -315,6 +335,27 @@ pub fn imdb_ratings_route(
     authenticated_response(&user, request, resp)
 }
 
+pub fn imdb_ratings_update(
+    data: Json<ImdbRatingsUpdateRequest>,
+    user: LoggedUser,
+    request: HttpRequest<AppState>,
+) -> FutureResponse<HttpResponse> {
+    let shows = data.into_inner();
+    let resp = move |req: HttpRequest<AppState>| {
+        req.state()
+            .db
+            .send(shows)
+            .from_err()
+            .and_then(move |res| match res {
+                Ok(_) => Ok(form_http_response("Success".to_string())),
+                Err(err) => Err(err.into()),
+            })
+            .responder()
+    };
+
+    authenticated_response(&user, request, resp)
+}
+
 pub fn movie_queue_route(
     query: Query<MovieQueueSyncRequest>,
     user: LoggedUser,
@@ -330,7 +371,28 @@ pub fn movie_queue_route(
                 Err(err) => {
                     println!("{}", err);
                     Err(err.into())
-                },
+                }
+            })
+            .responder()
+    };
+
+    authenticated_response(&user, request, resp)
+}
+
+pub fn movie_queue_update(
+    data: Json<MovieQueueUpdateRequest>,
+    user: LoggedUser,
+    request: HttpRequest<AppState>,
+) -> FutureResponse<HttpResponse> {
+    let queue = data.into_inner();
+    let resp = move |req: HttpRequest<AppState>| {
+        req.state()
+            .db
+            .send(queue)
+            .from_err()
+            .and_then(move |res| match res {
+                Ok(_) => Ok(form_http_response("Success".to_string())),
+                Err(err) => Err(err.into()),
             })
             .responder()
     };
@@ -350,6 +412,27 @@ pub fn movie_collection_route(
             .from_err()
             .and_then(move |res| match res {
                 Ok(collection) => to_json(&req, &collection),
+                Err(err) => Err(err.into()),
+            })
+            .responder()
+    };
+
+    authenticated_response(&user, request, resp)
+}
+
+pub fn movie_collection_update(
+    data: Json<MovieCollectionUpdateRequest>,
+    user: LoggedUser,
+    request: HttpRequest<AppState>,
+) -> FutureResponse<HttpResponse> {
+    let collection = data.into_inner();
+    let resp = move |req: HttpRequest<AppState>| {
+        req.state()
+            .db
+            .send(collection)
+            .from_err()
+            .and_then(move |res| match res {
+                Ok(_) => Ok(form_http_response("Success".to_string())),
                 Err(err) => Err(err.into()),
             })
             .responder()

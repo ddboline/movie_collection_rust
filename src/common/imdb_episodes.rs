@@ -1,10 +1,10 @@
-use chrono::{NaiveDate, DateTime, Utc};
+use chrono::{DateTime, NaiveDate, Utc};
 use failure::Error;
 use std::fmt;
 
 use crate::common::pgpool::PgPool;
 
-#[derive(Clone, Serialize)]
+#[derive(Clone, Serialize, Deserialize)]
 pub struct ImdbEpisodes {
     pub show: String,
     pub title: String,

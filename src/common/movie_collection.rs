@@ -1,4 +1,4 @@
-use chrono::{Duration, Local, NaiveDate, DateTime, Utc};
+use chrono::{DateTime, Duration, Local, NaiveDate, Utc};
 
 use failure::{err_msg, Error};
 use rayon::prelude::*;
@@ -75,7 +75,7 @@ impl fmt::Display for TvShowsResult {
     }
 }
 
-#[derive(Default, Serialize)]
+#[derive(Default, Serialize, Deserialize)]
 pub struct MovieCollectionRow {
     pub idx: i32,
     pub path: String,
@@ -488,6 +488,19 @@ pub trait MovieCollection: Send + Sync {
         self.get_pool()
             .get()?
             .execute(query, &[&path.to_string(), &show])?;
+        Ok(())
+    }
+
+    fn insert_into_collection_by_idx(&self, idx: i32, path: &str) -> Result<(), Error> {
+        let file_stem = Path::new(&path).file_stem().unwrap().to_str().unwrap();
+        let (show, _, _) = parse_file_stem(&file_stem);
+        let query = r#"
+            INSERT INTO movie_collection (idx, path, show, last_modified)
+            VALUES ($1, $2, $3, now())
+        "#;
+        self.get_pool()
+            .get()?
+            .execute(query, &[&idx, &path.to_string(), &show])?;
         Ok(())
     }
 

@@ -124,6 +124,14 @@ impl MovieQueueDB {
             }
         };
 
+        self.insert_into_queue_by_collection_idx(idx, collection_idx)
+    }
+
+    pub fn insert_into_queue_by_collection_idx(
+        &self,
+        idx: i32,
+        collection_idx: i32,
+    ) -> Result<(), Error> {
         let query = r#"SELECT idx FROM movie_queue WHERE collection_idx = $1"#;
         let current_idx: i32 = self
             .pool
@@ -259,9 +267,9 @@ impl MovieQueueDB {
     pub fn get_queue_after_timestamp(
         &self,
         timestamp: DateTime<Utc>,
-    ) -> Result<Vec<MovieQueueResult>, Error> {
+    ) -> Result<Vec<MovieQueueRow>, Error> {
         let query = r#"
-            SELECT a.idx, b.path
+            SELECT a.idx, a.collection_idx, b.path, b.show
             FROM movie_queue a
             JOIN movie_collection b ON a.collection_idx = b.idx
             WHERE a.last_modified >= $1
@@ -273,14 +281,25 @@ impl MovieQueueDB {
             .iter()
             .map(|row| {
                 let idx: i32 = row.get(0);
-                let path: String = row.get(1);
-                MovieQueueResult {
+                let collection_idx: i32 = row.get(1);
+                let path: String = row.get(2);
+                let show: String = row.get(3);
+                MovieQueueRow {
                     idx,
+                    collection_idx,
                     path,
-                    ..Default::default()
+                    show,
                 }
             })
             .collect();
         Ok(queue)
     }
+}
+
+#[derive(Default, Debug, Serialize, Deserialize)]
+pub struct MovieQueueRow {
+    pub idx: i32,
+    pub collection_idx: i32,
+    pub path: String,
+    pub show: String,
 }

@@ -1,5 +1,5 @@
 use actix::{Handler, Message};
-use chrono::{Duration, Local, Utc, DateTime};
+use chrono::{DateTime, Duration, Local, Utc};
 use failure::{err_msg, Error};
 use std::collections::{HashMap, HashSet};
 use std::path;
@@ -10,7 +10,7 @@ use crate::common::imdb_ratings::ImdbRatings;
 use crate::common::movie_collection::{
     ImdbSeason, MovieCollection, MovieCollectionDB, MovieCollectionRow, TvShowsResult,
 };
-use crate::common::movie_queue::{MovieQueueDB, MovieQueueResult};
+use crate::common::movie_queue::{MovieQueueDB, MovieQueueResult, MovieQueueRow};
 use crate::common::parse_imdb::{ParseImdb, ParseImdbOptions};
 use crate::common::pgpool::PgPool;
 use crate::common::trakt_utils::{
@@ -721,11 +721,11 @@ pub struct MovieQueueSyncRequest {
 }
 
 impl Message for MovieQueueSyncRequest {
-    type Result = Result<Vec<MovieQueueResult>, Error>;
+    type Result = Result<Vec<MovieQueueRow>, Error>;
 }
 
 impl Handler<MovieQueueSyncRequest> for PgPool {
-    type Result = Result<Vec<MovieQueueResult>, Error>;
+    type Result = Result<Vec<MovieQueueRow>, Error>;
 
     fn handle(&mut self, msg: MovieQueueSyncRequest, _: &mut Self::Context) -> Self::Result {
         let mq = MovieQueueDB::with_pool(&self);
@@ -748,5 +748,108 @@ impl Handler<MovieCollectionSyncRequest> for PgPool {
     fn handle(&mut self, msg: MovieCollectionSyncRequest, _: &mut Self::Context) -> Self::Result {
         let mc = MovieCollectionDB::with_pool(&self);
         mc.get_collection_after_timestamp(msg.start_timestamp)
+    }
+}
+
+#[derive(Serialize, Deserialize)]
+pub struct ImdbEpisodesUpdateRequest {
+    pub episodes: Vec<ImdbEpisodes>,
+}
+
+impl Message for ImdbEpisodesUpdateRequest {
+    type Result = Result<(), Error>;
+}
+
+impl Handler<ImdbEpisodesUpdateRequest> for PgPool {
+    type Result = Result<(), Error>;
+
+    fn handle(&mut self, msg: ImdbEpisodesUpdateRequest, _: &mut Self::Context) -> Self::Result {
+        for episode in msg.episodes {
+            match episode.get_index(&self)? {
+                Some(_) => episode.update_episode(&self)?,
+                None => episode.insert_episode(&self)?,
+            }
+        }
+        Ok(())
+    }
+}
+
+#[derive(Serialize, Deserialize)]
+pub struct ImdbRatingsUpdateRequest {
+    pub shows: Vec<ImdbRatings>,
+}
+
+impl Message for ImdbRatingsUpdateRequest {
+    type Result = Result<(), Error>;
+}
+
+impl Handler<ImdbRatingsUpdateRequest> for PgPool {
+    type Result = Result<(), Error>;
+
+    fn handle(&mut self, msg: ImdbRatingsUpdateRequest, _: &mut Self::Context) -> Self::Result {
+        for show in msg.shows {
+            match ImdbRatings::get_show_by_link(&show.link, &self)? {
+                Some(_) => show.update_show(&self)?,
+                None => show.insert_show(&self)?,
+            }
+        }
+        Ok(())
+    }
+}
+
+#[derive(Serialize, Deserialize)]
+pub struct MovieQueueUpdateRequest {
+    pub queue: Vec<MovieQueueRow>,
+}
+
+impl Message for MovieQueueUpdateRequest {
+    type Result = Result<(), Error>;
+}
+
+impl Handler<MovieQueueUpdateRequest> for PgPool {
+    type Result = Result<(), Error>;
+
+    fn handle(&mut self, msg: MovieQueueUpdateRequest, _: &mut Self::Context) -> Self::Result {
+        let mq = MovieQueueDB::with_pool(&self);
+        let mc = MovieCollectionDB::with_pool(&self);
+        for entry in msg.queue {
+            let cidx = match mc.get_collection_index(&entry.path)? {
+                Some(i) => i,
+                None => {
+                    mc.insert_into_collection_by_idx(entry.collection_idx, &entry.path)?;
+                    entry.collection_idx
+                }
+            };
+            assert_eq!(cidx, entry.collection_idx);
+            mq.insert_into_queue_by_collection_idx(entry.idx, entry.collection_idx)?;
+        }
+        Ok(())
+    }
+}
+
+#[derive(Serialize, Deserialize)]
+pub struct MovieCollectionUpdateRequest {
+    pub collection: Vec<MovieCollectionRow>,
+}
+
+impl Message for MovieCollectionUpdateRequest {
+    type Result = Result<(), Error>;
+}
+
+impl Handler<MovieCollectionUpdateRequest> for PgPool {
+    type Result = Result<(), Error>;
+
+    fn handle(&mut self, msg: MovieCollectionUpdateRequest, _: &mut Self::Context) -> Self::Result {
+        let mc = MovieCollectionDB::with_pool(&self);
+        for entry in msg.collection {
+            if let Some(cidx) = mc.get_collection_index(&entry.path)? {
+                if cidx == entry.idx {
+                    continue
+                }
+                mc.remove_from_collection(&entry.path)?;
+            };
+            mc.insert_into_collection_by_idx(entry.idx, &entry.path)?;
+        }
+        Ok(())
     }
 }
