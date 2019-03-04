@@ -6,10 +6,11 @@ pub mod movie_queue_routes;
 pub mod trakt_routes;
 pub mod tvshows_route;
 
-use actix_web::{AsyncResponder, FutureResponse, HttpRequest, HttpResponse};
+use actix_web::{http::StatusCode, AsyncResponder, FutureResponse, HttpRequest, HttpResponse};
 use futures::{lazy, Future};
 use logged_user::LoggedUser;
 use movie_queue_app::AppState;
+use serde::Serialize;
 
 fn get_auth_fut(
     user: &LoggedUser,
@@ -50,4 +51,15 @@ where
             })
             .responder()
     }
+}
+
+fn to_json<T>(req: &HttpRequest<AppState>, js: &T) -> Result<HttpResponse, actix_web::Error>
+where
+    T: Serialize,
+{
+    let body = serde_json::to_string(&js)?;
+    Ok(req
+        .build_response(StatusCode::OK)
+        .content_type("application/json")
+        .body(body))
 }

@@ -1,10 +1,10 @@
-use chrono::NaiveDate;
+use chrono::{DateTime, NaiveDate, Utc};
 use failure::Error;
 use std::fmt;
 
 use crate::common::pgpool::PgPool;
 
-#[derive(Clone)]
+#[derive(Clone, Serialize, Deserialize)]
 pub struct ImdbEpisodes {
     pub show: String,
     pub title: String,
@@ -106,12 +106,52 @@ impl ImdbEpisodes {
         }
     }
 
+    pub fn get_episodes_after_timestamp(
+        timestamp: DateTime<Utc>,
+        pool: &PgPool,
+    ) -> Result<Vec<ImdbEpisodes>, Error> {
+        let query = r#"
+            SELECT a.show, b.title, a.season, a.episode, a.airdate,
+                   cast(a.rating as double precision), a.eptitle, a.epurl
+            FROM imdb_episodes a
+            JOIN imdb_ratings b ON a.show = b.show
+            WHERE a.last_modified >= $1
+        "#;
+        let episodes: Vec<_> = pool
+            .get()?
+            .query(query, &[&timestamp])?
+            .iter()
+            .map(|row| {
+                let show: String = row.get(0);
+                let title: String = row.get(1);
+                let season: i32 = row.get(2);
+                let episode: i32 = row.get(3);
+                let airdate: NaiveDate = row.get(4);
+                let rating: f64 = row.get(5);
+                let eptitle: String = row.get(6);
+                let epurl: String = row.get(7);
+
+                ImdbEpisodes {
+                    show,
+                    title,
+                    season,
+                    episode,
+                    airdate,
+                    rating,
+                    eptitle,
+                    epurl,
+                }
+            })
+            .collect();
+        Ok(episodes)
+    }
+
     pub fn insert_episode(&self, pool: &PgPool) -> Result<(), Error> {
         let query = r#"
             INSERT INTO imdb_episodes
-            (show, season, episode, airdate, rating, eptitle, epurl)
+            (show, season, episode, airdate, rating, eptitle, epurl, last_modified)
             VALUES
-            ($1, $2, $3, $4, RATING, $5, $6)
+            ($1, $2, $3, $4, RATING, $5, $6, now())
         "#;
         let query = query.replace("RATING", &self.rating.to_string());
         pool.get()?.execute(
@@ -130,7 +170,9 @@ impl ImdbEpisodes {
 
     pub fn update_episode(&self, pool: &PgPool) -> Result<(), Error> {
         let query = r#"
-            UPDATE imdb_episodes SET rating=RATING,eptitle=$1,epurl=$2,airdate=$3 WHERE show=$4 AND season=$5 AND episode=$6
+            UPDATE imdb_episodes
+            SET rating=RATING,eptitle=$1,epurl=$2,airdate=$3,last_modified=now()
+            WHERE show=$4 AND season=$5 AND episode=$6
         "#;
         let query = query.replace("RATING", &self.rating.to_string());
 

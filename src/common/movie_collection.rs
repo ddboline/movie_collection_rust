@@ -1,4 +1,4 @@
-use chrono::{Duration, Local, NaiveDate};
+use chrono::{DateTime, Duration, Local, NaiveDate, Utc};
 
 use failure::{err_msg, Error};
 use rayon::prelude::*;
@@ -73,6 +73,13 @@ impl fmt::Display for TvShowsResult {
                 .unwrap_or_else(|| "".to_string()),
         )
     }
+}
+
+#[derive(Default, Serialize, Deserialize)]
+pub struct MovieCollectionRow {
+    pub idx: i32,
+    pub path: String,
+    pub show: String,
 }
 
 #[derive(Default)]
@@ -363,14 +370,20 @@ pub trait MovieCollection: Send + Sync {
             .query(&query, &[])?
             .iter()
             .map(|row| {
-                let mut result = MovieCollectionResult::default();
-                result.path = row.get(0);
-                result.show = row.get(1);
-                result.rating = row.get(2);
-                result.title = row.get(3);
+                let path: String = row.get(0);
+                let show: String = row.get(1);
+                let rating: f64 = row.get(2);
+                let title: String = row.get(3);
                 let istv: Option<bool> = row.get(4);
-                result.istv = istv.unwrap_or(false);
-                result
+
+                MovieCollectionResult {
+                    path,
+                    show,
+                    rating,
+                    title,
+                    istv: istv.unwrap_or(false),
+                    ..Default::default()
+                }
             })
             .collect();
 
@@ -469,12 +482,25 @@ pub trait MovieCollection: Send + Sync {
         let file_stem = Path::new(&path).file_stem().unwrap().to_str().unwrap();
         let (show, _, _) = parse_file_stem(&file_stem);
         let query = r#"
-            INSERT INTO movie_collection (idx, path, show)
-            VALUES ((SELECT max(idx)+1 FROM movie_collection), $1, $2)
+            INSERT INTO movie_collection (idx, path, show, last_modified)
+            VALUES ((SELECT max(idx)+1 FROM movie_collection), $1, $2, now())
         "#;
         self.get_pool()
             .get()?
             .execute(query, &[&path.to_string(), &show])?;
+        Ok(())
+    }
+
+    fn insert_into_collection_by_idx(&self, idx: i32, path: &str) -> Result<(), Error> {
+        let file_stem = Path::new(&path).file_stem().unwrap().to_str().unwrap();
+        let (show, _, _) = parse_file_stem(&file_stem);
+        let query = r#"
+            INSERT INTO movie_collection (idx, path, show, last_modified)
+            VALUES ($1, $2, $3, now())
+        "#;
+        self.get_pool()
+            .get()?
+            .execute(query, &[&idx, &path.to_string(), &show])?;
         Ok(())
     }
 
@@ -486,7 +512,9 @@ pub trait MovieCollection: Send + Sync {
                 JOIN imdb_ratings b ON a.show = b.show
                 WHERE a.show_id is null
             )
-            UPDATE movie_collection b set show_id=(SELECT c.index FROM imdb_ratings c WHERE b.show=c.show)
+            UPDATE movie_collection b
+            SET show_id=(SELECT c.index FROM imdb_ratings c WHERE b.show=c.show),
+                last_modified=now()
             WHERE idx in (SELECT a.idx FROM a)
         "#;
         let rows = self.get_pool().get()?.execute(query, &[])?;
@@ -820,5 +848,29 @@ pub trait MovieCollection: Send + Sync {
             output.push(epi);
         }
         Ok(output)
+    }
+
+    fn get_collection_after_timestamp(
+        &self,
+        timestamp: DateTime<Utc>,
+    ) -> Result<Vec<MovieCollectionRow>, Error> {
+        let query = r#"
+            SELECT idx, path, show
+            FROM movie_collection
+            WHERE last_modified >= $1
+        "#;
+        let queue: Vec<_> = self
+            .get_pool()
+            .get()?
+            .query(query, &[&timestamp])?
+            .iter()
+            .map(|row| {
+                let idx: i32 = row.get(0);
+                let path: String = row.get(1);
+                let show: String = row.get(2);
+                MovieCollectionRow { idx, path, show }
+            })
+            .collect();
+        Ok(queue)
     }
 }
