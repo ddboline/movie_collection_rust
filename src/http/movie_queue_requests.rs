@@ -853,3 +853,43 @@ impl Handler<MovieCollectionUpdateRequest> for PgPool {
         Ok(())
     }
 }
+
+#[derive(Serialize, Deserialize)]
+pub struct LastModifiedResponse {
+    pub table: String,
+    pub last_modified: DateTime<Utc>,
+}
+
+pub struct LastModifiedRequest {}
+
+impl Message for LastModifiedRequest {
+    type Result = Result<Vec<LastModifiedResponse>, Error>;
+}
+
+impl Handler<LastModifiedRequest> for PgPool {
+    type Result = Result<Vec<LastModifiedResponse>, Error>;
+
+    fn handle(&mut self, _: LastModifiedRequest, _: &mut Self::Context) -> Self::Result {
+        let tables = vec![
+            "imdb_episodes",
+            "imdb_ratings",
+            "movie_collection",
+            "movie_queue",
+        ];
+
+        let mut result = Vec::new();
+
+        for table in tables {
+            let query = format!("SELECT max(last_modified) FROM {}", table);
+            for row in self.get()?.query(&query, &[])?.iter() {
+                let last_modified: DateTime<Utc> = row.get(0);
+                result.push(LastModifiedResponse {
+                    table: table.to_string(),
+                    last_modified,
+                });
+                break;
+            }
+        }
+        Ok(result)
+    }
+}

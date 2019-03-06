@@ -14,7 +14,7 @@ use super::movie_queue_requests::{
     FindNewEpisodeRequest, ImdbEpisodesSyncRequest, ImdbEpisodesUpdateRequest,
     ImdbRatingsSyncRequest, ImdbRatingsUpdateRequest, ImdbShowRequest, MovieCollectionSyncRequest,
     MovieCollectionUpdateRequest, MoviePathRequest, MovieQueueRequest, MovieQueueSyncRequest,
-    MovieQueueUpdateRequest, ParseImdbRequest, QueueDeleteRequest,
+    MovieQueueUpdateRequest, ParseImdbRequest, QueueDeleteRequest, LastModifiedRequest,
 };
 use super::{authenticated_response, form_http_response, to_json};
 use crate::common::make_queue::movie_queue_http;
@@ -434,6 +434,25 @@ pub fn movie_collection_update(
             .and_then(move |res| match res {
                 Ok(_) => Ok(form_http_response("Success".to_string())),
                 Err(err) => Err(err.into()),
+            })
+            .responder()
+    };
+
+    authenticated_response(&user, request, resp)
+}
+
+pub fn last_modified_route(
+    user: LoggedUser,
+    request: HttpRequest<AppState>,
+) -> FutureResponse<HttpResponse> {
+    let resp = move |req: HttpRequest<AppState>| {
+        req.state()
+            .db
+            .send(LastModifiedRequest {})
+            .from_err()
+            .and_then(move |res| match res {
+                Ok(l) => to_json(&req, &l),
+                Err(e) => Err(e.into()),
             })
             .responder()
     };
