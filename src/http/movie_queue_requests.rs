@@ -844,7 +844,7 @@ impl Handler<MovieCollectionUpdateRequest> for PgPool {
         for entry in msg.collection {
             if let Some(cidx) = mc.get_collection_index(&entry.path)? {
                 if cidx == entry.idx {
-                    continue
+                    continue;
                 }
                 mc.remove_from_collection(&entry.path)?;
             };
