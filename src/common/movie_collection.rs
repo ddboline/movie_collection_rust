@@ -874,3 +874,99 @@ pub trait MovieCollection: Send + Sync {
         Ok(queue)
     }
 }
+
+pub fn find_new_episodes_http_worker(
+    pool: &PgPool,
+    shows: Option<String>,
+    source: Option<TvShowSource>,
+) -> Result<Vec<String>, Error> {
+    let button_add = format!(
+        "{}{}",
+        r#"<td><button type="submit" id="ID" "#,
+        r#"onclick="imdb_update('SHOW', 'LINK', SEASON);">update database</button></td>"#
+    );
+
+    let mc = MovieCollectionDB::with_pool(&pool);
+    let shows_filter: Option<HashSet<String>> =
+        shows.map(|s| s.split(',').map(|s| s.to_string()).collect());
+
+    let mindate = (Local::today() + Duration::days(-14)).naive_local();
+    let maxdate = (Local::today() + Duration::days(7)).naive_local();
+
+    let mq = MovieQueueDB::with_pool(&pool);
+
+    let episodes = mc.get_new_episodes(mindate, maxdate, &source)?;
+
+    let shows: HashSet<String> = episodes
+        .iter()
+        .filter_map(|s| {
+            let show = s.show.to_string();
+            match shows_filter.as_ref() {
+                Some(f) => {
+                    if f.contains(&show) {
+                        Some(show)
+                    } else {
+                        None
+                    }
+                }
+                None => Some(show),
+            }
+        })
+        .collect();
+
+    let mut queue = Vec::new();
+
+    for show in shows {
+        for s in mq.print_movie_queue(&[show])? {
+            if let Some(u) = mc.get_collection_index(&s.path)? {
+                queue.push((
+                    (
+                        s.show
+                            .as_ref()
+                            .map(|v| v.to_string())
+                            .unwrap_or_else(|| "".to_string()),
+                        s.season.unwrap_or(-1),
+                        s.episode.unwrap_or(-1),
+                    ),
+                    u,
+                ));
+            }
+        }
+    }
+
+    let queue: HashMap<(String, i32, i32), i32> = queue.into_iter().collect();
+
+    let output = episodes
+        .into_iter()
+        .map(|epi| {
+            let show = epi.show.clone();
+            format!(
+                "<tr><td>{}</td><td>{}</td><td>{}</td><td>{}</td><td>{}</td>{}</tr>",
+                format!(
+                    r#"<a href="/list/trakt/watched/list/{}/{}">{}</a>"#,
+                    epi.link, epi.season, epi.title
+                ),
+                match queue.get(&(show, epi.season, epi.episode)) {
+                    Some(idx) => format!(
+                        "<a href={}>{}</a>",
+                        &format!(r#""{}/{}""#, "/list/play", idx),
+                        epi.eptitle
+                    ),
+                    None => epi.eptitle.to_string(),
+                },
+                format!(
+                    r#"<a href="https://www.imdb.com/title/{}">s{} ep{}</a>"#,
+                    epi.epurl, epi.season, epi.episode
+                ),
+                format!("rating: {:0.1} / {:0.1}", epi.eprating, epi.rating,),
+                epi.airdate,
+                button_add
+                    .replace("SHOW", &epi.show)
+                    .replace("LINK", &epi.link)
+                    .replace("SEASON", &epi.season.to_string()),
+            )
+        })
+        .collect();
+
+    Ok(output)
+}

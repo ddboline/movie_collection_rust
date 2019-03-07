@@ -1,24 +1,24 @@
 use actix::{Handler, Message};
-use chrono::{DateTime, Duration, Local, Utc};
-use failure::{err_msg, Error};
-use std::collections::{HashMap, HashSet};
+use chrono::{DateTime, Utc};
+use failure::Error;
 use std::path;
 
 use super::logged_user::LoggedUser;
 use crate::common::imdb_episodes::ImdbEpisodes;
 use crate::common::imdb_ratings::ImdbRatings;
 use crate::common::movie_collection::{
-    ImdbSeason, MovieCollection, MovieCollectionDB, MovieCollectionRow, TvShowsResult,
+    find_new_episodes_http_worker, ImdbSeason, MovieCollection, MovieCollectionDB,
+    MovieCollectionRow, TvShowsResult,
 };
 use crate::common::movie_queue::{MovieQueueDB, MovieQueueResult, MovieQueueRow};
 use crate::common::parse_imdb::{ParseImdb, ParseImdbOptions};
 use crate::common::pgpool::PgPool;
 use crate::common::trakt_utils::{
-    get_watched_shows_db, get_watchlist_shows_db_map, TraktActions, TraktConnection, WatchListMap,
-    WatchListShow, WatchedEpisode, WatchedMovie,
+    get_watched_shows_db, get_watchlist_shows_db_map, trakt_cal_http_worker,
+    watch_list_http_worker, watched_action_http_worker, TraktActions, TraktConnection,
+    WatchListMap, WatchListShow, WatchedEpisode,
 };
 use crate::common::tv_show_source::TvShowSource;
-use crate::common::utils::map_result_vec;
 
 pub struct TvShowsRequest {}
 
@@ -149,17 +149,16 @@ impl Handler<WatchlistActionRequest> for PgPool {
 
     fn handle(&mut self, msg: WatchlistActionRequest, _: &mut Self::Context) -> Self::Result {
         let ti = TraktConnection::new();
-        let mc = MovieCollectionDB::with_pool(&self);
 
         match msg.action {
             TraktActions::Add => {
                 if let Some(show) = ti.get_watchlist_shows()?.get(&msg.imdb_url) {
-                    show.insert_show(&mc.pool)?;
+                    show.insert_show(&self)?;
                 }
             }
             TraktActions::Remove => {
-                if let Some(show) = WatchListShow::get_show_by_link(&msg.imdb_url, &mc.pool)? {
-                    show.delete_show(&mc.pool)?;
+                if let Some(show) = WatchListShow::get_show_by_link(&msg.imdb_url, &self)? {
+                    show.delete_show(&self)?;
                 }
             }
             _ => {}
@@ -215,113 +214,7 @@ impl Handler<WatchedListRequest> for PgPool {
     type Result = Result<String, Error>;
 
     fn handle(&mut self, msg: WatchedListRequest, _: &mut Self::Context) -> Self::Result {
-        let button_add = r#"<button type="submit" id="ID" onclick="watched_add('SHOW', SEASON, EPISODE);">add to watched</button>"#;
-        let button_rm = r#"<button type="submit" id="ID" onclick="watched_rm('SHOW', SEASON, EPISODE);">remove from watched</button>"#;
-
-        let body = include_str!("../../templates/watched_template.html").replace(
-            "PREVIOUS",
-            &format!("/list/trakt/watched/list/{}", msg.imdb_url),
-        );
-
-        let mc = MovieCollectionDB::with_pool(&self);
-        let mq = MovieQueueDB::with_pool(&self);
-
-        let show = ImdbRatings::get_show_by_link(&msg.imdb_url, &self)?
-            .ok_or_else(|| err_msg("Show Doesn't exist"))?;
-
-        let body = body
-            .replace("SHOW", &show.show)
-            .replace("LINK", &show.link)
-            .replace("SEASON", &msg.season.to_string());
-
-        let watched_episodes_db: HashSet<i32> =
-            get_watched_shows_db(&self, &show.show, Some(msg.season))?
-                .into_iter()
-                .map(|s| s.episode)
-                .collect();
-
-        let patterns = vec![show.show.clone()];
-
-        let queue: HashMap<(String, i32, i32), _> = mq
-            .print_movie_queue(&patterns)?
-            .into_iter()
-            .filter_map(|s| match &s.show {
-                Some(show) => match s.season {
-                    Some(season) => match s.episode {
-                        Some(episode) => Some(((show.clone(), season, episode), s)),
-                        None => None,
-                    },
-                    None => None,
-                },
-                None => None,
-            })
-            .collect();
-
-        let entries: Vec<_> = mc.print_imdb_episodes(&show.show, Some(msg.season))?;
-
-        let collection_idx_map: Vec<Result<_, Error>> = entries
-            .iter()
-            .filter_map(
-                |r| match queue.get(&(show.show.clone(), msg.season, r.episode)) {
-                    Some(row) => match mc.get_collection_index(&row.path) {
-                        Ok(i) => match i {
-                            Some(index) => Some(Ok((r.episode, index))),
-                            None => None,
-                        },
-                        Err(e) => Some(Err(e)),
-                    },
-                    None => None,
-                },
-            )
-            .collect();
-
-        let collection_idx_map = map_result_vec(collection_idx_map)?;
-        let collection_idx_map: HashMap<i32, i32> = collection_idx_map.into_iter().collect();
-
-        let entries: Vec<_> = entries
-            .iter()
-            .map(|s| {
-                let entry = if let Some(collection_idx) = collection_idx_map.get(&s.episode) {
-                    format!(
-                        "<a href={}>{}</a>",
-                        &format!(r#""{}/{}""#, "/list/play", collection_idx),
-                        s.eptitle
-                    )
-                } else {
-                    s.eptitle.clone()
-                };
-
-                format!(
-                    "<tr><td>{}</td><td><td>{}</td><td>{}</td><td>{}</td><td>{}</td><td>{}</td></tr>",
-                    show.show,
-                    entry,
-                    format!(
-                        r#"<a href="https://www.imdb.com/title/{}">s{} ep{}</a>"#,
-                        s.epurl, msg.season, s.episode,
-                    ),
-                    format!(
-                        "rating: {:0.1} / {:0.1}",
-                        s.rating,
-                        show.rating.as_ref().unwrap_or(&-1.0)
-                    ),
-                    s.airdate,
-                    if watched_episodes_db.contains(&s.episode) {
-                        button_rm
-                            .replace("SHOW", &show.link)
-                            .replace("SEASON", &msg.season.to_string())
-                            .replace("EPISODE", &s.episode.to_string())
-                    } else {
-                        button_add
-                            .replace("SHOW", &show.link)
-                            .replace("SEASON", &msg.season.to_string())
-                            .replace("EPISODE", &s.episode.to_string())
-                    }
-                )
-            })
-            .collect();
-
-        let body = body.replace("BODY", &entries.join("\n"));
-        Ok(body)
+        watch_list_http_worker(&self, &msg.imdb_url, msg.season)
     }
 }
 
@@ -340,61 +233,7 @@ impl Handler<WatchedActionRequest> for PgPool {
     type Result = Result<String, Error>;
 
     fn handle(&mut self, msg: WatchedActionRequest, _: &mut Self::Context) -> Self::Result {
-        let ti = TraktConnection::new();
-        let mc = MovieCollectionDB::with_pool(&self);
-
-        let body = match msg.action {
-            TraktActions::Add => {
-                let result = if msg.season != -1 && msg.episode != -1 {
-                    ti.add_episode_to_watched(&msg.imdb_url, msg.season, msg.episode)?
-                } else {
-                    ti.add_movie_to_watched(&msg.imdb_url)?
-                };
-                if msg.season != -1 && msg.episode != -1 {
-                    WatchedEpisode {
-                        imdb_url: msg.imdb_url,
-                        season: msg.season,
-                        episode: msg.episode,
-                        ..Default::default()
-                    }
-                    .insert_episode(&mc.pool)?;
-                } else {
-                    WatchedMovie {
-                        imdb_url: msg.imdb_url,
-                        title: "".to_string(),
-                    }
-                    .insert_movie(&mc.pool)?;
-                }
-
-                format!("{}", result)
-            }
-            TraktActions::Remove => {
-                let result = if msg.season != -1 && msg.episode != -1 {
-                    ti.remove_episode_to_watched(&msg.imdb_url, msg.season, msg.episode)?
-                } else {
-                    ti.remove_movie_to_watched(&msg.imdb_url)?
-                };
-
-                if msg.season != -1 && msg.episode != -1 {
-                    if let Some(epi_) = WatchedEpisode::get_watched_episode(
-                        &mc.pool,
-                        &msg.imdb_url,
-                        msg.season,
-                        msg.episode,
-                    )? {
-                        epi_.delete_episode(&mc.pool)?;
-                    }
-                } else if let Some(movie) =
-                    WatchedMovie::get_watched_movie(&mc.pool, &msg.imdb_url)?
-                {
-                    movie.delete_movie(&mc.pool)?;
-                };
-
-                format!("{}", result)
-            }
-            _ => "".to_string(),
-        };
-        Ok(body)
+        watched_action_http_worker(&self, msg.action, &msg.imdb_url, msg.season, msg.episode)
     }
 }
 
@@ -444,44 +283,10 @@ impl Handler<ImdbShowRequest> for PgPool {
     type Result = Result<String, Error>;
 
     fn handle(&mut self, msg: ImdbShowRequest, _: &mut Self::Context) -> Self::Result {
-        let button_add = r#"<td><button type="submit" id="ID" onclick="watchlist_add('SHOW');">add to watchlist</button></td>"#;
-        let button_rm = r#"<td><button type="submit" id="ID" onclick="watchlist_rm('SHOW');">remove from watchlist</button></td>"#;
-
-        let pi = ParseImdb::with_pool(&self);
-
-        let watchlist = get_watchlist_shows_db_map(&self)?;
-
-        let output: Vec<_> = pi
-            .parse_imdb_worker(&msg.into())?
-            .into_iter()
-            .map(|line| {
-                let mut imdb_url = "".to_string();
-                let tmp: Vec<_> = line
-                    .into_iter()
-                    .map(|i| {
-                        if i.starts_with("tt") {
-                            imdb_url = i.clone();
-                            format!(r#"<a href="https://www.imdb.com/title/{}">{}</a>"#, i, i)
-                        } else {
-                            i.to_string()
-                        }
-                    })
-                    .collect();
-                format!(
-                    "<tr><td>{}</td><td>{}</td></tr>",
-                    tmp.join("</td><td>"),
-                    if watchlist.contains_key(&imdb_url) {
-                        button_rm.replace("SHOW", &imdb_url)
-                    } else {
-                        button_add.replace("SHOW", &imdb_url)
-                    }
-                )
-            })
-            .collect();
-
         let body = include_str!("../../templates/watchlist_template.html");
-
-        let body = body.replace("BODY", &output.join("\n"));
+        let watchlist = get_watchlist_shows_db_map(&self)?;
+        let pi = ParseImdb::with_pool(&self);
+        let body = body.replace("BODY", &pi.parse_imdb_http_worker(&msg.into(), &watchlist)?);
         Ok(body)
     }
 }
@@ -496,70 +301,7 @@ impl Handler<TraktCalRequest> for PgPool {
     type Result = Result<Vec<String>, Error>;
 
     fn handle(&mut self, _: TraktCalRequest, _: &mut Self::Context) -> Self::Result {
-        let button_add = r#"<td><button type="submit" id="ID" onclick="imdb_update('SHOW', 'LINK', SEASON);">update database</button></td>"#;
-        let cal_list = TraktConnection::new().get_calendar()?;
-        let entries: Vec<Result<_, Error>> = cal_list
-            .into_iter()
-            .map(|cal| {
-                let show = match ImdbRatings::get_show_by_link(&cal.link, &self)? {
-                    Some(s) => s.show,
-                    None => "".to_string(),
-                };
-                let exists = if !show.is_empty() {
-                    let idx_opt = ImdbEpisodes {
-                        show: show.clone(),
-                        season: cal.season,
-                        episode: cal.episode,
-                        ..Default::default()
-                    }
-                    .get_index(&self)?;
-
-                    match idx_opt {
-                        Some(idx) => ImdbEpisodes::from_index(idx, &self)?,
-                        None => None,
-                    }
-                } else {
-                    None
-                };
-
-                let entry = format!(
-                    "<tr><td>{}</td><td>{}</td><td>{}</td><td>{}</td>{}</tr>",
-                    format!(
-                        r#"<a href="/list/trakt/watched/list/{}/{}">{}</a>"#,
-                        cal.link, cal.season, cal.show,
-                    ),
-                    format!(
-                        r#"<a href="https://www.imdb.com/title/{}">imdb</a>"#,
-                        cal.link
-                    ),
-                    match cal.ep_link {
-                        Some(link) => format!(
-                            r#"<a href="https://www.imdb.com/title/{}">{} {}</a>"#,
-                            link, cal.season, cal.episode,
-                        ),
-                        None => match &exists {
-                            Some(link) => format!(
-                                r#"<a href="https://www.imdb.com/title/{}">{} {}</a>"#,
-                                link, cal.season, cal.episode,
-                            ),
-                            None => format!("{} {}", cal.season, cal.episode,),
-                        },
-                    },
-                    cal.airdate,
-                    if !exists.is_some() {
-                        button_add
-                            .replace("SHOW", &show)
-                            .replace("LINK", &cal.link)
-                            .replace("SEASON", &cal.season.to_string())
-                    } else {
-                        "".to_string()
-                    },
-                );
-                Ok(entry)
-            })
-            .collect();
-        let entries = map_result_vec(entries)?;
-        Ok(entries)
+        trakt_cal_http_worker(&self)
     }
 }
 
@@ -577,92 +319,7 @@ impl Handler<FindNewEpisodeRequest> for PgPool {
     type Result = Result<Vec<String>, Error>;
 
     fn handle(&mut self, msg: FindNewEpisodeRequest, _: &mut Self::Context) -> Self::Result {
-        let button_add = r#"<td><button type="submit" id="ID" onclick="imdb_update('SHOW', 'LINK', SEASON);">update database</button></td>"#;
-
-        let mc = MovieCollectionDB::with_pool(&self);
-        let shows_filter: Option<HashSet<String>> = msg
-            .shows
-            .map(|s| s.split(',').map(|s| s.to_string()).collect());
-
-        let mindate = (Local::today() + Duration::days(-14)).naive_local();
-        let maxdate = (Local::today() + Duration::days(7)).naive_local();
-
-        let mq = MovieQueueDB::with_pool(&self);
-
-        let episodes = mc.get_new_episodes(mindate, maxdate, &msg.source)?;
-
-        let shows: HashSet<String> = episodes
-            .iter()
-            .filter_map(|s| {
-                let show = s.show.to_string();
-                match shows_filter.as_ref() {
-                    Some(f) => {
-                        if f.contains(&show) {
-                            Some(show)
-                        } else {
-                            None
-                        }
-                    }
-                    None => Some(show),
-                }
-            })
-            .collect();
-
-        let mut queue = Vec::new();
-
-        for show in shows {
-            for s in mq.print_movie_queue(&[show])? {
-                if let Some(u) = mc.get_collection_index(&s.path)? {
-                    queue.push((
-                        (
-                            s.show
-                                .as_ref()
-                                .map(|v| v.to_string())
-                                .unwrap_or_else(|| "".to_string()),
-                            s.season.unwrap_or(-1),
-                            s.episode.unwrap_or(-1),
-                        ),
-                        u,
-                    ));
-                }
-            }
-        }
-
-        let queue: HashMap<(String, i32, i32), i32> = queue.into_iter().collect();
-
-        let output = episodes
-            .into_iter()
-            .map(|epi| {
-                let show = epi.show.clone();
-                format!(
-                    "<tr><td>{}</td><td>{}</td><td>{}</td><td>{}</td><td>{}</td>{}</tr>",
-                    format!(
-                        r#"<a href="/list/trakt/watched/list/{}/{}">{}</a>"#,
-                        epi.link, epi.season, epi.title
-                    ),
-                    match queue.get(&(show, epi.season, epi.episode)) {
-                        Some(idx) => format!(
-                            "<a href={}>{}</a>",
-                            &format!(r#""{}/{}""#, "/list/play", idx),
-                            epi.eptitle
-                        ),
-                        None => epi.eptitle.to_string(),
-                    },
-                    format!(
-                        r#"<a href="https://www.imdb.com/title/{}">s{} ep{}</a>"#,
-                        epi.epurl, epi.season, epi.episode
-                    ),
-                    format!("rating: {:0.1} / {:0.1}", epi.eprating, epi.rating,),
-                    epi.airdate,
-                    button_add
-                        .replace("SHOW", &epi.show)
-                        .replace("LINK", &epi.link)
-                        .replace("SEASON", &epi.season.to_string()),
-                )
-            })
-            .collect();
-
-        Ok(output)
+        find_new_episodes_http_worker(&self, msg.shows, msg.source)
     }
 }
 

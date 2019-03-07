@@ -7,6 +7,7 @@ use crate::common::imdb_ratings::ImdbRatings;
 use crate::common::imdb_utils::ImdbConnection;
 use crate::common::movie_collection::{MovieCollection, MovieCollectionDB};
 use crate::common::pgpool::PgPool;
+use crate::common::trakt_utils::WatchListMap;
 
 #[derive(Default, Debug)]
 pub struct ParseImdbOptions {
@@ -212,5 +213,52 @@ impl ParseImdb {
             }
         }
         Ok(())
+    }
+
+    pub fn parse_imdb_http_worker(
+        &self,
+        opts: &ParseImdbOptions,
+        watchlist: &WatchListMap,
+    ) -> Result<String, Error> {
+        let button_add = format!(
+            "{}{}",
+            r#"<td><button type="submit" id="ID" "#,
+            r#"onclick="watchlist_add('SHOW');">add to watchlist</button></td>"#
+        );
+        let button_rm = format!(
+            "{}{}",
+            r#"<td><button type="submit" id="ID" "#,
+            r#"onclick="watchlist_rm('SHOW');">remove from watchlist</button></td>"#
+        );
+
+        let output: Vec<_> = self
+            .parse_imdb_worker(&opts)?
+            .into_iter()
+            .map(|line| {
+                let mut imdb_url = "".to_string();
+                let tmp: Vec<_> = line
+                    .into_iter()
+                    .map(|i| {
+                        if i.starts_with("tt") {
+                            imdb_url = i.clone();
+                            format!(r#"<a href="https://www.imdb.com/title/{}">{}</a>"#, i, i)
+                        } else {
+                            i.to_string()
+                        }
+                    })
+                    .collect();
+                format!(
+                    "<tr><td>{}</td><td>{}</td></tr>",
+                    tmp.join("</td><td>"),
+                    if watchlist.contains_key(&imdb_url) {
+                        button_rm.replace("SHOW", &imdb_url)
+                    } else {
+                        button_add.replace("SHOW", &imdb_url)
+                    }
+                )
+            })
+            .collect();
+
+        Ok(output.join("\n"))
     }
 }

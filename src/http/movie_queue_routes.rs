@@ -12,9 +12,9 @@ use super::logged_user::LoggedUser;
 use super::movie_queue_app::AppState;
 use super::movie_queue_requests::{
     FindNewEpisodeRequest, ImdbEpisodesSyncRequest, ImdbEpisodesUpdateRequest,
-    ImdbRatingsSyncRequest, ImdbRatingsUpdateRequest, ImdbShowRequest, MovieCollectionSyncRequest,
-    MovieCollectionUpdateRequest, MoviePathRequest, MovieQueueRequest, MovieQueueSyncRequest,
-    MovieQueueUpdateRequest, ParseImdbRequest, QueueDeleteRequest, LastModifiedRequest,
+    ImdbRatingsSyncRequest, ImdbRatingsUpdateRequest, ImdbShowRequest, LastModifiedRequest,
+    MovieCollectionSyncRequest, MovieCollectionUpdateRequest, MoviePathRequest, MovieQueueRequest,
+    MovieQueueSyncRequest, MovieQueueUpdateRequest, ParseImdbRequest, QueueDeleteRequest,
 };
 use super::{authenticated_response, form_http_response, to_json};
 use crate::common::make_queue::movie_queue_http;
