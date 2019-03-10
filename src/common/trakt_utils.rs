@@ -1009,8 +1009,8 @@ pub fn watched_action_http_worker(
             if season != -1 && episode != -1 {
                 WatchedEpisode {
                     imdb_url: imdb_url.to_string(),
-                    season: season,
-                    episode: episode,
+                    season,
+                    episode,
                     ..Default::default()
                 }
                 .insert_episode(&mc.pool)?;

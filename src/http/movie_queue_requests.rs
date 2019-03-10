@@ -19,6 +19,7 @@ use crate::common::trakt_utils::{
     WatchListMap, WatchListShow, WatchedEpisode,
 };
 use crate::common::tv_show_source::TvShowSource;
+use crate::common::utils::map_result_vec;
 
 pub struct TvShowsRequest {}
 
@@ -534,19 +535,22 @@ impl Handler<LastModifiedRequest> for PgPool {
             "movie_queue",
         ];
 
-        let mut result = Vec::new();
-
-        for table in tables {
-            let query = format!("SELECT max(last_modified) FROM {}", table);
-            for row in self.get()?.query(&query, &[])?.iter() {
-                let last_modified: DateTime<Utc> = row.get(0);
-                result.push(LastModifiedResponse {
-                    table: table.to_string(),
-                    last_modified,
+        let result: Vec<Result<_, Error>> = tables
+            .iter()
+            .map(|table| {
+                let query = format!("SELECT max(last_modified) FROM {}", table);
+                let r = self.get()?.query(&query, &[])?.iter().nth(0).map(|row| {
+                    let last_modified: DateTime<Utc> = row.get(0);
+                    LastModifiedResponse {
+                        table: table.to_string(),
+                        last_modified,
+                    }
                 });
-                break;
-            }
-        }
+                Ok(r)
+            })
+            .collect();
+
+        let result = map_result_vec(result)?.into_iter().filter_map(|x| x).collect();
         Ok(result)
     }
 }

@@ -94,10 +94,14 @@ pub fn movie_queue_http(queue: &[MovieQueueResult]) -> Result<Vec<String>, Error
                 .ok_or_else(|| err_msg("Failed conversion to UTF-8"))?;
             let file_name = path
                 .file_name()
-                .unwrap()
+                .ok_or_else(|| err_msg("Invalid path"))?
                 .to_str()
-                .unwrap();
-            let file_stem = path.file_stem().unwrap().to_str().unwrap();
+                .ok_or_else(|| err_msg("Invalid utf8"))?;
+            let file_stem = path
+                .file_stem()
+                .ok_or_else(|| err_msg("Invalid path"))?
+                .to_str()
+                .ok_or_else(|| err_msg("Invalid utf8"))?;
             let (_, season, episode) = parse_file_stem(&file_stem);
 
             let entry = if ext == "mp4" {

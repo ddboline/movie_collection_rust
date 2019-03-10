@@ -25,7 +25,7 @@ entry_map = {
     'movie_queue': 'queue'
 }
 
-dry_run = True
+dry_run = False
 
 
 def sync_db():
@@ -66,6 +66,7 @@ def sync_db():
             if not dry_run:
                 endpoint = f'{endpoint1}/list/{table}'
                 js = {entry_map[table]: resp}
+                print(endpoint, len(resp))
                 resp = requests.post(endpoint, json=js, cookies=cookies1)
                 print(resp.status_code, resp.text)
         if mod1 > mod0:
@@ -77,6 +78,7 @@ def sync_db():
             if not dry_run:
                 endpoint = f'{endpoint0}/list/{table}'
                 js = {entry_map[table]: resp}
+                print(endpoint, len(resp))
                 resp = requests.post(endpoint, json=js, cookies=cookies0)
                 print(resp.status_code, resp.text)
 
