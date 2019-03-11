@@ -65,6 +65,8 @@ fn make_queue() -> Result<(), Error> {
 }
 
 fn main() {
+    env_logger::init();
+
     match make_queue() {
         Ok(_) => (),
         Err(e) => {

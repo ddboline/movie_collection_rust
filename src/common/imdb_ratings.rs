@@ -43,6 +43,7 @@ impl ImdbRatings {
             VALUES
             ($1, $2, $3, $4, $5, $6, now())
         "#;
+        debug!("{:?}", self);
         let source = self.source.as_ref().map(|s| s.to_string());
         pool.get()?.execute(
             query,

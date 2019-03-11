@@ -59,6 +59,8 @@ fn find_new_episodes() -> Result<(), Error> {
 }
 
 fn main() {
+    env_logger::init();
+
     match find_new_episodes() {
         Ok(_) => (),
         Err(e) => {

@@ -1,6 +1,8 @@
 use movie_collection_rust::common::make_list::make_list;
 
 fn main() {
+    env_logger::init();
+
     match make_list() {
         Ok(_) => {}
         Err(e) => {

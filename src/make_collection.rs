@@ -73,6 +73,8 @@ fn make_collection() -> Result<(), Error> {
 }
 
 fn main() {
+    env_logger::init();
+
     match make_collection() {
         Ok(_) => {}
         Err(e) => {

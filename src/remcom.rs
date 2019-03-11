@@ -39,6 +39,8 @@ fn remcom() -> Result<(), Error> {
 }
 
 fn main() {
+    env_logger::init();
+
     match remcom() {
         Ok(_) => (),
         Err(e) => {

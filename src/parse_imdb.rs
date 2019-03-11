@@ -100,6 +100,8 @@ fn parse_imdb_parser() -> Result<(), Error> {
 }
 
 fn main() {
+    env_logger::init();
+
     match parse_imdb_parser() {
         Ok(_) => (),
         Err(e) => {

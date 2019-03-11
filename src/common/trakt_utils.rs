@@ -109,6 +109,7 @@ impl TraktConnection {
     pub fn get_watchlist_shows(&self) -> Result<HashMap<String, WatchListShow>, Error> {
         let url = format!("https://{}/trakt/watchlist", &self.config.domain);
         let url = Url::parse(&url)?;
+        debug!("{:?}", url);
         let watchlist_shows: Vec<WatchListShow> = self.get(&url)?.json()?;
         let watchlist_shows = watchlist_shows
             .into_iter()
@@ -724,7 +725,9 @@ fn watchlist_add(
             "result: {}",
             ti.add_watchlist_show(&imdb_url)?
         )?;
+        debug!("GOT HERE");
         if let Some(show) = ti.get_watchlist_shows()?.get(&imdb_url) {
+            debug!("INSERT SHOW {}", show);
             show.insert_show(&mc.pool)?;
         }
     }

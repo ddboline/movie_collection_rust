@@ -550,7 +550,10 @@ impl Handler<LastModifiedRequest> for PgPool {
             })
             .collect();
 
-        let result = map_result_vec(result)?.into_iter().filter_map(|x| x).collect();
+        let result = map_result_vec(result)?
+            .into_iter()
+            .filter_map(|x| x)
+            .collect();
         Ok(result)
     }
 }

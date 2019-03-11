@@ -25,6 +25,9 @@ actix = "*"
 actix-web = "*"
 futures = "*"
 jsonwebtoken = "5.0"
+log = "0.4"
+env_logger = "0.6"
+simple_logger = "1.0"
 
 [lib]
 name = "movie_collection_rust"

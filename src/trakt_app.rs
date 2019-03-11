@@ -74,6 +74,8 @@ fn trakt_app() -> Result<(), Error> {
 }
 
 fn main() {
+    env_logger::init();
+
     match trakt_app() {
         Ok(_) => (),
         Err(e) => {

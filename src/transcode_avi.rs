@@ -56,6 +56,8 @@ fn transcode_avi() -> Result<(), Error> {
 }
 
 fn main() {
+    env_logger::init();
+
     match transcode_avi() {
         Ok(_) => (),
         Err(e) => {

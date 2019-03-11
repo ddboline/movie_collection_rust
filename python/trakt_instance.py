@@ -102,7 +102,7 @@ class TraktInstance(object):
             return [{
                 'link': x.get_key('imdb'),
                 'title': x.title,
-                'year': x.year
+                'year': x.year if x.year is not None else datetime.date().today().year
             } for x in shows.values()]
 
     def get_watchlist_seasons(self):
