@@ -6,7 +6,11 @@ pub mod movie_queue_routes;
 pub mod trakt_routes;
 pub mod tvshows_route;
 
-use actix_web::{http::StatusCode, AsyncResponder, FutureResponse, HttpRequest, HttpResponse};
+use crate::common::pgpool::PgPool;
+use actix::{Handler, Message};
+use actix_web::{
+    http::StatusCode, AsyncResponder, FutureResponse, HttpRequest, HttpResponse,
+};
 use futures::{lazy, Future};
 use logged_user::LoggedUser;
 use movie_queue_app::AppState;
@@ -62,4 +66,56 @@ where
         .build_response(StatusCode::OK)
         .content_type("application/json")
         .body(body))
+}
+
+fn generic_route<T, U, V>(
+    query: T,
+    user: LoggedUser,
+    request: HttpRequest<AppState>,
+    callback: V,
+) -> FutureResponse<HttpResponse>
+where
+    T: Message<Result=Result<U, failure::Error>> + Send + 'static,
+    PgPool: Handler<T, Result=Result<U, failure::Error>>,
+    U: Send + 'static,
+    V: FnOnce(U) -> Result<HttpResponse, actix_web::Error> + 'static,
+{
+    let resp = move |req: HttpRequest<AppState>| {
+        req.state()
+            .db
+            .send(query)
+            .from_err()
+            .and_then(move |res| match res {
+                Ok(x) => callback(x),
+                Err(err) => Err(err.into()),
+            })
+            .responder()
+    };
+
+    authenticated_response(&user, request, resp)
+}
+
+fn json_route<T, U>(
+    query: T,
+    user: LoggedUser,
+    request: HttpRequest<AppState>,
+) -> FutureResponse<HttpResponse>
+where
+    T: Message<Result=Result<U, failure::Error>> + Send + 'static,
+    PgPool: Handler<T, Result=Result<U, failure::Error>>,
+    U: Serialize + Send + 'static,
+{
+    let resp = move |req: HttpRequest<AppState>| {
+        req.state()
+            .db
+            .send(query)
+            .from_err()
+            .and_then(move |res| match res {
+                Ok(x) => to_json(&req, &x),
+                Err(err) => Err(err.into()),
+            })
+            .responder()
+    };
+
+    authenticated_response(&user, request, resp)
 }

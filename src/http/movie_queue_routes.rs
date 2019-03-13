@@ -1,10 +1,9 @@
 #![allow(clippy::needless_pass_by_value)]
 
 use actix_web::{
-    http::StatusCode, AsyncResponder, FutureResponse, HttpRequest, HttpResponse, Json, Path, Query,
+    http::StatusCode, FutureResponse, HttpRequest, HttpResponse, Json, Path, Query,
 };
 use failure::{err_msg, Error};
-use futures::future::Future;
 use std::path;
 use subprocess::Exec;
 
@@ -16,7 +15,7 @@ use super::movie_queue_requests::{
     MovieCollectionSyncRequest, MovieCollectionUpdateRequest, MoviePathRequest, MovieQueueRequest,
     MovieQueueSyncRequest, MovieQueueUpdateRequest, ParseImdbRequest, QueueDeleteRequest,
 };
-use super::{authenticated_response, form_http_response, to_json};
+use super::{form_http_response, generic_route, json_route};
 use crate::common::make_queue::movie_queue_http;
 use crate::common::movie_queue::MovieQueueResult;
 use crate::common::utils::{map_result_vec, remcom_single_file};
@@ -48,21 +47,14 @@ pub fn movie_queue(
     user: LoggedUser,
     request: HttpRequest<AppState>,
 ) -> FutureResponse<HttpResponse> {
-    let resp = move |req: HttpRequest<AppState>| {
-        req.state()
-            .db
-            .send(MovieQueueRequest {
-                patterns: Vec::new(),
-            })
-            .from_err()
-            .and_then(move |r| match r {
-                Ok((queue, _)) => queue_body_resp(&[], &queue),
-                Err(err) => Err(err.into()),
-            })
-            .responder()
-    };
-
-    authenticated_response(&user, request, resp)
+    generic_route(
+        MovieQueueRequest {
+            patterns: Vec::new(),
+        },
+        user,
+        request,
+        move |(queue, _)| queue_body_resp(&[], &queue),
+    )
 }
 
 pub fn movie_queue_show(
@@ -73,19 +65,12 @@ pub fn movie_queue_show(
     let path = path.into_inner();
     let patterns = vec![path];
 
-    let resp = move |req: HttpRequest<AppState>| {
-        req.state()
-            .db
-            .send(MovieQueueRequest { patterns })
-            .from_err()
-            .and_then(move |res| match res {
-                Ok((queue, patterns)) => queue_body_resp(&patterns, &queue),
-                Err(err) => Err(err.into()),
-            })
-            .responder()
-    };
-
-    authenticated_response(&user, request, resp)
+    generic_route(
+        MovieQueueRequest { patterns },
+        user,
+        request,
+        move |(queue, patterns)| queue_body_resp(&patterns, &queue),
+    )
 }
 
 pub fn movie_queue_delete(
@@ -95,19 +80,9 @@ pub fn movie_queue_delete(
 ) -> FutureResponse<HttpResponse> {
     let path = path.into_inner();
 
-    let resp = move |req: HttpRequest<AppState>| {
-        req.state()
-            .db
-            .send(QueueDeleteRequest { path })
-            .from_err()
-            .and_then(move |res| match res {
-                Ok(path) => Ok(form_http_response(path)),
-                Err(err) => Err(err.into()),
-            })
-            .responder()
-    };
-
-    authenticated_response(&user, request, resp)
+    generic_route(QueueDeleteRequest { path }, user, request, move |path| {
+        Ok(form_http_response(path))
+    })
 }
 
 fn transcode_worker(
@@ -136,19 +111,12 @@ pub fn movie_queue_transcode(
     let path = path.into_inner();
     let patterns = vec![path];
 
-    let resp = move |req: HttpRequest<AppState>| {
-        req.state()
-            .db
-            .send(MovieQueueRequest { patterns })
-            .from_err()
-            .and_then(move |res| match res {
-                Ok((entries, _)) => transcode_worker(None, &entries),
-                Err(err) => Err(err.into()),
-            })
-            .responder()
-    };
-
-    authenticated_response(&user, request, resp)
+    generic_route(
+        MovieQueueRequest { patterns },
+        user,
+        request,
+        move |(entries, _)| transcode_worker(None, &entries),
+    )
 }
 
 pub fn movie_queue_transcode_directory(
@@ -159,19 +127,12 @@ pub fn movie_queue_transcode_directory(
     let (directory, file) = path.into_inner();
     let patterns = vec![file];
 
-    let resp = move |req: HttpRequest<AppState>| {
-        req.state()
-            .db
-            .send(MovieQueueRequest { patterns })
-            .from_err()
-            .and_then(move |res| match res {
-                Ok((entries, _)) => transcode_worker(Some(directory), &entries),
-                Err(err) => Err(err.into()),
-            })
-            .responder()
-    };
-
-    authenticated_response(&user, request, resp)
+    generic_route(
+        MovieQueueRequest { patterns },
+        user,
+        request,
+        move |(entries, _)| transcode_worker(Some(directory), &entries),
+    )
 }
 
 fn play_worker(full_path: String) -> Result<HttpResponse, actix_web::Error> {
@@ -207,19 +168,7 @@ pub fn movie_queue_play(
 ) -> FutureResponse<HttpResponse> {
     let idx = idx.into_inner();
 
-    let resp = move |req: HttpRequest<AppState>| {
-        req.state()
-            .db
-            .send(MoviePathRequest { idx })
-            .from_err()
-            .and_then(move |res| match res {
-                Ok(full_path) => play_worker(full_path),
-                Err(err) => Err(err.into()),
-            })
-            .responder()
-    };
-
-    authenticated_response(&user, request, resp)
+    generic_route(MoviePathRequest { idx }, user, request, play_worker)
 }
 
 pub fn imdb_show(
@@ -231,22 +180,15 @@ pub fn imdb_show(
     let show = path.into_inner();
     let query = query.into_inner();
 
-    let resp = move |req: HttpRequest<AppState>| {
-        req.state()
-            .db
-            .send(ImdbShowRequest { show, query })
-            .from_err()
-            .and_then(move |res| match res {
-                Ok(body) => Ok(form_http_response(body)),
-                Err(err) => Err(err.into()),
-            })
-            .responder()
-    };
-
-    authenticated_response(&user, request, resp)
+    generic_route(
+        ImdbShowRequest { show, query },
+        user,
+        request,
+        move |body| Ok(form_http_response(body)),
+    )
 }
 
-fn new_episode_worker(entries: &[String]) -> Result<HttpResponse, actix_web::Error> {
+fn new_episode_worker(entries: Vec<String>) -> Result<HttpResponse, actix_web::Error> {
     let body =
         include_str!("../../templates/watched_template.html").replace("PREVIOUS", "/list/tvshows");
     let body = body.replace("BODY", &entries.join("\n"));
@@ -261,19 +203,7 @@ pub fn find_new_episodes(
     user: LoggedUser,
     request: HttpRequest<AppState>,
 ) -> FutureResponse<HttpResponse> {
-    let resp = move |req: HttpRequest<AppState>| {
-        req.state()
-            .db
-            .send(query.into_inner())
-            .from_err()
-            .and_then(move |res| match res {
-                Ok(entries) => new_episode_worker(&entries),
-                Err(err) => Err(err.into()),
-            })
-            .responder()
-    };
-
-    authenticated_response(&user, request, resp)
+    generic_route(query.into_inner(), user, request, new_episode_worker)
 }
 
 pub fn imdb_episodes_route(
@@ -281,22 +211,7 @@ pub fn imdb_episodes_route(
     user: LoggedUser,
     request: HttpRequest<AppState>,
 ) -> FutureResponse<HttpResponse> {
-    let resp = move |req: HttpRequest<AppState>| {
-        req.state()
-            .db
-            .send(query.into_inner())
-            .from_err()
-            .and_then(move |res| match res {
-                Ok(episodes) => to_json(&req, &episodes),
-                Err(err) => {
-                    println!("{}", err);
-                    Err(err.into())
-                }
-            })
-            .responder()
-    };
-
-    authenticated_response(&user, request, resp)
+    json_route(query.into_inner(), user, request)
 }
 
 pub fn imdb_episodes_update(
@@ -305,19 +220,10 @@ pub fn imdb_episodes_update(
     request: HttpRequest<AppState>,
 ) -> FutureResponse<HttpResponse> {
     let episodes = data.into_inner();
-    let resp = move |req: HttpRequest<AppState>| {
-        req.state()
-            .db
-            .send(episodes)
-            .from_err()
-            .and_then(move |res| match res {
-                Ok(_) => Ok(form_http_response("Success".to_string())),
-                Err(err) => Err(err.into()),
-            })
-            .responder()
-    };
 
-    authenticated_response(&user, request, resp)
+    generic_route(episodes, user, request, move |_| {
+        Ok(form_http_response("Success".to_string()))
+    })
 }
 
 pub fn imdb_ratings_route(
@@ -325,19 +231,7 @@ pub fn imdb_ratings_route(
     user: LoggedUser,
     request: HttpRequest<AppState>,
 ) -> FutureResponse<HttpResponse> {
-    let resp = move |req: HttpRequest<AppState>| {
-        req.state()
-            .db
-            .send(query.into_inner())
-            .from_err()
-            .and_then(move |res| match res {
-                Ok(shows) => to_json(&req, &shows),
-                Err(err) => Err(err.into()),
-            })
-            .responder()
-    };
-
-    authenticated_response(&user, request, resp)
+    json_route(query.into_inner(), user, request)
 }
 
 pub fn imdb_ratings_update(
@@ -346,19 +240,10 @@ pub fn imdb_ratings_update(
     request: HttpRequest<AppState>,
 ) -> FutureResponse<HttpResponse> {
     let shows = data.into_inner();
-    let resp = move |req: HttpRequest<AppState>| {
-        req.state()
-            .db
-            .send(shows)
-            .from_err()
-            .and_then(move |res| match res {
-                Ok(_) => Ok(form_http_response("Success".to_string())),
-                Err(err) => Err(err.into()),
-            })
-            .responder()
-    };
 
-    authenticated_response(&user, request, resp)
+    generic_route(shows, user, request, move |_| {
+        Ok(form_http_response("Success".to_string()))
+    })
 }
 
 pub fn movie_queue_route(
@@ -366,22 +251,7 @@ pub fn movie_queue_route(
     user: LoggedUser,
     request: HttpRequest<AppState>,
 ) -> FutureResponse<HttpResponse> {
-    let resp = move |req: HttpRequest<AppState>| {
-        req.state()
-            .db
-            .send(query.into_inner())
-            .from_err()
-            .and_then(move |res| match res {
-                Ok(queue) => to_json(&req, &queue),
-                Err(err) => {
-                    println!("{}", err);
-                    Err(err.into())
-                }
-            })
-            .responder()
-    };
-
-    authenticated_response(&user, request, resp)
+    json_route(query.into_inner(), user, request)
 }
 
 pub fn movie_queue_update(
@@ -390,19 +260,10 @@ pub fn movie_queue_update(
     request: HttpRequest<AppState>,
 ) -> FutureResponse<HttpResponse> {
     let queue = data.into_inner();
-    let resp = move |req: HttpRequest<AppState>| {
-        req.state()
-            .db
-            .send(queue)
-            .from_err()
-            .and_then(move |res| match res {
-                Ok(_) => Ok(form_http_response("Success".to_string())),
-                Err(err) => Err(err.into()),
-            })
-            .responder()
-    };
 
-    authenticated_response(&user, request, resp)
+    generic_route(queue, user, request, move |_| {
+        Ok(form_http_response("Success".to_string()))
+    })
 }
 
 pub fn movie_collection_route(
@@ -410,19 +271,7 @@ pub fn movie_collection_route(
     user: LoggedUser,
     request: HttpRequest<AppState>,
 ) -> FutureResponse<HttpResponse> {
-    let resp = move |req: HttpRequest<AppState>| {
-        req.state()
-            .db
-            .send(query.into_inner())
-            .from_err()
-            .and_then(move |res| match res {
-                Ok(collection) => to_json(&req, &collection),
-                Err(err) => Err(err.into()),
-            })
-            .responder()
-    };
-
-    authenticated_response(&user, request, resp)
+    json_route(query.into_inner(), user, request)
 }
 
 pub fn movie_collection_update(
@@ -431,36 +280,15 @@ pub fn movie_collection_update(
     request: HttpRequest<AppState>,
 ) -> FutureResponse<HttpResponse> {
     let collection = data.into_inner();
-    let resp = move |req: HttpRequest<AppState>| {
-        req.state()
-            .db
-            .send(collection)
-            .from_err()
-            .and_then(move |res| match res {
-                Ok(_) => Ok(form_http_response("Success".to_string())),
-                Err(err) => Err(err.into()),
-            })
-            .responder()
-    };
 
-    authenticated_response(&user, request, resp)
+    generic_route(collection, user, request, move |_| {
+        Ok(form_http_response("Success".to_string()))
+    })
 }
 
 pub fn last_modified_route(
     user: LoggedUser,
     request: HttpRequest<AppState>,
 ) -> FutureResponse<HttpResponse> {
-    let resp = move |req: HttpRequest<AppState>| {
-        req.state()
-            .db
-            .send(LastModifiedRequest {})
-            .from_err()
-            .and_then(move |res| match res {
-                Ok(l) => to_json(&req, &l),
-                Err(e) => Err(e.into()),
-            })
-            .responder()
-    };
-
-    authenticated_response(&user, request, resp)
+    json_route(LastModifiedRequest {}, user, request)
 }
