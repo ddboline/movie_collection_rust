@@ -8,9 +8,7 @@ pub mod tvshows_route;
 
 use crate::common::pgpool::PgPool;
 use actix::{Handler, Message};
-use actix_web::{
-    http::StatusCode, AsyncResponder, FutureResponse, HttpRequest, HttpResponse,
-};
+use actix_web::{http::StatusCode, AsyncResponder, FutureResponse, HttpRequest, HttpResponse};
 use futures::{lazy, Future};
 use logged_user::LoggedUser;
 use movie_queue_app::AppState;
@@ -75,8 +73,8 @@ fn generic_route<T, U, V>(
     callback: V,
 ) -> FutureResponse<HttpResponse>
 where
-    T: Message<Result=Result<U, failure::Error>> + Send + 'static,
-    PgPool: Handler<T, Result=Result<U, failure::Error>>,
+    T: Message<Result = Result<U, failure::Error>> + Send + 'static,
+    PgPool: Handler<T, Result = Result<U, failure::Error>>,
     U: Send + 'static,
     V: FnOnce(U) -> Result<HttpResponse, actix_web::Error> + 'static,
 {
@@ -101,8 +99,8 @@ fn json_route<T, U>(
     request: HttpRequest<AppState>,
 ) -> FutureResponse<HttpResponse>
 where
-    T: Message<Result=Result<U, failure::Error>> + Send + 'static,
-    PgPool: Handler<T, Result=Result<U, failure::Error>>,
+    T: Message<Result = Result<U, failure::Error>> + Send + 'static,
+    PgPool: Handler<T, Result = Result<U, failure::Error>>,
     U: Serialize + Send + 'static,
 {
     let resp = move |req: HttpRequest<AppState>| {

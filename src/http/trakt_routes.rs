@@ -12,7 +12,7 @@ use super::movie_queue_requests::{
     ImdbRatingsRequest, ImdbSeasonsRequest, TraktCalRequest, WatchedActionRequest,
     WatchedListRequest, WatchlistActionRequest, WatchlistShowsRequest,
 };
-use super::{authenticated_response, form_http_response};
+use super::{authenticated_response, form_http_response, generic_route};
 use crate::common::movie_collection::ImdbSeason;
 use crate::common::trakt_utils::{TraktActions, TraktConnection, WatchListShow};
 use crate::common::tv_show_source::TvShowSource;
@@ -65,19 +65,7 @@ pub fn trakt_watchlist(
     user: LoggedUser,
     request: HttpRequest<AppState>,
 ) -> FutureResponse<HttpResponse> {
-    let resp = move |req: HttpRequest<AppState>| {
-        req.state()
-            .db
-            .send(WatchlistShowsRequest {})
-            .from_err()
-            .and_then(move |res| match res {
-                Ok(shows) => watchlist_worker(shows),
-                Err(err) => Err(err.into()),
-            })
-            .responder()
-    };
-
-    authenticated_response(&user, request, resp)
+    generic_route(WatchlistShowsRequest {}, user, request, watchlist_worker)
 }
 
 fn watchlist_action_worker(
@@ -105,19 +93,12 @@ pub fn trakt_watchlist_action(
     let (action, imdb_url) = path.into_inner();
     let action = TraktActions::from_command(&action);
 
-    let resp = move |req: HttpRequest<AppState>| {
-        req.state()
-            .db
-            .send(WatchlistActionRequest { action, imdb_url })
-            .from_err()
-            .and_then(move |res| match res {
-                Ok(imdb_url) => watchlist_action_worker(action, &imdb_url),
-                Err(err) => Err(err.into()),
-            })
-            .responder()
-    };
-
-    authenticated_response(&user, request, resp)
+    generic_route(
+        WatchlistActionRequest { action, imdb_url },
+        user,
+        request,
+        move |imdb_url| watchlist_action_worker(action, &imdb_url),
+    )
 }
 
 fn trakt_watched_seasons_worker(
@@ -198,19 +179,12 @@ pub fn trakt_watched_list(
 ) -> FutureResponse<HttpResponse> {
     let (imdb_url, season) = path.into_inner();
 
-    let resp = move |req: HttpRequest<AppState>| {
-        req.state()
-            .db
-            .send(WatchedListRequest { imdb_url, season })
-            .from_err()
-            .and_then(move |res| match res {
-                Ok(body) => Ok(form_http_response(body)),
-                Err(err) => Err(err.into()),
-            })
-            .responder()
-    };
-
-    authenticated_response(&user, request, resp)
+    generic_route(
+        WatchedListRequest { imdb_url, season },
+        user,
+        request,
+        move |body| Ok(form_http_response(body)),
+    )
 }
 
 pub fn trakt_watched_action(
@@ -220,24 +194,17 @@ pub fn trakt_watched_action(
 ) -> FutureResponse<HttpResponse> {
     let (action, imdb_url, season, episode) = path.into_inner();
 
-    let resp = move |req: HttpRequest<AppState>| {
-        req.state()
-            .db
-            .send(WatchedActionRequest {
-                action: TraktActions::from_command(&action),
-                imdb_url,
-                season,
-                episode,
-            })
-            .from_err()
-            .and_then(move |res| match res {
-                Ok(body) => Ok(form_http_response(body)),
-                Err(err) => Err(err.into()),
-            })
-            .responder()
-    };
-
-    authenticated_response(&user, request, resp)
+    generic_route(
+        WatchedActionRequest {
+            action: TraktActions::from_command(&action),
+            imdb_url,
+            season,
+            episode,
+        },
+        user,
+        request,
+        move |body| Ok(form_http_response(body)),
+    )
 }
 
 fn trakt_cal_worker(entries: &[String]) -> Result<HttpResponse, actix_web::Error> {
@@ -251,17 +218,7 @@ fn trakt_cal_worker(entries: &[String]) -> Result<HttpResponse, actix_web::Error
 }
 
 pub fn trakt_cal(user: LoggedUser, request: HttpRequest<AppState>) -> FutureResponse<HttpResponse> {
-    let resp = move |req: HttpRequest<AppState>| {
-        req.state()
-            .db
-            .send(TraktCalRequest {})
-            .from_err()
-            .and_then(move |res| match res {
-                Ok(entries) => trakt_cal_worker(&entries),
-                Err(err) => Err(err.into()),
-            })
-            .responder()
-    };
-
-    authenticated_response(&user, request, resp)
+    generic_route(TraktCalRequest {}, user, request, move |entries| {
+        trakt_cal_worker(&entries)
+    })
 }

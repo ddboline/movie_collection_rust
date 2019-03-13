@@ -1,8 +1,6 @@
 #![allow(clippy::needless_pass_by_value)]
 
-use actix_web::{
-    http::StatusCode, FutureResponse, HttpRequest, HttpResponse, Json, Path, Query,
-};
+use actix_web::{http::StatusCode, FutureResponse, HttpRequest, HttpResponse, Json, Path, Query};
 use failure::{err_msg, Error};
 use std::path;
 use subprocess::Exec;
@@ -188,7 +186,7 @@ pub fn imdb_show(
     )
 }
 
-fn new_episode_worker(entries: Vec<String>) -> Result<HttpResponse, actix_web::Error> {
+fn new_episode_worker(entries: &[String]) -> Result<HttpResponse, actix_web::Error> {
     let body =
         include_str!("../../templates/watched_template.html").replace("PREVIOUS", "/list/tvshows");
     let body = body.replace("BODY", &entries.join("\n"));
@@ -203,7 +201,9 @@ pub fn find_new_episodes(
     user: LoggedUser,
     request: HttpRequest<AppState>,
 ) -> FutureResponse<HttpResponse> {
-    generic_route(query.into_inner(), user, request, new_episode_worker)
+    generic_route(query.into_inner(), user, request, move |entries| {
+        new_episode_worker(&entries)
+    })
 }
 
 pub fn imdb_episodes_route(
