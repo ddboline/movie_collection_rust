@@ -247,9 +247,6 @@ impl ImdbConnection {
                             if let Some(link) = epi_url.split('/').nth(2) {
                                 result.epurl = Some(link.to_string());
                                 result.eptitle = Some(a_.text().trim().to_string());
-                                let r = self.parse_imdb_rating(link)?;
-                                result.rating = r.rating;
-                                result.nrating = r.count;
                             }
                         }
                     }
@@ -257,6 +254,19 @@ impl ImdbConnection {
                 }
             }
         }
-        Ok(results)
+
+        let results: Vec<Result<_, Error>> = results
+            .into_par_iter()
+            .map(|mut result| {
+                if let Some(link) = result.epurl.as_ref() {
+                    let r = self.parse_imdb_rating(&link)?;
+                    result.rating = r.rating;
+                    result.nrating = r.count;
+                }
+                Ok(result)
+            })
+            .collect();
+
+        map_result_vec(results)
     }
 }

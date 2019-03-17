@@ -60,7 +60,10 @@ fn parse_imdb_parser() -> Result<(), Error> {
         .arg(Arg::with_name("show").value_name("SHOW").help("Show"))
         .get_matches();
 
-    let show = matches.value_of("show").unwrap_or("");
+    let show = match matches.value_of("show") {
+        Some(s) => s,
+        None => return Ok(()),
+    };
     let tv = matches.is_present("tv");
     let imdb_link = matches.value_of("imdblink").map(|s| s.to_string());
 
