@@ -358,16 +358,16 @@ pub trait ExponentialRetry {
     fn get_client(&self) -> &Client;
 
     fn get(&self, url: &Url) -> Result<Response, Error> {
-        let mut timeout: u64 = 1000;
+        let mut timeout: f64 = 1.0;
         let mut rng = thread_rng();
         let range = Uniform::from(0..1000);
         loop {
             match self.get_client().get(url.clone()).send() {
                 Ok(x) => return Ok(x),
                 Err(e) => {
-                    sleep(Duration::from_millis(timeout));
-                    timeout *= 4 * range.sample(&mut rng);
-                    if timeout >= 64_000 {
+                    sleep(Duration::from_millis((timeout * 1000.0) as u64));
+                    timeout *= 4.0 * range.sample(&mut rng) as f64 / 1000.0;
+                    if timeout >= 64.0 {
                         return Err(err_msg(e));
                     }
                 }
