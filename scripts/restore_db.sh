@@ -14,5 +14,12 @@ trakt_watchlist"
 
 for T in $TABLES;
 do
+    aws s3 cp s3://movie-queue-db-backup/${T}.sql.gz backup/${T}.sql.gz
     gzip -dc backup/${T}.sql.gz | psql $DB -c "COPY $T FROM STDIN";
 done
+
+psql $DB -c "select setval('imdb_ratings_id_seq', (select max(index) from imdb_ratings), TRUE)"
+psql $DB -c "select setval('imdb_episodes_id_seq', (select max(id) from imdb_episodes), TRUE)"
+psql $DB -c "select setval('trakt_watched_episodes_id_seq', (select max(id) from trakt_watched_episodes), TRUE)"
+psql $DB -c "select setval('trakt_watched_movies_id_seq', (select max(id) from trakt_watched_movies), TRUE)"
+psql $DB -c "select setval('trakt_watchlist_id_seq', (select max(id) from trakt_watchlist), TRUE)"
