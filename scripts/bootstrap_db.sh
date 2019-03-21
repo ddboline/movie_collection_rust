@@ -11,6 +11,8 @@ sudo -u postgres psql -c "CREATE ROLE $USER PASSWORD '$PASSWORD' NOSUPERUSER NOC
 sudo -u postgres psql -c "ALTER ROLE $USER PASSWORD '$PASSWORD' NOSUPERUSER NOCREATEDB NOCREATEROLE INHERIT LOGIN;"
 sudo -u postgres createdb movie_queue
 
+mkdir ${HOME}/.config/movie_collection_rust/
+
 cat > ${HOME}/.config/movie_collection_rust/config.env <<EOL
 PGURL=postgresql://$USER:$PASSWORD@localhost:5432/movie_queue
 AUTHDB=postgresql://$USER:$PASSWORD@localhost:5432/auth
