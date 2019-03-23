@@ -239,6 +239,8 @@ class TraktInstance(object):
                 return {}
             else:
                 show_obj = show_obj[0]
+        if show_obj is None:
+            return {}
         with Trakt.configuration.oauth.from_response(self.authorization, refresh=True):
             items = {'shows': [show_obj.to_dict()]}
             return Trakt['sync/watchlist'].add(items=items)
