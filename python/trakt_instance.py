@@ -358,7 +358,7 @@ class TraktInstance(object):
         output = []
         cal = self.get_calendar()
         if cal is None:
-            return
+            return []
         for ep_ in cal:
             show = ep_.show.title
             season, episode = ep_.pk
