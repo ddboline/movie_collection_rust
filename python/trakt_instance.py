@@ -14,7 +14,7 @@ from threading import Condition
 import argparse
 from gevent.pywsgi import WSGIServer
 
-from trakt import Trakt
+import trakt
 
 from flask import Flask, request, json
 
@@ -43,13 +43,13 @@ class TraktInstance(object):
         self.username = username
         self.client_id = credentials['client_id']
         self.client_secret = credentials['client_secret']
-        self.trakt = Trakt.configuration.defaults.client(
+        self.trakt = trakt.Trakt.configuration.defaults.client(
             id=self.client_id, secret=self.client_secret)
 
         self.is_authenticating = Condition()
 
         # Bind trakt events
-        Trakt.on('oauth.token_refreshed', self.on_token_refreshed)
+        trakt.Trakt.on('oauth.token_refreshed', self.on_token_refreshed)
 
         self.authorization = self.read_auth()
 
@@ -62,13 +62,13 @@ class TraktInstance(object):
             return False
 
         # Request new device code
-        code = Trakt['oauth/device'].code()
+        code = trakt.Trakt['oauth/device'].code()
 
         print('Enter the code "%s" at %s to authenticate your account' %
               (code.get('user_code'), code.get('verification_url')))
 
         # Construct device authentication poller
-        poller = Trakt['oauth/device'].poll(**code)\
+        poller = trakt.Trakt['oauth/device'].poll(**code)\
             .on('aborted', self.on_aborted)\
             .on('authenticated', self.on_authenticated)\
             .on('expired', self.on_expired)\
@@ -90,13 +90,13 @@ class TraktInstance(object):
         else:
             print('authorization:', self.authorization)
 
-        with Trakt.configuration.oauth.from_response(self.authorization, refresh=True):
+        with trakt.Trakt.configuration.oauth.from_response(self.authorization, refresh=True):
             # Expired token will be refreshed automatically (as `refresh=True`)
-            print(Trakt['sync/watchlist'].shows(pagination=True))
+            print(trakt.Trakt['sync/watchlist'].shows(pagination=True))
 
     def get_watchlist_shows(self):
-        with Trakt.configuration.oauth.from_response(self.authorization, refresh=True):
-            shows = Trakt['sync/watchlist'].shows(pagination=True)
+        with trakt.Trakt.configuration.oauth.from_response(self.authorization, refresh=True):
+            shows = trakt.Trakt['sync/watchlist'].shows(pagination=True)
             if shows is None:
                 return []
             return [{
@@ -106,17 +106,17 @@ class TraktInstance(object):
             } for x in shows.values()]
 
     def get_watchlist_seasons(self):
-        with Trakt.configuration.oauth.from_response(self.authorization, refresh=True):
-            return Trakt['sync/watchlist'].seasons(pagination=True)
+        with trakt.Trakt.configuration.oauth.from_response(self.authorization, refresh=True):
+            return trakt.Trakt['sync/watchlist'].seasons(pagination=True)
 
     def get_watchlist_episodes(self):
-        with Trakt.configuration.oauth.from_response(self.authorization, refresh=True):
-            return Trakt['sync/watchlist'].episodes(pagination=True)
+        with trakt.Trakt.configuration.oauth.from_response(self.authorization, refresh=True):
+            return trakt.Trakt['sync/watchlist'].episodes(pagination=True)
 
     def get_watched_shows(self, imdb_id=None):
-        with Trakt.configuration.oauth.from_response(self.authorization, refresh=True):
+        with trakt.Trakt.configuration.oauth.from_response(self.authorization, refresh=True):
             results = []
-            watched = Trakt['sync/watched'].shows(pagination=True)
+            watched = trakt.Trakt['sync/watched'].shows(pagination=True)
             if watched is None:
                 return []
             for show in watched.values():
@@ -134,9 +134,9 @@ class TraktInstance(object):
             return results
 
     def get_watched_movies(self, imdb_id=None):
-        with Trakt.configuration.oauth.from_response(self.authorization, refresh=True):
+        with trakt.Trakt.configuration.oauth.from_response(self.authorization, refresh=True):
             results = []
-            watched = Trakt['sync/watched'].movies(pagination=True)
+            watched = trakt.Trakt['sync/watched'].movies(pagination=True)
             if watched is None:
                 return []
             for movies in watched.values():
@@ -220,12 +220,12 @@ class TraktInstance(object):
             return json.load(f)
 
     def do_lookup(self, imdb_id):
-        with Trakt.configuration.oauth.from_response(self.authorization, refresh=True):
-            return Trakt['search'].lookup(id=imdb_id, service='imdb')
+        with trakt.Trakt.configuration.oauth.from_response(self.authorization, refresh=True):
+            return trakt.Trakt['search'].lookup(id=imdb_id, service='imdb')
 
     def do_query(self, show, media='show'):
-        with Trakt.configuration.oauth.from_response(self.authorization, refresh=True):
-            shows = Trakt['search'].query(show.replace('_', ' '), media=media, pagination=True)
+        with trakt.Trakt.configuration.oauth.from_response(self.authorization, refresh=True):
+            shows = trakt.Trakt['search'].query(show.replace('_', ' '), media=media, pagination=True)
             shows = {s.get_key('imdb'): s.to_dict() for s in shows}
             return shows
 
@@ -241,9 +241,9 @@ class TraktInstance(object):
                 show_obj = show_obj[0]
         if show_obj is None:
             return {}
-        with Trakt.configuration.oauth.from_response(self.authorization, refresh=True):
+        with trakt.Trakt.configuration.oauth.from_response(self.authorization, refresh=True):
             items = {'shows': [show_obj.to_dict()]}
-            return Trakt['sync/watchlist'].add(items=items)
+            return trakt.Trakt['sync/watchlist'].add(items=items)
 
     def add_episode_to_watched(self, show=None, imdb_id=None, season=None, episode=None):
         if imdb_id:
@@ -259,21 +259,21 @@ class TraktInstance(object):
                 show_obj = show_obj[0]
         if season and episode:
             print(show_obj)
-            episode_ = Trakt['shows'].episode(
+            episode_ = trakt.Trakt['shows'].episode(
                 show_obj.get_key('imdb'), season=season, episode=episode)
             if not episode_:
                 return {}
-            with Trakt.configuration.oauth.from_response(self.authorization, refresh=True):
+            with trakt.Trakt.configuration.oauth.from_response(self.authorization, refresh=True):
                 items = {'episodes': [episode_.to_dict()]}
-                return Trakt['sync/history'].add(items=items)
+                return trakt.Trakt['sync/history'].add(items=items)
         elif season:
-            with Trakt.configuration.oauth.from_response(self.authorization, refresh=True):
-                episodes = Trakt['shows'].season(show_obj.get_key('imdb'), season=season)
+            with trakt.Trakt.configuration.oauth.from_response(self.authorization, refresh=True):
+                episodes = trakt.Trakt['shows'].season(show_obj.get_key('imdb'), season=season)
                 if not episodes:
                     return {}
                 episodes = [e.to_dict() for e in episodes]
                 items = {'episodes': episodes}
-                return Trakt['sync/history'].add(items=items)
+                return trakt.Trakt['sync/history'].add(items=items)
 
     def remove_show_to_watchlist(self, show=None, imdb_id=None):
         if imdb_id:
@@ -285,10 +285,10 @@ class TraktInstance(object):
                 return {}
             else:
                 show_obj = show_obj[0]
-        with Trakt.configuration.oauth.from_response(self.authorization, refresh=True):
+        with trakt.Trakt.configuration.oauth.from_response(self.authorization, refresh=True):
             items = {'shows': [show_obj.to_dict()]}
             print(show_obj)
-            return Trakt['sync/watchlist'].remove(items=items)
+            return trakt.Trakt['sync/watchlist'].remove(items=items)
 
     def remove_movie_to_watched(self, show=None, imdb_id=None):
         if imdb_id:
@@ -300,9 +300,9 @@ class TraktInstance(object):
                 return
             else:
                 show_obj = show_obj[0]
-        with Trakt.configuration.oauth.from_response(self.authorization, refresh=True):
+        with trakt.Trakt.configuration.oauth.from_response(self.authorization, refresh=True):
             items = {'movies': [show_obj.to_dict()]}
-            return Trakt['sync/history'].remove(items=items)
+            return trakt.Trakt['sync/history'].remove(items=items)
 
     def remove_episode_to_watched(self, show=None, imdb_id=None, season=None, episode=None):
         if imdb_id:
@@ -315,20 +315,20 @@ class TraktInstance(object):
             else:
                 show_obj = show_obj[0]
         if season and episode:
-            episode_ = Trakt['shows'].episode(
+            episode_ = trakt.Trakt['shows'].episode(
                 show_obj.get_key('imdb'), season=season, episode=episode)
-            with Trakt.configuration.oauth.from_response(self.authorization, refresh=True):
+            with trakt.Trakt.configuration.oauth.from_response(self.authorization, refresh=True):
                 items = {'episodes': [episode_.to_dict()]}
                 print(episode_)
-                return Trakt['sync/history'].remove(items=items)
+                return trakt.Trakt['sync/history'].remove(items=items)
         elif season:
-            with Trakt.configuration.oauth.from_response(self.authorization, refresh=True):
+            with trakt.Trakt.configuration.oauth.from_response(self.authorization, refresh=True):
                 episodes = []
-                for episode_ in Trakt['shows'].season(show_obj.get_key('imdb'), season=season):
+                for episode_ in trakt.Trakt['shows'].season(show_obj.get_key('imdb'), season=season):
                     episodes.append(episode_.to_dict())
                 items = {'episodes': episodes}
                 print(episodes)
-                return Trakt['sync/history'].remove(items=items)
+                return trakt.Trakt['sync/history'].remove(items=items)
 
     def add_movie_to_watched(self, title=None, imdb_id=None):
         if imdb_id:
@@ -344,13 +344,13 @@ class TraktInstance(object):
             if not show_obj:
                 return {}
             show_obj.values()[0]
-        with Trakt.configuration.oauth.from_response(self.authorization, refresh=True):
+        with trakt.Trakt.configuration.oauth.from_response(self.authorization, refresh=True):
             items = {'movies': [show_obj.to_dict()]}
-            return Trakt['sync/history'].add(items=items)
+            return trakt.Trakt['sync/history'].add(items=items)
 
     def get_calendar(self):
-        with Trakt.configuration.oauth.from_response(self.authorization, refresh=True):
-            return Trakt['calendars/my/*'].get(media='shows', pagination=True)
+        with trakt.Trakt.configuration.oauth.from_response(self.authorization, refresh=True):
+            return trakt.Trakt['calendars/my/*'].get(media='shows', pagination=True)
 
     def get_trakt_cal_episode(self):
         maxdate = datetime.date.today() + datetime.timedelta(days=90)
