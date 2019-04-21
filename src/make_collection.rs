@@ -4,8 +4,8 @@ use rayon::prelude::*;
 use std::io;
 use std::io::Write;
 
-use movie_collection_rust::common::movie_collection::{MovieCollection, MovieCollectionDB};
-use movie_collection_rust::common::utils::{get_version_number, get_video_runtime, map_result_vec};
+use movie_collection_lib::common::movie_collection::{MovieCollection, MovieCollectionDB};
+use movie_collection_lib::common::utils::{get_version_number, get_video_runtime, map_result_vec};
 
 fn make_collection() -> Result<(), Error> {
     let matches = App::new("Collection Query/Parser")

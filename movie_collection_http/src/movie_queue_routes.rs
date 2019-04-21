@@ -14,9 +14,9 @@ use super::movie_queue_requests::{
     MovieQueueSyncRequest, MovieQueueUpdateRequest, ParseImdbRequest, QueueDeleteRequest,
 };
 use super::{form_http_response, generic_route, json_route};
-use crate::common::make_queue::movie_queue_http;
-use crate::common::movie_queue::MovieQueueResult;
-use crate::common::utils::{map_result_vec, remcom_single_file};
+use movie_collection_lib::common::make_queue::movie_queue_http;
+use movie_collection_lib::common::movie_queue::MovieQueueResult;
+use movie_collection_lib::common::utils::{map_result_vec, remcom_single_file};
 
 fn movie_queue_body(patterns: &[String], entries: &[String]) -> String {
     let watchlist_url = if patterns.is_empty() {

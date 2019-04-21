@@ -1,0 +1,28 @@
+[package]
+name = "movie_collection_lib"
+version = "0.1.0"
+authors = ["Daniel Boline <ddboline@gmail.com>"]
+edition = "2018"
+
+[dependencies]
+serde = "1.0"
+serde_derive = "1.0"
+serde_json = "1.0"
+postgres = {version = "0.15", features = ["with-chrono"]}
+subprocess = "0.1"
+r2d2 = "0.8"
+r2d2_postgres = "0.14"
+failure = "0.1"
+rayon = "1.0"
+clap = "2.33"
+dotenv = "0.13"
+amqp = {version="0.1", default_features=false}
+select = "0.4"
+reqwest = "0.9"
+chrono = { version = "0.4", features = ["serde"] }
+rand = "0.6"
+futures = "0.1"
+log = "0.4"
+env_logger = "0.6"
+simple_logger = "1.0"
+actix = "0.7"

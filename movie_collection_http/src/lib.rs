@@ -1,3 +1,6 @@
+#[macro_use]
+extern crate serde_derive;
+
 pub mod errors;
 pub mod logged_user;
 pub mod movie_queue_app;
@@ -6,11 +9,11 @@ pub mod movie_queue_routes;
 pub mod trakt_routes;
 pub mod tvshows_route;
 
-use crate::common::pgpool::PgPool;
 use actix::{Handler, Message};
 use actix_web::{http::StatusCode, AsyncResponder, FutureResponse, HttpRequest, HttpResponse};
 use futures::{lazy, Future};
 use logged_user::LoggedUser;
+use movie_collection_lib::common::pgpool::PgPool;
 use movie_queue_app::AppState;
 use serde::Serialize;
 
@@ -116,4 +119,12 @@ where
     };
 
     authenticated_response(&user, request, resp)
+}
+
+#[cfg(test)]
+mod tests {
+    #[test]
+    fn it_works() {
+        assert_eq!(2 + 2, 4);
+    }
 }

@@ -3,9 +3,9 @@ use failure::Error;
 use std::io;
 use std::io::Write;
 
-use movie_collection_rust::common::movie_collection::{MovieCollection, MovieCollectionDB};
-use movie_collection_rust::common::tv_show_source::TvShowSource;
-use movie_collection_rust::common::utils::get_version_number;
+use movie_collection_lib::common::movie_collection::{MovieCollection, MovieCollectionDB};
+use movie_collection_lib::common::tv_show_source::TvShowSource;
+use movie_collection_lib::common::utils::get_version_number;
 
 fn find_new_episodes() -> Result<(), Error> {
     let matches = App::new("Find new episodes")

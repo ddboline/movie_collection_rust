@@ -886,7 +886,7 @@ pub fn watch_list_http_worker(pool: &PgPool, imdb_url: &str, season: i32) -> Res
         r#"onclick="watched_rm('SHOW', SEASON, EPISODE);">remove from watched</button>"#
     );
 
-    let body = include_str!("../../templates/watched_template.html").replace(
+    let body = include_str!("../../../templates/watched_template.html").replace(
         "PREVIOUS",
         &format!("/list/trakt/watched/list/{}", imdb_url),
     );

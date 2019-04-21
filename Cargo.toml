@@ -5,33 +5,16 @@ authors = ["Daniel Boline <ddboline@gmail.com>"]
 edition = "2018"
 
 [dependencies]
-serde = "1.0"
-serde_derive = "1.0"
-serde_json = "1.0"
-postgres = {version = "0.15", features = ["with-chrono"]}
-subprocess = "0.1"
-r2d2 = "*"
-r2d2_postgres = "*"
-failure = "*"
+movie_collection_lib = {path = "movie_collection_lib"}
+movie_collection_http = {path = "movie_collection_http"}
 rayon = "1.0"
-clap = "*"
-dotenv = "*"
-amqp = {version="*", default_features=false}
-select = "*"
-reqwest = "*"
-chrono = { version = "0.4", features = ["serde"] }
-rand = "0.6"
-actix = "*"
-actix-web = "*"
-futures = "*"
-jsonwebtoken = "5.0"
+clap = "2.33"
+failure = "0.1"
 log = "0.4"
 env_logger = "0.6"
 simple_logger = "1.0"
-
-[lib]
-name = "movie_collection_rust"
-path = "src/lib.rs"
+subprocess = "0.1"
+actix = "0.7"
 
 [[bin]]
 name = "make-list"

@@ -2,9 +2,9 @@ use clap::{App, Arg};
 use failure::Error;
 use std::io::{stdout, Write};
 
-use movie_collection_rust::common::movie_collection::MovieCollectionDB;
-use movie_collection_rust::common::parse_imdb::{ParseImdb, ParseImdbOptions};
-use movie_collection_rust::common::utils::get_version_number;
+use movie_collection_lib::common::movie_collection::MovieCollectionDB;
+use movie_collection_lib::common::parse_imdb::{ParseImdb, ParseImdbOptions};
+use movie_collection_lib::common::utils::get_version_number;
 
 fn parse_imdb_parser() -> Result<(), Error> {
     let matches = App::new("Parse IMDB")

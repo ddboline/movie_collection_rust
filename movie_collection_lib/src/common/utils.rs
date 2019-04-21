@@ -185,7 +185,7 @@ pub fn create_transcode_script(config: &Config, path: &Path) -> Result<String, E
         Err(err_msg("File exists"))
     } else {
         let output_file = format!("{}/dvdrip/avi/{}.mp4", config.home_dir, fstem);
-        let template_file = include_str!("../../templates/transcode_script.sh")
+        let template_file = include_str!("../../../templates/transcode_script.sh")
             .replace("INPUT_FILE", full_path)
             .replace("OUTPUT_FILE", &output_file)
             .replace("PREFIX", &fstem);
@@ -236,7 +236,7 @@ pub fn create_move_script(
     };
     let mp4_script = format!("{}/dvdrip/jobs/{}_copy.sh", config.home_dir, prefix);
 
-    let script_str = include_str!("../../templates/move_script.sh")
+    let script_str = include_str!("../../../templates/move_script.sh")
         .replace("SHOW", prefix)
         .replace("OUTNAME", &format!("{}/{}", output_dir, prefix))
         .replace("FNAME", file)

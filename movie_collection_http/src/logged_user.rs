@@ -7,7 +7,7 @@ use std::env;
 use std::sync::{Arc, RwLock};
 
 use super::errors::ServiceError;
-use crate::common::pgpool::PgPool;
+use movie_collection_lib::common::pgpool::PgPool;
 
 #[derive(Debug, Serialize, Deserialize)]
 struct Claims {

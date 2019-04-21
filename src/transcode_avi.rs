@@ -3,8 +3,8 @@ use failure::{err_msg, Error};
 use std::io::{stdout, Write};
 use std::path::{Path, PathBuf};
 
-use movie_collection_rust::common::config::Config;
-use movie_collection_rust::common::utils::{
+use movie_collection_lib::common::config::Config;
+use movie_collection_lib::common::utils::{
     create_transcode_script, get_version_number, publish_transcode_job_to_queue,
 };
 

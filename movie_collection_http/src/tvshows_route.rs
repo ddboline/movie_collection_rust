@@ -9,9 +9,9 @@ use super::authenticated_response;
 use super::logged_user::LoggedUser;
 use super::movie_queue_app::AppState;
 use super::movie_queue_requests::{TvShowsRequest, WatchlistShowsRequest};
-use crate::common::movie_collection::TvShowsResult;
-use crate::common::trakt_utils::WatchListShow;
-use crate::common::tv_show_source::TvShowSource;
+use movie_collection_lib::common::movie_collection::TvShowsResult;
+use movie_collection_lib::common::trakt_utils::WatchListShow;
+use movie_collection_lib::common::tv_show_source::TvShowSource;
 
 type TvShowsMap = HashMap<String, (String, WatchListShow, Option<TvShowSource>)>;
 

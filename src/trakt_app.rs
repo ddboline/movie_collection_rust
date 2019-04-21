@@ -1,10 +1,10 @@
 use clap::{App, Arg};
 use failure::Error;
 
-use movie_collection_rust::common::trakt_utils::{
+use movie_collection_lib::common::trakt_utils::{
     sync_trakt_with_db, trakt_app_parse, TraktActions, TraktCommands,
 };
-use movie_collection_rust::common::utils::get_version_number;
+use movie_collection_lib::common::utils::get_version_number;
 
 fn trakt_app() -> Result<(), Error> {
     let matches = App::new("Trakt Query/Parser")

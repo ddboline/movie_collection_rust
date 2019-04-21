@@ -18,8 +18,8 @@ use super::trakt_routes::{
     trakt_watchlist_action,
 };
 use super::tvshows_route::tvshows;
-use crate::common::config::Config;
-use crate::common::pgpool::PgPool;
+use movie_collection_lib::common::config::Config;
+use movie_collection_lib::common::pgpool::PgPool;
 
 pub struct AppState {
     pub db: Addr<PgPool>,

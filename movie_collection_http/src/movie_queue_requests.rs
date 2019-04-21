@@ -4,22 +4,22 @@ use failure::Error;
 use std::path;
 
 use super::logged_user::LoggedUser;
-use crate::common::imdb_episodes::ImdbEpisodes;
-use crate::common::imdb_ratings::ImdbRatings;
-use crate::common::movie_collection::{
+use movie_collection_lib::common::imdb_episodes::ImdbEpisodes;
+use movie_collection_lib::common::imdb_ratings::ImdbRatings;
+use movie_collection_lib::common::movie_collection::{
     find_new_episodes_http_worker, ImdbSeason, MovieCollection, MovieCollectionDB,
     MovieCollectionRow, TvShowsResult,
 };
-use crate::common::movie_queue::{MovieQueueDB, MovieQueueResult, MovieQueueRow};
-use crate::common::parse_imdb::{ParseImdb, ParseImdbOptions};
-use crate::common::pgpool::PgPool;
-use crate::common::trakt_utils::{
+use movie_collection_lib::common::movie_queue::{MovieQueueDB, MovieQueueResult, MovieQueueRow};
+use movie_collection_lib::common::parse_imdb::{ParseImdb, ParseImdbOptions};
+use movie_collection_lib::common::pgpool::PgPool;
+use movie_collection_lib::common::trakt_utils::{
     get_watched_shows_db, get_watchlist_shows_db_map, trakt_cal_http_worker,
     watch_list_http_worker, watched_action_http_worker, TraktActions, TraktConnection,
     WatchListMap, WatchListShow, WatchedEpisode,
 };
-use crate::common::tv_show_source::TvShowSource;
-use crate::common::utils::map_result_vec;
+use movie_collection_lib::common::tv_show_source::TvShowSource;
+use movie_collection_lib::common::utils::map_result_vec;
 
 pub struct TvShowsRequest {}
 

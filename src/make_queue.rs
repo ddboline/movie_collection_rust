@@ -1,8 +1,8 @@
 use clap::{App, Arg};
 use failure::Error;
 
-use movie_collection_rust::common::make_queue::make_queue_worker;
-use movie_collection_rust::common::utils::get_version_number;
+use movie_collection_lib::common::make_queue::make_queue_worker;
+use movie_collection_lib::common::utils::get_version_number;
 
 fn make_queue() -> Result<(), Error> {
     let matches = App::new("Parse IMDB")
