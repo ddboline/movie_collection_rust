@@ -16,6 +16,11 @@ simple_logger = "1.0"
 subprocess = "0.1"
 actix = "0.7"
 
+[workspace]
+members = [
+    "movie_collection_lib", "movie_collection_http"
+]
+
 [[bin]]
 name = "make-list"
 path = "src/make_list.rs"
