@@ -642,10 +642,10 @@ pub trait MovieCollection: Send + Sync {
             }
         }
         let mut shows_not_in_db: HashSet<String> = HashSet::new();
-        for (show, season, episode, _) in &episode_list {
-            let key = (show.clone(), *season, *episode);
+        for (show, season, episode, _) in episode_list {
+            let key = (show.clone(), season, episode);
             if !episodes_set.contains(&key) {
-                shows_not_in_db.insert(show.clone());
+                shows_not_in_db.insert(show);
             }
         }
         for show in shows_not_in_db {
@@ -939,14 +939,14 @@ pub fn find_new_episodes_http_worker(
     let output = episodes
         .into_iter()
         .map(|epi| {
-            let show = epi.show.clone();
+            let key = (epi.show.clone(), epi.season, epi.episode);
             format!(
                 "<tr><td>{}</td><td>{}</td><td>{}</td><td>{}</td><td>{}</td>{}</tr>",
                 format!(
                     r#"<a href="/list/trakt/watched/list/{}/{}">{}</a>"#,
                     epi.link, epi.season, epi.title
                 ),
-                match queue.get(&(show, epi.season, epi.episode)) {
+                match queue.get(&key) {
                     Some(idx) => format!(
                         "<a href={}>{}</a>",
                         &format!(r#""{}/{}""#, "/list/play", idx),
