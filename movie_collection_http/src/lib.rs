@@ -18,13 +18,13 @@ use movie_queue_app::AppState;
 use serde::Serialize;
 
 fn get_auth_fut(
-    user: &LoggedUser,
+    user: LoggedUser,
     request: &HttpRequest<AppState>,
 ) -> impl Future<Item = Result<bool, failure::Error>, Error = actix_web::Error> {
     request
         .state()
         .db
-        .send(movie_queue_requests::AuthorizedUserRequest { user: user.clone() })
+        .send(movie_queue_requests::AuthorizedUserRequest { user })
         .from_err()
 }
 
@@ -39,7 +39,7 @@ fn unauthbody() -> FutureResponse<HttpResponse> {
 }
 
 fn authenticated_response<T: 'static>(
-    user: &LoggedUser,
+    user: LoggedUser,
     request: HttpRequest<AppState>,
     resp: T,
 ) -> FutureResponse<HttpResponse>
@@ -49,7 +49,7 @@ where
     if request.state().user_list.is_authorized(&user) {
         resp(request)
     } else {
-        get_auth_fut(&user, &request)
+        get_auth_fut(user, &request)
             .and_then(move |res| match res {
                 Ok(true) => resp(request),
                 _ => unauthbody(),
@@ -93,7 +93,7 @@ where
             .responder()
     };
 
-    authenticated_response(&user, request, resp)
+    authenticated_response(user, request, resp)
 }
 
 fn json_route<T, U>(
@@ -118,7 +118,7 @@ where
             .responder()
     };
 
-    authenticated_response(&user, request, resp)
+    authenticated_response(user, request, resp)
 }
 
 #[cfg(test)]

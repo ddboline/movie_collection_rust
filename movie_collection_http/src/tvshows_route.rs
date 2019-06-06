@@ -54,7 +54,7 @@ pub fn tvshows(user: LoggedUser, request: HttpRequest<AppState>) -> FutureRespon
             .responder()
     };
 
-    authenticated_response(&user, request, resp)
+    authenticated_response(user, request, resp)
 }
 
 fn process_shows(

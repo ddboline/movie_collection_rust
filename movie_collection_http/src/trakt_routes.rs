@@ -151,7 +151,7 @@ pub fn trakt_watched_seasons(
                 let empty = || ("".to_string(), "".to_string(), "".to_string());
                 let (imdb_url, show, link) = show_opt
                     .map(|s| {
-                        s.map(|(imdb_url, t)| (imdb_url, t.show.clone(), t.link.clone()))
+                        s.map(|(imdb_url, t)| (imdb_url, t.show, t.link))
                             .unwrap_or_else(empty)
                     })
                     .unwrap_or_else(|_| empty());
@@ -169,7 +169,7 @@ pub fn trakt_watched_seasons(
             .responder()
     };
 
-    authenticated_response(&user, request, resp)
+    authenticated_response(user, request, resp)
 }
 
 pub fn trakt_watched_list(
