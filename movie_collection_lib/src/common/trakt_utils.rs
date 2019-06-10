@@ -690,7 +690,8 @@ fn get_imdb_url_from_show(
 }
 
 fn trakt_cal_list(ti: &TraktConnection, mc: &MovieCollectionDB) -> Result<(), Error> {
-    for cal in ti.get_calendar()? {
+    let cal_entries = ti.get_calendar()?;
+    for cal in cal_entries {
         let show = match ImdbRatings::get_show_by_link(&cal.link, &mc.pool)? {
             Some(s) => s.show,
             None => "".to_string(),
@@ -753,7 +754,8 @@ fn watchlist_rm(
 }
 
 fn watchlist_list(mc: &MovieCollectionDB) -> Result<(), Error> {
-    for (_, show) in get_watchlist_shows_db(&mc.pool)? {
+    let show_map = get_watchlist_shows_db(&mc.pool)?;
+    for (_, show) in show_map {
         writeln!(io::stdout().lock(), "{}", show)?;
     }
     Ok(())
@@ -1097,7 +1099,7 @@ pub fn trakt_cal_http_worker(pool: &PgPool) -> Result<Vec<String>, Error> {
                         r#"<a href="https://www.imdb.com/title/{}">{} {}</a>"#,
                         link, cal.season, cal.episode,
                     ),
-                    None => match &exists {
+                    None => match exists.as_ref() {
                         Some(link) => format!(
                             r#"<a href="https://www.imdb.com/title/{}">{} {}</a>"#,
                             link, cal.season, cal.episode,

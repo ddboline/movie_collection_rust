@@ -23,7 +23,8 @@ pub fn make_queue_worker(
     println!("{:?}", add_files);
 
     if do_shows {
-        for show in mc.print_tv_shows()? {
+        let shows = mc.print_tv_shows()?;
+        for show in shows {
             writeln!(stdout.lock(), "{}", show)?;
         }
     } else if let Some(files) = del_files {

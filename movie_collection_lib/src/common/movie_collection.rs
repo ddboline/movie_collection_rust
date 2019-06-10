@@ -825,10 +825,11 @@ pub trait MovieCollection: Send + Sync {
 
         let mut output = Vec::new();
 
-        'outer: for epi in
-            self.get_new_episodes(mindate.naive_local(), maxdate.naive_local(), source)?
-        {
-            for s in mq.print_movie_queue(&[epi.show.clone()])? {
+        let episodes =
+            self.get_new_episodes(mindate.naive_local(), maxdate.naive_local(), source)?;
+        'outer: for epi in episodes {
+            let movie_queue = mq.print_movie_queue(&[epi.show.clone()])?;
+            for s in movie_queue {
                 if let Some(show) = &s.show {
                     if let Some(season) = &s.season {
                         if let Some(episode) = &s.episode {
@@ -917,7 +918,8 @@ pub fn find_new_episodes_http_worker(
     let mut queue = Vec::new();
 
     for show in shows {
-        for s in mq.print_movie_queue(&[show])? {
+        let movie_queue = mq.print_movie_queue(&[show])?;
+        for s in movie_queue {
             if let Some(u) = mc.get_collection_index(&s.path)? {
                 queue.push((
                     (

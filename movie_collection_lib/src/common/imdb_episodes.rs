@@ -74,7 +74,7 @@ impl ImdbEpisodes {
 
     pub fn from_index(idx: i32, pool: &PgPool) -> Result<Option<ImdbEpisodes>, Error> {
         let query = r#"
-            SELECT a.show, a.title, a.season, a.episode, a.airdate,
+            SELECT a.show, b.title, a.season, a.episode, a.airdate,
                    cast(a.rating as double precision), a.eptitle, a.epurl
             FROM imdb_episodes a
             JOIN imdb_ratings b ON a.show = b.show
@@ -111,7 +111,7 @@ impl ImdbEpisodes {
         pool: &PgPool,
     ) -> Result<Vec<ImdbEpisodes>, Error> {
         let query = r#"
-            SELECT a.show, a.title, a.season, a.episode, a.airdate,
+            SELECT a.show, b.title, a.season, a.episode, a.airdate,
                    cast(a.rating as double precision), a.eptitle, a.epurl
             FROM imdb_episodes a
             JOIN imdb_ratings b ON a.show = b.show

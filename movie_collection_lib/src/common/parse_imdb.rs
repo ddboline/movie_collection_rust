@@ -66,7 +66,8 @@ impl ParseImdb {
         let episodes: Option<Vec<_>> = if opts.tv {
             if opts.all_seasons {
                 if !opts.do_update {
-                    for s in self.mc.print_imdb_all_seasons(&opts.show)? {
+                    let seasons = self.mc.print_imdb_all_seasons(&opts.show)?;
+                    for s in seasons {
                         output.push(s.get_string_vec());
                     }
                 }
@@ -164,7 +165,8 @@ impl ParseImdb {
         } else if let Some(link) = link {
             output.push(vec![format!("Using {}", link)]);
             if let Some(result) = shows.get(&link) {
-                for episode in imdb_conn.parse_imdb_episode_list(&link, opts.season)? {
+                let episode_list = imdb_conn.parse_imdb_episode_list(&link, opts.season)?;
+                for episode in episode_list {
                     output.push(vec![format!("{} {}", result, episode)]);
                     if opts.update_database {
                         let key = (episode.season, episode.episode);

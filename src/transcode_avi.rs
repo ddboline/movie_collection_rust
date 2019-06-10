@@ -25,10 +25,10 @@ fn transcode_avi() -> Result<(), Error> {
         )
         .get_matches();
 
-    for f in matches
+    let files = matches
         .values_of("files")
-        .ok_or_else(|| err_msg("No files given"))?
-    {
+        .ok_or_else(|| err_msg("No files given"))?;
+    for f in files {
         let path = PathBuf::from(f);
 
         let movie_path = format!("{}/Documents/movies", config.home_dir);
