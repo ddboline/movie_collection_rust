@@ -41,7 +41,7 @@ pub fn start_app(config: Config) {
 
     thread::spawn(move || loop {
         _u.fill_from_db(&_p).unwrap();
-        thread::sleep(time::Duration::from_secs(600));
+        thread::sleep(time::Duration::from_secs(60));
     });
 
     let addr: Addr<PgPool> = SyncArbiter::start(nconn, move || pool.clone());
