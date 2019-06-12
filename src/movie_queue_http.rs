@@ -12,7 +12,7 @@ fn main() {
     let command = "rm -f /var/www/html/videos/partial/*";
     Exec::shell(command).join().unwrap();
 
-    let sys = actix::System::new("movie_queue");
+    let sys = actix_rt::System::new("movie_queue");
     start_app(config);
     let _ = sys.run();
 }

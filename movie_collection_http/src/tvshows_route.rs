@@ -1,11 +1,11 @@
 #![allow(clippy::needless_pass_by_value)]
 
-use actix_web::{http::StatusCode, AsyncResponder, FutureResponse, HttpRequest, HttpResponse};
+use actix_web::web::Data;
+use actix_web::HttpResponse;
 use failure::Error;
 use futures::future::Future;
 use std::collections::HashMap;
 
-use super::authenticated_response;
 use super::logged_user::LoggedUser;
 use super::movie_queue_app::AppState;
 use super::movie_queue_requests::{TvShowsRequest, WatchlistShowsRequest};
@@ -34,27 +34,30 @@ fn tvshows_worker(
     let body =
         include_str!("../../templates/tvshows_template.html").replace("BODY", &shows.join("\n"));
 
-    let resp = HttpResponse::build(StatusCode::OK)
+    let resp = HttpResponse::Ok()
         .content_type("text/html; charset=utf-8")
         .body(body);
     Ok(resp)
 }
 
-pub fn tvshows(user: LoggedUser, request: HttpRequest<AppState>) -> FutureResponse<HttpResponse> {
-    let resp = move |req: HttpRequest<AppState>| {
-        req.state()
-            .db
-            .send(TvShowsRequest {})
-            .from_err()
-            .join(req.state().db.send(WatchlistShowsRequest {}).from_err())
-            .and_then(move |(res0, res1)| match res0 {
-                Ok(tvshows) => tvshows_worker(res1, tvshows),
-                Err(err) => Err(err.into()),
-            })
-            .responder()
-    };
-
-    authenticated_response(user, request, resp)
+pub fn tvshows(
+    user: LoggedUser,
+    state: Data<AppState>,
+) -> impl Future<Item = HttpResponse, Error = actix_web::Error> {
+    state
+        .db
+        .send(TvShowsRequest {})
+        .from_err()
+        .join(state.db.send(WatchlistShowsRequest {}).from_err())
+        .and_then(move |(res0, res1)| match res0 {
+            Ok(tvshows) => {
+                if !state.user_list.is_authorized(&user) {
+                    return Ok(HttpResponse::Unauthorized().json("Unauthorized"));
+                }
+                tvshows_worker(res1, tvshows)
+            }
+            Err(err) => Err(err.into()),
+        })
 }
 
 fn process_shows(

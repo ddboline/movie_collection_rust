@@ -1,9 +1,8 @@
 #![allow(clippy::needless_pass_by_value)]
 
-use actix_web::{
-    http::StatusCode, AsyncResponder, FutureResponse, HttpRequest, HttpResponse, Path,
-};
-use futures::future::Future;
+use actix_web::web::{Data, Path};
+use actix_web::HttpResponse;
+use futures::Future;
 use std::collections::HashMap;
 
 use super::logged_user::LoggedUser;
@@ -12,7 +11,7 @@ use super::movie_queue_requests::{
     ImdbRatingsRequest, ImdbSeasonsRequest, TraktCalRequest, WatchedActionRequest,
     WatchedListRequest, WatchlistActionRequest, WatchlistShowsRequest,
 };
-use super::{authenticated_response, form_http_response, generic_route};
+use super::{form_http_response, generic_route};
 use movie_collection_lib::common::movie_collection::ImdbSeason;
 use movie_collection_lib::common::trakt_utils::{TraktActions, TraktConnection, WatchListShow};
 use movie_collection_lib::common::tv_show_source::TvShowSource;
@@ -55,7 +54,7 @@ fn watchlist_worker(
 
     let body = body.replace("BODY", &shows.join("\n"));
 
-    let resp = HttpResponse::build(StatusCode::OK)
+    let resp = HttpResponse::Ok()
         .content_type("text/html; charset=utf-8")
         .body(body);
     Ok(resp)
@@ -63,9 +62,9 @@ fn watchlist_worker(
 
 pub fn trakt_watchlist(
     user: LoggedUser,
-    request: HttpRequest<AppState>,
-) -> FutureResponse<HttpResponse> {
-    generic_route(WatchlistShowsRequest {}, user, request, watchlist_worker)
+    state: Data<AppState>,
+) -> impl Future<Item = HttpResponse, Error = actix_web::Error> {
+    generic_route(WatchlistShowsRequest {}, user, state, watchlist_worker)
 }
 
 fn watchlist_action_worker(
@@ -79,7 +78,7 @@ fn watchlist_action_worker(
         TraktActions::Remove => ti.remove_watchlist_show(&imdb_url)?.to_string(),
         _ => "".to_string(),
     };
-    let resp = HttpResponse::build(StatusCode::OK)
+    let resp = HttpResponse::Ok()
         .content_type("text/html; charset=utf-8")
         .body(body);
     Ok(resp)
@@ -88,15 +87,15 @@ fn watchlist_action_worker(
 pub fn trakt_watchlist_action(
     path: Path<(String, String)>,
     user: LoggedUser,
-    request: HttpRequest<AppState>,
-) -> FutureResponse<HttpResponse> {
+    state: Data<AppState>,
+) -> impl Future<Item = HttpResponse, Error = actix_web::Error> {
     let (action, imdb_url) = path.into_inner();
     let action = TraktActions::from_command(&action);
 
     generic_route(
         WatchlistActionRequest { action, imdb_url },
         user,
-        request,
+        state,
         move |imdb_url| watchlist_action_worker(action, &imdb_url),
     )
 }
@@ -130,7 +129,7 @@ fn trakt_watched_seasons_worker(
         .collect();
     let body = body.replace("BODY", &entries.join("\n"));
 
-    let resp = HttpResponse::build(StatusCode::OK)
+    let resp = HttpResponse::Ok()
         .content_type("text/html; charset=utf-8")
         .body(body);
     Ok(resp)
@@ -139,50 +138,52 @@ fn trakt_watched_seasons_worker(
 pub fn trakt_watched_seasons(
     path: Path<String>,
     user: LoggedUser,
-    request: HttpRequest<AppState>,
-) -> FutureResponse<HttpResponse> {
+    state: Data<AppState>,
+) -> impl Future<Item = HttpResponse, Error = actix_web::Error> {
     let imdb_url = path.into_inner();
 
-    let resp = move |req: HttpRequest<AppState>| {
-        req.state()
-            .db
-            .send(ImdbRatingsRequest { imdb_url })
-            .map(move |show_opt| {
-                let empty = || ("".to_string(), "".to_string(), "".to_string());
-                let (imdb_url, show, link) = show_opt
-                    .map(|s| {
-                        s.map(|(imdb_url, t)| (imdb_url, t.show, t.link))
-                            .unwrap_or_else(empty)
-                    })
-                    .unwrap_or_else(|_| empty());
-                req.state()
-                    .db
-                    .send(ImdbSeasonsRequest { show })
-                    .from_err()
-                    .map(|res| (imdb_url, link, res))
-            })
-            .flatten()
-            .and_then(move |(imdb_url, link, res)| match res {
-                Ok(entries) => trakt_watched_seasons_worker(&link, &imdb_url, &entries),
-                Err(err) => Err(err.into()),
-            })
-            .responder()
-    };
+    let is_auth = state.user_list.is_authorized(&user);
 
-    authenticated_response(user, request, resp)
+    state
+        .db
+        .send(ImdbRatingsRequest { imdb_url })
+        .map(move |show_opt| {
+            let empty = || ("".to_string(), "".to_string(), "".to_string());
+            let (imdb_url, show, link) = show_opt
+                .map(|s| {
+                    s.map(|(imdb_url, t)| (imdb_url, t.show, t.link))
+                        .unwrap_or_else(empty)
+                })
+                .unwrap_or_else(|_| empty());
+            state
+                .db
+                .send(ImdbSeasonsRequest { show })
+                .from_err()
+                .map(|res| (imdb_url, link, res))
+        })
+        .flatten()
+        .and_then(move |(imdb_url, link, res)| match res {
+            Ok(entries) => {
+                if !is_auth {
+                    return Ok(HttpResponse::Unauthorized().json("Unauthorized"));
+                }
+                trakt_watched_seasons_worker(&link, &imdb_url, &entries)
+            }
+            Err(err) => Err(err.into()),
+        })
 }
 
 pub fn trakt_watched_list(
     path: Path<(String, i32)>,
     user: LoggedUser,
-    request: HttpRequest<AppState>,
-) -> FutureResponse<HttpResponse> {
+    state: Data<AppState>,
+) -> impl Future<Item = HttpResponse, Error = actix_web::Error> {
     let (imdb_url, season) = path.into_inner();
 
     generic_route(
         WatchedListRequest { imdb_url, season },
         user,
-        request,
+        state,
         move |body| Ok(form_http_response(body)),
     )
 }
@@ -190,8 +191,8 @@ pub fn trakt_watched_list(
 pub fn trakt_watched_action(
     path: Path<(String, String, i32, i32)>,
     user: LoggedUser,
-    request: HttpRequest<AppState>,
-) -> FutureResponse<HttpResponse> {
+    state: Data<AppState>,
+) -> impl Future<Item = HttpResponse, Error = actix_web::Error> {
     let (action, imdb_url, season, episode) = path.into_inner();
 
     generic_route(
@@ -202,7 +203,7 @@ pub fn trakt_watched_action(
             episode,
         },
         user,
-        request,
+        state,
         move |body| Ok(form_http_response(body)),
     )
 }
@@ -211,14 +212,17 @@ fn trakt_cal_worker(entries: &[String]) -> Result<HttpResponse, actix_web::Error
     let body =
         include_str!("../../templates/watched_template.html").replace("PREVIOUS", "/list/tvshows");
     let body = body.replace("BODY", &entries.join("\n"));
-    let resp = HttpResponse::build(StatusCode::OK)
+    let resp = HttpResponse::Ok()
         .content_type("text/html; charset=utf-8")
         .body(body);
     Ok(resp)
 }
 
-pub fn trakt_cal(user: LoggedUser, request: HttpRequest<AppState>) -> FutureResponse<HttpResponse> {
-    generic_route(TraktCalRequest {}, user, request, move |entries| {
+pub fn trakt_cal(
+    user: LoggedUser,
+    state: Data<AppState>,
+) -> impl Future<Item = HttpResponse, Error = actix_web::Error> {
+    generic_route(TraktCalRequest {}, user, state, move |entries| {
         trakt_cal_worker(&entries)
     })
 }

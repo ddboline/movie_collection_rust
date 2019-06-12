@@ -3,8 +3,10 @@
 use actix::sync::SyncArbiter;
 use actix::Addr;
 use actix_web::middleware::identity::{CookieIdentityPolicy, IdentityService};
-use actix_web::{http::Method, server, App};
+use actix_web::{web, App, HttpServer};
 use chrono::Duration;
+use std::thread;
+use std::time;
 
 use super::logged_user::AuthorizedUsers;
 use super::movie_queue_routes::{
@@ -34,81 +36,94 @@ pub fn start_app(config: Config) {
     let pool = PgPool::new(&config.pgurl);
     let user_list = AuthorizedUsers::new();
 
+    let _u = user_list.clone();
+    let _p = pool.clone();
+
+    thread::spawn(move || loop {
+        _u.fill_from_db(&_p).unwrap();
+        thread::sleep(time::Duration::from_secs(600));
+    });
+
     let addr: Addr<PgPool> = SyncArbiter::start(nconn, move || pool.clone());
 
-    server::new(move || {
-        App::with_state(AppState {
-            db: addr.clone(),
-            user_list: user_list.clone(),
-        })
-        .middleware(IdentityService::new(
-            CookieIdentityPolicy::new(secret.as_bytes())
-                .name("auth")
-                .path("/")
-                .domain(domain.as_str())
-                .max_age(Duration::days(1))
-                .secure(false), // this can only be true if you have https
-        ))
-        .resource("/list/cal", |r| {
-            r.method(Method::GET).with(find_new_episodes)
-        })
-        .resource("/list/tvshows", |r| r.method(Method::GET).with(tvshows))
-        .resource("/list/delete/{path}", |r| {
-            r.method(Method::GET).with(movie_queue_delete)
-        })
-        .resource("/list/transcode/{file}", |r| {
-            r.method(Method::GET).with(movie_queue_transcode)
-        })
-        .resource("/list/transcode/{directory}/{file}", |r| {
-            r.method(Method::GET).with(movie_queue_transcode_directory)
-        })
-        .resource("/list/play/{index}", |r| {
-            r.method(Method::GET).with(movie_queue_play)
-        })
-        .resource("/list/trakt/cal", |r| r.method(Method::GET).with(trakt_cal))
-        .resource("/list/trakt/watchlist", |r| {
-            r.method(Method::GET).with(trakt_watchlist)
-        })
-        .resource("/list/trakt/watchlist/{action}/{imdb_url}", |r| {
-            r.method(Method::GET).with(trakt_watchlist_action)
-        })
-        .resource("/list/trakt/watched/list/{imdb_url}", |r| {
-            r.method(Method::GET).with(trakt_watched_seasons)
-        })
-        .resource("/list/trakt/watched/list/{imdb_url}/{season}", |r| {
-            r.method(Method::GET).with(trakt_watched_list)
-        })
-        .resource(
-            "/list/trakt/watched/{action}/{imdb_url}/{season}/{episode}",
-            |r| r.method(Method::GET).with(trakt_watched_action),
-        )
-        .resource("/list/imdb_episodes", |r| {
-            r.method(Method::GET).with(imdb_episodes_route);
-            r.method(Method::POST).with(imdb_episodes_update);
-        })
-        .resource("/list/imdb_ratings", |r| {
-            r.method(Method::GET).with(imdb_ratings_route);
-            r.method(Method::POST).with(imdb_ratings_update);
-        })
-        .resource("/list/movie_queue", |r| {
-            r.method(Method::GET).with(movie_queue_route);
-            r.method(Method::POST).with(movie_queue_update);
-        })
-        .resource("/list/movie_collection", |r| {
-            r.method(Method::GET).with(movie_collection_route);
-            r.method(Method::POST).with(movie_collection_update);
-        })
-        .resource("/list/imdb/{show}", |r| {
-            r.method(Method::GET).with(imdb_show)
-        })
-        .resource("/list/last_modified", |r| {
-            r.method(Method::GET).with(last_modified_route)
-        })
-        .resource("/list/{show}", |r| {
-            r.method(Method::GET).with(movie_queue_show)
-        })
-        .resource("/list/", |r| r.method(Method::GET).with(movie_queue))
-        .resource("/list", |r| r.method(Method::GET).with(movie_queue))
+    HttpServer::new(move || {
+        App::new()
+            .data(AppState {
+                db: addr.clone(),
+                user_list: user_list.clone(),
+            })
+            .wrap(IdentityService::new(
+                CookieIdentityPolicy::new(secret.as_bytes())
+                    .name("auth")
+                    .path("/")
+                    .domain(domain.as_str())
+                    .max_age_time(Duration::days(1))
+                    .secure(false), // this can only be true if you have https
+            ))
+            .service(web::resource("/list/cal").route(web::get().to_async(find_new_episodes)))
+            .service(web::resource("/list/tvshows").route(web::get().to_async(tvshows)))
+            .service(
+                web::resource("/list/delete/{path}").route(web::get().to_async(movie_queue_delete)),
+            )
+            .service(
+                web::resource("/list/transcode/{file}")
+                    .route(web::get().to_async(movie_queue_transcode)),
+            )
+            .service(
+                web::resource("/list/transcode/{directory}/{file}")
+                    .route(web::get().to_async(movie_queue_transcode_directory)),
+            )
+            .service(
+                web::resource("/list/play/{index}").route(web::get().to_async(movie_queue_play)),
+            )
+            .service(web::resource("/list/trakt/cal").route(web::get().to_async(trakt_cal)))
+            .service(
+                web::resource("/list/trakt/watchlist").route(web::get().to_async(trakt_watchlist)),
+            )
+            .service(
+                web::resource("/list/trakt/watchlist/{action}/{imdb_url}")
+                    .route(web::get().to_async(trakt_watchlist_action)),
+            )
+            .service(
+                web::resource("/list/trakt/watched/list/{imdb_url}")
+                    .route(web::get().to_async(trakt_watched_seasons)),
+            )
+            .service(
+                web::resource("/list/trakt/watched/list/{imdb_url}/{season}")
+                    .route(web::get().to_async(trakt_watched_list)),
+            )
+            .service(
+                web::resource("/list/trakt/watched/{action}/{imdb_url}/{season}/{episode}")
+                    .route(web::get().to_async(trakt_watched_action)),
+            )
+            .service(
+                web::resource("/list/imdb_episodes")
+                    .route(web::get().to_async(imdb_episodes_route))
+                    .route(web::post().to_async(imdb_episodes_update)),
+            )
+            .service(
+                web::resource("/list/imdb_ratings")
+                    .route(web::get().to_async(imdb_ratings_route))
+                    .route(web::post().to_async(imdb_ratings_update)),
+            )
+            .service(
+                web::resource("/list/movie_queue")
+                    .route(web::get().to_async(movie_queue_route))
+                    .route(web::post().to_async(movie_queue_update)),
+            )
+            .service(
+                web::resource("/list/movie_collection")
+                    .route(web::get().to_async(movie_collection_route))
+                    .route(web::post().to_async(movie_collection_update)),
+            )
+            .service(web::resource("/list/imdb/{show}").route(web::get().to_async(imdb_show)))
+            .service(
+                web::resource("/list/last_modified")
+                    .route(web::get().to_async(last_modified_route)),
+            )
+            .service(web::resource("/list/{show}").route(web::get().to_async(movie_queue_show)))
+            .service(web::resource("/list/").route(web::get().to_async(movie_queue)))
+            .service(web::resource("/list").route(web::get().to_async(movie_queue)))
     })
     .bind(&format!("127.0.0.1:{}", port))
     .unwrap_or_else(|_| panic!("Failed to bind to port {}", port))
