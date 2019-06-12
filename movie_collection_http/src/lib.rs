@@ -12,6 +12,7 @@ pub mod tvshows_route;
 use actix::{Handler, Message};
 use actix_web::web::Data;
 use actix_web::HttpResponse;
+use failure::Error;
 use futures::Future;
 use logged_user::LoggedUser;
 use movie_collection_lib::common::pgpool::PgPool;
@@ -24,7 +25,7 @@ fn form_http_response(body: String) -> HttpResponse {
         .body(body)
 }
 
-fn to_json<T>(js: &T) -> Result<HttpResponse, actix_web::Error>
+fn to_json<T>(js: &T) -> Result<HttpResponse, Error>
 where
     T: Serialize,
 {
@@ -36,51 +37,41 @@ fn generic_route<T, U, V>(
     user: LoggedUser,
     state: Data<AppState>,
     callback: V,
-) -> impl Future<Item = HttpResponse, Error = actix_web::Error>
+) -> impl Future<Item = HttpResponse, Error = Error>
 where
     T: Message<Result = Result<U, failure::Error>> + Send + 'static,
     PgPool: Handler<T, Result = Result<U, failure::Error>>,
     U: Send + 'static,
-    V: FnOnce(U) -> Result<HttpResponse, actix_web::Error> + 'static,
+    V: FnOnce(U) -> Result<HttpResponse, Error>,
 {
-    state
-        .db
-        .send(query)
-        .from_err()
-        .and_then(move |res| match res {
-            Ok(x) => {
-                if !state.user_list.is_authorized(&user) {
-                    return Ok(HttpResponse::Unauthorized().json("Unauthorized"));
-                }
-                callback(x)
+    state.db.send(query).from_err().and_then(move |res| {
+        res.and_then(|x| {
+            if !state.user_list.is_authorized(&user) {
+                return Ok(HttpResponse::Unauthorized().json("Unauthorized"));
             }
-            Err(err) => Err(err.into()),
+            callback(x)
         })
+    })
 }
 
 fn json_route<T, U>(
     query: T,
     user: LoggedUser,
     state: Data<AppState>,
-) -> impl Future<Item = HttpResponse, Error = actix_web::Error>
+) -> impl Future<Item = HttpResponse, Error = Error>
 where
     T: Message<Result = Result<U, failure::Error>> + Send + 'static,
     PgPool: Handler<T, Result = Result<U, failure::Error>>,
     U: Serialize + Send + 'static,
 {
-    state
-        .db
-        .send(query)
-        .from_err()
-        .and_then(move |res| match res {
-            Ok(x) => {
-                if !state.user_list.is_authorized(&user) {
-                    return Ok(HttpResponse::Unauthorized().json("Unauthorized"));
-                }
-                to_json(&x)
+    state.db.send(query).from_err().and_then(move |res| {
+        res.and_then(|x| {
+            if !state.user_list.is_authorized(&user) {
+                return Ok(HttpResponse::Unauthorized().json("Unauthorized"));
             }
-            Err(err) => Err(err.into()),
+            to_json(&x)
         })
+    })
 }
 
 #[cfg(test)]

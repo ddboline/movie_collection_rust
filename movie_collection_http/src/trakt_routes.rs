@@ -2,6 +2,7 @@
 
 use actix_web::web::{Data, Path};
 use actix_web::HttpResponse;
+use failure::Error;
 use futures::Future;
 use std::collections::HashMap;
 
@@ -18,7 +19,7 @@ use movie_collection_lib::common::tv_show_source::TvShowSource;
 
 fn watchlist_worker(
     shows: HashMap<String, (String, WatchListShow, Option<TvShowSource>)>,
-) -> Result<HttpResponse, actix_web::Error> {
+) -> Result<HttpResponse, Error> {
     let mut shows: Vec<_> = shows
         .into_iter()
         .map(|(_, (_, s, source))| (s.title, s.link, source))
@@ -63,14 +64,11 @@ fn watchlist_worker(
 pub fn trakt_watchlist(
     user: LoggedUser,
     state: Data<AppState>,
-) -> impl Future<Item = HttpResponse, Error = actix_web::Error> {
+) -> impl Future<Item = HttpResponse, Error = Error> {
     generic_route(WatchlistShowsRequest {}, user, state, watchlist_worker)
 }
 
-fn watchlist_action_worker(
-    action: TraktActions,
-    imdb_url: &str,
-) -> Result<HttpResponse, actix_web::Error> {
+fn watchlist_action_worker(action: TraktActions, imdb_url: &str) -> Result<HttpResponse, Error> {
     let ti = TraktConnection::new();
 
     let body = match action {
@@ -88,7 +86,7 @@ pub fn trakt_watchlist_action(
     path: Path<(String, String)>,
     user: LoggedUser,
     state: Data<AppState>,
-) -> impl Future<Item = HttpResponse, Error = actix_web::Error> {
+) -> impl Future<Item = HttpResponse, Error = Error> {
     let (action, imdb_url) = path.into_inner();
     let action = TraktActions::from_command(&action);
 
@@ -104,7 +102,7 @@ fn trakt_watched_seasons_worker(
     link: &str,
     imdb_url: &str,
     entries: &[ImdbSeason],
-) -> Result<HttpResponse, actix_web::Error> {
+) -> Result<HttpResponse, Error> {
     let button_add = r#"<td><button type="submit" id="ID" onclick="imdb_update('SHOW', 'LINK', SEASON);">update database</button></td>"#;
     let body = include_str!("../../templates/watchlist_template.html")
         .replace("PREVIOUS", "/list/trakt/watchlist");
@@ -139,7 +137,7 @@ pub fn trakt_watched_seasons(
     path: Path<String>,
     user: LoggedUser,
     state: Data<AppState>,
-) -> impl Future<Item = HttpResponse, Error = actix_web::Error> {
+) -> impl Future<Item = HttpResponse, Error = Error> {
     let imdb_url = path.into_inner();
 
     let is_auth = state.user_list.is_authorized(&user);
@@ -177,7 +175,7 @@ pub fn trakt_watched_list(
     path: Path<(String, i32)>,
     user: LoggedUser,
     state: Data<AppState>,
-) -> impl Future<Item = HttpResponse, Error = actix_web::Error> {
+) -> impl Future<Item = HttpResponse, Error = Error> {
     let (imdb_url, season) = path.into_inner();
 
     generic_route(
@@ -192,7 +190,7 @@ pub fn trakt_watched_action(
     path: Path<(String, String, i32, i32)>,
     user: LoggedUser,
     state: Data<AppState>,
-) -> impl Future<Item = HttpResponse, Error = actix_web::Error> {
+) -> impl Future<Item = HttpResponse, Error = Error> {
     let (action, imdb_url, season, episode) = path.into_inner();
 
     generic_route(
@@ -208,7 +206,7 @@ pub fn trakt_watched_action(
     )
 }
 
-fn trakt_cal_worker(entries: &[String]) -> Result<HttpResponse, actix_web::Error> {
+fn trakt_cal_worker(entries: &[String]) -> Result<HttpResponse, Error> {
     let body =
         include_str!("../../templates/watched_template.html").replace("PREVIOUS", "/list/tvshows");
     let body = body.replace("BODY", &entries.join("\n"));
@@ -221,7 +219,7 @@ fn trakt_cal_worker(entries: &[String]) -> Result<HttpResponse, actix_web::Error
 pub fn trakt_cal(
     user: LoggedUser,
     state: Data<AppState>,
-) -> impl Future<Item = HttpResponse, Error = actix_web::Error> {
+) -> impl Future<Item = HttpResponse, Error = Error> {
     generic_route(TraktCalRequest {}, user, state, move |entries| {
         trakt_cal_worker(&entries)
     })

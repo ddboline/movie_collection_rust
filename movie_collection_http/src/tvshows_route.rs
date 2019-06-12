@@ -18,7 +18,7 @@ type TvShowsMap = HashMap<String, (String, WatchListShow, Option<TvShowSource>)>
 fn tvshows_worker(
     res1: Result<TvShowsMap, Error>,
     tvshows: Vec<TvShowsResult>,
-) -> Result<HttpResponse, actix_web::Error> {
+) -> Result<HttpResponse, Error> {
     let tvshows: HashMap<String, _> = tvshows
         .into_iter()
         .map(|s| (s.link.clone(), (s.show, s.title, s.link, s.source)))
@@ -43,7 +43,7 @@ fn tvshows_worker(
 pub fn tvshows(
     user: LoggedUser,
     state: Data<AppState>,
-) -> impl Future<Item = HttpResponse, Error = actix_web::Error> {
+) -> impl Future<Item = HttpResponse, Error = Error> {
     state
         .db
         .send(TvShowsRequest {})

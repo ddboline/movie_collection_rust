@@ -31,10 +31,7 @@ fn movie_queue_body(patterns: &[String], entries: &[String]) -> String {
     body.replace("BODY", &entries.join("\n"))
 }
 
-fn queue_body_resp(
-    patterns: &[String],
-    queue: &[MovieQueueResult],
-) -> Result<HttpResponse, actix_web::error::Error> {
+fn queue_body_resp(patterns: &[String], queue: &[MovieQueueResult]) -> Result<HttpResponse, Error> {
     let entries = movie_queue_http(queue)?;
     let body = movie_queue_body(patterns, &entries);
     let resp = HttpResponse::Ok()
@@ -46,7 +43,7 @@ fn queue_body_resp(
 pub fn movie_queue(
     user: LoggedUser,
     state: Data<AppState>,
-) -> impl Future<Item = HttpResponse, Error = actix_web::Error> {
+) -> impl Future<Item = HttpResponse, Error = Error> {
     generic_route(
         MovieQueueRequest {
             patterns: Vec::new(),
@@ -61,7 +58,7 @@ pub fn movie_queue_show(
     path: Path<String>,
     user: LoggedUser,
     state: Data<AppState>,
-) -> impl Future<Item = HttpResponse, Error = actix_web::Error> {
+) -> impl Future<Item = HttpResponse, Error = Error> {
     let path = path.into_inner();
     let patterns = vec![path];
 
@@ -77,7 +74,7 @@ pub fn movie_queue_delete(
     path: Path<String>,
     user: LoggedUser,
     state: Data<AppState>,
-) -> impl Future<Item = HttpResponse, Error = actix_web::Error> {
+) -> impl Future<Item = HttpResponse, Error = Error> {
     let path = path.into_inner();
 
     generic_route(QueueDeleteRequest { path }, user, state, move |path| {
@@ -88,7 +85,7 @@ pub fn movie_queue_delete(
 fn transcode_worker(
     directory: Option<String>,
     entries: &[MovieQueueResult],
-) -> Result<HttpResponse, actix_web::Error> {
+) -> Result<HttpResponse, Error> {
     let entries: Vec<Result<_, Error>> = entries
         .iter()
         .map(|entry| {
@@ -107,7 +104,7 @@ pub fn movie_queue_transcode(
     path: Path<String>,
     user: LoggedUser,
     state: Data<AppState>,
-) -> impl Future<Item = HttpResponse, Error = actix_web::Error> {
+) -> impl Future<Item = HttpResponse, Error = Error> {
     let path = path.into_inner();
     let patterns = vec![path];
 
@@ -123,7 +120,7 @@ pub fn movie_queue_transcode_directory(
     path: Path<(String, String)>,
     user: LoggedUser,
     state: Data<AppState>,
-) -> impl Future<Item = HttpResponse, Error = actix_web::Error> {
+) -> impl Future<Item = HttpResponse, Error = Error> {
     let (directory, file) = path.into_inner();
     let patterns = vec![file];
 
@@ -135,7 +132,7 @@ pub fn movie_queue_transcode_directory(
     )
 }
 
-fn play_worker(full_path: String) -> Result<HttpResponse, actix_web::Error> {
+fn play_worker(full_path: String) -> Result<HttpResponse, Error> {
     let path = path::Path::new(&full_path);
 
     let file_name = path
@@ -165,7 +162,7 @@ pub fn movie_queue_play(
     idx: Path<i32>,
     user: LoggedUser,
     state: Data<AppState>,
-) -> impl Future<Item = HttpResponse, Error = actix_web::Error> {
+) -> impl Future<Item = HttpResponse, Error = Error> {
     let idx = idx.into_inner();
 
     generic_route(MoviePathRequest { idx }, user, state, play_worker)
@@ -176,7 +173,7 @@ pub fn imdb_show(
     query: Query<ParseImdbRequest>,
     user: LoggedUser,
     state: Data<AppState>,
-) -> impl Future<Item = HttpResponse, Error = actix_web::Error> {
+) -> impl Future<Item = HttpResponse, Error = Error> {
     let show = path.into_inner();
     let query = query.into_inner();
 
@@ -185,7 +182,7 @@ pub fn imdb_show(
     })
 }
 
-fn new_episode_worker(entries: &[String]) -> Result<HttpResponse, actix_web::Error> {
+fn new_episode_worker(entries: &[String]) -> Result<HttpResponse, Error> {
     let body =
         include_str!("../../templates/watched_template.html").replace("PREVIOUS", "/list/tvshows");
     let body = body.replace("BODY", &entries.join("\n"));
@@ -199,7 +196,7 @@ pub fn find_new_episodes(
     query: Query<FindNewEpisodeRequest>,
     user: LoggedUser,
     state: Data<AppState>,
-) -> impl Future<Item = HttpResponse, Error = actix_web::Error> {
+) -> impl Future<Item = HttpResponse, Error = Error> {
     generic_route(query.into_inner(), user, state, move |entries| {
         new_episode_worker(&entries)
     })
@@ -209,7 +206,7 @@ pub fn imdb_episodes_route(
     query: Query<ImdbEpisodesSyncRequest>,
     user: LoggedUser,
     state: Data<AppState>,
-) -> impl Future<Item = HttpResponse, Error = actix_web::Error> {
+) -> impl Future<Item = HttpResponse, Error = Error> {
     json_route(query.into_inner(), user, state)
 }
 
@@ -217,7 +214,7 @@ pub fn imdb_episodes_update(
     data: Json<ImdbEpisodesUpdateRequest>,
     user: LoggedUser,
     state: Data<AppState>,
-) -> impl Future<Item = HttpResponse, Error = actix_web::Error> {
+) -> impl Future<Item = HttpResponse, Error = Error> {
     let episodes = data.into_inner();
 
     generic_route(episodes, user, state, move |_| {
@@ -229,7 +226,7 @@ pub fn imdb_ratings_route(
     query: Query<ImdbRatingsSyncRequest>,
     user: LoggedUser,
     state: Data<AppState>,
-) -> impl Future<Item = HttpResponse, Error = actix_web::Error> {
+) -> impl Future<Item = HttpResponse, Error = Error> {
     json_route(query.into_inner(), user, state)
 }
 
@@ -237,7 +234,7 @@ pub fn imdb_ratings_update(
     data: Json<ImdbRatingsUpdateRequest>,
     user: LoggedUser,
     state: Data<AppState>,
-) -> impl Future<Item = HttpResponse, Error = actix_web::Error> {
+) -> impl Future<Item = HttpResponse, Error = Error> {
     let shows = data.into_inner();
 
     generic_route(shows, user, state, move |_| {
@@ -249,7 +246,7 @@ pub fn movie_queue_route(
     query: Query<MovieQueueSyncRequest>,
     user: LoggedUser,
     state: Data<AppState>,
-) -> impl Future<Item = HttpResponse, Error = actix_web::Error> {
+) -> impl Future<Item = HttpResponse, Error = Error> {
     json_route(query.into_inner(), user, state)
 }
 
@@ -257,7 +254,7 @@ pub fn movie_queue_update(
     data: Json<MovieQueueUpdateRequest>,
     user: LoggedUser,
     state: Data<AppState>,
-) -> impl Future<Item = HttpResponse, Error = actix_web::Error> {
+) -> impl Future<Item = HttpResponse, Error = Error> {
     let queue = data.into_inner();
 
     generic_route(queue, user, state, move |_| {
@@ -269,7 +266,7 @@ pub fn movie_collection_route(
     query: Query<MovieCollectionSyncRequest>,
     user: LoggedUser,
     state: Data<AppState>,
-) -> impl Future<Item = HttpResponse, Error = actix_web::Error> {
+) -> impl Future<Item = HttpResponse, Error = Error> {
     json_route(query.into_inner(), user, state)
 }
 
@@ -277,7 +274,7 @@ pub fn movie_collection_update(
     data: Json<MovieCollectionUpdateRequest>,
     user: LoggedUser,
     state: Data<AppState>,
-) -> impl Future<Item = HttpResponse, Error = actix_web::Error> {
+) -> impl Future<Item = HttpResponse, Error = Error> {
     let collection = data.into_inner();
 
     generic_route(collection, user, state, move |_| {
@@ -288,6 +285,6 @@ pub fn movie_collection_update(
 pub fn last_modified_route(
     user: LoggedUser,
     state: Data<AppState>,
-) -> impl Future<Item = HttpResponse, Error = actix_web::Error> {
+) -> impl Future<Item = HttpResponse, Error = Error> {
     json_route(LastModifiedRequest {}, user, state)
 }
