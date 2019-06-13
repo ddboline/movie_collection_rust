@@ -5,8 +5,10 @@ use actix::Addr;
 use actix_web::middleware::identity::{CookieIdentityPolicy, IdentityService};
 use actix_web::{web, App, HttpServer};
 use chrono::Duration;
-use std::thread;
+use futures::stream::Stream;
+use futures::future::Future;
 use std::time;
+use tokio_timer::Interval;
 
 use super::logged_user::AuthorizedUsers;
 use super::movie_queue_routes::{
@@ -39,10 +41,14 @@ pub fn start_app(config: Config) {
     let _u = user_list.clone();
     let _p = pool.clone();
 
-    thread::spawn(move || loop {
-        _u.fill_from_db(&_p).unwrap();
-        thread::sleep(time::Duration::from_secs(60));
-    });
+    actix_rt::spawn(
+        Interval::new(time::Instant::now(), time::Duration::from_secs(60))
+            .for_each(move |_| {
+                _u.fill_from_db(&_p).unwrap();
+                Ok(())
+            })
+            .map_err(|e| panic!("error {:?}", e)),
+    );
 
     let addr: Addr<PgPool> = SyncArbiter::start(nconn, move || pool.clone());
 
