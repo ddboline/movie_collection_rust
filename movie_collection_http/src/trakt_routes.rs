@@ -160,14 +160,13 @@ pub fn trakt_watched_seasons(
                 .map(|res| (imdb_url, link, res))
         })
         .flatten()
-        .and_then(move |(imdb_url, link, res)| match res {
-            Ok(entries) => {
+        .and_then(move |(imdb_url, link, res)| {
+            res.and_then(|entries| {
                 if !is_auth {
                     return Ok(HttpResponse::Unauthorized().json("Unauthorized"));
                 }
                 trakt_watched_seasons_worker(&link, &imdb_url, &entries)
-            }
-            Err(err) => Err(err.into()),
+            })
         })
 }
 
