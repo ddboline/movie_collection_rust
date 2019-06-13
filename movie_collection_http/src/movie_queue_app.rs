@@ -5,8 +5,8 @@ use actix::Addr;
 use actix_web::middleware::identity::{CookieIdentityPolicy, IdentityService};
 use actix_web::{web, App, HttpServer};
 use chrono::Duration;
-use futures::stream::Stream;
 use futures::future::Future;
+use futures::stream::Stream;
 use std::time;
 use tokio_timer::Interval;
 
@@ -44,7 +44,7 @@ pub fn start_app(config: Config) {
     actix_rt::spawn(
         Interval::new(time::Instant::now(), time::Duration::from_secs(60))
             .for_each(move |_| {
-                _u.fill_from_db(&_p).unwrap();
+                _u.fill_from_db(&_p).unwrap_or(());
                 Ok(())
             })
             .map_err(|e| panic!("error {:?}", e)),
