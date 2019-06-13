@@ -147,6 +147,9 @@ impl ImdbEpisodes {
     }
 
     pub fn insert_episode(&self, pool: &PgPool) -> Result<(), Error> {
+        if self.get_index(pool)?.is_some() {
+            return self.update_episode(pool);
+        }
         let query = r#"
             INSERT INTO imdb_episodes
             (show, season, episode, airdate, rating, eptitle, epurl, last_modified)
