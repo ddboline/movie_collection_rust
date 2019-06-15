@@ -8,7 +8,7 @@ use movie_collection_lib::common::config::Config;
 fn main() {
     env_logger::init();
 
-    let config = Config::with_config();
+    let config = Config::with_config().expect("Config init failed");
     let command = "rm -f /var/www/html/videos/partial/*";
     Exec::shell(command).join().unwrap();
 

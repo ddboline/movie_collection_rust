@@ -79,7 +79,7 @@ fn parse_imdb_parser() -> Result<(), Error> {
     let update_database = matches.is_present("database");
 
     let mc = MovieCollectionDB::new();
-    let pi = ParseImdb::with_pool(&mc.pool);
+    let pi = ParseImdb::with_pool(&mc.pool)?;
 
     let opts = ParseImdbOptions {
         show: show.to_string(),

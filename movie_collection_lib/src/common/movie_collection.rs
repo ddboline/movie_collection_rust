@@ -165,7 +165,7 @@ impl Default for MovieCollectionDB {
 
 impl MovieCollectionDB {
     pub fn new() -> MovieCollectionDB {
-        let config = Config::with_config();
+        let config = Config::with_config().expect("Init config failed");
         let pgurl = &config.pgurl;
         MovieCollectionDB {
             pool: PgPool::new(&pgurl),
@@ -173,12 +173,13 @@ impl MovieCollectionDB {
         }
     }
 
-    pub fn with_pool(pool: &PgPool) -> MovieCollectionDB {
-        let config = Config::with_config();
-        MovieCollectionDB {
+    pub fn with_pool(pool: &PgPool) -> Result<MovieCollectionDB, Error> {
+        let config = Config::with_config()?;
+        let mc = MovieCollectionDB {
             config,
             pool: pool.clone(),
-        }
+        };
+        Ok(mc)
     }
 }
 
@@ -887,7 +888,7 @@ pub fn find_new_episodes_http_worker(
         r#"onclick="imdb_update('SHOW', 'LINK', SEASON);">update database</button></td>"#
     );
 
-    let mc = MovieCollectionDB::with_pool(&pool);
+    let mc = MovieCollectionDB::with_pool(&pool)?;
     let shows_filter: Option<HashSet<String>> =
         shows.map(|s| s.split(',').map(|s| s.to_string()).collect());
 

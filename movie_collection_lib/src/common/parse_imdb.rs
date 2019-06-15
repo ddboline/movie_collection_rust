@@ -26,10 +26,11 @@ pub struct ParseImdb {
 }
 
 impl ParseImdb {
-    pub fn with_pool(pool: &PgPool) -> ParseImdb {
-        ParseImdb {
-            mc: MovieCollectionDB::with_pool(&pool),
-        }
+    pub fn with_pool(pool: &PgPool) -> Result<ParseImdb, Error> {
+        let p = ParseImdb {
+            mc: MovieCollectionDB::with_pool(&pool)?,
+        };
+        Ok(p)
     }
 
     pub fn parse_imdb_worker(&self, opts: &ParseImdbOptions) -> Result<Vec<Vec<String>>, Error> {

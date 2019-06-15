@@ -8,7 +8,7 @@ use crate::common::config::Config;
 use crate::common::utils::{get_video_runtime, map_result_vec, walk_directory};
 
 pub fn make_list() -> Result<(), Error> {
-    let config = Config::with_config();
+    let config = Config::with_config()?;
 
     let movies_dir = format!("{}/Documents/movies", config.home_dir);
 

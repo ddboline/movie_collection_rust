@@ -11,7 +11,7 @@ use movie_collection_lib::common::utils::{
 fn transcode_avi() -> Result<(), Error> {
     let stdout = stdout();
 
-    let config = Config::with_config();
+    let config = Config::with_config()?;
 
     let matches = App::new("Transcode AVI")
         .version(get_version_number().as_str())

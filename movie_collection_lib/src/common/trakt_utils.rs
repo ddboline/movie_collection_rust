@@ -102,7 +102,7 @@ impl TraktConnection {
     pub fn new() -> TraktConnection {
         TraktConnection {
             client: Client::new(),
-            config: Config::with_config(),
+            config: Config::with_config().expect("Config init failed"),
         }
     }
 
@@ -893,7 +893,7 @@ pub fn watch_list_http_worker(pool: &PgPool, imdb_url: &str, season: i32) -> Res
         &format!("/list/trakt/watched/list/{}", imdb_url),
     );
 
-    let mc = MovieCollectionDB::with_pool(&pool);
+    let mc = MovieCollectionDB::with_pool(&pool)?;
     let mq = MovieQueueDB::with_pool(&pool);
 
     let show = ImdbRatings::get_show_by_link(imdb_url, &pool)?
@@ -1002,7 +1002,7 @@ pub fn watched_action_http_worker(
     episode: i32,
 ) -> Result<String, Error> {
     let ti = TraktConnection::new();
-    let mc = MovieCollectionDB::with_pool(&pool);
+    let mc = MovieCollectionDB::with_pool(&pool)?;
 
     let body = match action {
         TraktActions::Add => {

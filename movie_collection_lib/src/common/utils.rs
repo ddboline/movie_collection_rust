@@ -327,7 +327,7 @@ pub fn remcom_single_file(
     directory: &Option<String>,
     unwatched: bool,
 ) -> Result<(), Error> {
-    let config = Config::with_config();
+    let config = Config::with_config()?;
     let path = Path::new(&file);
     let ext = path
         .extension()
