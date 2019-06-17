@@ -3,7 +3,9 @@ use failure::Error;
 use std::fmt;
 
 use crate::common::pgpool::PgPool;
+use crate::common::row_index_trait::RowIndexTrait;
 use crate::common::tv_show_source::TvShowSource;
+use crate::common::utils::map_result;
 use crate::common::utils::option_string_wrapper;
 
 #[derive(Default, Clone, Debug, Serialize, Deserialize)]
@@ -77,13 +79,13 @@ impl ImdbRatings {
             WHERE (link = $1 OR show = $1)
         "#;
         if let Some(row) = pool.get()?.query(query, &[&link])?.iter().nth(0) {
-            let index: i32 = row.get(0);
-            let show: String = row.get(1);
-            let title: Option<String> = row.get(2);
-            let link: String = row.get(3);
-            let rating: Option<f64> = row.get(4);
-            let istv: Option<bool> = row.get(5);
-            let source: Option<String> = row.get(6);
+            let index: i32 = row.get_idx(0)?;
+            let show: String = row.get_idx(1)?;
+            let title: Option<String> = row.get_idx(2)?;
+            let link: String = row.get_idx(3)?;
+            let rating: Option<f64> = row.get_idx(4)?;
+            let istv: Option<bool> = row.get_idx(5)?;
+            let source: Option<String> = row.get_idx(6)?;
             let source: Option<TvShowSource> = match source {
                 Some(s) => s.parse().ok(),
                 None => None,
@@ -116,18 +118,18 @@ impl ImdbRatings {
             .query(query, &[&timestamp])?
             .iter()
             .map(|row| {
-                let index: i32 = row.get(0);
-                let show: String = row.get(1);
-                let title: Option<String> = row.get(2);
-                let link: String = row.get(3);
-                let rating: Option<f64> = row.get(4);
-                let istv: Option<bool> = row.get(5);
-                let source: Option<String> = row.get(6);
+                let index: i32 = row.get_idx(0)?;
+                let show: String = row.get_idx(1)?;
+                let title: Option<String> = row.get_idx(2)?;
+                let link: String = row.get_idx(3)?;
+                let rating: Option<f64> = row.get_idx(4)?;
+                let istv: Option<bool> = row.get_idx(5)?;
+                let source: Option<String> = row.get_idx(6)?;
                 let source: Option<TvShowSource> = match source {
                     Some(s) => s.parse().ok(),
                     None => None,
                 };
-                ImdbRatings {
+                Ok(ImdbRatings {
                     index,
                     show,
                     title,
@@ -135,10 +137,10 @@ impl ImdbRatings {
                     rating,
                     istv,
                     source,
-                }
+                })
             })
             .collect();
-        Ok(shows)
+        map_result(shows)
     }
 
     pub fn get_string_vec(&self) -> Vec<String> {

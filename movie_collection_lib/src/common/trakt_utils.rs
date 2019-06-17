@@ -13,6 +13,7 @@ use crate::common::imdb_ratings::ImdbRatings;
 use crate::common::movie_collection::{MovieCollection, MovieCollectionDB};
 use crate::common::movie_queue::MovieQueueDB;
 use crate::common::pgpool::PgPool;
+use crate::common::row_index_trait::RowIndexTrait;
 use crate::common::tv_show_source::TvShowSource;
 use crate::common::utils::{map_result, option_string_wrapper, ExponentialRetry};
 
@@ -246,8 +247,8 @@ impl WatchListShow {
     pub fn get_show_by_link(link: &str, pool: &PgPool) -> Result<Option<WatchListShow>, Error> {
         let query = "SELECT title, year FROM trakt_watchlist WHERE link = $1";
         if let Some(row) = pool.get()?.query(query, &[&link])?.iter().nth(0) {
-            let title: String = row.get(0);
-            let year: i32 = row.get(1);
+            let title: String = row.get_idx(0)?;
+            let year: i32 = row.get_idx(1)?;
             Ok(Some(WatchListShow {
                 link: link.to_string(),
                 title,
@@ -261,7 +262,7 @@ impl WatchListShow {
     pub fn get_index(&self, pool: &PgPool) -> Result<Option<i32>, Error> {
         let query = "SELECT id FROM trakt_watchlist WHERE link = $1";
         if let Some(row) = pool.get()?.query(query, &[&self.link])?.iter().nth(0) {
-            let id: i32 = row.get(0);
+            let id: i32 = row.get_idx(0)?;
             Ok(Some(id))
         } else {
             Ok(None)
@@ -287,18 +288,18 @@ pub fn get_watchlist_shows_db(pool: &PgPool) -> Result<HashMap<String, WatchList
         SELECT a.link, a.title, a.year
         FROM trakt_watchlist a
     "#;
-    let watchlist = pool
+    let watchlist: Vec<_> = pool
         .get()?
         .query(query, &[])?
         .iter()
         .map(|row| {
-            let link: String = row.get(0);
-            let title: String = row.get(1);
-            let year: i32 = row.get(2);
-            (link.clone(), WatchListShow { link, title, year })
+            let link: String = row.get_idx(0)?;
+            let title: String = row.get_idx(1)?;
+            let year: i32 = row.get_idx(2)?;
+            Ok((link.clone(), WatchListShow { link, title, year }))
         })
         .collect();
-    Ok(watchlist)
+    map_result(watchlist)
 }
 
 pub type WatchListMap = HashMap<String, (String, WatchListShow, Option<TvShowSource>)>;
@@ -309,29 +310,29 @@ pub fn get_watchlist_shows_db_map(pool: &PgPool) -> Result<WatchListMap, Error> 
         FROM trakt_watchlist a
         JOIN imdb_ratings b ON a.link=b.link
     "#;
-    let watchlist = pool
+    let watchlist: Vec<_> = pool
         .get()?
         .query(query, &[])?
         .iter()
         .map(|row| {
-            let show: String = row.get(0);
-            let link: String = row.get(1);
-            let title: String = row.get(2);
-            let year: i32 = row.get(3);
-            let source: Option<String> = row.get(4);
+            let show: String = row.get_idx(0)?;
+            let link: String = row.get_idx(1)?;
+            let title: String = row.get_idx(2)?;
+            let year: i32 = row.get_idx(3)?;
+            let source: Option<String> = row.get_idx(4)?;
 
             let source: Option<TvShowSource> = match source {
                 Some(s) => s.parse().ok(),
                 None => None,
             };
 
-            (
+            Ok((
                 link.clone(),
                 (show, WatchListShow { link, title, year }, source),
-            )
+            ))
         })
         .collect();
-    Ok(watchlist)
+    map_result(watchlist)
 }
 
 #[derive(Serialize, Deserialize, Debug, Default, PartialEq, Eq, Hash)]
@@ -365,7 +366,7 @@ impl WatchedEpisode {
             .iter()
             .nth(0)
         {
-            let id: i32 = row.get(0);
+            let id: i32 = row.get_idx(0)?;
             Ok(Some(id))
         } else {
             Ok(None)
@@ -384,26 +385,25 @@ impl WatchedEpisode {
             JOIN imdb_ratings b ON a.link = b.link
             WHERE a.link = $1 AND a.season = $2 AND a.episode = $3
         "#;
-        let watched_episode = if let Some(row) = pool
+        if let Some(row) = pool
             .get()?
             .query(query, &[&link, &season, &episode])?
             .iter()
             .nth(0)
         {
-            let imdb_url: String = row.get(0);
-            let title: String = row.get(1);
-            let season: i32 = row.get(2);
-            let episode: i32 = row.get(3);
-            Some(WatchedEpisode {
+            let imdb_url: String = row.get_idx(0)?;
+            let title: String = row.get_idx(1)?;
+            let season: i32 = row.get_idx(2)?;
+            let episode: i32 = row.get_idx(3)?;
+            Ok(Some(WatchedEpisode {
                 title,
                 imdb_url,
                 season,
                 episode,
-            })
+            }))
         } else {
-            None
-        };
-        Ok(watched_episode)
+            Ok(None)
+        }
     }
 
     pub fn insert_episode(&self, pool: &PgPool) -> Result<(), Error> {
@@ -457,24 +457,24 @@ pub fn get_watched_shows_db(
         where_str
     );
 
-    let watched_shows = pool
+    let watched_shows: Vec<_> = pool
         .get()?
         .query(&query, &[])?
         .iter()
         .map(|row| {
-            let imdb_url: String = row.get(0);
-            let title: String = row.get(1);
-            let season: i32 = row.get(2);
-            let episode: i32 = row.get(3);
-            WatchedEpisode {
+            let imdb_url: String = row.get_idx(0)?;
+            let title: String = row.get_idx(1)?;
+            let season: i32 = row.get_idx(2)?;
+            let episode: i32 = row.get_idx(3)?;
+            Ok(WatchedEpisode {
                 title,
                 imdb_url,
                 season,
                 episode,
-            }
+            })
         })
         .collect();
-    Ok(watched_shows)
+    map_result(watched_shows)
 }
 
 #[derive(Serialize, Deserialize, Debug, Default, PartialEq, Eq, Hash)]
@@ -497,7 +497,7 @@ impl WatchedMovie {
             WHERE link=$1
         "#;
         if let Some(row) = pool.get()?.query(query, &[&self.imdb_url])?.iter().nth(0) {
-            let id: i32 = row.get(0);
+            let id: i32 = row.get_idx(0)?;
             Ok(Some(id))
         } else {
             Ok(None)
@@ -511,14 +511,13 @@ impl WatchedMovie {
             JOIN imdb_ratings b ON a.link = b.link
             WHERE a.link = $1
         "#;
-        let watched_movie = if let Some(row) = pool.get()?.query(query, &[&link])?.iter().nth(0) {
-            let imdb_url: String = row.get(0);
-            let title: String = row.get(1);
-            Some(WatchedMovie { title, imdb_url })
+        if let Some(row) = pool.get()?.query(query, &[&link])?.iter().nth(0) {
+            let imdb_url: String = row.get_idx(0)?;
+            let title: String = row.get_idx(1)?;
+            Ok(Some(WatchedMovie { title, imdb_url }))
         } else {
-            None
-        };
-        Ok(watched_movie)
+            Ok(None)
+        }
     }
 
     pub fn insert_movie(&self, pool: &PgPool) -> Result<(), Error> {
@@ -547,17 +546,17 @@ pub fn get_watched_movies_db(pool: &PgPool) -> Result<Vec<WatchedMovie>, Error> 
         JOIN imdb_ratings b ON a.link = b.link
         ORDER BY b.show
     "#;
-    let watched_shows = pool
+    let watched_shows: Vec<_> = pool
         .get()?
         .query(query, &[])?
         .iter()
         .map(|row| {
-            let imdb_url: String = row.get(0);
-            let title: String = row.get(1);
-            WatchedMovie { title, imdb_url }
+            let imdb_url: String = row.get_idx(0)?;
+            let title: String = row.get_idx(1)?;
+            Ok(WatchedMovie { title, imdb_url })
         })
         .collect();
-    Ok(watched_shows)
+    map_result(watched_shows)
 }
 
 pub fn sync_trakt_with_db() -> Result<(), Error> {

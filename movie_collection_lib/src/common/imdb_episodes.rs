@@ -3,6 +3,8 @@ use failure::Error;
 use std::fmt;
 
 use crate::common::pgpool::PgPool;
+use crate::common::row_index_trait::RowIndexTrait;
+use crate::common::utils::map_result;
 
 #[derive(Clone, Serialize, Deserialize)]
 pub struct ImdbEpisodes {
@@ -65,7 +67,7 @@ impl ImdbEpisodes {
             .iter()
             .nth(0)
         {
-            let id: i32 = row.get(0);
+            let id: i32 = row.get_idx(0)?;
             Ok(Some(id))
         } else {
             Ok(None)
@@ -80,14 +82,14 @@ impl ImdbEpisodes {
             JOIN imdb_ratings b ON a.show = b.show
             WHERE a.id = $1"#;
         if let Some(row) = pool.get()?.query(query, &[&idx])?.iter().nth(0) {
-            let show: String = row.get(0);
-            let title: String = row.get(1);
-            let season: i32 = row.get(2);
-            let episode: i32 = row.get(3);
-            let airdate: NaiveDate = row.get(4);
-            let rating: f64 = row.get(5);
-            let eptitle: String = row.get(6);
-            let epurl: String = row.get(7);
+            let show: String = row.get_idx(0)?;
+            let title: String = row.get_idx(1)?;
+            let season: i32 = row.get_idx(2)?;
+            let episode: i32 = row.get_idx(3)?;
+            let airdate: NaiveDate = row.get_idx(4)?;
+            let rating: f64 = row.get_idx(5)?;
+            let eptitle: String = row.get_idx(6)?;
+            let epurl: String = row.get_idx(7)?;
 
             let epi = ImdbEpisodes {
                 show,
@@ -122,16 +124,16 @@ impl ImdbEpisodes {
             .query(query, &[&timestamp])?
             .iter()
             .map(|row| {
-                let show: String = row.get(0);
-                let title: String = row.get(1);
-                let season: i32 = row.get(2);
-                let episode: i32 = row.get(3);
-                let airdate: NaiveDate = row.get(4);
-                let rating: f64 = row.get(5);
-                let eptitle: String = row.get(6);
-                let epurl: String = row.get(7);
+                let show: String = row.get_idx(0)?;
+                let title: String = row.get_idx(1)?;
+                let season: i32 = row.get_idx(2)?;
+                let episode: i32 = row.get_idx(3)?;
+                let airdate: NaiveDate = row.get_idx(4)?;
+                let rating: f64 = row.get_idx(5)?;
+                let eptitle: String = row.get_idx(6)?;
+                let epurl: String = row.get_idx(7)?;
 
-                ImdbEpisodes {
+                Ok(ImdbEpisodes {
                     show,
                     title,
                     season,
@@ -140,10 +142,10 @@ impl ImdbEpisodes {
                     rating,
                     eptitle,
                     epurl,
-                }
+                })
             })
             .collect();
-        Ok(episodes)
+        map_result(episodes)
     }
 
     pub fn insert_episode(&self, pool: &PgPool) -> Result<(), Error> {

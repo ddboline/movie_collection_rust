@@ -8,6 +8,7 @@ pub mod movie_collection;
 pub mod movie_queue;
 pub mod parse_imdb;
 pub mod pgpool;
+pub mod row_index_trait;
 pub mod trakt_utils;
 pub mod tv_show_source;
 pub mod utils;

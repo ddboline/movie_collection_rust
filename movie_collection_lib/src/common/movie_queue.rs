@@ -7,6 +7,7 @@ use std::path::Path;
 use crate::common::config::Config;
 use crate::common::movie_collection::{MovieCollection, MovieCollectionDB};
 use crate::common::pgpool::PgPool;
+use crate::common::row_index_trait::RowIndexTrait;
 use crate::common::utils::{map_result, option_string_wrapper, parse_file_stem};
 
 #[derive(Default, Serialize)]
@@ -95,7 +96,7 @@ impl MovieQueueDB {
     pub fn remove_from_queue_by_collection_idx(&self, collection_idx: i32) -> Result<(), Error> {
         let query = r#"SELECT idx FROM movie_queue WHERE collection_idx=$1"#;
         for row in self.pool.get()?.query(query, &[&collection_idx])?.iter() {
-            let idx = row.get(0);
+            let idx = row.get_idx(0)?;
             self.remove_from_queue_by_idx(idx)?;
         }
         Ok(())
@@ -139,8 +140,8 @@ impl MovieQueueDB {
             .query(query, &[&collection_idx])?
             .iter()
             .last()
-            .map(|row| row.get(0))
-            .unwrap_or(-1);
+            .map(|row| row.get_idx(0))
+            .unwrap_or(Ok(-1))?;
 
         if current_idx != -1 {
             self.remove_from_queue_by_idx(current_idx)?;
@@ -185,7 +186,7 @@ impl MovieQueueDB {
     pub fn get_max_queue_index(&self) -> Result<i32, Error> {
         let query = r#"SELECT max(idx) FROM movie_queue"#;
         if let Some(row) = self.pool.get()?.query(query, &[])?.iter().nth(0) {
-            let max_idx: i32 = row.get(0);
+            let max_idx: i32 = row.get_idx(0)?;
             Ok(max_idx)
         } else {
             Ok(-1)
@@ -214,19 +215,20 @@ impl MovieQueueDB {
             .query(&query, &[])?
             .iter()
             .map(|row| {
-                let idx: i32 = row.get(0);
-                let path: String = row.get(1);
-                let link: Option<String> = row.get(2);
-                let istv: Option<bool> = row.get(3);
-                MovieQueueResult {
+                let idx: i32 = row.get_idx(0)?;
+                let path: String = row.get_idx(1)?;
+                let link: Option<String> = row.get_idx(2)?;
+                let istv: Option<bool> = row.get_idx(3)?;
+                Ok(MovieQueueResult {
                     idx,
                     path,
                     link,
                     istv: istv.unwrap_or(false),
                     ..Default::default()
-                }
+                })
             })
             .collect();
+        let results: Vec<_> = map_result(results)?;
 
         let results: Vec<Result<_, Error>> = results
             .into_par_iter()
@@ -249,7 +251,7 @@ impl MovieQueueDB {
                         .query(query, &[&show, &season, &episode])?
                         .iter()
                     {
-                        let epurl: String = row.get(0);
+                        let epurl: String = row.get_idx(0)?;
                         result.eplink = Some(epurl);
                         result.show = Some(show.clone());
                         result.season = Some(season);
@@ -280,19 +282,19 @@ impl MovieQueueDB {
             .query(query, &[&timestamp])?
             .iter()
             .map(|row| {
-                let idx: i32 = row.get(0);
-                let collection_idx: i32 = row.get(1);
-                let path: String = row.get(2);
-                let show: String = row.get(3);
-                MovieQueueRow {
+                let idx: i32 = row.get_idx(0)?;
+                let collection_idx: i32 = row.get_idx(1)?;
+                let path: String = row.get_idx(2)?;
+                let show: String = row.get_idx(3)?;
+                Ok(MovieQueueRow {
                     idx,
                     collection_idx,
                     path,
                     show,
-                }
+                })
             })
             .collect();
-        Ok(queue)
+        map_result(queue)
     }
 }
 

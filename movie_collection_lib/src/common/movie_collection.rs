@@ -13,6 +13,7 @@ use crate::common::imdb_episodes::ImdbEpisodes;
 use crate::common::imdb_ratings::ImdbRatings;
 use crate::common::movie_queue::MovieQueueDB;
 use crate::common::pgpool::PgPool;
+use crate::common::row_index_trait::RowIndexTrait;
 use crate::common::tv_show_source::TvShowSource;
 use crate::common::utils::{map_result, option_string_wrapper, parse_file_stem, walk_directory};
 
@@ -237,22 +238,23 @@ pub trait MovieCollection: Send + Sync {
                     .query(&query, &[])?
                     .iter()
                     .map(|row| {
-                        let index: i32 = row.get(0);
-                        let show: String = row.get(1);
-                        let title: String = row.get(2);
-                        let link: String = row.get(3);
-                        let rating: f64 = row.get(4);
+                        let index: i32 = row.get_idx(0)?;
+                        let show: String = row.get_idx(1)?;
+                        let title: String = row.get_idx(2)?;
+                        let link: String = row.get_idx(3)?;
+                        let rating: f64 = row.get_idx(4)?;
 
-                        ImdbRatings {
+                        Ok(ImdbRatings {
                             index,
                             show,
                             title: Some(title),
                             link,
                             rating: Some(rating),
                             ..Default::default()
-                        }
+                        })
                     })
                     .collect();
+                let results: Vec<_> = map_result(results)?;
                 Ok(results)
             })
             .collect();
@@ -287,16 +289,16 @@ pub trait MovieCollection: Send + Sync {
             .query(&query, &[])?
             .iter()
             .map(|row| {
-                let show: String = row.get(0);
-                let title: String = row.get(1);
-                let season: i32 = row.get(2);
-                let episode: i32 = row.get(3);
-                let airdate: NaiveDate = row.get(4);
-                let rating: f64 = row.get(5);
-                let eptitle: String = row.get(6);
-                let epurl: String = row.get(7);
+                let show: String = row.get_idx(0)?;
+                let title: String = row.get_idx(1)?;
+                let season: i32 = row.get_idx(2)?;
+                let episode: i32 = row.get_idx(3)?;
+                let airdate: NaiveDate = row.get_idx(4)?;
+                let rating: f64 = row.get_idx(5)?;
+                let eptitle: String = row.get_idx(6)?;
+                let epurl: String = row.get_idx(7)?;
 
-                ImdbEpisodes {
+                Ok(ImdbEpisodes {
                     show,
                     title,
                     season,
@@ -305,10 +307,10 @@ pub trait MovieCollection: Send + Sync {
                     rating,
                     eptitle,
                     epurl,
-                }
+                })
             })
             .collect();
-        Ok(result)
+        map_result(result)
     }
 
     fn print_imdb_all_seasons(&self, show: &str) -> Result<Vec<ImdbSeason>, Error> {
@@ -320,26 +322,26 @@ pub trait MovieCollection: Send + Sync {
         let query = format!("{} GROUP BY a.show, b.title, a.season", query);
         let query = format!("{} ORDER BY a.season", query);
 
-        let result = self
+        let result: Vec<_> = self
             .get_pool()
             .get()?
             .query(&query, &[])?
             .iter()
             .map(|row| {
-                let show: String = row.get(0);
-                let title: String = row.get(1);
-                let season: i32 = row.get(2);
-                let nepisodes: i64 = row.get(3);
+                let show: String = row.get_idx(0)?;
+                let title: String = row.get_idx(1)?;
+                let season: i32 = row.get_idx(2)?;
+                let nepisodes: i64 = row.get_idx(3)?;
 
-                ImdbSeason {
+                Ok(ImdbSeason {
                     show,
                     title,
                     season,
                     nepisodes,
-                }
+                })
             })
             .collect();
-        Ok(result)
+        map_result(result)
     }
 
     fn search_movie_collection(
@@ -370,22 +372,24 @@ pub trait MovieCollection: Send + Sync {
             .query(&query, &[])?
             .iter()
             .map(|row| {
-                let path: String = row.get(0);
-                let show: String = row.get(1);
-                let rating: f64 = row.get(2);
-                let title: String = row.get(3);
-                let istv: Option<bool> = row.get(4);
+                let path: String = row.get_idx(0)?;
+                let show: String = row.get_idx(1)?;
+                let rating: f64 = row.get_idx(2)?;
+                let title: String = row.get_idx(3)?;
+                let istv: Option<bool> = row.get_idx(4)?;
 
-                MovieCollectionResult {
+                Ok(MovieCollectionResult {
                     path,
                     show,
                     rating,
                     title,
                     istv: istv.unwrap_or(false),
                     ..Default::default()
-                }
+                })
             })
             .collect();
+
+        let results: Vec<_> = map_result(results)?;
 
         let results: Vec<Result<_, Error>> = results
             .into_par_iter()
@@ -411,9 +415,9 @@ pub trait MovieCollection: Send + Sync {
                     {
                         result.season = Some(season);
                         result.episode = Some(episode);
-                        result.eprating = row.get(0);
-                        result.eptitle = row.get(1);
-                        result.epurl = row.get(2);
+                        result.eprating = row.get_idx(0)?;
+                        result.eptitle = row.get_idx(1)?;
+                        result.epurl = row.get_idx(2)?;
                     }
                 }
                 Ok(result)
@@ -437,14 +441,18 @@ pub trait MovieCollection: Send + Sync {
 
     fn get_collection_index(&self, path: &str) -> Result<Option<i32>, Error> {
         let query = r#"SELECT idx FROM movie_collection WHERE path = $1"#;
-        let result = self
+        match self
             .get_pool()
             .get()?
             .query(query, &[&path])?
             .iter()
-            .map(|row| row.get(0))
-            .nth(0);
-        Ok(result)
+            .map(|row| row.get_idx(0))
+            .nth(0)
+        {
+            Some(Ok(x)) => Ok(Some(x)),
+            Some(Err(e)) => Err(e),
+            None => Ok(None),
+        }
     }
 
     fn get_collection_path(&self, idx: i32) -> Result<String, Error> {
@@ -465,14 +473,18 @@ pub trait MovieCollection: Send + Sync {
             r#"SELECT idx FROM movie_collection WHERE path like '%{}%'"#,
             path
         );
-        let result = self
+        match self
             .get_pool()
             .get()?
             .query(&query, &[])?
             .iter()
-            .map(|row| row.get(0))
-            .nth(0);
-        Ok(result)
+            .map(|row| row.get_idx(0))
+            .nth(0)
+        {
+            Some(Ok(x)) => Ok(Some(x)),
+            Some(Err(e)) => Err(e),
+            None => Ok(None),
+        }
     }
 
     fn insert_into_collection(&self, path: &str) -> Result<(), Error> {
@@ -555,43 +567,47 @@ pub trait MovieCollection: Send + Sync {
             FROM movie_queue a
             JOIN movie_collection b ON a.collection_idx=b.idx
         "#;
-        let movie_queue: HashMap<String, i32> = self
+        let results: Vec<_> = self
             .get_pool()
             .get()?
             .query(query, &[])?
             .iter()
             .map(|row| {
-                let path: String = row.get(0);
-                let idx: i32 = row.get(1);
-                (path, idx)
+                let path: String = row.get_idx(0)?;
+                let idx: i32 = row.get_idx(1)?;
+                Ok((path, idx))
             })
             .collect();
+        let movie_queue: HashMap<String, i32> = map_result(results)?;
 
         let query = "SELECT path, show FROM movie_collection";
-        let collection_map: HashMap<String, String> = self
+        let results: Vec<_> = self
             .get_pool()
             .get()?
             .query(query, &[])?
             .iter()
             .map(|row| {
-                let path: String = row.get(0);
-                let show: String = row.get(1);
-                (path, show)
+                let path: String = row.get_idx(0)?;
+                let show: String = row.get_idx(1)?;
+                Ok((path, show))
             })
             .collect();
+        let collection_map: HashMap<String, String> = map_result(results)?;
+
         let query = "SELECT show, season, episode from imdb_episodes";
-        let episodes_set: HashSet<(String, i32, i32)> = self
+        let results: Vec<_> = self
             .get_pool()
             .get()?
             .query(query, &[])?
             .iter()
             .map(|row| {
-                let show: String = row.get(0);
-                let season: i32 = row.get(1);
-                let episode: i32 = row.get(2);
-                (show, season, episode)
+                let show: String = row.get_idx(0)?;
+                let season: i32 = row.get_idx(1)?;
+                let episode: i32 = row.get_idx(2)?;
+                Ok((show, season, episode))
             })
             .collect();
+        let episodes_set: HashSet<(String, i32, i32)> = map_result(results)?;
 
         let stdout = io::stdout();
 
@@ -662,25 +678,25 @@ pub trait MovieCollection: Send + Sync {
             FROM imdb_ratings
             WHERE link IS NOT null AND rating IS NOT null
         "#;
-        let results: HashMap<String, ImdbRatings> = self
+        let results: Vec<_> = self
             .get_pool()
             .get()?
             .query(query, &[])?
             .iter()
             .map(|row| {
-                let link: String = row.get(0);
-                let show: String = row.get(1);
-                let title: String = row.get(2);
-                let rating: f64 = row.get(3);
-                let istv: bool = row.get(4);
-                let source: Option<String> = row.get(5);
+                let link: String = row.get_idx(0)?;
+                let show: String = row.get_idx(1)?;
+                let title: String = row.get_idx(2)?;
+                let rating: f64 = row.get_idx(3)?;
+                let istv: bool = row.get_idx(4)?;
+                let source: Option<String> = row.get_idx(5)?;
 
                 let source: Option<TvShowSource> = match source {
                     Some(s) => s.parse().ok(),
                     None => None,
                 };
 
-                (
+                Ok((
                     link.clone(),
                     ImdbRatings {
                         show,
@@ -691,10 +707,10 @@ pub trait MovieCollection: Send + Sync {
                         source,
                         ..Default::default()
                     },
-                )
+                ))
             })
             .collect();
-        Ok(results)
+        map_result(results)
     }
 
     fn print_tv_shows(&self) -> Result<Vec<TvShowsResult>, Error> {
@@ -713,27 +729,27 @@ pub trait MovieCollection: Send + Sync {
             .query(query, &[])?
             .iter()
             .map(|row| {
-                let show: String = row.get(0);
-                let link: String = row.get(1);
-                let title: String = row.get(2);
-                let source: Option<String> = row.get(3);
-                let count: i64 = row.get(4);
+                let show: String = row.get_idx(0)?;
+                let link: String = row.get_idx(1)?;
+                let title: String = row.get_idx(2)?;
+                let source: Option<String> = row.get_idx(3)?;
+                let count: i64 = row.get_idx(4)?;
 
                 let source: Option<TvShowSource> = match source {
                     Some(s) => s.parse().ok(),
                     None => None,
                 };
 
-                TvShowsResult {
+                Ok(TvShowsResult {
                     show,
                     link,
                     title,
                     count,
                     source,
-                }
+                })
             })
             .collect();
-        Ok(results)
+        map_result(results)
     }
 
     fn get_new_episodes(
@@ -782,23 +798,23 @@ pub trait MovieCollection: Send + Sync {
         };
         let query = format!("{} {}", query, groupby);
 
-        let results = self
+        let results: Vec<_> = self
             .get_pool()
             .get()?
             .query(&query, &[&mindate, &maxdate])?
             .iter()
             .map(|row| {
-                let show: String = row.get(0);
-                let link: String = row.get(1);
-                let title: String = row.get(2);
-                let season: i32 = row.get(3);
-                let episode: i32 = row.get(4);
-                let epurl: String = row.get(5);
-                let airdate: NaiveDate = row.get(6);
-                let rating: f64 = row.get(7);
-                let eprating: f64 = row.get(8);
-                let eptitle: String = row.get(9);
-                NewEpisodesResult {
+                let show: String = row.get_idx(0)?;
+                let link: String = row.get_idx(1)?;
+                let title: String = row.get_idx(2)?;
+                let season: i32 = row.get_idx(3)?;
+                let episode: i32 = row.get_idx(4)?;
+                let epurl: String = row.get_idx(5)?;
+                let airdate: NaiveDate = row.get_idx(6)?;
+                let rating: f64 = row.get_idx(7)?;
+                let eprating: f64 = row.get_idx(8)?;
+                let eptitle: String = row.get_idx(9)?;
+                Ok(NewEpisodesResult {
                     show,
                     link,
                     title,
@@ -809,10 +825,10 @@ pub trait MovieCollection: Send + Sync {
                     rating,
                     eprating,
                     eptitle,
-                }
+                })
             })
             .collect();
-        Ok(results)
+        map_result(results)
     }
 
     fn find_new_episodes(
@@ -868,13 +884,13 @@ pub trait MovieCollection: Send + Sync {
             .query(query, &[&timestamp])?
             .iter()
             .map(|row| {
-                let idx: i32 = row.get(0);
-                let path: String = row.get(1);
-                let show: String = row.get(2);
-                MovieCollectionRow { idx, path, show }
+                let idx: i32 = row.get_idx(0)?;
+                let path: String = row.get_idx(1)?;
+                let show: String = row.get_idx(2)?;
+                Ok(MovieCollectionRow { idx, path, show })
             })
             .collect();
-        Ok(queue)
+        map_result(queue)
     }
 }
 
