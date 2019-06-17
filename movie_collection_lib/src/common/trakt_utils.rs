@@ -14,7 +14,7 @@ use crate::common::movie_collection::{MovieCollection, MovieCollectionDB};
 use crate::common::movie_queue::MovieQueueDB;
 use crate::common::pgpool::PgPool;
 use crate::common::tv_show_source::TvShowSource;
-use crate::common::utils::{map_result_vec, option_string_wrapper, ExponentialRetry};
+use crate::common::utils::{map_result, option_string_wrapper, ExponentialRetry};
 
 #[derive(Clone, Copy)]
 pub enum TraktActions {
@@ -582,7 +582,7 @@ pub fn sync_trakt_with_db() -> Result<(), Error> {
             Ok(())
         })
         .collect();
-    map_result_vec(results)?;
+    map_result(results)?;
 
     /*
     let results: Vec<Result<_, Error>> = watchlist_shows_db
@@ -595,7 +595,7 @@ pub fn sync_trakt_with_db() -> Result<(), Error> {
             Ok(())
         })
         .collect();
-    map_result_vec(results)?;
+    map_result(results)?;
     */
 
     let watched_shows_db: HashMap<(String, i32, i32), _> =
@@ -617,7 +617,7 @@ pub fn sync_trakt_with_db() -> Result<(), Error> {
             Ok(())
         })
         .collect();
-    map_result_vec(results)?;
+    map_result(results)?;
 
     /*
     let results: Vec<Result<_, Error>> = watched_shows_db
@@ -630,7 +630,7 @@ pub fn sync_trakt_with_db() -> Result<(), Error> {
             Ok(())
         })
         .collect();
-    map_result_vec(results)?;
+    map_result(results)?;
     */
 
     let watched_movies_db: HashMap<String, _> = get_watched_movies_db(&mc.pool)?
@@ -651,7 +651,7 @@ pub fn sync_trakt_with_db() -> Result<(), Error> {
             Ok(())
         })
         .collect();
-    map_result_vec(results)?;
+    map_result(results)?;
 
     let results: Vec<Result<_, Error>> = watched_movies_db
         .par_iter()
@@ -663,7 +663,7 @@ pub fn sync_trakt_with_db() -> Result<(), Error> {
             Ok(())
         })
         .collect();
-    map_result_vec(results)?;
+    map_result(results)?;
     Ok(())
 }
 
@@ -944,7 +944,7 @@ pub fn watch_list_http_worker(pool: &PgPool, imdb_url: &str, season: i32) -> Res
         )
         .collect();
 
-    let collection_idx_map = map_result_vec(collection_idx_map)?;
+    let collection_idx_map: Vec<_> = map_result(collection_idx_map)?;
     let collection_idx_map: HashMap<i32, i32> = collection_idx_map.into_iter().collect();
 
     let entries: Vec<_> = entries
@@ -1120,6 +1120,6 @@ pub fn trakt_cal_http_worker(pool: &PgPool) -> Result<Vec<String>, Error> {
             Ok(entry)
         })
         .collect();
-    let entries = map_result_vec(entries)?;
+    let entries = map_result(entries)?;
     Ok(entries)
 }

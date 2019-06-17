@@ -5,7 +5,7 @@ use std::io;
 use std::io::Write;
 
 use movie_collection_lib::common::movie_collection::{MovieCollection, MovieCollectionDB};
-use movie_collection_lib::common::utils::{get_version_number, get_video_runtime, map_result_vec};
+use movie_collection_lib::common::utils::{get_version_number, get_video_runtime, map_result};
 
 fn make_collection() -> Result<(), Error> {
     let matches = App::new("Collection Query/Parser")
@@ -56,7 +56,7 @@ fn make_collection() -> Result<(), Error> {
                     Ok((timeval, result))
                 })
                 .collect();
-            let shows = map_result_vec(shows)?;
+            let shows: Vec<_> = map_result(shows)?;
             for (timeval, show) in shows {
                 writeln!(stdout.lock(), "{} {}", timeval, show)?;
             }

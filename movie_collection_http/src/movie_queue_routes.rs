@@ -18,7 +18,7 @@ use super::movie_queue_requests::{
 use super::{form_http_response, generic_route, json_route};
 use movie_collection_lib::common::make_queue::movie_queue_http;
 use movie_collection_lib::common::movie_queue::MovieQueueResult;
-use movie_collection_lib::common::utils::{map_result_vec, remcom_single_file};
+use movie_collection_lib::common::utils::{map_result, remcom_single_file};
 
 fn movie_queue_body(patterns: &[String], entries: &[String]) -> String {
     let watchlist_url = if patterns.is_empty() {
@@ -93,7 +93,7 @@ fn transcode_worker(
             Ok(format!("{}", entry))
         })
         .collect();
-    let entries = map_result_vec(entries)?;
+    let entries: Vec<_> = map_result(entries)?;
     let resp = HttpResponse::Ok()
         .content_type("text/html; charset=utf-8")
         .body(entries.join("\n"));

@@ -19,7 +19,7 @@ use movie_collection_lib::common::trakt_utils::{
     WatchListMap, WatchListShow, WatchedEpisode,
 };
 use movie_collection_lib::common::tv_show_source::TvShowSource;
-use movie_collection_lib::common::utils::map_result_vec;
+use movie_collection_lib::common::utils::map_result;
 
 pub struct TvShowsRequest {}
 
@@ -550,10 +550,9 @@ impl Handler<LastModifiedRequest> for PgPool {
             })
             .collect();
 
-        let result = map_result_vec(result)?
-            .into_iter()
-            .filter_map(|x| x)
-            .collect();
+        let result: Vec<_> = map_result(result)?;
+
+        let result = result.into_iter().filter_map(|x| x).collect();
         Ok(result)
     }
 }

@@ -7,7 +7,7 @@ use std::path::Path;
 use crate::common::config::Config;
 use crate::common::movie_collection::{MovieCollection, MovieCollectionDB};
 use crate::common::pgpool::PgPool;
-use crate::common::utils::{map_result_vec, option_string_wrapper, parse_file_stem};
+use crate::common::utils::{map_result, option_string_wrapper, parse_file_stem};
 
 #[derive(Default, Serialize)]
 pub struct MovieQueueResult {
@@ -259,7 +259,7 @@ impl MovieQueueDB {
                 Ok(result)
             })
             .collect();
-        let mut results = map_result_vec(results)?;
+        let mut results: Vec<_> = map_result(results)?;
         results.sort_by_key(|r| r.idx);
         Ok(results)
     }

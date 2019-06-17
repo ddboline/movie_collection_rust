@@ -14,9 +14,7 @@ use crate::common::imdb_ratings::ImdbRatings;
 use crate::common::movie_queue::MovieQueueDB;
 use crate::common::pgpool::PgPool;
 use crate::common::tv_show_source::TvShowSource;
-use crate::common::utils::{
-    map_result_vec, option_string_wrapper, parse_file_stem, walk_directory,
-};
+use crate::common::utils::{map_result, option_string_wrapper, parse_file_stem, walk_directory};
 
 pub struct NewEpisodesResult {
     pub show: String,
@@ -258,7 +256,8 @@ pub trait MovieCollection: Send + Sync {
                 Ok(results)
             })
             .collect();
-        let results: Vec<_> = map_result_vec(shows)?.into_iter().flatten().collect();
+        let shows: Vec<_> = map_result(shows)?;
+        let results: Vec<_> = shows.into_iter().flatten().collect();
         Ok(results)
     }
 
@@ -420,7 +419,7 @@ pub trait MovieCollection: Send + Sync {
                 Ok(result)
             })
             .collect();
-        let mut results = map_result_vec(results)?;
+        let mut results: Vec<_> = map_result(results)?;
         results.sort_by_key(|r| (r.season, r.episode));
         Ok(results)
     }
@@ -534,7 +533,9 @@ pub trait MovieCollection: Send + Sync {
             return Ok(());
         }
 
-        let file_list: HashSet<_> = map_result_vec(file_list)?.into_iter().flatten().collect();
+        let file_list: Vec<_> = map_result(file_list)?;
+
+        let file_list: HashSet<_> = file_list.into_iter().flatten().collect();
 
         let episode_list: HashSet<_> = file_list
             .par_iter()
@@ -609,7 +610,7 @@ pub trait MovieCollection: Send + Sync {
                 self.insert_into_collection(f)?;
             }
         }
-        let results = collection_map
+        let results: Vec<_> = collection_map
             .par_iter()
             .map(|(key, val)| {
                 if !file_list.contains(key) {
@@ -631,7 +632,7 @@ pub trait MovieCollection: Send + Sync {
             })
             .collect();
 
-        map_result_vec(results)?;
+        let _: Vec<_> = map_result(results)?;
 
         for (key, val) in collection_map {
             if !file_list.contains(&key) {

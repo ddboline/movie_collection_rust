@@ -6,7 +6,7 @@ use select::document::Document;
 use select::predicate::{Class, Name};
 use std::fmt;
 
-use crate::common::utils::{map_result_vec, option_string_wrapper, ExponentialRetry};
+use crate::common::utils::{map_result, option_string_wrapper, ExponentialRetry};
 
 #[derive(Default)]
 pub struct ImdbTuple {
@@ -121,7 +121,7 @@ impl ImdbConnection {
             })
             .collect();
 
-        let shows: Vec<_> = map_result_vec(results)?;
+        let shows: Vec<_> = map_result(results)?;
 
         Ok(shows)
     }
@@ -199,7 +199,7 @@ impl ImdbConnection {
                 results
             })
             .collect();
-        let results: Vec<_> = map_result_vec(results)?;
+        let results: Vec<_> = map_result(results)?;
         Ok(results)
     }
 
@@ -267,6 +267,6 @@ impl ImdbConnection {
             })
             .collect();
 
-        map_result_vec(results)
+        map_result(results)
     }
 }

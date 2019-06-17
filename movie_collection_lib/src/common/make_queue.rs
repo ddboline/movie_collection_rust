@@ -7,7 +7,7 @@ use std::path;
 
 use crate::common::movie_collection::{MovieCollection, MovieCollectionDB};
 use crate::common::movie_queue::{MovieQueueDB, MovieQueueResult};
-use crate::common::utils::{get_video_runtime, map_result_vec, parse_file_stem};
+use crate::common::utils::{get_video_runtime, map_result, parse_file_stem};
 
 pub fn make_queue_worker(
     add_files: Option<Vec<String>>,
@@ -66,7 +66,7 @@ pub fn make_queue_worker(
                 })
                 .collect();
 
-            let results = map_result_vec(results)?;
+            let results: Vec<_> = map_result(results)?;
 
             for (timeval, result) in results {
                 writeln!(stdout.lock(), "{} {}", result, timeval)?;
@@ -146,7 +146,7 @@ pub fn movie_queue_http(queue: &[MovieQueueResult]) -> Result<Vec<String>, Error
         })
         .collect();
 
-    let entries = map_result_vec(entries)?;
+    let entries = map_result(entries)?;
 
     Ok(entries)
 }

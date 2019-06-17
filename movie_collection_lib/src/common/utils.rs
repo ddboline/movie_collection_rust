@@ -10,6 +10,7 @@ use std::fs::rename;
 use std::fs::{File, OpenOptions};
 use std::io::{stdout, Write};
 use std::io::{BufRead, BufReader};
+use std::iter::FromIterator;
 use std::path::Path;
 use std::thread::sleep;
 use std::time::Duration;
@@ -22,9 +23,13 @@ pub fn option_string_wrapper(s: &Option<String>) -> &str {
     s.as_ref().map(|s| s.as_str()).unwrap_or("")
 }
 
-pub fn map_result_vec<T>(input: Vec<Result<T, Error>>) -> Result<Vec<T>, Error> {
+pub fn map_result<T, U, V>(input: U) -> Result<V, Error>
+where
+    U: IntoIterator<Item = Result<T, Error>>,
+    V: FromIterator<T>,
+{
     let mut errors: Vec<_> = Vec::new();
-    let output: Vec<T> = input
+    let output: V = input
         .into_iter()
         .filter_map(|item| match item {
             Ok(i) => Some(i),
@@ -318,7 +323,7 @@ pub fn get_video_runtime(f: &str) -> Result<String, Error> {
             Ok(())
         })
         .collect();
-    map_result_vec(results)?;
+    map_result(results)?;
     Ok(timeval)
 }
 
