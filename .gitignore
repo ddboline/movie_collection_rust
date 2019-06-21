@@ -2,3 +2,6 @@
 **/*.rs.bk
 Cargo.lock
 */target
+backup
+backup.tar.gz
+config.env
