@@ -20,7 +20,6 @@ pub fn make_queue_worker(
     let mq = MovieQueueDB::with_pool(&mc.pool);
 
     let stdout = io::stdout();
-    println!("{:?}", add_files);
 
     if do_shows {
         let shows = mc.print_tv_shows()?;
