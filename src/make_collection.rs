@@ -1,6 +1,6 @@
 use clap::{App, Arg};
 use failure::Error;
-use rayon::prelude::*;
+use rayon::iter::{IntoParallelIterator, ParallelIterator};
 use std::io;
 use std::io::Write;
 

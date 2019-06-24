@@ -1,6 +1,5 @@
 use failure::{err_msg, Error};
-use rayon::prelude::*;
-
+use rayon::iter::{IntoParallelIterator, IntoParallelRefIterator, ParallelIterator};
 use std::io;
 use std::io::Write;
 use std::path;

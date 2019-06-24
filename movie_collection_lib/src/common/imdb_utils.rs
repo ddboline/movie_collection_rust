@@ -1,6 +1,6 @@
 use chrono::NaiveDate;
 use failure::{err_msg, Error};
-use rayon::prelude::*;
+use rayon::iter::{IntoParallelIterator, ParallelIterator};
 use reqwest::{Client, Url};
 use select::document::Document;
 use select::predicate::{Class, Name};

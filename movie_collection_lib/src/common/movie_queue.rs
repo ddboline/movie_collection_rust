@@ -1,6 +1,6 @@
 use chrono::{DateTime, Utc};
 use failure::{err_msg, Error};
-use rayon::prelude::*;
+use rayon::iter::{IntoParallelIterator, ParallelIterator};
 use std::fmt;
 use std::path::Path;
 

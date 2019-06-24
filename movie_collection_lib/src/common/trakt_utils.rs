@@ -1,6 +1,6 @@
 use chrono::NaiveDate;
 use failure::{err_msg, Error};
-use rayon::prelude::*;
+use rayon::iter::{IntoParallelRefIterator, ParallelIterator};
 use reqwest::{Client, Url};
 use std::collections::{HashMap, HashSet};
 use std::fmt;

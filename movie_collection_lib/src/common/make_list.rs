@@ -1,5 +1,5 @@
 use failure::Error;
-use rayon::prelude::*;
+use rayon::iter::{IntoParallelRefIterator, ParallelIterator};
 use std::collections::HashMap;
 use std::io::{stdout, Write};
 use std::path::Path;
