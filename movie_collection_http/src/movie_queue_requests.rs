@@ -7,8 +7,7 @@ use super::logged_user::LoggedUser;
 use movie_collection_lib::common::imdb_episodes::ImdbEpisodes;
 use movie_collection_lib::common::imdb_ratings::ImdbRatings;
 use movie_collection_lib::common::movie_collection::{
-    find_new_episodes_http_worker, ImdbSeason, MovieCollection, MovieCollectionDB,
-    MovieCollectionRow, TvShowsResult,
+    find_new_episodes_http_worker, ImdbSeason, MovieCollection, MovieCollectionRow, TvShowsResult,
 };
 use movie_collection_lib::common::movie_queue::{MovieQueueDB, MovieQueueResult, MovieQueueRow};
 use movie_collection_lib::common::parse_imdb::{ParseImdb, ParseImdbOptions};
@@ -32,7 +31,7 @@ impl Handler<TvShowsRequest> for PgPool {
     type Result = Result<Vec<TvShowsResult>, Error>;
 
     fn handle(&mut self, _: TvShowsRequest, _: &mut Self::Context) -> Self::Result {
-        MovieCollectionDB::with_pool(&self)?.print_tv_shows()
+        MovieCollection::with_pool(&self)?.print_tv_shows()
     }
 }
 
@@ -97,7 +96,7 @@ impl Handler<MoviePathRequest> for PgPool {
     type Result = Result<String, Error>;
 
     fn handle(&mut self, msg: MoviePathRequest, _: &mut Self::Context) -> Self::Result {
-        MovieCollectionDB::with_pool(&self)?.get_collection_path(msg.idx)
+        MovieCollection::with_pool(&self)?.get_collection_path(msg.idx)
     }
 }
 
@@ -132,7 +131,7 @@ impl Handler<ImdbSeasonsRequest> for PgPool {
         if msg.show.as_str() == "" {
             Ok(Vec::new())
         } else {
-            MovieCollectionDB::with_pool(&self)?.print_imdb_all_seasons(&msg.show)
+            MovieCollection::with_pool(&self)?.print_imdb_all_seasons(&msg.show)
         }
     }
 }
@@ -199,7 +198,7 @@ impl Handler<ImdbEpisodesRequest> for PgPool {
     type Result = Result<Vec<ImdbEpisodes>, Error>;
 
     fn handle(&mut self, msg: ImdbEpisodesRequest, _: &mut Self::Context) -> Self::Result {
-        MovieCollectionDB::with_pool(&self)?.print_imdb_episodes(&msg.show, msg.season)
+        MovieCollection::with_pool(&self)?.print_imdb_episodes(&msg.show, msg.season)
     }
 }
 
@@ -405,7 +404,7 @@ impl Handler<MovieCollectionSyncRequest> for PgPool {
     type Result = Result<Vec<MovieCollectionRow>, Error>;
 
     fn handle(&mut self, msg: MovieCollectionSyncRequest, _: &mut Self::Context) -> Self::Result {
-        let mc = MovieCollectionDB::with_pool(&self)?;
+        let mc = MovieCollection::with_pool(&self)?;
         mc.get_collection_after_timestamp(msg.start_timestamp)
     }
 }
@@ -470,7 +469,7 @@ impl Handler<MovieQueueUpdateRequest> for PgPool {
 
     fn handle(&mut self, msg: MovieQueueUpdateRequest, _: &mut Self::Context) -> Self::Result {
         let mq = MovieQueueDB::with_pool(&self);
-        let mc = MovieCollectionDB::with_pool(&self)?;
+        let mc = MovieCollection::with_pool(&self)?;
         for entry in msg.queue {
             let cidx = match mc.get_collection_index(&entry.path)? {
                 Some(i) => i,
@@ -499,7 +498,7 @@ impl Handler<MovieCollectionUpdateRequest> for PgPool {
     type Result = Result<(), Error>;
 
     fn handle(&mut self, msg: MovieCollectionUpdateRequest, _: &mut Self::Context) -> Self::Result {
-        let mc = MovieCollectionDB::with_pool(&self)?;
+        let mc = MovieCollection::with_pool(&self)?;
         for entry in msg.collection {
             if let Some(cidx) = mc.get_collection_index(&entry.path)? {
                 if cidx == entry.idx {

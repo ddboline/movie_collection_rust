@@ -4,7 +4,7 @@ use rayon::iter::{IntoParallelIterator, ParallelIterator};
 use std::io;
 use std::io::Write;
 
-use movie_collection_lib::common::movie_collection::{MovieCollection, MovieCollectionDB};
+use movie_collection_lib::common::movie_collection::{MovieCollection};
 use movie_collection_lib::common::utils::{get_version_number, get_video_runtime, map_result};
 
 fn make_collection() -> Result<(), Error> {
@@ -45,7 +45,7 @@ fn make_collection() -> Result<(), Error> {
 
     let stdout = io::stdout();
 
-    let mc = MovieCollectionDB::new();
+    let mc = MovieCollection::new();
     if !do_parse {
         let shows = mc.search_movie_collection(&shows)?;
         if do_time {

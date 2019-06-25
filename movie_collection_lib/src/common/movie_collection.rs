@@ -151,53 +151,45 @@ impl ImdbSeason {
 }
 
 #[derive(Debug)]
-pub struct MovieCollectionDB {
+pub struct MovieCollection {
     pub config: Config,
     pub pool: PgPool,
 }
 
-impl Default for MovieCollectionDB {
-    fn default() -> MovieCollectionDB {
-        MovieCollectionDB::new()
+impl Default for MovieCollection {
+    fn default() -> MovieCollection {
+        MovieCollection::new()
     }
 }
 
-impl MovieCollectionDB {
-    pub fn new() -> MovieCollectionDB {
+impl MovieCollection {
+    pub fn new() -> MovieCollection {
         let config = Config::with_config().expect("Init config failed");
         let pgurl = &config.pgurl;
-        MovieCollectionDB {
+        MovieCollection {
             pool: PgPool::new(&pgurl),
             config,
         }
     }
 
-    pub fn with_pool(pool: &PgPool) -> Result<MovieCollectionDB, Error> {
+    pub fn with_pool(pool: &PgPool) -> Result<MovieCollection, Error> {
         let config = Config::with_config()?;
-        let mc = MovieCollectionDB {
+        let mc = MovieCollection {
             config,
             pool: pool.clone(),
         };
         Ok(mc)
     }
-}
 
-impl MovieCollection for MovieCollectionDB {
-    fn get_pool(&self) -> &PgPool {
+    pub fn get_pool(&self) -> &PgPool {
         &self.pool
     }
 
-    fn get_config(&self) -> &Config {
+    pub fn get_config(&self) -> &Config {
         &self.config
     }
-}
 
-pub trait MovieCollection: Send + Sync {
-    fn get_pool(&self) -> &PgPool;
-
-    fn get_config(&self) -> &Config;
-
-    fn print_imdb_shows(&self, show: &str, istv: bool) -> Result<Vec<ImdbRatings>, Error> {
+    pub fn print_imdb_shows(&self, show: &str, istv: bool) -> Result<Vec<ImdbRatings>, Error> {
         let query = format!("SELECT show FROM imdb_ratings WHERE show like '%{}%'", show);
         let query = if istv {
             format!("{} AND istv", query)
@@ -263,7 +255,7 @@ pub trait MovieCollection: Send + Sync {
         Ok(results)
     }
 
-    fn print_imdb_episodes(
+    pub fn print_imdb_episodes(
         &self,
         show: &str,
         season: Option<i32>,
@@ -313,7 +305,7 @@ pub trait MovieCollection: Send + Sync {
         map_result(result)
     }
 
-    fn print_imdb_all_seasons(&self, show: &str) -> Result<Vec<ImdbSeason>, Error> {
+    pub fn print_imdb_all_seasons(&self, show: &str) -> Result<Vec<ImdbSeason>, Error> {
         let query = r#"
             SELECT a.show, b.title, a.season, count(distinct a.episode)
             FROM imdb_episodes a
@@ -344,7 +336,7 @@ pub trait MovieCollection: Send + Sync {
         map_result(result)
     }
 
-    fn search_movie_collection(
+    pub fn search_movie_collection(
         &self,
         search_strs: &[String],
     ) -> Result<Vec<MovieCollectionResult>, Error> {
@@ -428,7 +420,7 @@ pub trait MovieCollection: Send + Sync {
         Ok(results)
     }
 
-    fn remove_from_collection(&self, path: &str) -> Result<(), Error> {
+    pub fn remove_from_collection(&self, path: &str) -> Result<(), Error> {
         let query = r#"
             DELETE FROM movie_collection
             WHERE path = $1
@@ -439,7 +431,7 @@ pub trait MovieCollection: Send + Sync {
         Ok(())
     }
 
-    fn get_collection_index(&self, path: &str) -> Result<Option<i32>, Error> {
+    pub fn get_collection_index(&self, path: &str) -> Result<Option<i32>, Error> {
         let query = r#"SELECT idx FROM movie_collection WHERE path = $1"#;
         match self
             .get_pool()
@@ -455,7 +447,7 @@ pub trait MovieCollection: Send + Sync {
         }
     }
 
-    fn get_collection_path(&self, idx: i32) -> Result<String, Error> {
+    pub fn get_collection_path(&self, idx: i32) -> Result<String, Error> {
         let query = "SELECT path FROM movie_collection WHERE idx = $1";
         let path: String = self
             .get_pool()
@@ -468,7 +460,7 @@ pub trait MovieCollection: Send + Sync {
         Ok(path)
     }
 
-    fn get_collection_index_match(&self, path: &str) -> Result<Option<i32>, Error> {
+    pub fn get_collection_index_match(&self, path: &str) -> Result<Option<i32>, Error> {
         let query = format!(
             r#"SELECT idx FROM movie_collection WHERE path like '%{}%'"#,
             path
@@ -487,7 +479,7 @@ pub trait MovieCollection: Send + Sync {
         }
     }
 
-    fn insert_into_collection(&self, path: &str) -> Result<(), Error> {
+    pub fn insert_into_collection(&self, path: &str) -> Result<(), Error> {
         if !Path::new(&path).exists() {
             return Err(err_msg("No such file"));
         }
@@ -503,7 +495,7 @@ pub trait MovieCollection: Send + Sync {
         Ok(())
     }
 
-    fn insert_into_collection_by_idx(&self, idx: i32, path: &str) -> Result<(), Error> {
+    pub fn insert_into_collection_by_idx(&self, idx: i32, path: &str) -> Result<(), Error> {
         let file_stem = Path::new(&path).file_stem().unwrap().to_str().unwrap();
         let (show, _, _) = parse_file_stem(&file_stem);
         let query = r#"
@@ -516,7 +508,7 @@ pub trait MovieCollection: Send + Sync {
         Ok(())
     }
 
-    fn fix_collection_show_id(&self) -> Result<u64, Error> {
+    pub fn fix_collection_show_id(&self) -> Result<u64, Error> {
         let query = r#"
             WITH a AS (
                 SELECT a.idx, a.show, b.index
@@ -533,7 +525,7 @@ pub trait MovieCollection: Send + Sync {
         Ok(rows)
     }
 
-    fn make_collection(&self) -> Result<(), Error> {
+    pub fn make_collection(&self) -> Result<(), Error> {
         let file_list: Vec<_> = self
             .get_config()
             .movie_dirs
@@ -672,7 +664,7 @@ pub trait MovieCollection: Send + Sync {
         Ok(())
     }
 
-    fn get_imdb_show_map(&self) -> Result<HashMap<String, ImdbRatings>, Error> {
+    pub fn get_imdb_show_map(&self) -> Result<HashMap<String, ImdbRatings>, Error> {
         let query = r#"
             SELECT link, show, title, rating, istv, source
             FROM imdb_ratings
@@ -713,7 +705,7 @@ pub trait MovieCollection: Send + Sync {
         map_result(results)
     }
 
-    fn print_tv_shows(&self) -> Result<Vec<TvShowsResult>, Error> {
+    pub fn print_tv_shows(&self) -> Result<Vec<TvShowsResult>, Error> {
         let query = r#"
             SELECT b.show, c.link, c.title, c.source, count(*) as count
             FROM movie_queue a
@@ -752,7 +744,7 @@ pub trait MovieCollection: Send + Sync {
         map_result(results)
     }
 
-    fn get_new_episodes(
+    pub fn get_new_episodes(
         &self,
         mindate: NaiveDate,
         maxdate: NaiveDate,
@@ -831,7 +823,7 @@ pub trait MovieCollection: Send + Sync {
         map_result(results)
     }
 
-    fn find_new_episodes(
+    pub fn find_new_episodes(
         &self,
         source: &Option<TvShowSource>,
         shows: &[String],
@@ -869,7 +861,7 @@ pub trait MovieCollection: Send + Sync {
         Ok(output)
     }
 
-    fn get_collection_after_timestamp(
+    pub fn get_collection_after_timestamp(
         &self,
         timestamp: DateTime<Utc>,
     ) -> Result<Vec<MovieCollectionRow>, Error> {
@@ -905,7 +897,7 @@ pub fn find_new_episodes_http_worker(
         r#"onclick="imdb_update('SHOW', 'LINK', SEASON);">update database</button></td>"#
     );
 
-    let mc = MovieCollectionDB::with_pool(&pool)?;
+    let mc = MovieCollection::with_pool(&pool)?;
     let shows_filter: Option<HashSet<String>> =
         shows.map(|s| s.split(',').map(|s| s.to_string()).collect());
 

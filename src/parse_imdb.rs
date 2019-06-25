@@ -2,7 +2,7 @@ use clap::{App, Arg};
 use failure::Error;
 use std::io::{stdout, Write};
 
-use movie_collection_lib::common::movie_collection::MovieCollectionDB;
+use movie_collection_lib::common::movie_collection::MovieCollection;
 use movie_collection_lib::common::parse_imdb::{ParseImdb, ParseImdbOptions};
 use movie_collection_lib::common::utils::get_version_number;
 
@@ -78,7 +78,7 @@ fn parse_imdb_parser() -> Result<(), Error> {
     let do_update = matches.is_present("update");
     let update_database = matches.is_present("database");
 
-    let mc = MovieCollectionDB::new();
+    let mc = MovieCollection::new();
     let pi = ParseImdb::with_pool(&mc.pool)?;
 
     let opts = ParseImdbOptions {

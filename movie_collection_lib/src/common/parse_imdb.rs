@@ -5,7 +5,7 @@ use std::collections::HashMap;
 use crate::common::imdb_episodes::ImdbEpisodes;
 use crate::common::imdb_ratings::ImdbRatings;
 use crate::common::imdb_utils::ImdbConnection;
-use crate::common::movie_collection::{MovieCollection, MovieCollectionDB};
+use crate::common::movie_collection::MovieCollection;
 use crate::common::pgpool::PgPool;
 use crate::common::trakt_utils::WatchListMap;
 
@@ -22,13 +22,13 @@ pub struct ParseImdbOptions {
 
 #[derive(Default)]
 pub struct ParseImdb {
-    pub mc: MovieCollectionDB,
+    pub mc: MovieCollection,
 }
 
 impl ParseImdb {
     pub fn with_pool(pool: &PgPool) -> Result<ParseImdb, Error> {
         let p = ParseImdb {
-            mc: MovieCollectionDB::with_pool(&pool)?,
+            mc: MovieCollection::with_pool(&pool)?,
         };
         Ok(p)
     }

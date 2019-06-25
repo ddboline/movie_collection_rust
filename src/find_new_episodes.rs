@@ -3,7 +3,7 @@ use failure::Error;
 use std::io;
 use std::io::Write;
 
-use movie_collection_lib::common::movie_collection::{MovieCollection, MovieCollectionDB};
+use movie_collection_lib::common::movie_collection::MovieCollection;
 use movie_collection_lib::common::tv_show_source::TvShowSource;
 use movie_collection_lib::common::utils::get_version_number;
 
@@ -45,7 +45,7 @@ fn find_new_episodes() -> Result<(), Error> {
         Some(TvShowSource::All)
     };
 
-    let mc = MovieCollectionDB::new();
+    let mc = MovieCollection::new();
 
     let output = mc.find_new_episodes(&source, &shows)?;
 

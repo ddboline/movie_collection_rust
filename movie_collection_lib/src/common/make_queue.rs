@@ -4,7 +4,7 @@ use std::io;
 use std::io::Write;
 use std::path;
 
-use crate::common::movie_collection::{MovieCollection, MovieCollectionDB};
+use crate::common::movie_collection::MovieCollection;
 use crate::common::movie_queue::{MovieQueueDB, MovieQueueResult};
 use crate::common::utils::{get_video_runtime, map_result, parse_file_stem};
 
@@ -15,7 +15,7 @@ pub fn make_queue_worker(
     patterns: &[String],
     do_shows: bool,
 ) -> Result<(), Error> {
-    let mc = MovieCollectionDB::new();
+    let mc = MovieCollection::new();
     let mq = MovieQueueDB::with_pool(&mc.pool);
 
     let stdout = io::stdout();
@@ -79,7 +79,7 @@ pub fn make_queue_worker(
 }
 
 pub fn movie_queue_http(queue: &[MovieQueueResult]) -> Result<Vec<String>, Error> {
-    let mc = MovieCollectionDB::new();
+    let mc = MovieCollection::new();
 
     let button = r#"<td><button type="submit" id="ID" onclick="delete_show('SHOW');"> remove </button></td>"#;
 

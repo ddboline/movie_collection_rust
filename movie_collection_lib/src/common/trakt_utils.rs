@@ -10,7 +10,7 @@ use std::io::Write;
 use crate::common::config::Config;
 use crate::common::imdb_episodes::ImdbEpisodes;
 use crate::common::imdb_ratings::ImdbRatings;
-use crate::common::movie_collection::{MovieCollection, MovieCollectionDB};
+use crate::common::movie_collection::MovieCollection;
 use crate::common::movie_queue::MovieQueueDB;
 use crate::common::pgpool::PgPool;
 use crate::common::row_index_trait::RowIndexTrait;
@@ -560,7 +560,7 @@ pub fn get_watched_movies_db(pool: &PgPool) -> Result<Vec<WatchedMovie>, Error> 
 }
 
 pub fn sync_trakt_with_db() -> Result<(), Error> {
-    let mc = MovieCollectionDB::new();
+    let mc = MovieCollection::new();
     let ti = TraktConnection::new();
 
     let watchlist_shows_db = get_watchlist_shows_db(&mc.pool)?;
@@ -667,7 +667,7 @@ pub fn sync_trakt_with_db() -> Result<(), Error> {
 }
 
 fn get_imdb_url_from_show(
-    mc: &MovieCollectionDB,
+    mc: &MovieCollection,
     show: Option<&String>,
 ) -> Result<Option<String>, Error> {
     let stdout = io::stdout();
@@ -688,7 +688,7 @@ fn get_imdb_url_from_show(
     Ok(result)
 }
 
-fn trakt_cal_list(ti: &TraktConnection, mc: &MovieCollectionDB) -> Result<(), Error> {
+fn trakt_cal_list(ti: &TraktConnection, mc: &MovieCollection) -> Result<(), Error> {
     let cal_entries = ti.get_calendar()?;
     for cal in cal_entries {
         let show = match ImdbRatings::get_show_by_link(&cal.link, &mc.pool)? {
@@ -716,7 +716,7 @@ fn trakt_cal_list(ti: &TraktConnection, mc: &MovieCollectionDB) -> Result<(), Er
 
 fn watchlist_add(
     ti: &TraktConnection,
-    mc: &MovieCollectionDB,
+    mc: &MovieCollection,
     show: Option<&String>,
 ) -> Result<(), Error> {
     if let Some(imdb_url) = get_imdb_url_from_show(&mc, show)? {
@@ -736,7 +736,7 @@ fn watchlist_add(
 
 fn watchlist_rm(
     ti: &TraktConnection,
-    mc: &MovieCollectionDB,
+    mc: &MovieCollection,
     show: Option<&String>,
 ) -> Result<(), Error> {
     if let Some(imdb_url) = get_imdb_url_from_show(&mc, show)? {
@@ -752,7 +752,7 @@ fn watchlist_rm(
     Ok(())
 }
 
-fn watchlist_list(mc: &MovieCollectionDB) -> Result<(), Error> {
+fn watchlist_list(mc: &MovieCollection) -> Result<(), Error> {
     let show_map = get_watchlist_shows_db(&mc.pool)?;
     for (_, show) in show_map {
         writeln!(io::stdout().lock(), "{}", show)?;
@@ -762,7 +762,7 @@ fn watchlist_list(mc: &MovieCollectionDB) -> Result<(), Error> {
 
 fn watched_add(
     ti: &TraktConnection,
-    mc: &MovieCollectionDB,
+    mc: &MovieCollection,
     show: Option<&String>,
     season: i32,
     episode: &[i32],
@@ -793,7 +793,7 @@ fn watched_add(
 
 fn watched_rm(
     ti: &TraktConnection,
-    mc: &MovieCollectionDB,
+    mc: &MovieCollection,
     show: Option<&String>,
     season: i32,
     episode: &[i32],
@@ -818,7 +818,7 @@ fn watched_rm(
     Ok(())
 }
 
-fn watched_list(mc: &MovieCollectionDB, show: Option<&String>, season: i32) -> Result<(), Error> {
+fn watched_list(mc: &MovieCollection, show: Option<&String>, season: i32) -> Result<(), Error> {
     let watched_shows = get_watched_shows_db(&mc.pool, "", None)?;
     let watched_movies = get_watched_movies_db(&mc.pool)?;
 
@@ -854,7 +854,7 @@ pub fn trakt_app_parse(
     season: i32,
     episode: &[i32],
 ) -> Result<(), Error> {
-    let mc = MovieCollectionDB::new();
+    let mc = MovieCollection::new();
     let ti = TraktConnection::new();
     match trakt_command {
         TraktCommands::Calendar => trakt_cal_list(&ti, &mc)?,
@@ -892,7 +892,7 @@ pub fn watch_list_http_worker(pool: &PgPool, imdb_url: &str, season: i32) -> Res
         &format!("/list/trakt/watched/list/{}", imdb_url),
     );
 
-    let mc = MovieCollectionDB::with_pool(&pool)?;
+    let mc = MovieCollection::with_pool(&pool)?;
     let mq = MovieQueueDB::with_pool(&pool);
 
     let show = ImdbRatings::get_show_by_link(imdb_url, &pool)?
@@ -1001,7 +1001,7 @@ pub fn watched_action_http_worker(
     episode: i32,
 ) -> Result<String, Error> {
     let ti = TraktConnection::new();
-    let mc = MovieCollectionDB::with_pool(&pool)?;
+    let mc = MovieCollection::with_pool(&pool)?;
 
     let body = match action {
         TraktActions::Add => {
