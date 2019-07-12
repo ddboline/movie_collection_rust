@@ -1,9 +1,11 @@
 use failure::{err_msg, Error};
 use std::env::var;
+use std::ops::Deref;
 use std::path::Path;
+use std::sync::Arc;
 
 #[derive(Debug, Default, Clone)]
-pub struct Config {
+pub struct ConfigInner {
     pub home_dir: String,
     pub pgurl: String,
     pub movie_dirs: Vec<String>,
@@ -18,9 +20,12 @@ pub struct Config {
     pub n_db_workers: usize,
 }
 
-impl Config {
-    pub fn new() -> Config {
-        Config {
+#[derive(Debug, Default, Clone)]
+pub struct Config(Arc<ConfigInner>);
+
+impl ConfigInner {
+    pub fn new() -> ConfigInner {
+        ConfigInner {
             home_dir: "/tmp".to_string(),
             suffixes: vec!["avi".to_string(), "mp4".to_string(), "mkv".to_string()],
             port: 8042,
@@ -29,9 +34,11 @@ impl Config {
             ..Default::default()
         }
     }
+}
 
+impl Config {
     pub fn with_config() -> Result<Config, Error> {
-        let mut config = Config::new();
+        let mut config = ConfigInner::new();
 
         config.home_dir = var("HOME").map_err(|_| err_msg("No HOME directory..."))?;
 
@@ -82,6 +89,14 @@ impl Config {
             }
         }
 
-        Ok(config)
+        Ok(Config(Arc::new(config)))
+    }
+}
+
+impl Deref for Config {
+    type Target = ConfigInner;
+
+    fn deref(&self) -> &Self::Target {
+        &self.0
     }
 }
