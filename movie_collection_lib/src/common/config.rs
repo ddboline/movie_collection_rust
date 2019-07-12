@@ -4,7 +4,7 @@ use std::ops::Deref;
 use std::path::Path;
 use std::sync::Arc;
 
-#[derive(Debug, Default, Clone)]
+#[derive(Debug, Default)]
 pub struct ConfigInner {
     pub home_dir: String,
     pub pgurl: String,
