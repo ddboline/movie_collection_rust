@@ -5,7 +5,8 @@ from urllib.parse import urlencode
 
 
 def read_config_env():
-    with open('config.env', 'r') as f:
+    homedir = os.environ.get('HOME', '/tmp')
+    with open(f'{homedir}/setup_files/build/garmin_scripts/config.env', 'r') as f:
         for l in f:
             (key, val) = l.strip().split('=')[:2]
             os.environ[key] = val
@@ -13,8 +14,6 @@ def read_config_env():
 
 read_config_env()
 
-client_id = os.environ['FITBIT_CLIENTID']
-client_secret = os.environ['FITBIT_CLIENTSECRET']
 garmin_username = os.environ['GARMIN_USERNAME']
 garmin_password = os.environ['GARMIN_PASSWORD']
 
@@ -45,6 +44,8 @@ def sync_db():
 
     last_modified0 = requests.get(f'{endpoint0}/list/last_modified', cookies=cookies0).json()
     last_modified1 = requests.get(f'{endpoint1}/list/last_modified', cookies=cookies1).json()
+
+    print(last_modified0, last_modified1)
 
     last_modified0 = {x['table']: x['last_modified'] for x in last_modified0}
     last_modified1 = {x['table']: x['last_modified'] for x in last_modified1}
