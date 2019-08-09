@@ -169,7 +169,7 @@ pub fn read_transcode_jobs_from_queue(queue: &str) -> Result<(), Error> {
         Table::new(),
     )?;
 
-    println!("Starting consumer {}", consumer_name);
+    writeln!(stdout().lock(), "Starting consumer {}", consumer_name)?;
 
     channel.start_consuming();
 
@@ -249,7 +249,7 @@ pub fn create_move_script(
     let mut f = File::create(mp4_script.clone())?;
     f.write_all(&script_str.into_bytes())?;
 
-    println!("dir {} file {}", output_dir, file);
+    writeln!(stdout().lock(), "dir {} file {}", output_dir, file)?;
     Ok(mp4_script)
 }
 
