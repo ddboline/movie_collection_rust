@@ -13,10 +13,11 @@ use movie_collection_lib::common::movie_queue::{MovieQueueDB, MovieQueueResult, 
 use movie_collection_lib::common::parse_imdb::{ParseImdb, ParseImdbOptions};
 use movie_collection_lib::common::pgpool::PgPool;
 use movie_collection_lib::common::row_index_trait::RowIndexTrait;
+use movie_collection_lib::common::trakt_instance::TraktInstance;
 use movie_collection_lib::common::trakt_utils::{
     get_watched_shows_db, get_watchlist_shows_db_map, trakt_cal_http_worker,
-    watch_list_http_worker, watched_action_http_worker, TraktActions, TraktConnection,
-    TraktConnectionTrait, WatchListMap, WatchListShow, WatchedEpisode,
+    watch_list_http_worker, watched_action_http_worker, TraktActions, WatchListMap, WatchListShow,
+    WatchedEpisode,
 };
 use movie_collection_lib::common::tv_show_source::TvShowSource;
 use movie_collection_lib::common::utils::map_result;
@@ -149,7 +150,7 @@ impl Handler<WatchlistActionRequest> for PgPool {
     type Result = Result<String, Error>;
 
     fn handle(&mut self, msg: WatchlistActionRequest, _: &mut Self::Context) -> Self::Result {
-        let ti = TraktConnection::new();
+        let ti = TraktInstance::new();
 
         match msg.action {
             TraktActions::Add => {

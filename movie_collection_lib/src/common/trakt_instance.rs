@@ -4,8 +4,7 @@ use std::collections::HashMap;
 
 use crate::common::config::Config;
 use crate::common::trakt_utils::{
-    TraktCalEntryList, TraktConnectionTrait, TraktResult, WatchListShow, WatchedEpisode,
-    WatchedMovie,
+    TraktCalEntryList, TraktResult, WatchListShow, WatchedEpisode, WatchedMovie,
 };
 
 pub struct TraktInstance {
@@ -35,10 +34,8 @@ impl TraktInstance {
         let result = trakt_instance.call(py, method, tup, None)?;
         String::extract(py, &result)
     }
-}
 
-impl TraktConnectionTrait for TraktInstance {
-    fn get_watchlist_shows(&self) -> Result<HashMap<String, WatchListShow>, Error> {
+    pub fn get_watchlist_shows(&self) -> Result<HashMap<String, WatchListShow>, Error> {
         let gil = Python::acquire_gil();
         let py = gil.python();
         let result = self
@@ -52,7 +49,7 @@ impl TraktConnectionTrait for TraktInstance {
         Ok(watchlist_shows)
     }
 
-    fn add_watchlist_show(&self, imdb_id: &str) -> Result<TraktResult, Error> {
+    pub fn add_watchlist_show(&self, imdb_id: &str) -> Result<TraktResult, Error> {
         let gil = Python::acquire_gil();
         let py = gil.python();
         let tup = PyTuple::new(py, &[PyString::new(py, imdb_id).into_object()]);
@@ -63,7 +60,7 @@ impl TraktConnectionTrait for TraktInstance {
         Ok(result)
     }
 
-    fn remove_watchlist_show(&self, imdb_id: &str) -> Result<TraktResult, Error> {
+    pub fn remove_watchlist_show(&self, imdb_id: &str) -> Result<TraktResult, Error> {
         let gil = Python::acquire_gil();
         let py = gil.python();
         let tup = PyTuple::new(py, &[PyString::new(py, imdb_id).into_object()]);
@@ -74,7 +71,7 @@ impl TraktConnectionTrait for TraktInstance {
         Ok(result)
     }
 
-    fn get_watched_shows(&self) -> Result<HashMap<(String, i32, i32), WatchedEpisode>, Error> {
+    pub fn get_watched_shows(&self) -> Result<HashMap<(String, i32, i32), WatchedEpisode>, Error> {
         let gil = Python::acquire_gil();
         let py = gil.python();
         let result = self
@@ -88,7 +85,7 @@ impl TraktConnectionTrait for TraktInstance {
         Ok(watched_shows)
     }
 
-    fn get_watched_movies(&self) -> Result<HashMap<String, WatchedMovie>, Error> {
+    pub fn get_watched_movies(&self) -> Result<HashMap<String, WatchedMovie>, Error> {
         let gil = Python::acquire_gil();
         let py = gil.python();
         let result = self
@@ -102,7 +99,7 @@ impl TraktConnectionTrait for TraktInstance {
         Ok(watched_movies)
     }
 
-    fn get_calendar(&self) -> Result<TraktCalEntryList, Error> {
+    pub fn get_calendar(&self) -> Result<TraktCalEntryList, Error> {
         let gil = Python::acquire_gil();
         let py = gil.python();
         let result = self
@@ -112,7 +109,7 @@ impl TraktConnectionTrait for TraktInstance {
         Ok(calendar)
     }
 
-    fn add_episode_to_watched(
+    pub fn add_episode_to_watched(
         &self,
         imdb_id: &str,
         season: i32,
@@ -135,7 +132,7 @@ impl TraktConnectionTrait for TraktInstance {
         Ok(result)
     }
 
-    fn add_movie_to_watched(&self, imdb_id: &str) -> Result<TraktResult, Error> {
+    pub fn add_movie_to_watched(&self, imdb_id: &str) -> Result<TraktResult, Error> {
         let gil = Python::acquire_gil();
         let py = gil.python();
         let tup = PyTuple::new(py, &[PyString::new(py, imdb_id).into_object()]);
@@ -146,7 +143,7 @@ impl TraktConnectionTrait for TraktInstance {
         Ok(result)
     }
 
-    fn remove_episode_to_watched(
+    pub fn remove_episode_to_watched(
         &self,
         imdb_id: &str,
         season: i32,
@@ -169,7 +166,7 @@ impl TraktConnectionTrait for TraktInstance {
         Ok(result)
     }
 
-    fn remove_movie_to_watched(&self, imdb_id: &str) -> Result<TraktResult, Error> {
+    pub fn remove_movie_to_watched(&self, imdb_id: &str) -> Result<TraktResult, Error> {
         let gil = Python::acquire_gil();
         let py = gil.python();
         let tup = PyTuple::new(py, &[PyString::new(py, imdb_id).into_object()]);

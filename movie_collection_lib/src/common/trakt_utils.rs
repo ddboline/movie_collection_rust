@@ -1,21 +1,20 @@
 use chrono::NaiveDate;
 use failure::{err_msg, Error};
 use rayon::iter::{IntoParallelRefIterator, ParallelIterator};
-use reqwest::{Client, Url};
 use std::collections::{HashMap, HashSet};
 use std::fmt;
 use std::io;
 use std::io::Write;
 
-use crate::common::config::Config;
 use crate::common::imdb_episodes::ImdbEpisodes;
 use crate::common::imdb_ratings::ImdbRatings;
 use crate::common::movie_collection::MovieCollection;
 use crate::common::movie_queue::MovieQueueDB;
 use crate::common::pgpool::PgPool;
 use crate::common::row_index_trait::RowIndexTrait;
+use crate::common::trakt_instance::TraktInstance;
 use crate::common::tv_show_source::TvShowSource;
-use crate::common::utils::{map_result, option_string_wrapper, ExponentialRetry};
+use crate::common::utils::{map_result, option_string_wrapper};
 
 #[derive(Clone, Copy)]
 pub enum TraktActions {
@@ -81,177 +80,6 @@ impl fmt::Display for TraktCalEntry {
 }
 
 pub type TraktCalEntryList = Vec<TraktCalEntry>;
-
-pub struct TraktConnection {
-    client: Client,
-    config: Config,
-}
-
-impl Default for TraktConnection {
-    fn default() -> TraktConnection {
-        TraktConnection::new()
-    }
-}
-
-impl ExponentialRetry for TraktConnection {
-    fn get_client(&self) -> &Client {
-        &self.client
-    }
-}
-
-pub trait TraktConnectionTrait {
-    fn get_watchlist_shows(&self) -> Result<HashMap<String, WatchListShow>, Error>;
-
-    fn add_watchlist_show(&self, imdb_id: &str) -> Result<TraktResult, Error>;
-
-    fn remove_watchlist_show(&self, imdb_id: &str) -> Result<TraktResult, Error>;
-
-    fn get_watched_shows(&self) -> Result<HashMap<(String, i32, i32), WatchedEpisode>, Error>;
-
-    fn get_watched_movies(&self) -> Result<HashMap<String, WatchedMovie>, Error>;
-
-    fn get_calendar(&self) -> Result<TraktCalEntryList, Error>;
-
-    fn add_episode_to_watched(
-        &self,
-        imdb_id: &str,
-        season: i32,
-        episode: i32,
-    ) -> Result<TraktResult, Error>;
-
-    fn add_movie_to_watched(&self, imdb_id: &str) -> Result<TraktResult, Error>;
-
-    fn remove_episode_to_watched(
-        &self,
-        imdb_id: &str,
-        season: i32,
-        episode: i32,
-    ) -> Result<TraktResult, Error>;
-
-    fn remove_movie_to_watched(&self, imdb_id: &str) -> Result<TraktResult, Error>;
-}
-
-impl TraktConnection {
-    pub fn new() -> TraktConnection {
-        TraktConnection {
-            client: Client::new(),
-            config: Config::with_config().expect("Config init failed"),
-        }
-    }
-}
-
-impl TraktConnectionTrait for TraktConnection {
-    fn get_watchlist_shows(&self) -> Result<HashMap<String, WatchListShow>, Error> {
-        let url = format!("https://{}/trakt/watchlist", &self.config.domain);
-        let url = Url::parse(&url)?;
-        debug!("{:?}", url);
-        let watchlist_shows: Vec<WatchListShow> = self.get(&url)?.json()?;
-        let watchlist_shows = watchlist_shows
-            .into_iter()
-            .map(|s| (s.link.clone(), s))
-            .collect();
-        Ok(watchlist_shows)
-    }
-
-    fn add_watchlist_show(&self, imdb_id: &str) -> Result<TraktResult, Error> {
-        let url = format!(
-            "https://{}/trakt/add_to_watchlist/{}",
-            &self.config.domain, imdb_id
-        );
-        let url = Url::parse(&url)?;
-        let result: TraktResult = self.get(&url)?.json()?;
-        Ok(result)
-    }
-
-    fn remove_watchlist_show(&self, imdb_id: &str) -> Result<TraktResult, Error> {
-        let url = format!(
-            "https://{}/trakt/delete_show/{}",
-            &self.config.domain, imdb_id
-        );
-        let url = Url::parse(&url)?;
-        let result: TraktResult = self.get(&url)?.json()?;
-        Ok(result)
-    }
-
-    fn get_watched_shows(&self) -> Result<HashMap<(String, i32, i32), WatchedEpisode>, Error> {
-        let url = format!("https://{}/trakt/watched_shows", &self.config.domain);
-        let url = Url::parse(&url)?;
-        let watched_shows: Vec<WatchedEpisode> = self.get(&url)?.json()?;
-        let watched_shows: HashMap<(String, i32, i32), WatchedEpisode> = watched_shows
-            .into_iter()
-            .map(|s| ((s.imdb_url.clone(), s.season, s.episode), s))
-            .collect();
-        Ok(watched_shows)
-    }
-
-    fn get_watched_movies(&self) -> Result<HashMap<String, WatchedMovie>, Error> {
-        let url = format!("https://{}/trakt/watched_movies", &self.config.domain);
-        let url = Url::parse(&url)?;
-        let watched_movies: Vec<WatchedMovie> = self.get(&url)?.json()?;
-        let watched_movies: HashMap<String, WatchedMovie> = watched_movies
-            .into_iter()
-            .map(|s| (s.imdb_url.clone(), s))
-            .collect();
-        Ok(watched_movies)
-    }
-
-    fn get_calendar(&self) -> Result<TraktCalEntryList, Error> {
-        let url = format!("https://{}/trakt/cal", &self.config.domain);
-        let url = Url::parse(&url)?;
-        let calendar = self.get(&url)?.json()?;
-        Ok(calendar)
-    }
-
-    fn add_episode_to_watched(
-        &self,
-        imdb_id: &str,
-        season: i32,
-        episode: i32,
-    ) -> Result<TraktResult, Error> {
-        let url = format!(
-            "https://{}/trakt/add_episode_to_watched/{}/{}/{}",
-            &self.config.domain, imdb_id, season, episode
-        );
-        let url = Url::parse(&url)?;
-        let result: TraktResult = self.get(&url)?.json()?;
-        Ok(result)
-    }
-
-    fn add_movie_to_watched(&self, imdb_id: &str) -> Result<TraktResult, Error> {
-        let url = format!(
-            "https://{}/trakt/add_to_watched/{}",
-            &self.config.domain, imdb_id
-        );
-        let url = Url::parse(&url)?;
-        let result: TraktResult = self.get(&url)?.json()?;
-        Ok(result)
-    }
-
-    fn remove_episode_to_watched(
-        &self,
-        imdb_id: &str,
-        season: i32,
-        episode: i32,
-    ) -> Result<TraktResult, Error> {
-        let url = format!(
-            "https://{}/trakt/delete_watched/{}/{}/{}",
-            &self.config.domain, imdb_id, season, episode
-        );
-        let url = Url::parse(&url)?;
-        let result: TraktResult = self.get(&url)?.json()?;
-        Ok(result)
-    }
-
-    fn remove_movie_to_watched(&self, imdb_id: &str) -> Result<TraktResult, Error> {
-        let url = format!(
-            "https://{}/trakt/delete_watched_movie/{}",
-            &self.config.domain, imdb_id
-        );
-        let url = Url::parse(&url)?;
-        let result: TraktResult = self.get(&url)?.json()?;
-        Ok(result)
-    }
-}
 
 #[derive(Serialize, Deserialize, Debug, Default)]
 pub struct TraktResult {
@@ -595,7 +423,7 @@ pub fn get_watched_movies_db(pool: &PgPool) -> Result<Vec<WatchedMovie>, Error> 
 
 pub fn sync_trakt_with_db() -> Result<(), Error> {
     let mc = MovieCollection::new();
-    let ti = TraktConnection::new();
+    let ti = TraktInstance::new();
 
     let watchlist_shows_db = get_watchlist_shows_db(&mc.pool)?;
     let watchlist_shows = ti.get_watchlist_shows()?;
@@ -722,7 +550,7 @@ fn get_imdb_url_from_show(
     Ok(result)
 }
 
-fn trakt_cal_list(ti: &TraktConnection, mc: &MovieCollection) -> Result<(), Error> {
+fn trakt_cal_list(ti: &TraktInstance, mc: &MovieCollection) -> Result<(), Error> {
     let cal_entries = ti.get_calendar()?;
     for cal in cal_entries {
         let show = match ImdbRatings::get_show_by_link(&cal.link, &mc.pool)? {
@@ -749,7 +577,7 @@ fn trakt_cal_list(ti: &TraktConnection, mc: &MovieCollection) -> Result<(), Erro
 }
 
 fn watchlist_add(
-    ti: &TraktConnection,
+    ti: &TraktInstance,
     mc: &MovieCollection,
     show: Option<&String>,
 ) -> Result<(), Error> {
@@ -769,7 +597,7 @@ fn watchlist_add(
 }
 
 fn watchlist_rm(
-    ti: &TraktConnection,
+    ti: &TraktInstance,
     mc: &MovieCollection,
     show: Option<&String>,
 ) -> Result<(), Error> {
@@ -795,7 +623,7 @@ fn watchlist_list(mc: &MovieCollection) -> Result<(), Error> {
 }
 
 fn watched_add(
-    ti: &TraktConnection,
+    ti: &TraktInstance,
     mc: &MovieCollection,
     show: Option<&String>,
     season: i32,
@@ -826,7 +654,7 @@ fn watched_add(
 }
 
 fn watched_rm(
-    ti: &TraktConnection,
+    ti: &TraktInstance,
     mc: &MovieCollection,
     show: Option<&String>,
     season: i32,
@@ -889,7 +717,7 @@ pub fn trakt_app_parse(
     episode: &[i32],
 ) -> Result<(), Error> {
     let mc = MovieCollection::new();
-    let ti = TraktConnection::new();
+    let ti = TraktInstance::new();
     match trakt_command {
         TraktCommands::Calendar => trakt_cal_list(&ti, &mc)?,
         TraktCommands::WatchList => match trakt_action {
@@ -1034,7 +862,7 @@ pub fn watched_action_http_worker(
     season: i32,
     episode: i32,
 ) -> Result<String, Error> {
-    let ti = TraktConnection::new();
+    let ti = TraktInstance::new();
     let mc = MovieCollection::with_pool(&pool)?;
 
     let body = match action {
@@ -1092,7 +920,7 @@ pub fn trakt_cal_http_worker(pool: &PgPool) -> Result<Vec<String>, Error> {
         r#"<td><button type="submit" id="ID" "#,
         r#"onclick="imdb_update('SHOW', 'LINK', SEASON);">update database</button></td>"#
     );
-    let cal_list = TraktConnection::new().get_calendar()?;
+    let cal_list = TraktInstance::new().get_calendar()?;
     let entries: Vec<Result<_, Error>> = cal_list
         .into_iter()
         .map(|cal| {

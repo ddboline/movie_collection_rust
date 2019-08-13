@@ -14,9 +14,8 @@ use super::movie_queue_requests::{
 };
 use super::{form_http_response, generic_route};
 use movie_collection_lib::common::movie_collection::ImdbSeason;
-use movie_collection_lib::common::trakt_utils::{
-    TraktActions, TraktConnection, TraktConnectionTrait, WatchListShow,
-};
+use movie_collection_lib::common::trakt_instance::TraktInstance;
+use movie_collection_lib::common::trakt_utils::{TraktActions, WatchListShow};
 use movie_collection_lib::common::tv_show_source::TvShowSource;
 
 fn watchlist_worker(
@@ -71,7 +70,7 @@ pub fn trakt_watchlist(
 }
 
 fn watchlist_action_worker(action: TraktActions, imdb_url: &str) -> Result<HttpResponse, Error> {
-    let ti = TraktConnection::new();
+    let ti = TraktInstance::new();
 
     let body = match action {
         TraktActions::Add => ti.add_watchlist_show(&imdb_url)?.to_string(),
