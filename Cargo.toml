@@ -1,13 +1,13 @@
 [package]
 name = "movie_collection_rust"
-version = "0.3.9"
+version = "0.3.10"
 authors = ["Daniel Boline <ddboline@gmail.com>"]
 edition = "2018"
 
 [dependencies]
 movie_collection_lib = {path = "movie_collection_lib"}
 movie_collection_http = {path = "movie_collection_http"}
-rayon = "1.0"
+rayon = "1.1"
 clap = "2.33"
 failure = "0.1"
 log = "0.4"

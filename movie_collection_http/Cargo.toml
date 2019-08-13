@@ -1,13 +1,13 @@
 [package]
 name = "movie_collection_http"
-version = "0.3.9"
+version = "0.3.10"
 authors = ["Daniel Boline <ddboline@gmail.com>"]
 edition = "2018"
 
 [dependencies]
 movie_collection_lib = {path = "../movie_collection_lib"}
 actix = "0.8.3"
-actix-web = "1.0.2"
+actix-web = "1.0.5"
 actix-rt = "0.2"
 actix-identity = "0.1"
 failure = "0.1"
