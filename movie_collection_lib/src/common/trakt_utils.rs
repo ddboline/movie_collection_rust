@@ -99,6 +99,38 @@ impl ExponentialRetry for TraktConnection {
     }
 }
 
+pub trait TraktConnectionTrait {
+    fn get_watchlist_shows(&self) -> Result<HashMap<String, WatchListShow>, Error>;
+
+    fn add_watchlist_show(&self, imdb_id: &str) -> Result<TraktResult, Error>;
+
+    fn remove_watchlist_show(&self, imdb_id: &str) -> Result<TraktResult, Error>;
+
+    fn get_watched_shows(&self) -> Result<HashMap<(String, i32, i32), WatchedEpisode>, Error>;
+
+    fn get_watched_movies(&self) -> Result<HashMap<String, WatchedMovie>, Error>;
+
+    fn get_calendar(&self) -> Result<TraktCalEntryList, Error>;
+
+    fn add_episode_to_watched(
+        &self,
+        imdb_id: &str,
+        season: i32,
+        episode: i32,
+    ) -> Result<TraktResult, Error>;
+
+    fn add_movie_to_watched(&self, imdb_id: &str) -> Result<TraktResult, Error>;
+
+    fn remove_episode_to_watched(
+        &self,
+        imdb_id: &str,
+        season: i32,
+        episode: i32,
+    ) -> Result<TraktResult, Error>;
+
+    fn remove_movie_to_watched(&self, imdb_id: &str) -> Result<TraktResult, Error>;
+}
+
 impl TraktConnection {
     pub fn new() -> TraktConnection {
         TraktConnection {
@@ -106,8 +138,10 @@ impl TraktConnection {
             config: Config::with_config().expect("Config init failed"),
         }
     }
+}
 
-    pub fn get_watchlist_shows(&self) -> Result<HashMap<String, WatchListShow>, Error> {
+impl TraktConnectionTrait for TraktConnection {
+    fn get_watchlist_shows(&self) -> Result<HashMap<String, WatchListShow>, Error> {
         let url = format!("https://{}/trakt/watchlist", &self.config.domain);
         let url = Url::parse(&url)?;
         debug!("{:?}", url);
@@ -119,7 +153,7 @@ impl TraktConnection {
         Ok(watchlist_shows)
     }
 
-    pub fn add_watchlist_show(&self, imdb_id: &str) -> Result<TraktResult, Error> {
+    fn add_watchlist_show(&self, imdb_id: &str) -> Result<TraktResult, Error> {
         let url = format!(
             "https://{}/trakt/add_to_watchlist/{}",
             &self.config.domain, imdb_id
@@ -129,7 +163,7 @@ impl TraktConnection {
         Ok(result)
     }
 
-    pub fn remove_watchlist_show(&self, imdb_id: &str) -> Result<TraktResult, Error> {
+    fn remove_watchlist_show(&self, imdb_id: &str) -> Result<TraktResult, Error> {
         let url = format!(
             "https://{}/trakt/delete_show/{}",
             &self.config.domain, imdb_id
@@ -139,7 +173,7 @@ impl TraktConnection {
         Ok(result)
     }
 
-    pub fn get_watched_shows(&self) -> Result<HashMap<(String, i32, i32), WatchedEpisode>, Error> {
+    fn get_watched_shows(&self) -> Result<HashMap<(String, i32, i32), WatchedEpisode>, Error> {
         let url = format!("https://{}/trakt/watched_shows", &self.config.domain);
         let url = Url::parse(&url)?;
         let watched_shows: Vec<WatchedEpisode> = self.get(&url)?.json()?;
@@ -150,7 +184,7 @@ impl TraktConnection {
         Ok(watched_shows)
     }
 
-    pub fn get_watched_movies(&self) -> Result<HashMap<String, WatchedMovie>, Error> {
+    fn get_watched_movies(&self) -> Result<HashMap<String, WatchedMovie>, Error> {
         let url = format!("https://{}/trakt/watched_movies", &self.config.domain);
         let url = Url::parse(&url)?;
         let watched_movies: Vec<WatchedMovie> = self.get(&url)?.json()?;
@@ -161,14 +195,14 @@ impl TraktConnection {
         Ok(watched_movies)
     }
 
-    pub fn get_calendar(&self) -> Result<TraktCalEntryList, Error> {
+    fn get_calendar(&self) -> Result<TraktCalEntryList, Error> {
         let url = format!("https://{}/trakt/cal", &self.config.domain);
         let url = Url::parse(&url)?;
         let calendar = self.get(&url)?.json()?;
         Ok(calendar)
     }
 
-    pub fn add_episode_to_watched(
+    fn add_episode_to_watched(
         &self,
         imdb_id: &str,
         season: i32,
@@ -183,7 +217,7 @@ impl TraktConnection {
         Ok(result)
     }
 
-    pub fn add_movie_to_watched(&self, imdb_id: &str) -> Result<TraktResult, Error> {
+    fn add_movie_to_watched(&self, imdb_id: &str) -> Result<TraktResult, Error> {
         let url = format!(
             "https://{}/trakt/add_to_watched/{}",
             &self.config.domain, imdb_id
@@ -193,7 +227,7 @@ impl TraktConnection {
         Ok(result)
     }
 
-    pub fn remove_episode_to_watched(
+    fn remove_episode_to_watched(
         &self,
         imdb_id: &str,
         season: i32,
@@ -208,7 +242,7 @@ impl TraktConnection {
         Ok(result)
     }
 
-    pub fn remove_movie_to_watched(&self, imdb_id: &str) -> Result<TraktResult, Error> {
+    fn remove_movie_to_watched(&self, imdb_id: &str) -> Result<TraktResult, Error> {
         let url = format!(
             "https://{}/trakt/delete_watched_movie/{}",
             &self.config.domain, imdb_id

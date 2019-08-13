@@ -16,7 +16,7 @@ use movie_collection_lib::common::row_index_trait::RowIndexTrait;
 use movie_collection_lib::common::trakt_utils::{
     get_watched_shows_db, get_watchlist_shows_db_map, trakt_cal_http_worker,
     watch_list_http_worker, watched_action_http_worker, TraktActions, TraktConnection,
-    WatchListMap, WatchListShow, WatchedEpisode,
+    TraktConnectionTrait, WatchListMap, WatchListShow, WatchedEpisode,
 };
 use movie_collection_lib::common::tv_show_source::TvShowSource;
 use movie_collection_lib::common::utils::map_result;

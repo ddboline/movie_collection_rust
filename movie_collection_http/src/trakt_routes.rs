@@ -14,7 +14,9 @@ use super::movie_queue_requests::{
 };
 use super::{form_http_response, generic_route};
 use movie_collection_lib::common::movie_collection::ImdbSeason;
-use movie_collection_lib::common::trakt_utils::{TraktActions, TraktConnection, WatchListShow};
+use movie_collection_lib::common::trakt_utils::{
+    TraktActions, TraktConnection, TraktConnectionTrait, WatchListShow,
+};
 use movie_collection_lib::common::tv_show_source::TvShowSource;
 
 fn watchlist_worker(
