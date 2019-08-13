@@ -8,6 +8,5 @@ ADD src /movie_collection_rust/src
 ADD scripts /movie_collection_rust/scripts
 ADD Makefile /movie_collection_rust
 ADD templates /movie_collection_rust/templates
-ADD python /movie_collection_rust/python
 ADD movie_collection_lib /movie_collection_rust/movie_collection_lib
 ADD movie_collection_http /movie_collection_rust/movie_collection_http
