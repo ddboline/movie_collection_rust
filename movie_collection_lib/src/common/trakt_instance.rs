@@ -1,4 +1,4 @@
-use cpython::{FromPyObject, PyResult, PyString, PyTuple, Python, PythonObject};
+use cpython::{FromPyObject, PyResult, PyTuple, Python, PythonObject, ToPyObject};
 use failure::{err_msg, Error};
 use std::collections::HashMap;
 
@@ -7,6 +7,7 @@ use crate::common::trakt_utils::{
     TraktCalEntryList, TraktResult, WatchListShow, WatchedEpisode, WatchedMovie,
 };
 
+#[derive(Default)]
 pub struct TraktInstance {
     pub config: Config,
 }
@@ -52,7 +53,7 @@ impl TraktInstance {
     pub fn add_watchlist_show(&self, imdb_id: &str) -> Result<TraktResult, Error> {
         let gil = Python::acquire_gil();
         let py = gil.python();
-        let tup = PyTuple::new(py, &[PyString::new(py, imdb_id).into_object()]);
+        let tup = PyTuple::new(py, &[imdb_id.to_py_object(py).into_object()]);
         let result = self
             .trakt_instance_call_tuple(py, "add_to_watchlist", tup)
             .map_err(|e| err_msg(format!("{:?}", e)))?;
@@ -63,7 +64,7 @@ impl TraktInstance {
     pub fn remove_watchlist_show(&self, imdb_id: &str) -> Result<TraktResult, Error> {
         let gil = Python::acquire_gil();
         let py = gil.python();
-        let tup = PyTuple::new(py, &[PyString::new(py, imdb_id).into_object()]);
+        let tup = PyTuple::new(py, &[imdb_id.to_py_object(py).into_object()]);
         let result = self
             .trakt_instance_call_tuple(py, "delete_show_from_watchlist", tup)
             .map_err(|e| err_msg(format!("{:?}", e)))?;
@@ -120,9 +121,9 @@ impl TraktInstance {
         let tup = PyTuple::new(
             py,
             &[
-                PyString::new(py, imdb_id).into_object(),
-                PyString::new(py, &season.to_string()).into_object(),
-                PyString::new(py, &episode.to_string()).into_object(),
+                imdb_id.to_py_object(py).into_object(),
+                season.to_string().to_py_object(py).into_object(),
+                episode.to_string().to_py_object(py).into_object(),
             ],
         );
         let result = self
@@ -135,7 +136,7 @@ impl TraktInstance {
     pub fn add_movie_to_watched(&self, imdb_id: &str) -> Result<TraktResult, Error> {
         let gil = Python::acquire_gil();
         let py = gil.python();
-        let tup = PyTuple::new(py, &[PyString::new(py, imdb_id).into_object()]);
+        let tup = PyTuple::new(py, &[imdb_id.to_py_object(py).into_object()]);
         let result = self
             .trakt_instance_call_tuple(py, "add_to_watched", tup)
             .map_err(|e| err_msg(format!("{:?}", e)))?;
@@ -154,9 +155,9 @@ impl TraktInstance {
         let tup = PyTuple::new(
             py,
             &[
-                PyString::new(py, imdb_id).into_object(),
-                PyString::new(py, &season.to_string()).into_object(),
-                PyString::new(py, &episode.to_string()).into_object(),
+                imdb_id.to_py_object(py).into_object(),
+                season.to_string().to_py_object(py).into_object(),
+                episode.to_string().to_py_object(py).into_object(),
             ],
         );
         let result = self
@@ -169,7 +170,7 @@ impl TraktInstance {
     pub fn remove_movie_to_watched(&self, imdb_id: &str) -> Result<TraktResult, Error> {
         let gil = Python::acquire_gil();
         let py = gil.python();
-        let tup = PyTuple::new(py, &[PyString::new(py, imdb_id).into_object()]);
+        let tup = PyTuple::new(py, &[imdb_id.to_py_object(py).into_object()]);
         let result = self
             .trakt_instance_call_tuple(py, "delete_movie_from_watched", tup)
             .map_err(|e| err_msg(format!("{:?}", e)))?;
