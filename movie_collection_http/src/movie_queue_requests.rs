@@ -80,7 +80,8 @@ impl Handler<MovieQueueRequest> for PgPool {
     type Result = Result<(Vec<MovieQueueResult>, Vec<String>), Error>;
 
     fn handle(&mut self, msg: MovieQueueRequest, _: &mut Self::Context) -> Self::Result {
-        let queue = MovieQueueDB::with_pool(&self).print_movie_queue(&msg.patterns)?;
+        let patterns: Vec<_> = msg.patterns.iter().map(|s| s.as_str()).collect();
+        let queue = MovieQueueDB::with_pool(&self).print_movie_queue(&patterns)?;
         Ok((queue, msg.patterns))
     }
 }

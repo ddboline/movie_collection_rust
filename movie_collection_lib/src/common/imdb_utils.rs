@@ -94,7 +94,7 @@ impl ImdbConnection {
                         if let Some(link) = a.attr("href") {
                             if let Some(link) = link.split('/').nth(2) {
                                 if link.starts_with("tt") {
-                                    Some((title.clone(), link))
+                                    Some((title.to_string(), link))
                                 } else {
                                     None
                                 }

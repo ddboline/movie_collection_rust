@@ -83,13 +83,13 @@ pub fn movie_queue_delete(
 }
 
 fn transcode_worker(
-    directory: Option<String>,
+    directory: Option<&str>,
     entries: &[MovieQueueResult],
 ) -> Result<HttpResponse, Error> {
     let entries: Vec<Result<_, Error>> = entries
         .iter()
         .map(|entry| {
-            remcom_single_file(&entry.path, &directory, false)?;
+            remcom_single_file(&entry.path, directory, false)?;
             Ok(format!("{}", entry))
         })
         .collect();
@@ -128,7 +128,7 @@ pub fn movie_queue_transcode_directory(
         MovieQueueRequest { patterns },
         user,
         state,
-        move |(entries, _)| transcode_worker(Some(directory), &entries),
+        move |(entries, _)| transcode_worker(Some(&directory), &entries),
     )
 }
 

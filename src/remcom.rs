@@ -27,12 +27,12 @@ fn remcom() -> Result<(), Error> {
 
     let unwatched = matches.is_present("unwatched");
 
-    let directory = matches.value_of("directory").map(|d| d.to_string());
+    let directory = matches.value_of("directory");
 
     if let Some(patterns) = matches.values_of("files") {
         let files: Vec<String> = patterns.map(|x| x.to_string()).collect();
         for file in files {
-            remcom_single_file(&file, &directory, unwatched)?;
+            remcom_single_file(&file, directory, unwatched)?;
         }
     }
     Ok(())

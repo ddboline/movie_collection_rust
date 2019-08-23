@@ -40,7 +40,7 @@ impl ParseImdb {
                 .into_iter()
                 .filter_map(|s| {
                     if &s.link == ilink {
-                        Some((s.link.clone(), s))
+                        Some((s.link.to_string(), s))
                     } else {
                         None
                     }
@@ -50,7 +50,7 @@ impl ParseImdb {
             self.mc
                 .print_imdb_shows(&opts.show, opts.tv)?
                 .into_iter()
-                .map(|s| (s.link.clone(), s))
+                .map(|s| (s.link.to_string(), s))
                 .collect()
         };
 
@@ -118,9 +118,9 @@ impl ParseImdb {
         };
 
         let link = if let Some(link) = &opts.imdb_link {
-            Some(link.clone())
+            Some(link.to_string())
         } else if let Some(result) = results.get(0) {
-            Some(result.link.clone())
+            Some(result.link.to_string())
         } else {
             None
         };
@@ -132,7 +132,7 @@ impl ParseImdb {
                         Some(s) => {
                             if (result.rating - s.rating.unwrap_or(-1.0)).abs() > 0.1 {
                                 let mut new = s.clone();
-                                new.title = Some(result.title.clone());
+                                new.title = Some(result.title.to_string());
                                 new.rating = Some(result.rating);
                                 new.update_show(&self.mc.get_pool())?;
                                 output.push(vec![format!(
@@ -148,8 +148,8 @@ impl ParseImdb {
 
                             ImdbRatings {
                                 show: opts.show.to_string(),
-                                title: Some(result.title.clone()),
-                                link: result.link.clone(),
+                                title: Some(result.title.to_string()),
+                                link: result.link.to_string(),
                                 rating: Some(result.rating),
                                 istv: Some(istv),
                                 ..Default::default()
@@ -243,7 +243,7 @@ impl ParseImdb {
                     .into_iter()
                     .map(|i| {
                         if i.starts_with("tt") {
-                            imdb_url = i.clone();
+                            imdb_url = i.to_string();
                             format!(r#"<a href="https://www.imdb.com/title/{}">{}</a>"#, i, i)
                         } else {
                             i.to_string()

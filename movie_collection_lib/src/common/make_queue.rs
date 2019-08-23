@@ -12,7 +12,7 @@ pub fn make_queue_worker(
     add_files: Option<Vec<String>>,
     del_files: Option<Vec<String>>,
     do_time: bool,
-    patterns: &[String],
+    patterns: &[&str],
     do_shows: bool,
 ) -> Result<(), Error> {
     let mc = MovieCollection::new();
@@ -115,10 +115,23 @@ pub fn movie_queue_http(queue: &[MovieQueueResult]) -> Result<Vec<String>, Error
             } else {
                 file_name.to_string()
             };
-            let entry = format!("<tr>\n<td>{}</td>\n<td><a href={}>imdb</a></td>",
-                entry, &format!(
-                    "https://www.imdb.com/title/{}",
-                    row.link.clone().unwrap_or_else(|| "".to_string())));
+
+            let entry = match row.link.as_ref() {
+                Some(link) => {
+                    format!("<tr>\n<td>{}</td>\n<td><a href={}>imdb</a></td>",
+                        entry,
+                        &format!(
+                            "https://www.imdb.com/title/{}",
+                            link
+                        )
+                    )
+                },
+                None => {
+                    format!("<tr>\n<td>{}</td>\n",
+                        entry
+                    )
+                },
+            };
             let entry = format!(
                 "{}\n{}",
                 entry,

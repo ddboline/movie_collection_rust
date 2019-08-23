@@ -142,8 +142,8 @@ impl fmt::Display for ImdbSeason {
 impl ImdbSeason {
     pub fn get_string_vec(&self) -> Vec<String> {
         vec![
-            self.show.clone(),
-            self.title.clone(),
+            self.show.to_string(),
+            self.title.to_string(),
             self.season.to_string(),
             self.nepisodes.to_string(),
         ]
@@ -653,7 +653,7 @@ impl MovieCollection {
         }
         let mut shows_not_in_db: HashSet<String> = HashSet::new();
         for (show, season, episode, _) in episode_list {
-            let key = (show.clone(), season, episode);
+            let key = (show.to_string(), season, episode);
             if !episodes_set.contains(&key) {
                 shows_not_in_db.insert(show);
             }
@@ -689,7 +689,7 @@ impl MovieCollection {
                 };
 
                 Ok((
-                    link.clone(),
+                    link.to_string(),
                     ImdbRatings {
                         show,
                         title: Some(title),
@@ -838,7 +838,7 @@ impl MovieCollection {
         let episodes =
             self.get_new_episodes(mindate.naive_local(), maxdate.naive_local(), source)?;
         'outer: for epi in episodes {
-            let movie_queue = mq.print_movie_queue(&[epi.show.clone()])?;
+            let movie_queue = mq.print_movie_queue(&[&epi.show])?;
             for s in movie_queue {
                 if let Some(show) = &s.show {
                     if let Some(season) = &s.season {
@@ -928,7 +928,7 @@ pub fn find_new_episodes_http_worker(
     let mut queue = Vec::new();
 
     for show in shows {
-        let movie_queue = mq.print_movie_queue(&[show])?;
+        let movie_queue = mq.print_movie_queue(&[&show])?;
         for s in movie_queue {
             if let Some(u) = mc.get_collection_index(&s.path)? {
                 queue.push((
@@ -951,7 +951,7 @@ pub fn find_new_episodes_http_worker(
     let output = episodes
         .into_iter()
         .map(|epi| {
-            let key = (epi.show.clone(), epi.season, epi.episode);
+            let key = (epi.show.to_string(), epi.season, epi.episode);
             format!(
                 "<tr><td>{}</td><td>{}</td><td>{}</td><td>{}</td><td>{}</td>{}</tr>",
                 format!(

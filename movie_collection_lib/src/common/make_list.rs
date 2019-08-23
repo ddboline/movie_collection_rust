@@ -48,11 +48,11 @@ pub fn make_list() -> Result<(), Error> {
 
     file_list.sort();
 
-    let file_map: HashMap<String, String> = file_list
+    let file_map: HashMap<String, _> = file_list
         .iter()
         .map(|f| {
             let file_name = f.split('/').last().unwrap().to_string();
-            (file_name, f.clone())
+            (file_name, f)
         })
         .collect();
 
@@ -60,8 +60,8 @@ pub fn make_list() -> Result<(), Error> {
         .iter()
         .map(|f| {
             let full_path = match file_map.get(f) {
-                Some(s) => s.clone(),
-                None => "".to_string(),
+                Some(s) => s,
+                None => "",
             };
             format!("{} {}", f, full_path)
         })

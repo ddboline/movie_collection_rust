@@ -158,7 +158,7 @@ pub fn get_watchlist_shows_db(pool: &PgPool) -> Result<HashMap<String, WatchList
             let link: String = row.get_idx(0)?;
             let title: String = row.get_idx(1)?;
             let year: i32 = row.get_idx(2)?;
-            Ok((link.clone(), WatchListShow { link, title, year }))
+            Ok((link.to_string(), WatchListShow { link, title, year }))
         })
         .collect();
     map_result(watchlist)
@@ -189,7 +189,7 @@ pub fn get_watchlist_shows_db_map(pool: &PgPool) -> Result<WatchListMap, Error> 
             };
 
             Ok((
-                link.clone(),
+                link.to_string(),
                 (show, WatchListShow { link, title, year }, source),
             ))
         })
@@ -462,7 +462,7 @@ pub fn sync_trakt_with_db() -> Result<(), Error> {
     let watched_shows_db: HashMap<(String, i32, i32), _> =
         get_watched_shows_db(&mc.pool, "", None)?
             .into_iter()
-            .map(|s| ((s.imdb_url.clone(), s.season, s.episode), s))
+            .map(|s| ((s.imdb_url.to_string(), s.season, s.episode), s))
             .collect();
     let watched_shows = ti.get_watched_shows()?;
     if watched_shows.is_empty() {
@@ -496,7 +496,7 @@ pub fn sync_trakt_with_db() -> Result<(), Error> {
 
     let watched_movies_db: HashMap<String, _> = get_watched_movies_db(&mc.pool)?
         .into_iter()
-        .map(|s| (s.imdb_url.clone(), s))
+        .map(|s| (s.imdb_url.to_string(), s))
         .collect();
     let watched_movies = ti.get_watched_movies()?;
     if watched_movies.is_empty() {
@@ -530,7 +530,7 @@ pub fn sync_trakt_with_db() -> Result<(), Error> {
 
 fn get_imdb_url_from_show(
     mc: &MovieCollection,
-    show: Option<&String>,
+    show: Option<&str>,
 ) -> Result<Option<String>, Error> {
     let stdout = io::stdout();
 
@@ -542,7 +542,7 @@ fn get_imdb_url_from_show(
             }
             None
         } else {
-            Some(imdb_shows[0].link.clone())
+            Some(imdb_shows[0].link.to_string())
         }
     } else {
         None
@@ -559,7 +559,7 @@ fn trakt_cal_list(ti: &TraktInstance, mc: &MovieCollection) -> Result<(), Error>
         };
         let exists = if !show.is_empty() {
             ImdbEpisodes {
-                show: show.clone(),
+                show: show.to_string(),
                 season: cal.season,
                 episode: cal.episode,
                 ..Default::default()
@@ -579,7 +579,7 @@ fn trakt_cal_list(ti: &TraktInstance, mc: &MovieCollection) -> Result<(), Error>
 fn watchlist_add(
     ti: &TraktInstance,
     mc: &MovieCollection,
-    show: Option<&String>,
+    show: Option<&str>,
 ) -> Result<(), Error> {
     if let Some(imdb_url) = get_imdb_url_from_show(&mc, show)? {
         writeln!(
@@ -596,11 +596,7 @@ fn watchlist_add(
     Ok(())
 }
 
-fn watchlist_rm(
-    ti: &TraktInstance,
-    mc: &MovieCollection,
-    show: Option<&String>,
-) -> Result<(), Error> {
+fn watchlist_rm(ti: &TraktInstance, mc: &MovieCollection, show: Option<&str>) -> Result<(), Error> {
     if let Some(imdb_url) = get_imdb_url_from_show(&mc, show)? {
         writeln!(
             io::stdout().lock(),
@@ -625,7 +621,7 @@ fn watchlist_list(mc: &MovieCollection) -> Result<(), Error> {
 fn watched_add(
     ti: &TraktInstance,
     mc: &MovieCollection,
-    show: Option<&String>,
+    show: Option<&str>,
     season: i32,
     episode: &[i32],
 ) -> Result<(), Error> {
@@ -634,7 +630,7 @@ fn watched_add(
             for epi in episode {
                 ti.add_episode_to_watched(&imdb_url, season, *epi)?;
                 WatchedEpisode {
-                    imdb_url: imdb_url.clone(),
+                    imdb_url: imdb_url.to_string(),
                     season,
                     episode: *epi,
                     ..Default::default()
@@ -656,7 +652,7 @@ fn watched_add(
 fn watched_rm(
     ti: &TraktInstance,
     mc: &MovieCollection,
-    show: Option<&String>,
+    show: Option<&str>,
     season: i32,
     episode: &[i32],
 ) -> Result<(), Error> {
@@ -680,7 +676,7 @@ fn watched_rm(
     Ok(())
 }
 
-fn watched_list(mc: &MovieCollection, show: Option<&String>, season: i32) -> Result<(), Error> {
+fn watched_list(mc: &MovieCollection, show: Option<&str>, season: i32) -> Result<(), Error> {
     let watched_shows = get_watched_shows_db(&mc.pool, "", None)?;
     let watched_movies = get_watched_movies_db(&mc.pool)?;
 
@@ -712,7 +708,7 @@ fn watched_list(mc: &MovieCollection, show: Option<&String>, season: i32) -> Res
 pub fn trakt_app_parse(
     trakt_command: &TraktCommands,
     trakt_action: TraktActions,
-    show: Option<&String>,
+    show: Option<&str>,
     season: i32,
     episode: &[i32],
 ) -> Result<(), Error> {
@@ -770,15 +766,13 @@ pub fn watch_list_http_worker(pool: &PgPool, imdb_url: &str, season: i32) -> Res
         .map(|s| s.episode)
         .collect();
 
-    let patterns = vec![show.show.clone()];
-
     let queue: HashMap<(String, i32, i32), _> = mq
-        .print_movie_queue(&patterns)?
+        .print_movie_queue(&[&show.show])?
         .into_iter()
         .filter_map(|s| match &s.show {
             Some(show) => match s.season {
                 Some(season) => match s.episode {
-                    Some(episode) => Some(((show.clone(), season, episode), s)),
+                    Some(episode) => Some(((show.to_string(), season, episode), s)),
                     None => None,
                 },
                 None => None,
@@ -792,7 +786,7 @@ pub fn watch_list_http_worker(pool: &PgPool, imdb_url: &str, season: i32) -> Res
     let collection_idx_map: Vec<Result<_, Error>> = entries
         .iter()
         .filter_map(
-            |r| match queue.get(&(show.show.clone(), season, r.episode)) {
+            |r| match queue.get(&(show.show.to_string(), season, r.episode)) {
                 Some(row) => match mc.get_collection_index(&row.path) {
                     Ok(i) => match i {
                         Some(index) => Some(Ok((r.episode, index))),
@@ -818,7 +812,7 @@ pub fn watch_list_http_worker(pool: &PgPool, imdb_url: &str, season: i32) -> Res
                     s.eptitle
                 )
             } else {
-                s.eptitle.clone()
+                s.eptitle.to_string()
             };
 
             format!(
@@ -930,7 +924,7 @@ pub fn trakt_cal_http_worker(pool: &PgPool) -> Result<Vec<String>, Error> {
             };
             let exists = if !show.is_empty() {
                 let idx_opt = ImdbEpisodes {
-                    show: show.clone(),
+                    show: show.to_string(),
                     season: cal.season,
                     episode: cal.episode,
                     ..Default::default()

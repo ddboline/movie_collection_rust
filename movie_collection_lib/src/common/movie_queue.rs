@@ -192,7 +192,7 @@ impl MovieQueueDB {
         }
     }
 
-    pub fn print_movie_queue(&self, patterns: &[String]) -> Result<Vec<MovieQueueResult>, Error> {
+    pub fn print_movie_queue(&self, patterns: &[&str]) -> Result<Vec<MovieQueueResult>, Error> {
         let query = r#"
             SELECT a.idx, b.path, c.link, c.istv
             FROM movie_queue a
@@ -252,7 +252,7 @@ impl MovieQueueDB {
                     {
                         let epurl: String = row.get_idx(0)?;
                         result.eplink = Some(epurl);
-                        result.show = Some(show.clone());
+                        result.show = Some(show.to_string());
                         result.season = Some(season);
                         result.episode = Some(episode);
                     }

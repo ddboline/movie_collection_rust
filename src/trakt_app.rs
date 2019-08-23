@@ -42,7 +42,7 @@ fn trakt_app() -> Result<(), Error> {
         Some(a) => TraktActions::from_command(a),
         None => TraktActions::None,
     };
-    let show = commands.get(2).cloned();
+    let show = commands.get(2).map(|s| s.as_str());
     let season: i32 = match commands.get(3) {
         Some(c) => {
             if let Ok(s) = c.parse() {
@@ -61,13 +61,7 @@ fn trakt_app() -> Result<(), Error> {
     if do_parse {
         sync_trakt_with_db()?;
     } else {
-        trakt_app_parse(
-            &trakt_command,
-            trakt_action,
-            show.as_ref(),
-            season,
-            &episode,
-        )?;
+        trakt_app_parse(&trakt_command, trakt_action, show, season, &episode)?;
     }
 
     Ok(())

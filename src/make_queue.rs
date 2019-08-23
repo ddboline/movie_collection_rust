@@ -60,6 +60,7 @@ fn make_queue() -> Result<(), Error> {
         .unwrap_or_else(Vec::new);
     let do_shows = matches.is_present("shows");
 
+    let patterns: Vec<_> = patterns.iter().map(|s| s.as_str()).collect();
     make_queue_worker(add_files, del_files, do_time, &patterns, do_shows)?;
     Ok(())
 }

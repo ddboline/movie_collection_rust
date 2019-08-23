@@ -45,7 +45,7 @@ impl TraktInstance {
         let watchlist_shows: Vec<WatchListShow> = serde_json::from_str(&result)?;
         let watchlist_shows = watchlist_shows
             .into_iter()
-            .map(|s| (s.link.clone(), s))
+            .map(|s| (s.link.to_string(), s))
             .collect();
         Ok(watchlist_shows)
     }
@@ -81,7 +81,7 @@ impl TraktInstance {
         let watched_shows: Vec<WatchedEpisode> = serde_json::from_str(&result)?;
         let watched_shows: HashMap<(String, i32, i32), WatchedEpisode> = watched_shows
             .into_iter()
-            .map(|s| ((s.imdb_url.clone(), s.season, s.episode), s))
+            .map(|s| ((s.imdb_url.to_string(), s.season, s.episode), s))
             .collect();
         Ok(watched_shows)
     }
@@ -95,7 +95,7 @@ impl TraktInstance {
         let watched_movies: Vec<WatchedMovie> = serde_json::from_str(&result)?;
         let watched_movies: HashMap<String, WatchedMovie> = watched_movies
             .into_iter()
-            .map(|s| (s.imdb_url.clone(), s))
+            .map(|s| (s.imdb_url.to_string(), s))
             .collect();
         Ok(watched_movies)
     }

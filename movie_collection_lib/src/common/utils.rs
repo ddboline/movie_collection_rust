@@ -61,7 +61,7 @@ pub fn walk_directory(path: &str, match_strs: &[String]) -> Result<Vec<String>, 
                             .iter()
                             .filter_map(|m| {
                                 if path_name.contains(m) {
-                                    Some(path_name.clone())
+                                    Some(path_name.to_string())
                                 } else {
                                     None
                                 }
@@ -192,7 +192,7 @@ pub fn create_transcode_script(config: &Config, path: &Path) -> Result<String, E
             .replace("INPUT_FILE", full_path)
             .replace("OUTPUT_FILE", &output_file)
             .replace("PREFIX", &fstem);
-        let mut file = File::create(script_file.clone())?;
+        let mut file = File::create(&script_file)?;
         file.write_all(&template_file.into_bytes())?;
         Ok(script_file)
     }
@@ -200,7 +200,7 @@ pub fn create_transcode_script(config: &Config, path: &Path) -> Result<String, E
 
 pub fn create_move_script(
     config: &Config,
-    directory: Option<String>,
+    directory: Option<&str>,
     unwatched: bool,
     path: &Path,
 ) -> Result<String, Error> {
@@ -246,7 +246,7 @@ pub fn create_move_script(
         .replace("BNAME", file_name)
         .replace("ONAME", &format!("{}/{}", output_dir, prefix));
 
-    let mut f = File::create(mp4_script.clone())?;
+    let mut f = File::create(&mp4_script)?;
     f.write_all(&script_str.into_bytes())?;
 
     writeln!(stdout().lock(), "dir {} file {}", output_dir, file)?;
@@ -324,7 +324,7 @@ pub fn get_video_runtime(f: &str) -> Result<String, Error> {
 
 pub fn remcom_single_file(
     file: &str,
-    directory: &Option<String>,
+    directory: Option<&str>,
     unwatched: bool,
 ) -> Result<(), Error> {
     let config = Config::with_config()?;
@@ -347,7 +347,7 @@ pub fn remcom_single_file(
         }
     }
 
-    match create_move_script(&config, directory.clone(), unwatched, &path) {
+    match create_move_script(&config, directory, unwatched, &path) {
         Ok(s) => {
             writeln!(stdout.lock(), "script {}", s)?;
             publish_transcode_job_to_queue(&s, "transcode_work_queue", "transcode_work_queue")?;
