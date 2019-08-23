@@ -4,7 +4,7 @@ use actix_web::web::Data;
 use actix_web::HttpResponse;
 use failure::Error;
 use futures::future::Future;
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 
 use super::logged_user::LoggedUser;
 use super::movie_queue_app::AppState;
@@ -15,17 +15,47 @@ use movie_collection_lib::common::tv_show_source::TvShowSource;
 
 type TvShowsMap = HashMap<String, (String, WatchListShow, Option<TvShowSource>)>;
 
+#[derive(Debug, Default)]
+struct ProcessShowItem {
+    show: String,
+    title: String,
+    link: String,
+    source: Option<TvShowSource>,
+}
+
+impl From<TvShowsResult> for ProcessShowItem {
+    fn from(item: TvShowsResult) -> Self {
+        Self {
+            show: item.show,
+            title: item.title,
+            link: item.link,
+            source: item.source,
+        }
+    }
+}
+
 fn tvshows_worker(
     res1: Result<TvShowsMap, Error>,
     tvshows: Vec<TvShowsResult>,
 ) -> Result<HttpResponse, Error> {
     let tvshows: HashMap<String, _> = tvshows
         .into_iter()
-        .map(|s| (s.link.clone(), (s.show, s.title, s.link, s.source)))
+        .map(|s| {
+            let item: ProcessShowItem = s.into();
+            (item.link.clone(), item)
+        })
         .collect();
     let watchlist: HashMap<String, _> = res1.map(|w| {
         w.into_iter()
-            .map(|(link, (show, s, source))| (link, (show, s.title, s.link, source)))
+            .map(|(link, (show, s, source))| {
+                let item = ProcessShowItem {
+                    show,
+                    title: s.title,
+                    link: s.link,
+                    source,
+                };
+                (link, item)
+            })
             .collect()
     })?;
 
@@ -60,58 +90,60 @@ pub fn tvshows(
 }
 
 fn process_shows(
-    tvshows: HashMap<String, (String, String, String, Option<TvShowSource>)>,
-    watchlist: HashMap<String, (String, String, String, Option<TvShowSource>)>,
+    tvshows: HashMap<String, ProcessShowItem>,
+    watchlist: HashMap<String, ProcessShowItem>,
 ) -> Result<Vec<String>, Error> {
+    let watchlist_keys: HashSet<_> = watchlist.keys().cloned().collect();
     let watchlist_shows: Vec<_> = watchlist
-        .iter()
-        .filter_map(|(_, (show, title, link, source))| match tvshows.get(link) {
-            None => Some((show.clone(), title.clone(), link.clone(), source.clone())),
+        .into_iter()
+        .filter_map(|(_, item)| match tvshows.get(&item.link) {
+            None => Some(item),
             Some(_) => None,
         })
         .collect();
 
+    let tvshow_keys: HashSet<_> = tvshows.keys().cloned().collect();
     let mut shows: Vec<_> = tvshows
-        .iter()
+        .into_iter()
         .map(|(_, v)| v)
-        .chain(watchlist_shows.iter())
+        .chain(watchlist_shows.into_iter())
         .collect();
-    shows.sort_by_key(|(s, _, _, _)| s);
+    shows.sort_by_key(|item| item.show.clone());
 
     let button_add = r#"<td><button type="submit" id="ID" onclick="watchlist_add('SHOW');">add to watchlist</button></td>"#;
     let button_rm = r#"<td><button type="submit" id="ID" onclick="watchlist_rm('SHOW');">remove from watchlist</button></td>"#;
 
     let shows: Vec<_> = shows
         .into_iter()
-        .map(|(show, title, link, source)| {
-            let has_watchlist = watchlist.contains_key(link);
+        .map(|item| {
+            let has_watchlist = watchlist_keys.contains(&item.link);
             format!(
                 r#"<tr><td>{}</td>
                 <td><a href="https://www.imdb.com/title/{}">imdb</a></td><td>{}</td><td>{}</td><td>{}</td></tr>"#,
-                if tvshows.contains_key(link) {
-                    format!(r#"<a href="/list/{}">{}</a>"#, show, title)
+                if tvshow_keys.contains(&item.link) {
+                    format!(r#"<a href="/list/{}">{}</a>"#, item.show, item.title)
                 } else {
                     format!(
                         r#"<a href="/list/trakt/watched/list/{}">{}</a>"#,
-                        link, title
+                        item.link, item.title
                     )
                 },
-                link,
-                match source {
+                item.link,
+                match item.source {
                     Some(TvShowSource::Netflix) => r#"<a href="https://netflix.com">netflix</a>"#,
                     Some(TvShowSource::Hulu) => r#"<a href="https://hulu.com">hulu</a>"#,
                     Some(TvShowSource::Amazon) => r#"<a href="https://amazon.com">amazon</a>"#,
                     _ => "",
                 },
                 if has_watchlist {
-                    format!(r#"<a href="/list/trakt/watched/list/{}">watchlist</a>"#, link)
+                    format!(r#"<a href="/list/trakt/watched/list/{}">watchlist</a>"#, item.link)
                 } else {
                     "".to_string()
                 },
                 if !has_watchlist {
-                    button_add.replace("SHOW", link)
+                    button_add.replace("SHOW", &item.link)
                 } else {
-                    button_rm.replace("SHOW", link)
+                    button_rm.replace("SHOW", &item.link)
                 },
             )
         })
