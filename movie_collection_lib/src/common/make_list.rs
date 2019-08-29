@@ -5,7 +5,7 @@ use std::io::{stdout, Write};
 use std::path::Path;
 
 use crate::common::config::Config;
-use crate::common::utils::{get_video_runtime, map_result, walk_directory};
+use crate::common::utils::{get_video_runtime, walk_directory};
 
 pub fn make_list() -> Result<(), Error> {
     let config = Config::with_config()?;
@@ -36,15 +36,13 @@ pub fn make_list() -> Result<(), Error> {
 
     local_file_list.sort();
 
-    let file_list: Vec<_> = config
+    let file_list: Result<Vec<_>, Error> = config
         .movie_dirs
         .par_iter()
         .map(|d| walk_directory(&d, &local_file_list))
         .collect();
 
-    let file_list: Vec<_> = map_result(file_list)?;
-
-    let mut file_list: Vec<_> = file_list.into_iter().flatten().collect();
+    let mut file_list: Vec<_> = file_list?.into_iter().flatten().collect();
 
     file_list.sort();
 

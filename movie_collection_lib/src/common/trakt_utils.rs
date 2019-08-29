@@ -14,7 +14,7 @@ use crate::common::pgpool::PgPool;
 use crate::common::row_index_trait::RowIndexTrait;
 use crate::common::trakt_instance::TraktInstance;
 use crate::common::tv_show_source::TvShowSource;
-use crate::common::utils::{map_result, option_string_wrapper};
+use crate::common::utils::option_string_wrapper;
 
 #[derive(Clone, Copy)]
 pub enum TraktActions {
@@ -150,8 +150,7 @@ pub fn get_watchlist_shows_db(pool: &PgPool) -> Result<HashMap<String, WatchList
         SELECT a.link, a.title, a.year
         FROM trakt_watchlist a
     "#;
-    let watchlist: Vec<_> = pool
-        .get()?
+    pool.get()?
         .query(query, &[])?
         .iter()
         .map(|row| {
@@ -160,8 +159,7 @@ pub fn get_watchlist_shows_db(pool: &PgPool) -> Result<HashMap<String, WatchList
             let year: i32 = row.get_idx(2)?;
             Ok((link.to_string(), WatchListShow { link, title, year }))
         })
-        .collect();
-    map_result(watchlist)
+        .collect()
 }
 
 pub type WatchListMap = HashMap<String, (String, WatchListShow, Option<TvShowSource>)>;
@@ -172,8 +170,7 @@ pub fn get_watchlist_shows_db_map(pool: &PgPool) -> Result<WatchListMap, Error> 
         FROM trakt_watchlist a
         JOIN imdb_ratings b ON a.link=b.link
     "#;
-    let watchlist: Vec<_> = pool
-        .get()?
+    pool.get()?
         .query(query, &[])?
         .iter()
         .map(|row| {
@@ -193,8 +190,7 @@ pub fn get_watchlist_shows_db_map(pool: &PgPool) -> Result<WatchListMap, Error> 
                 (show, WatchListShow { link, title, year }, source),
             ))
         })
-        .collect();
-    map_result(watchlist)
+        .collect()
 }
 
 #[derive(Serialize, Deserialize, Debug, Default, PartialEq, Eq, Hash)]
@@ -319,8 +315,7 @@ pub fn get_watched_shows_db(
         where_str
     );
 
-    let watched_shows: Vec<_> = pool
-        .get()?
+    pool.get()?
         .query(&query, &[])?
         .iter()
         .map(|row| {
@@ -335,8 +330,7 @@ pub fn get_watched_shows_db(
                 episode,
             })
         })
-        .collect();
-    map_result(watched_shows)
+        .collect()
 }
 
 #[derive(Serialize, Deserialize, Debug, Default, PartialEq, Eq, Hash)]
@@ -408,8 +402,7 @@ pub fn get_watched_movies_db(pool: &PgPool) -> Result<Vec<WatchedMovie>, Error> 
         JOIN imdb_ratings b ON a.link = b.link
         ORDER BY b.show
     "#;
-    let watched_shows: Vec<_> = pool
-        .get()?
+    pool.get()?
         .query(query, &[])?
         .iter()
         .map(|row| {
@@ -417,8 +410,7 @@ pub fn get_watched_movies_db(pool: &PgPool) -> Result<Vec<WatchedMovie>, Error> 
             let title: String = row.get_idx(1)?;
             Ok(WatchedMovie { title, imdb_url })
         })
-        .collect();
-    map_result(watched_shows)
+        .collect()
 }
 
 pub fn sync_trakt_with_db() -> Result<(), Error> {
@@ -433,7 +425,7 @@ pub fn sync_trakt_with_db() -> Result<(), Error> {
 
     let stdout = io::stdout();
 
-    let results: Vec<Result<_, Error>> = watchlist_shows
+    let results: Result<Vec<_>, Error> = watchlist_shows
         .par_iter()
         .map(|(link, show)| {
             if !watchlist_shows_db.contains_key(link) {
@@ -443,10 +435,10 @@ pub fn sync_trakt_with_db() -> Result<(), Error> {
             Ok(())
         })
         .collect();
-    map_result(results)?;
+    results?;
 
     /*
-    let results: Vec<Result<_, Error>> = watchlist_shows_db
+    let results: Result<Vec<_>, Error> = watchlist_shows_db
         .par_iter()
         .map(|(link, show)| {
             if !watchlist_shows.contains_key(link) {
@@ -456,7 +448,7 @@ pub fn sync_trakt_with_db() -> Result<(), Error> {
             Ok(())
         })
         .collect();
-    map_result(results)?;
+    results?;
     */
 
     let watched_shows_db: HashMap<(String, i32, i32), _> =
@@ -468,7 +460,7 @@ pub fn sync_trakt_with_db() -> Result<(), Error> {
     if watched_shows.is_empty() {
         return Ok(());
     }
-    let results: Vec<Result<_, Error>> = watched_shows
+    let results: Result<Vec<_>, Error> = watched_shows
         .par_iter()
         .map(|(key, episode)| {
             if !watched_shows_db.contains_key(&key) {
@@ -478,10 +470,10 @@ pub fn sync_trakt_with_db() -> Result<(), Error> {
             Ok(())
         })
         .collect();
-    map_result(results)?;
+    results?;
 
     /*
-    let results: Vec<Result<_, Error>> = watched_shows_db
+    let results: Result<Vec<_>, Error> = watched_shows_db
         .par_iter()
         .map(|(key, episode)| {
             if !watched_shows.contains_key(&key) {
@@ -491,7 +483,7 @@ pub fn sync_trakt_with_db() -> Result<(), Error> {
             Ok(())
         })
         .collect();
-    map_result(results)?;
+    results?;
     */
 
     let watched_movies_db: HashMap<String, _> = get_watched_movies_db(&mc.pool)?
@@ -502,7 +494,7 @@ pub fn sync_trakt_with_db() -> Result<(), Error> {
     if watched_movies.is_empty() {
         return Ok(());
     }
-    let results: Vec<Result<_, Error>> = watched_movies
+    let results: Result<Vec<_>, Error> = watched_movies
         .par_iter()
         .map(|(key, movie)| {
             if !watched_movies_db.contains_key(key) {
@@ -512,9 +504,9 @@ pub fn sync_trakt_with_db() -> Result<(), Error> {
             Ok(())
         })
         .collect();
-    map_result(results)?;
+    results?;
 
-    let results: Vec<Result<_, Error>> = watched_movies_db
+    let results: Result<Vec<_>, Error> = watched_movies_db
         .par_iter()
         .map(|(key, movie)| {
             if !watched_movies.contains_key(key) {
@@ -524,8 +516,7 @@ pub fn sync_trakt_with_db() -> Result<(), Error> {
             Ok(())
         })
         .collect();
-    map_result(results)?;
-    Ok(())
+    results.map(|_| ())
 }
 
 fn get_imdb_url_from_show(
@@ -783,7 +774,7 @@ pub fn watch_list_http_worker(pool: &PgPool, imdb_url: &str, season: i32) -> Res
 
     let entries: Vec<_> = mc.print_imdb_episodes(&show.show, Some(season))?;
 
-    let collection_idx_map: Vec<Result<_, Error>> = entries
+    let collection_idx_map: Result<HashMap<i32, i32>, Error> = entries
         .iter()
         .filter_map(
             |r| match queue.get(&(show.show.to_string(), season, r.episode)) {
@@ -799,8 +790,7 @@ pub fn watch_list_http_worker(pool: &PgPool, imdb_url: &str, season: i32) -> Res
         )
         .collect();
 
-    let collection_idx_map: Vec<_> = map_result(collection_idx_map)?;
-    let collection_idx_map: HashMap<i32, i32> = collection_idx_map.into_iter().collect();
+    let collection_idx_map = collection_idx_map?;
 
     let entries: Vec<_> = entries
         .iter()
@@ -915,7 +905,7 @@ pub fn trakt_cal_http_worker(pool: &PgPool) -> Result<Vec<String>, Error> {
         r#"onclick="imdb_update('SHOW', 'LINK', SEASON);">update database</button></td>"#
     );
     let cal_list = TraktInstance::new().get_calendar()?;
-    let entries: Vec<Result<_, Error>> = cal_list
+    cal_list
         .into_iter()
         .map(|cal| {
             let show = match ImdbRatings::get_show_by_link(&cal.link, &pool)? {
@@ -974,7 +964,5 @@ pub fn trakt_cal_http_worker(pool: &PgPool) -> Result<Vec<String>, Error> {
             );
             Ok(entry)
         })
-        .collect();
-    let entries = map_result(entries)?;
-    Ok(entries)
+        .collect()
 }

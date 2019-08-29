@@ -6,7 +6,7 @@ use select::document::Document;
 use select::predicate::{Class, Name};
 use std::fmt;
 
-use crate::common::utils::{map_result, option_string_wrapper, ExponentialRetry};
+use crate::common::utils::{option_string_wrapper, ExponentialRetry};
 
 #[derive(Default)]
 pub struct ImdbTuple {
@@ -109,7 +109,7 @@ impl ImdbConnection {
             })
             .collect();
 
-        let results: Vec<Result<_, Error>> = shows
+        shows
             .into_par_iter()
             .map(|(t, l)| {
                 let r = self.parse_imdb_rating(l)?;
@@ -119,11 +119,7 @@ impl ImdbConnection {
                     rating: r.rating.unwrap_or(-1.0),
                 })
             })
-            .collect();
-
-        let shows: Vec<_> = map_result(results)?;
-
-        Ok(shows)
+            .collect()
     }
 
     pub fn parse_imdb_rating(&self, title: &str) -> Result<RatingOutput, Error> {
@@ -179,7 +175,7 @@ impl ImdbConnection {
             })
             .collect();
 
-        let results: Vec<_> = results
+        results
             .into_par_iter()
             .flat_map(|(episodes_url, season_str)| {
                 let season_: i32 = match season_str.parse() {
@@ -198,9 +194,7 @@ impl ImdbConnection {
                     };
                 results
             })
-            .collect();
-        let results: Vec<_> = map_result(results)?;
-        Ok(results)
+            .collect()
     }
 
     fn parse_episodes_url(
@@ -255,7 +249,7 @@ impl ImdbConnection {
             }
         }
 
-        let results: Vec<Result<_, Error>> = results
+        results
             .into_par_iter()
             .map(|mut result| {
                 if let Some(link) = result.epurl.as_ref() {
@@ -265,8 +259,6 @@ impl ImdbConnection {
                 }
                 Ok(result)
             })
-            .collect();
-
-        map_result(results)
+            .collect()
     }
 }

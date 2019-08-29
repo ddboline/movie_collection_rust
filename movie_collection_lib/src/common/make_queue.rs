@@ -6,7 +6,7 @@ use std::path;
 
 use crate::common::movie_collection::MovieCollection;
 use crate::common::movie_queue::{MovieQueueDB, MovieQueueResult};
-use crate::common::utils::{get_video_runtime, map_result, parse_file_stem};
+use crate::common::utils::{get_video_runtime, parse_file_stem};
 
 pub fn make_queue_worker(
     add_files: Option<Vec<String>>,
@@ -54,9 +54,9 @@ pub fn make_queue_worker(
             }
         }
     } else {
-        let results = mq.print_movie_queue(&patterns)?;
+        let movie_queue = mq.print_movie_queue(&patterns)?;
         if do_time {
-            let results: Vec<Result<_, Error>> = results
+            let results: Result<Vec<_>, Error> = movie_queue
                 .into_par_iter()
                 .map(|result| {
                     let timeval = get_video_runtime(&result.path)?;
@@ -64,13 +64,11 @@ pub fn make_queue_worker(
                 })
                 .collect();
 
-            let results: Vec<_> = map_result(results)?;
-
-            for (timeval, result) in results {
+            for (timeval, result) in results? {
                 writeln!(stdout.lock(), "{} {}", result, timeval)?;
             }
         } else {
-            for result in results {
+            for result in movie_queue {
                 writeln!(stdout.lock(), "{}", result)?;
             }
         }
@@ -83,7 +81,7 @@ pub fn movie_queue_http(queue: &[MovieQueueResult]) -> Result<Vec<String>, Error
 
     let button = r#"<td><button type="submit" id="ID" onclick="delete_show('SHOW');"> remove </button></td>"#;
 
-    let entries: Vec<Result<_, Error>> = queue
+    queue
         .par_iter()
         .map(|row| {
             let path = path::Path::new(&row.path);
@@ -155,9 +153,5 @@ pub fn movie_queue_http(queue: &[MovieQueueResult]) -> Result<Vec<String>, Error
 
             Ok(entry)
         })
-        .collect();
-
-    let entries = map_result(entries)?;
-
-    Ok(entries)
+        .collect()
 }

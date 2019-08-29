@@ -8,7 +8,7 @@ use crate::common::config::Config;
 use crate::common::movie_collection::MovieCollection;
 use crate::common::pgpool::PgPool;
 use crate::common::row_index_trait::RowIndexTrait;
-use crate::common::utils::{map_result, option_string_wrapper, parse_file_stem};
+use crate::common::utils::{option_string_wrapper, parse_file_stem};
 
 #[derive(Default, Serialize)]
 pub struct MovieQueueResult {
@@ -208,7 +208,7 @@ impl MovieQueueDB {
         } else {
             query.to_string()
         };
-        let results: Vec<_> = self
+        let results: Result<Vec<_>, Error> = self
             .pool
             .get()?
             .query(&query, &[])?
@@ -227,9 +227,8 @@ impl MovieQueueDB {
                 })
             })
             .collect();
-        let results: Vec<_> = map_result(results)?;
 
-        let results: Vec<Result<_, Error>> = results
+        let results: Result<Vec<_>, Error> = results?
             .into_par_iter()
             .map(|mut result| {
                 if result.istv {
@@ -260,7 +259,7 @@ impl MovieQueueDB {
                 Ok(result)
             })
             .collect();
-        let mut results: Vec<_> = map_result(results)?;
+        let mut results = results?;
         results.sort_by_key(|r| r.idx);
         Ok(results)
     }
@@ -275,8 +274,7 @@ impl MovieQueueDB {
             JOIN movie_collection b ON a.collection_idx = b.idx
             WHERE a.last_modified >= $1
         "#;
-        let queue: Vec<_> = self
-            .pool
+        self.pool
             .get()?
             .query(query, &[&timestamp])?
             .iter()
@@ -292,8 +290,7 @@ impl MovieQueueDB {
                     show,
                 })
             })
-            .collect();
-        map_result(queue)
+            .collect()
     }
 }
 

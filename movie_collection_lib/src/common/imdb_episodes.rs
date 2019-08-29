@@ -4,7 +4,6 @@ use std::fmt;
 
 use crate::common::pgpool::PgPool;
 use crate::common::row_index_trait::RowIndexTrait;
-use crate::common::utils::map_result;
 
 #[derive(Clone, Serialize, Deserialize)]
 pub struct ImdbEpisodes {
@@ -119,8 +118,7 @@ impl ImdbEpisodes {
             JOIN imdb_ratings b ON a.show = b.show
             WHERE a.last_modified >= $1
         "#;
-        let episodes: Vec<_> = pool
-            .get()?
+        pool.get()?
             .query(query, &[&timestamp])?
             .iter()
             .map(|row| {
@@ -144,8 +142,7 @@ impl ImdbEpisodes {
                     epurl,
                 })
             })
-            .collect();
-        map_result(episodes)
+            .collect()
     }
 
     pub fn insert_episode(&self, pool: &PgPool) -> Result<(), Error> {

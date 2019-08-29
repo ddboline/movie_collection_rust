@@ -5,7 +5,6 @@ use std::fmt;
 use crate::common::pgpool::PgPool;
 use crate::common::row_index_trait::RowIndexTrait;
 use crate::common::tv_show_source::TvShowSource;
-use crate::common::utils::map_result;
 use crate::common::utils::option_string_wrapper;
 
 #[derive(Default, Clone, Debug, Serialize, Deserialize)]
@@ -113,8 +112,7 @@ impl ImdbRatings {
             FROM imdb_ratings
             WHERE last_modified >= $1
         "#;
-        let shows: Vec<_> = pool
-            .get()?
+        pool.get()?
             .query(query, &[&timestamp])?
             .iter()
             .map(|row| {
@@ -139,8 +137,7 @@ impl ImdbRatings {
                     source,
                 })
             })
-            .collect();
-        map_result(shows)
+            .collect()
     }
 
     pub fn get_string_vec(&self) -> Vec<String> {

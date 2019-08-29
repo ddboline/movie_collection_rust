@@ -15,7 +15,7 @@ use crate::common::movie_queue::MovieQueueDB;
 use crate::common::pgpool::PgPool;
 use crate::common::row_index_trait::RowIndexTrait;
 use crate::common::tv_show_source::TvShowSource;
-use crate::common::utils::{map_result, option_string_wrapper, parse_file_stem, walk_directory};
+use crate::common::utils::{option_string_wrapper, parse_file_stem, walk_directory};
 
 pub struct NewEpisodesResult {
     pub show: String,
@@ -210,7 +210,7 @@ impl MovieCollection {
             shows
         };
 
-        let shows: Vec<Result<_, Error>> = shows
+        let shows: Result<Vec<_>, Error> = shows
             .par_iter()
             .map(|show| {
                 let query = r#"
@@ -224,7 +224,7 @@ impl MovieCollection {
                     query
                 };
 
-                let results: Vec<_> = self
+                let results: Result<Vec<_>, Error> = self
                     .get_pool()
                     .get()?
                     .query(&query, &[])?
@@ -246,12 +246,10 @@ impl MovieCollection {
                         })
                     })
                     .collect();
-                let results: Vec<_> = map_result(results)?;
-                Ok(results)
+                results
             })
             .collect();
-        let shows: Vec<_> = map_result(shows)?;
-        let results: Vec<_> = shows.into_iter().flatten().collect();
+        let results: Vec<_> = shows?.into_iter().flatten().collect();
         Ok(results)
     }
 
@@ -275,8 +273,7 @@ impl MovieCollection {
         };
         let query = format!("{} ORDER BY a.season, a.episode", query);
 
-        let result: Vec<_> = self
-            .get_pool()
+        self.get_pool()
             .get()?
             .query(&query, &[])?
             .iter()
@@ -301,8 +298,7 @@ impl MovieCollection {
                     epurl,
                 })
             })
-            .collect();
-        map_result(result)
+            .collect()
     }
 
     pub fn print_imdb_all_seasons(&self, show: &str) -> Result<Vec<ImdbSeason>, Error> {
@@ -314,8 +310,7 @@ impl MovieCollection {
         let query = format!("{} GROUP BY a.show, b.title, a.season", query);
         let query = format!("{} ORDER BY a.season", query);
 
-        let result: Vec<_> = self
-            .get_pool()
+        self.get_pool()
             .get()?
             .query(&query, &[])?
             .iter()
@@ -332,8 +327,7 @@ impl MovieCollection {
                     nepisodes,
                 })
             })
-            .collect();
-        map_result(result)
+            .collect()
     }
 
     pub fn search_movie_collection(
@@ -358,7 +352,7 @@ impl MovieCollection {
             query.to_string()
         };
 
-        let results: Vec<_> = self
+        let results: Result<Vec<_>, Error> = self
             .get_pool()
             .get()?
             .query(&query, &[])?
@@ -381,9 +375,7 @@ impl MovieCollection {
             })
             .collect();
 
-        let results: Vec<_> = map_result(results)?;
-
-        let results: Vec<Result<_, Error>> = results
+        let results: Result<Vec<_>, Error> = results?
             .into_par_iter()
             .map(|mut result| {
                 let file_stem = Path::new(&result.path)
@@ -415,7 +407,7 @@ impl MovieCollection {
                 Ok(result)
             })
             .collect();
-        let mut results: Vec<_> = map_result(results)?;
+        let mut results = results?;
         results.sort_by_key(|r| (r.season, r.episode));
         Ok(results)
     }
@@ -526,18 +518,18 @@ impl MovieCollection {
     }
 
     pub fn make_collection(&self) -> Result<(), Error> {
-        let file_list: Vec<_> = self
+        let file_list: Result<Vec<_>, Error> = self
             .get_config()
             .movie_dirs
             .par_iter()
             .map(|d| walk_directory(&d, &self.get_config().suffixes))
             .collect();
 
+        let file_list = file_list?;
+
         if file_list.is_empty() {
             return Ok(());
         }
-
-        let file_list: Vec<_> = map_result(file_list)?;
 
         let file_list: HashSet<_> = file_list.into_iter().flatten().collect();
 
@@ -559,7 +551,7 @@ impl MovieCollection {
             FROM movie_queue a
             JOIN movie_collection b ON a.collection_idx=b.idx
         "#;
-        let results: Vec<_> = self
+        let results: Result<HashMap<String, i32>, Error> = self
             .get_pool()
             .get()?
             .query(query, &[])?
@@ -570,10 +562,10 @@ impl MovieCollection {
                 Ok((path, idx))
             })
             .collect();
-        let movie_queue: HashMap<String, i32> = map_result(results)?;
+        let movie_queue = results?;
 
         let query = "SELECT path, show FROM movie_collection";
-        let results: Vec<_> = self
+        let results: Result<HashMap<String, String>, Error> = self
             .get_pool()
             .get()?
             .query(query, &[])?
@@ -584,10 +576,10 @@ impl MovieCollection {
                 Ok((path, show))
             })
             .collect();
-        let collection_map: HashMap<String, String> = map_result(results)?;
+        let collection_map = results?;
 
         let query = "SELECT show, season, episode from imdb_episodes";
-        let results: Vec<_> = self
+        let results: Result<HashSet<(String, i32, i32)>, Error> = self
             .get_pool()
             .get()?
             .query(query, &[])?
@@ -599,7 +591,7 @@ impl MovieCollection {
                 Ok((show, season, episode))
             })
             .collect();
-        let episodes_set: HashSet<(String, i32, i32)> = map_result(results)?;
+        let episodes_set = results?;
 
         let stdout = io::stdout();
 
@@ -618,7 +610,7 @@ impl MovieCollection {
                 self.insert_into_collection(f)?;
             }
         }
-        let results: Vec<_> = collection_map
+        let results: Result<Vec<_>, Error> = collection_map
             .par_iter()
             .map(|(key, val)| {
                 if !file_list.contains(key) {
@@ -640,7 +632,7 @@ impl MovieCollection {
             })
             .collect();
 
-        let _: Vec<_> = map_result(results)?;
+        results?;
 
         for (key, val) in collection_map {
             if !file_list.contains(&key) {
@@ -670,8 +662,7 @@ impl MovieCollection {
             FROM imdb_ratings
             WHERE link IS NOT null AND rating IS NOT null
         "#;
-        let results: Vec<_> = self
-            .get_pool()
+        self.get_pool()
             .get()?
             .query(query, &[])?
             .iter()
@@ -701,8 +692,7 @@ impl MovieCollection {
                     },
                 ))
             })
-            .collect();
-        map_result(results)
+            .collect()
     }
 
     pub fn print_tv_shows(&self) -> Result<Vec<TvShowsResult>, Error> {
@@ -715,8 +705,7 @@ impl MovieCollection {
             GROUP BY 1,2,3,4
             ORDER BY 1,2,3,4
         "#;
-        let results: Vec<_> = self
-            .get_pool()
+        self.get_pool()
             .get()?
             .query(query, &[])?
             .iter()
@@ -740,8 +729,7 @@ impl MovieCollection {
                     source,
                 })
             })
-            .collect();
-        map_result(results)
+            .collect()
     }
 
     pub fn get_new_episodes(
@@ -790,8 +778,7 @@ impl MovieCollection {
         };
         let query = format!("{} {}", query, groupby);
 
-        let results: Vec<_> = self
-            .get_pool()
+        self.get_pool()
             .get()?
             .query(&query, &[&mindate, &maxdate])?
             .iter()
@@ -819,8 +806,7 @@ impl MovieCollection {
                     eptitle,
                 })
             })
-            .collect();
-        map_result(results)
+            .collect()
     }
 
     pub fn find_new_episodes(
@@ -870,8 +856,7 @@ impl MovieCollection {
             FROM movie_collection
             WHERE last_modified >= $1
         "#;
-        let queue: Vec<_> = self
-            .get_pool()
+        self.get_pool()
             .get()?
             .query(query, &[&timestamp])?
             .iter()
@@ -881,8 +866,7 @@ impl MovieCollection {
                 let show: String = row.get_idx(2)?;
                 Ok(MovieCollectionRow { idx, path, show })
             })
-            .collect();
-        map_result(queue)
+            .collect()
     }
 }
 

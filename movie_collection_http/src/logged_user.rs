@@ -11,7 +11,6 @@ use std::sync::Arc;
 
 use movie_collection_lib::common::pgpool::PgPool;
 use movie_collection_lib::common::row_index_trait::RowIndexTrait;
-use movie_collection_lib::common::utils::map_result;
 
 use super::errors::ServiceError;
 
@@ -88,8 +87,14 @@ enum AuthStatus {
     NotAuthorized,
 }
 
-#[derive(Clone, Debug, Default)]
+#[derive(Debug, Default)]
 pub struct AuthorizedUsers(Arc<RwLock<HashMap<LoggedUser, AuthStatus>>>);
+
+impl Clone for AuthorizedUsers {
+    fn clone(&self) -> Self {
+        AuthorizedUsers(Arc::clone(&self.0))
+    }
+}
 
 impl AuthorizedUsers {
     pub fn new() -> AuthorizedUsers {
@@ -98,7 +103,7 @@ impl AuthorizedUsers {
 
     pub fn fill_from_db(&self, pool: &PgPool) -> Result<(), Error> {
         let query = "SELECT email FROM authorized_users";
-        let results: Vec<_> = pool
+        let results: Result<HashSet<_>, Error> = pool
             .get()?
             .query(query, &[])?
             .iter()
@@ -107,7 +112,7 @@ impl AuthorizedUsers {
                 Ok(LoggedUser { email })
             })
             .collect();
-        let users: HashSet<LoggedUser> = map_result(results)?;
+        let users = results?;
         let cached_users = self.list_of_users();
 
         for user in &users {

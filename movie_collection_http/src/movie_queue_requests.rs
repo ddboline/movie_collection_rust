@@ -20,7 +20,6 @@ use movie_collection_lib::common::trakt_utils::{
     WatchedEpisode,
 };
 use movie_collection_lib::common::tv_show_source::TvShowSource;
-use movie_collection_lib::common::utils::map_result;
 
 pub struct TvShowsRequest {}
 
@@ -537,7 +536,7 @@ impl Handler<LastModifiedRequest> for PgPool {
             "movie_queue",
         ];
 
-        let result: Vec<Result<_, Error>> = tables
+        tables
             .iter()
             .map(|table| {
                 let query = format!("SELECT max(last_modified) FROM {}", table);
@@ -554,11 +553,7 @@ impl Handler<LastModifiedRequest> for PgPool {
 
                 Ok(r)
             })
-            .collect();
-
-        let result: Vec<_> = map_result(result)?;
-
-        let result = result.into_iter().filter_map(|x| x).collect();
-        Ok(result)
+            .filter_map(|x| x.transpose())
+            .collect()
     }
 }

@@ -10,7 +10,6 @@ use std::fs::rename;
 use std::fs::{File, OpenOptions};
 use std::io::{stdout, Write};
 use std::io::{BufRead, BufReader};
-use std::iter::FromIterator;
 use std::path::Path;
 use std::thread::sleep;
 use std::time::Duration;
@@ -21,24 +20,6 @@ use crate::common::config::Config;
 #[inline]
 pub fn option_string_wrapper(s: &Option<String>) -> &str {
     s.as_ref().map(|s| s.as_str()).unwrap_or("")
-}
-
-pub fn map_result<T, U, V>(input: U) -> Result<V, Error>
-where
-    U: IntoIterator<Item = Result<T, Error>>,
-    V: FromIterator<T>,
-{
-    let (output, errors): (Vec<_>, Vec<_>) = input.into_iter().partition(Result::is_ok);
-    if !errors.is_empty() {
-        let errors: Vec<_> = errors
-            .into_iter()
-            .filter_map(Result::err)
-            .map(|x| x.to_string())
-            .collect();
-        Err(err_msg(errors.join("\n")))
-    } else {
-        Ok(output.into_iter().filter_map(Result::ok).collect())
-    }
 }
 
 pub fn walk_directory(path: &str, match_strs: &[String]) -> Result<Vec<String>, Error> {
@@ -293,7 +274,7 @@ pub fn get_video_runtime(f: &str) -> Result<String, Error> {
     let mut timeval = "".to_string();
 
     let stream = Exec::shell(command).stream_stdout()?;
-    let results: Vec<Result<_, Error>> = BufReader::new(stream)
+    let results: Result<Vec<_>, Error> = BufReader::new(stream)
         .lines()
         .map(|l| {
             let items: Vec<_> = l?.split_whitespace().map(|s| s.to_string()).collect();
@@ -318,7 +299,7 @@ pub fn get_video_runtime(f: &str) -> Result<String, Error> {
             Ok(())
         })
         .collect();
-    map_result(results)?;
+    results?;
     Ok(timeval)
 }
 
