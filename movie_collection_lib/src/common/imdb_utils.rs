@@ -83,9 +83,7 @@ impl ImdbConnection {
         let url = Url::parse_with_params(endpoint, &[("s", "all"), ("q", title)])?;
         let body = self.get(&url)?.text()?;
 
-        let document = Document::from(body.as_str());
-
-        let shows: Vec<_> = document
+        Document::from(body.as_str())
             .find(Class("result_text"))
             .flat_map(|tr| {
                 let title = tr.text().trim().to_string();
@@ -107,10 +105,6 @@ impl ImdbConnection {
                     })
                     .collect::<Vec<_>>()
             })
-            .collect();
-
-        shows
-            .into_par_iter()
             .map(|(t, l)| {
                 let r = self.parse_imdb_rating(l)?;
                 Ok(ImdbTuple {
@@ -155,9 +149,7 @@ impl ImdbConnection {
         let endpoint: String = format!("http://m.imdb.com/title/{}/episodes", imdb_id);
         let url = Url::parse(&endpoint)?;
         let body = self.get(&url)?.text()?;
-        let document = Document::from(body.as_str());
-
-        let results: Vec<_> = document
+        Document::from(body.as_str())
             .find(Name("a"))
             .filter_map(|a| {
                 if let Some("season") = a.attr("class") {
@@ -173,10 +165,6 @@ impl ImdbConnection {
                     None
                 }
             })
-            .collect();
-
-        results
-            .into_par_iter()
             .flat_map(|(episodes_url, season_str)| {
                 let season_: i32 = match season_str.parse() {
                     Ok(s) => s,

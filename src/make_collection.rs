@@ -77,8 +77,7 @@ fn main() {
     match make_collection() {
         Ok(_) => {}
         Err(e) => {
-            if e.to_string().contains("Broken pipe") {
-            } else {
+            if !e.to_string().contains("Broken pipe") {
                 panic!("{}", e)
             }
         }
