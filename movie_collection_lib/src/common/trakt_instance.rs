@@ -1,5 +1,5 @@
 use cpython::{FromPyObject, PyResult, PyTuple, Python, PythonObject, ToPyObject};
-use failure::{err_msg, Error};
+use failure::{format_err, Error};
 use std::collections::HashMap;
 
 use crate::common::config::Config;
@@ -41,7 +41,7 @@ impl TraktInstance {
         let py = gil.python();
         let result = self
             .trakt_instance_call_noargs(py, "get_watchlist")
-            .map_err(|e| err_msg(format!("{:?}", e)))?;
+            .map_err(|e| format_err!("{:?}", e))?;
         let watchlist_shows: Vec<WatchListShow> = serde_json::from_str(&result)?;
         let watchlist_shows = watchlist_shows
             .into_iter()
@@ -56,7 +56,7 @@ impl TraktInstance {
         let tup = PyTuple::new(py, &[imdb_id.to_py_object(py).into_object()]);
         let result = self
             .trakt_instance_call_tuple(py, "add_to_watchlist", tup)
-            .map_err(|e| err_msg(format!("{:?}", e)))?;
+            .map_err(|e| format_err!("{:?}", e))?;
         let result: TraktResult = serde_json::from_str(&result)?;
         Ok(result)
     }
@@ -67,7 +67,7 @@ impl TraktInstance {
         let tup = PyTuple::new(py, &[imdb_id.to_py_object(py).into_object()]);
         let result = self
             .trakt_instance_call_tuple(py, "delete_show_from_watchlist", tup)
-            .map_err(|e| err_msg(format!("{:?}", e)))?;
+            .map_err(|e| format_err!("{:?}", e))?;
         let result: TraktResult = serde_json::from_str(&result)?;
         Ok(result)
     }
@@ -77,7 +77,7 @@ impl TraktInstance {
         let py = gil.python();
         let result = self
             .trakt_instance_call_noargs(py, "get_watched_shows")
-            .map_err(|e| err_msg(format!("{:?}", e)))?;
+            .map_err(|e| format_err!("{:?}", e))?;
         let watched_shows: Vec<WatchedEpisode> = serde_json::from_str(&result)?;
         let watched_shows: HashMap<(String, i32, i32), WatchedEpisode> = watched_shows
             .into_iter()
@@ -91,7 +91,7 @@ impl TraktInstance {
         let py = gil.python();
         let result = self
             .trakt_instance_call_noargs(py, "get_watched_movies")
-            .map_err(|e| err_msg(format!("{:?}", e)))?;
+            .map_err(|e| format_err!("{:?}", e))?;
         let watched_movies: Vec<WatchedMovie> = serde_json::from_str(&result)?;
         let watched_movies: HashMap<String, WatchedMovie> = watched_movies
             .into_iter()
@@ -105,7 +105,7 @@ impl TraktInstance {
         let py = gil.python();
         let result = self
             .trakt_instance_call_noargs(py, "get_trakt_cal")
-            .map_err(|e| err_msg(format!("{:?}", e)))?;
+            .map_err(|e| format_err!("{:?}", e))?;
         let calendar = serde_json::from_str(&result)?;
         Ok(calendar)
     }
@@ -128,7 +128,7 @@ impl TraktInstance {
         );
         let result = self
             .trakt_instance_call_tuple(py, "add_episode_to_watched", tup)
-            .map_err(|e| err_msg(format!("{:?}", e)))?;
+            .map_err(|e| format_err!("{:?}", e))?;
         let result: TraktResult = serde_json::from_str(&result)?;
         Ok(result)
     }
@@ -139,7 +139,7 @@ impl TraktInstance {
         let tup = PyTuple::new(py, &[imdb_id.to_py_object(py).into_object()]);
         let result = self
             .trakt_instance_call_tuple(py, "add_to_watched", tup)
-            .map_err(|e| err_msg(format!("{:?}", e)))?;
+            .map_err(|e| format_err!("{:?}", e))?;
         let result: TraktResult = serde_json::from_str(&result)?;
         Ok(result)
     }
@@ -162,7 +162,7 @@ impl TraktInstance {
         );
         let result = self
             .trakt_instance_call_tuple(py, "delete_episode_from_watched", tup)
-            .map_err(|e| err_msg(format!("{:?}", e)))?;
+            .map_err(|e| format_err!("{:?}", e))?;
         let result: TraktResult = serde_json::from_str(&result)?;
         Ok(result)
     }
@@ -173,7 +173,7 @@ impl TraktInstance {
         let tup = PyTuple::new(py, &[imdb_id.to_py_object(py).into_object()]);
         let result = self
             .trakt_instance_call_tuple(py, "delete_movie_from_watched", tup)
-            .map_err(|e| err_msg(format!("{:?}", e)))?;
+            .map_err(|e| format_err!("{:?}", e))?;
         let result: TraktResult = serde_json::from_str(&result)?;
         Ok(result)
     }

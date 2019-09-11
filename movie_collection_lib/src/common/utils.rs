@@ -1,5 +1,5 @@
 use amqp::{protocol, Basic, Channel, Options, Session, Table};
-use failure::{err_msg, Error};
+use failure::{err_msg, format_err, Error};
 use rand::distributions::{Distribution, Uniform};
 use rand::thread_rng;
 use reqwest::Url;
@@ -191,13 +191,13 @@ pub fn create_move_script(
     let output_dir = if let Some(d) = directory {
         let d = format!("{}/Documents/movies/{}", config.preferred_dir, d);
         if !Path::new(&d).exists() {
-            return Err(err_msg(format!("Directory {} does not exist", d)));
+            return Err(format_err!("Directory {} does not exist", d));
         }
         d
     } else if unwatched {
         let d = format!("{}/television/unwatched", config.preferred_dir);
         if !Path::new(&d).exists() {
-            return Err(err_msg(format!("Directory {} does not exist", d)));
+            return Err(format_err!("Directory {} does not exist", d));
         }
         d
     } else {
