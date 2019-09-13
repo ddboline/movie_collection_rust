@@ -1,6 +1,7 @@
 use actix::{Handler, Message};
 use chrono::{DateTime, Utc};
 use failure::Error;
+use serde::{Deserialize, Serialize};
 use std::path;
 
 use super::logged_user::LoggedUser;

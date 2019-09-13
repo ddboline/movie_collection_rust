@@ -1,6 +1,8 @@
 use chrono::NaiveDate;
 use failure::{err_msg, Error};
+use log::debug;
 use rayon::iter::{IntoParallelRefIterator, ParallelIterator};
+use serde::{Deserialize, Serialize};
 use std::collections::{HashMap, HashSet};
 use std::fmt;
 use std::io;
@@ -437,20 +439,6 @@ pub fn sync_trakt_with_db() -> Result<(), Error> {
         .collect();
     results?;
 
-    /*
-    let results: Result<Vec<_>, Error> = watchlist_shows_db
-        .par_iter()
-        .map(|(link, show)| {
-            if !watchlist_shows.contains_key(link) {
-                show.delete_show(&mc.pool)?;
-                writeln!(stdout.lock(), "delete watchlist {}", show)?;
-            }
-            Ok(())
-        })
-        .collect();
-    results?;
-    */
-
     let watched_shows_db: HashMap<(String, i32, i32), _> =
         get_watched_shows_db(&mc.pool, "", None)?
             .into_iter()
@@ -471,20 +459,6 @@ pub fn sync_trakt_with_db() -> Result<(), Error> {
         })
         .collect();
     results?;
-
-    /*
-    let results: Result<Vec<_>, Error> = watched_shows_db
-        .par_iter()
-        .map(|(key, episode)| {
-            if !watched_shows.contains_key(&key) {
-                episode.delete_episode(&mc.pool)?;
-                writeln!(stdout.lock(), "delete watched {}", episode)?;
-            }
-            Ok(())
-        })
-        .collect();
-    results?;
-    */
 
     let watched_movies_db: HashMap<String, _> = get_watched_movies_db(&mc.pool)?
         .into_iter()

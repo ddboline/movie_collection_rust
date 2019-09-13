@@ -1,6 +1,3 @@
-#[macro_use]
-extern crate serde_derive;
-
 pub mod errors;
 pub mod logged_user;
 pub mod movie_queue_app;

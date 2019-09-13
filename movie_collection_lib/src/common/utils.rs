@@ -4,6 +4,7 @@ use rand::distributions::{Distribution, Uniform};
 use rand::thread_rng;
 use reqwest::Url;
 use reqwest::{Client, Response};
+use serde::{Deserialize, Serialize};
 use std::env::var;
 use std::fs::create_dir_all;
 use std::fs::rename;

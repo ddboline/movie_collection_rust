@@ -1,5 +1,6 @@
 use chrono::{DateTime, NaiveDate, Utc};
 use failure::Error;
+use serde::{Deserialize, Serialize};
 use std::fmt;
 
 use crate::common::pgpool::PgPool;

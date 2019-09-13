@@ -1,7 +1,7 @@
 use chrono::{DateTime, Duration, Local, NaiveDate, Utc};
-
 use failure::{err_msg, Error};
 use rayon::iter::{IntoParallelIterator, IntoParallelRefIterator, ParallelIterator};
+use serde::{Deserialize, Serialize};
 use std::collections::{HashMap, HashSet};
 use std::fmt;
 use std::io;
