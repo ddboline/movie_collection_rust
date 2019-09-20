@@ -136,14 +136,17 @@ impl WatchListShow {
     pub fn insert_show(&self, pool: &PgPool) -> Result<(), Error> {
         let query = "INSERT INTO trakt_watchlist (link, title, year) VALUES ($1, $2, $3)";
         pool.get()?
-            .execute(query, &[&self.link, &self.title, &self.year])?;
-        Ok(())
+            .execute(query, &[&self.link, &self.title, &self.year])
+            .map(|_| ())
+            .map_err(err_msg)
     }
 
     pub fn delete_show(&self, pool: &PgPool) -> Result<(), Error> {
         let query = "DELETE FROM trakt_watchlist WHERE link=$1";
-        pool.get()?.execute(query, &[&self.link])?;
-        Ok(())
+        pool.get()?
+            .execute(query, &[&self.link])
+            .map(|_| ())
+            .map_err(err_msg)
     }
 }
 
@@ -272,8 +275,9 @@ impl WatchedEpisode {
             VALUES ($1, $2, $3)
         "#;
         pool.get()?
-            .execute(query, &[&self.imdb_url, &self.season, &self.episode])?;
-        Ok(())
+            .execute(query, &[&self.imdb_url, &self.season, &self.episode])
+            .map(|_| ())
+            .map_err(err_msg)
     }
 
     pub fn delete_episode(&self, pool: &PgPool) -> Result<(), Error> {
@@ -282,8 +286,9 @@ impl WatchedEpisode {
             WHERE link=$1 AND season=$2 AND episode=$3
         "#;
         pool.get()?
-            .execute(query, &[&self.imdb_url, &self.season, &self.episode])?;
-        Ok(())
+            .execute(query, &[&self.imdb_url, &self.season, &self.episode])
+            .map(|_| ())
+            .map_err(err_msg)
     }
 }
 
@@ -383,8 +388,10 @@ impl WatchedMovie {
             INSERT INTO trakt_watched_movies (link)
             VALUES ($1)
         "#;
-        pool.get()?.execute(query, &[&self.imdb_url])?;
-        Ok(())
+        pool.get()?
+            .execute(query, &[&self.imdb_url])
+            .map(|_| ())
+            .map_err(err_msg)
     }
 
     pub fn delete_movie(&self, pool: &PgPool) -> Result<(), Error> {
@@ -392,8 +399,10 @@ impl WatchedMovie {
             DELETE FROM trakt_watched_movies
             WHERE link=$1
         "#;
-        pool.get()?.execute(query, &[&self.imdb_url])?;
-        Ok(())
+        pool.get()?
+            .execute(query, &[&self.imdb_url])
+            .map(|_| ())
+            .map_err(err_msg)
     }
 }
 
@@ -480,7 +489,7 @@ pub fn sync_trakt_with_db() -> Result<(), Error> {
         .collect();
     results?;
 
-    let results: Result<Vec<_>, Error> = watched_movies_db
+    watched_movies_db
         .par_iter()
         .map(|(key, movie)| {
             if !watched_movies.contains_key(key) {
@@ -489,8 +498,7 @@ pub fn sync_trakt_with_db() -> Result<(), Error> {
             }
             Ok(())
         })
-        .collect();
-    results.map(|_| ())
+        .collect()
 }
 
 fn get_imdb_url_from_show(

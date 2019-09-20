@@ -1,5 +1,6 @@
 use amqp::{protocol, Basic, Channel, Options, Session, Table};
 use failure::{err_msg, format_err, Error};
+use log::error;
 use rand::distributions::{Distribution, Uniform};
 use rand::thread_rng;
 use reqwest::Url;
@@ -94,21 +95,23 @@ pub fn publish_transcode_job_to_queue(
     routing_key: &str,
 ) -> Result<(), Error> {
     let mut channel = open_transcode_channel(queue)?;
-    channel.basic_publish(
-        "",
-        routing_key,
-        true,
-        false,
-        protocol::basic::BasicProperties {
-            content_type: Some("text".to_string()),
-            ..Default::default()
-        },
-        serde_json::to_string(&ScriptStruct {
-            script: script.to_string(),
-        })?
-        .into_bytes(),
-    )?;
-    Ok(())
+    channel
+        .basic_publish(
+            "",
+            routing_key,
+            true,
+            false,
+            protocol::basic::BasicProperties {
+                content_type: Some("text".to_string()),
+                ..Default::default()
+            },
+            serde_json::to_string(&ScriptStruct {
+                script: script.to_string(),
+            })?
+            .into_bytes(),
+        )
+        .map(|_| ())
+        .map_err(err_msg)
 }
 
 pub fn read_transcode_jobs_from_queue(queue: &str) -> Result<(), Error> {
@@ -329,14 +332,15 @@ pub fn remcom_single_file(
         }
     }
 
-    match create_move_script(&config, directory, unwatched, &path) {
-        Ok(s) => {
+    create_move_script(&config, directory, unwatched, &path)
+        .and_then(|s| {
             writeln!(stdout.lock(), "script {}", s)?;
-            publish_transcode_job_to_queue(&s, "transcode_work_queue", "transcode_work_queue")?;
-        }
-        Err(e) => writeln!(stdout.lock(), "error {}", e)?,
-    }
-    Ok(())
+            publish_transcode_job_to_queue(&s, "transcode_work_queue", "transcode_work_queue")
+        })
+        .map_err(|e| {
+            error!("{:?}", e);
+            e
+        })
 }
 
 pub trait ExponentialRetry {

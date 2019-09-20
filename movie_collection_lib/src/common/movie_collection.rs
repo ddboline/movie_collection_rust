@@ -419,8 +419,9 @@ impl MovieCollection {
         "#;
         self.get_pool()
             .get()?
-            .execute(query, &[&path.to_string()])?;
-        Ok(())
+            .execute(query, &[&path.to_string()])
+            .map(|_| ())
+            .map_err(err_msg)
     }
 
     pub fn get_collection_index(&self, path: &str) -> Result<Option<i32>, Error> {
@@ -483,8 +484,9 @@ impl MovieCollection {
         "#;
         self.get_pool()
             .get()?
-            .execute(query, &[&path.to_string(), &show])?;
-        Ok(())
+            .execute(query, &[&path.to_string(), &show])
+            .map(|_| ())
+            .map_err(err_msg)
     }
 
     pub fn insert_into_collection_by_idx(&self, idx: i32, path: &str) -> Result<(), Error> {
@@ -496,8 +498,9 @@ impl MovieCollection {
         "#;
         self.get_pool()
             .get()?
-            .execute(query, &[&idx, &path.to_string(), &show])?;
-        Ok(())
+            .execute(query, &[&idx, &path.to_string(), &show])
+            .map(|_| ())
+            .map_err(err_msg)
     }
 
     pub fn fix_collection_show_id(&self) -> Result<u64, Error> {

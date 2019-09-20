@@ -1,5 +1,5 @@
 use chrono::{DateTime, Utc};
-use failure::Error;
+use failure::{err_msg, Error};
 use log::debug;
 use serde::{Deserialize, Serialize};
 use std::fmt;
@@ -48,18 +48,20 @@ impl ImdbRatings {
         "#;
         debug!("{:?}", self);
         let source = self.source.as_ref().map(|s| s.to_string());
-        pool.get()?.execute(
-            query,
-            &[
-                &self.show,
-                &self.title,
-                &self.link,
-                &self.rating,
-                &self.istv,
-                &source,
-            ],
-        )?;
-        Ok(())
+        pool.get()?
+            .execute(
+                query,
+                &[
+                    &self.show,
+                    &self.title,
+                    &self.link,
+                    &self.rating,
+                    &self.istv,
+                    &source,
+                ],
+            )
+            .map(|_| ())
+            .map_err(err_msg)
     }
 
     pub fn update_show(&self, pool: &PgPool) -> Result<(), Error> {
@@ -69,8 +71,9 @@ impl ImdbRatings {
             WHERE show=$3
         "#;
         pool.get()?
-            .execute(query, &[&self.rating, &self.title, &self.show])?;
-        Ok(())
+            .execute(query, &[&self.rating, &self.title, &self.show])
+            .map(|_| ())
+            .map_err(err_msg)
     }
 
     pub fn get_show_by_link(link: &str, pool: &PgPool) -> Result<Option<ImdbRatings>, Error> {

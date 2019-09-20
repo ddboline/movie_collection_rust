@@ -96,11 +96,15 @@ impl MovieQueueDB {
 
     pub fn remove_from_queue_by_collection_idx(&self, collection_idx: i32) -> Result<(), Error> {
         let query = r#"SELECT idx FROM movie_queue WHERE collection_idx=$1"#;
-        for row in self.pool.get()?.query(query, &[&collection_idx])?.iter() {
-            let idx = row.get_idx(0)?;
-            self.remove_from_queue_by_idx(idx)?;
-        }
-        Ok(())
+        self.pool
+            .get()?
+            .query(query, &[&collection_idx])?
+            .iter()
+            .map(|row| {
+                let idx = row.get_idx(0)?;
+                self.remove_from_queue_by_idx(idx)
+            })
+            .collect()
     }
 
     pub fn remove_from_queue_by_path(&self, path: &str) -> Result<(), Error> {

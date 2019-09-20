@@ -59,12 +59,10 @@ fn trakt_app() -> Result<(), Error> {
     };
 
     if do_parse {
-        sync_trakt_with_db()?;
+        sync_trakt_with_db()
     } else {
-        trakt_app_parse(&trakt_command, trakt_action, show, season, &episode)?;
+        trakt_app_parse(&trakt_command, trakt_action, show, season, &episode)
     }
-
-    Ok(())
 }
 
 fn main() {

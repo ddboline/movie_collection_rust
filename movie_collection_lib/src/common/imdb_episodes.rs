@@ -1,5 +1,5 @@
 use chrono::{DateTime, NaiveDate, Utc};
-use failure::Error;
+use failure::{err_msg, Error};
 use serde::{Deserialize, Serialize};
 use std::fmt;
 
@@ -157,18 +157,20 @@ impl ImdbEpisodes {
             ($1, $2, $3, $4, RATING, $5, $6, now())
         "#;
         let query = query.replace("RATING", &self.rating.to_string());
-        pool.get()?.execute(
-            &query,
-            &[
-                &self.show,
-                &self.season,
-                &self.episode,
-                &self.airdate,
-                &self.eptitle,
-                &self.epurl,
-            ],
-        )?;
-        Ok(())
+        pool.get()?
+            .execute(
+                &query,
+                &[
+                    &self.show,
+                    &self.season,
+                    &self.episode,
+                    &self.airdate,
+                    &self.eptitle,
+                    &self.epurl,
+                ],
+            )
+            .map(|_| ())
+            .map_err(err_msg)
     }
 
     pub fn update_episode(&self, pool: &PgPool) -> Result<(), Error> {
@@ -179,18 +181,20 @@ impl ImdbEpisodes {
         "#;
         let query = query.replace("RATING", &self.rating.to_string());
 
-        pool.get()?.execute(
-            &query,
-            &[
-                &self.eptitle,
-                &self.epurl,
-                &self.airdate,
-                &self.show,
-                &self.season,
-                &self.episode,
-            ],
-        )?;
-        Ok(())
+        pool.get()?
+            .execute(
+                &query,
+                &[
+                    &self.eptitle,
+                    &self.epurl,
+                    &self.airdate,
+                    &self.show,
+                    &self.season,
+                    &self.episode,
+                ],
+            )
+            .map(|_| ())
+            .map_err(err_msg)
     }
 
     pub fn get_string_vec(&self) -> Vec<String> {

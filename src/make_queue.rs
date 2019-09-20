@@ -61,8 +61,7 @@ fn make_queue() -> Result<(), Error> {
     let do_shows = matches.is_present("shows");
 
     let patterns: Vec<_> = patterns.iter().map(|s| s.as_str()).collect();
-    make_queue_worker(add_files, del_files, do_time, &patterns, do_shows)?;
-    Ok(())
+    make_queue_worker(add_files, del_files, do_time, &patterns, do_shows)
 }
 
 fn main() {
