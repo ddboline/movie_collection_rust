@@ -527,7 +527,6 @@ impl MovieCollection {
             .par_iter()
             .map(|d| walk_directory(&d, &self.get_config().suffixes))
             .collect();
-
         let file_list = file_list?;
 
         if file_list.is_empty() {
@@ -536,25 +535,30 @@ impl MovieCollection {
 
         let file_list: HashSet<_> = file_list.into_iter().flatten().collect();
 
-        let episode_list: HashSet<_> = file_list
+        let episode_list: Result<HashSet<_>, Error> = file_list
             .par_iter()
-            .filter_map(|f| {
-                let file_stem = Path::new(f).file_stem().unwrap().to_str().unwrap();
+            .map(|f| {
+                let file_stem = Path::new(f)
+                    .file_stem()
+                    .and_then(|f| f.to_str())
+                    .ok_or_else(|| err_msg("file_stem failed"))?;
                 let (show, season, episode) = parse_file_stem(&file_stem);
                 if season == -1 || episode == -1 {
-                    None
+                    Ok(None)
                 } else {
-                    Some((show, season, episode, f))
+                    Ok(Some((show, season, episode, f)))
                 }
             })
+            .filter_map(|x| x.transpose())
             .collect();
+        let episode_list = episode_list?;
 
         let query = r#"
             SELECT b.path, a.idx
             FROM movie_queue a
             JOIN movie_collection b ON a.collection_idx=b.idx
         "#;
-        let results: Result<HashMap<String, i32>, Error> = self
+        let movie_queue: Result<HashMap<String, i32>, Error> = self
             .get_pool()
             .get()?
             .query(query, &[])?
@@ -565,10 +569,10 @@ impl MovieCollection {
                 Ok((path, idx))
             })
             .collect();
-        let movie_queue = results?;
+        let movie_queue = movie_queue?;
 
         let query = "SELECT path, show FROM movie_collection";
-        let results: Result<HashMap<String, String>, Error> = self
+        let collection_map: Result<HashMap<String, String>, Error> = self
             .get_pool()
             .get()?
             .query(query, &[])?
@@ -579,10 +583,10 @@ impl MovieCollection {
                 Ok((path, show))
             })
             .collect();
-        let collection_map = results?;
+        let collection_map = collection_map?;
 
         let query = "SELECT show, season, episode from imdb_episodes";
-        let results: Result<HashSet<(String, i32, i32)>, Error> = self
+        let episodes_set: Result<HashSet<(String, i32, i32)>, Error> = self
             .get_pool()
             .get()?
             .query(query, &[])?
@@ -594,26 +598,30 @@ impl MovieCollection {
                 Ok((show, season, episode))
             })
             .collect();
-        let episodes_set = results?;
+        let episodes_set = episodes_set?;
 
         let stdout = io::stdout();
 
-        for f in &file_list {
-            if collection_map.get(f).is_none() {
-                let ext = Path::new(&f)
-                    .extension()
-                    .unwrap()
-                    .to_str()
-                    .unwrap()
-                    .to_string();
-                if !self.get_config().suffixes.contains(&ext) {
-                    continue;
+        let results: Result<(), Error> = file_list
+            .iter()
+            .map(|f| {
+                if collection_map.get(f).is_none() {
+                    let ext = Path::new(&f)
+                        .extension()
+                        .and_then(|e| e.to_str())
+                        .ok_or_else(|| err_msg("extension fail"))?
+                        .to_string();
+                    if self.get_config().suffixes.contains(&ext) {
+                        writeln!(stdout.lock(), "not in collection {}", f)?;
+                        self.insert_into_collection(f)?;
+                    }
                 }
-                writeln!(stdout.lock(), "not in collection {}", f)?;
-                self.insert_into_collection(f)?;
-            }
-        }
-        let results: Result<Vec<_>, Error> = collection_map
+                Ok(())
+            })
+            .collect();
+        results?;
+
+        let results: Result<(), Error> = collection_map
             .par_iter()
             .map(|(key, val)| {
                 if !file_list.contains(key) {
@@ -622,19 +630,17 @@ impl MovieCollection {
                             writeln!(stdout.lock(), "in queue but not disk {} {}", key, v)?;
                             let mq = MovieQueueDB::with_pool(self.get_pool());
                             mq.remove_from_queue_by_path(key)?;
-                            self.remove_from_collection(key)
                         }
                         None => {
                             writeln!(stdout.lock(), "not on disk {} {}", key, val)?;
-                            self.remove_from_collection(key)
                         }
-                    }
+                    };
+                    self.remove_from_collection(key)
                 } else {
                     Ok(())
                 }
             })
             .collect();
-
         results?;
 
         for (key, val) in collection_map {
