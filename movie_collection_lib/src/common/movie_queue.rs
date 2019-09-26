@@ -241,8 +241,7 @@ impl MovieQueueDB {
                     let file_stem = Path::new(&result.path)
                         .file_stem()
                         .unwrap()
-                        .to_str()
-                        .unwrap();
+                        .to_string_lossy();
                     let (show, season, episode) = parse_file_stem(&file_stem);
                     let query = r#"
                         SELECT epurl

@@ -87,18 +87,15 @@ pub fn movie_queue_http(queue: &[MovieQueueResult]) -> Result<Vec<String>, Error
             let path = path::Path::new(&row.path);
             let ext = path.extension()
                 .ok_or_else(|| err_msg("Cannot determine extension"))?
-                .to_str()
-                .ok_or_else(|| err_msg("Failed conversion to UTF-8"))?;
+                .to_string_lossy();
             let file_name = path
                 .file_name()
                 .ok_or_else(|| err_msg("Invalid path"))?
-                .to_str()
-                .ok_or_else(|| err_msg("Invalid utf8"))?;
+                .to_string_lossy().to_string();
             let file_stem = path
                 .file_stem()
                 .ok_or_else(|| err_msg("Invalid path"))?
-                .to_str()
-                .ok_or_else(|| err_msg("Invalid utf8"))?;
+                .to_string_lossy();
             let (_, season, episode) = parse_file_stem(&file_stem);
 
             let entry = if ext == "mp4" {
@@ -133,7 +130,7 @@ pub fn movie_queue_http(queue: &[MovieQueueResult]) -> Result<Vec<String>, Error
             let entry = format!(
                 "{}\n{}",
                 entry,
-                button.replace("ID", file_name).replace("SHOW", file_name)
+                button.replace("ID", &file_name).replace("SHOW", &file_name)
             );
 
             let entry = if ext != "mp4" {

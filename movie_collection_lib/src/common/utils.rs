@@ -30,7 +30,7 @@ pub fn walk_directory(path: &str, match_strs: &[String]) -> Result<Vec<String>, 
         .filter_map(|f| match f {
             Ok(fpath) => match fpath.file_type() {
                 Ok(ftype) => {
-                    let path_name = fpath.path().to_str().unwrap().to_string();
+                    let path_name = fpath.path().to_string_lossy().to_string();
 
                     if ftype.is_dir() {
                         Some(match walk_directory(&path_name, match_strs) {
@@ -129,7 +129,7 @@ pub fn read_transcode_jobs_from_queue(queue: &str) -> Result<(), Error> {
                 .unwrap();
 
             let path = Path::new(&script);
-            let file_name = path.file_name().unwrap().to_str().unwrap();
+            let file_name = path.file_name().unwrap().to_string_lossy();
             let home_dir = var("HOME").unwrap_or_else(|_| "/tmp".to_string());
             if path.exists() {
                 let command = format!("sh {}", script);
@@ -162,19 +162,18 @@ pub fn read_transcode_jobs_from_queue(queue: &str) -> Result<(), Error> {
 }
 
 pub fn create_transcode_script(config: &Config, path: &Path) -> Result<String, Error> {
-    let full_path = path.to_str().ok_or_else(|| err_msg("Bad path"))?;
+    let full_path = path.to_string_lossy().to_string();
     let fstem = path
         .file_stem()
         .ok_or_else(|| err_msg("No stem"))?
-        .to_str()
-        .ok_or_else(|| err_msg("failure"))?;
+        .to_string_lossy();
     let script_file = format!("{}/dvdrip/jobs/{}.sh", config.home_dir, fstem);
     if Path::new(&script_file).exists() {
         Err(err_msg("File exists"))
     } else {
         let output_file = format!("{}/dvdrip/avi/{}.mp4", config.home_dir, fstem);
         let template_file = include_str!("../../../templates/transcode_script.sh")
-            .replace("INPUT_FILE", full_path)
+            .replace("INPUT_FILE", &full_path)
             .replace("OUTPUT_FILE", &output_file)
             .replace("PREFIX", &fstem);
         let mut file = File::create(&script_file)?;
@@ -189,9 +188,9 @@ pub fn create_move_script(
     unwatched: bool,
     path: &Path,
 ) -> Result<String, Error> {
-    let file = path.to_str().unwrap();
-    let file_name = path.file_name().unwrap().to_str().unwrap();
-    let prefix = path.file_stem().unwrap().to_str().unwrap();
+    let file = path.to_string_lossy();
+    let file_name = path.file_name().unwrap().to_string_lossy();
+    let prefix = path.file_stem().unwrap().to_string_lossy().to_string();
     let output_dir = if let Some(d) = directory {
         let d = format!("{}/Documents/movies/{}", config.preferred_dir, d);
         if !Path::new(&d).exists() {
@@ -205,9 +204,9 @@ pub fn create_move_script(
         }
         d
     } else {
-        let file_stem = path.file_stem().unwrap().to_str().unwrap();
+        let file_stem = path.file_stem().unwrap().to_string_lossy().to_string();
 
-        let (show, season, episode) = parse_file_stem(file_stem);
+        let (show, season, episode) = parse_file_stem(&file_stem);
 
         if season == -1 || episode == -1 {
             panic!("Failed to parse show season {} episode {}", season, episode);
@@ -225,10 +224,10 @@ pub fn create_move_script(
     let mp4_script = format!("{}/dvdrip/jobs/{}_copy.sh", config.home_dir, prefix);
 
     let script_str = include_str!("../../../templates/move_script.sh")
-        .replace("SHOW", prefix)
+        .replace("SHOW", &prefix)
         .replace("OUTNAME", &format!("{}/{}", output_dir, prefix))
-        .replace("FNAME", file)
-        .replace("BNAME", file_name)
+        .replace("FNAME", &file)
+        .replace("BNAME", &file_name)
         .replace("ONAME", &format!("{}/{}", output_dir, prefix));
 
     let mut f = File::create(&mp4_script)?;
@@ -317,8 +316,7 @@ pub fn remcom_single_file(
     let ext = path
         .extension()
         .ok_or_else(|| err_msg("no extension"))?
-        .to_str()
-        .ok_or_else(|| err_msg("invalid str"))?;
+        .to_string_lossy();
 
     let stdout = stdout();
 

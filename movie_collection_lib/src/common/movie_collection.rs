@@ -381,8 +381,7 @@ impl MovieCollection {
                 let file_stem = Path::new(&result.path)
                     .file_stem()
                     .unwrap()
-                    .to_str()
-                    .unwrap();
+                    .to_string_lossy();
                 let (show, season, episode) = parse_file_stem(&file_stem);
 
                 if season != -1 && episode != -1 && show == result.show {
@@ -476,7 +475,7 @@ impl MovieCollection {
         if !Path::new(&path).exists() {
             return Err(err_msg("No such file"));
         }
-        let file_stem = Path::new(&path).file_stem().unwrap().to_str().unwrap();
+        let file_stem = Path::new(&path).file_stem().unwrap().to_string_lossy();
         let (show, _, _) = parse_file_stem(&file_stem);
         let query = r#"
             INSERT INTO movie_collection (idx, path, show, last_modified)
@@ -490,7 +489,7 @@ impl MovieCollection {
     }
 
     pub fn insert_into_collection_by_idx(&self, idx: i32, path: &str) -> Result<(), Error> {
-        let file_stem = Path::new(&path).file_stem().unwrap().to_str().unwrap();
+        let file_stem = Path::new(&path).file_stem().unwrap().to_string_lossy();
         let (show, _, _) = parse_file_stem(&file_stem);
         let query = r#"
             INSERT INTO movie_collection (idx, path, show, last_modified)
@@ -540,7 +539,7 @@ impl MovieCollection {
             .map(|f| {
                 let file_stem = Path::new(f)
                     .file_stem()
-                    .and_then(|f| f.to_str())
+                    .map(|f| f.to_string_lossy())
                     .ok_or_else(|| err_msg("file_stem failed"))?;
                 let (show, season, episode) = parse_file_stem(&file_stem);
                 if season == -1 || episode == -1 {
@@ -608,7 +607,7 @@ impl MovieCollection {
                 if collection_map.get(f).is_none() {
                     let ext = Path::new(&f)
                         .extension()
-                        .and_then(|e| e.to_str())
+                        .map(|e| e.to_string_lossy())
                         .ok_or_else(|| err_msg("extension fail"))?
                         .to_string();
                     if self.get_config().suffixes.contains(&ext) {

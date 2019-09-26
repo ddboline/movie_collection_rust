@@ -137,8 +137,7 @@ fn play_worker(full_path: String) -> Result<HttpResponse, Error> {
     let file_name = path
         .file_name()
         .ok_or_else(|| err_msg("Invalid path"))?
-        .to_str()
-        .ok_or_else(|| err_msg("Invalid utf8"))?;
+        .to_string_lossy();
     let url = format!("/videos/partial/{}", file_name);
 
     let body = include_str!("../../templates/video_template.html").replace("VIDEO", &url);
