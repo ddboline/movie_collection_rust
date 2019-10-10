@@ -63,10 +63,10 @@ fn watchlist_worker(
 }
 
 pub fn trakt_watchlist(
-    user: LoggedUser,
+    _: LoggedUser,
     state: Data<AppState>,
 ) -> impl Future<Item = HttpResponse, Error = Error> {
-    generic_route(WatchlistShowsRequest {}, user, state, watchlist_worker)
+    generic_route(WatchlistShowsRequest {}, state, watchlist_worker)
 }
 
 fn watchlist_action_worker(action: TraktActions, imdb_url: &str) -> Result<HttpResponse, Error> {
@@ -85,7 +85,7 @@ fn watchlist_action_worker(action: TraktActions, imdb_url: &str) -> Result<HttpR
 
 pub fn trakt_watchlist_action(
     path: Path<(String, String)>,
-    user: LoggedUser,
+    _: LoggedUser,
     state: Data<AppState>,
 ) -> impl Future<Item = HttpResponse, Error = Error> {
     let (action, imdb_url) = path.into_inner();
@@ -93,7 +93,6 @@ pub fn trakt_watchlist_action(
 
     generic_route(
         WatchlistActionRequest { action, imdb_url },
-        user,
         state,
         move |imdb_url| watchlist_action_worker(action, &imdb_url),
     )
@@ -136,12 +135,10 @@ fn trakt_watched_seasons_worker(
 
 pub fn trakt_watched_seasons(
     path: Path<String>,
-    user: LoggedUser,
+    _: LoggedUser,
     state: Data<AppState>,
 ) -> impl Future<Item = HttpResponse, Error = Error> {
     let imdb_url = path.into_inner();
-
-    let is_auth = state.user_list.is_authorized(&user);
 
     state
         .db
@@ -163,9 +160,6 @@ pub fn trakt_watched_seasons(
         .flatten()
         .and_then(move |(imdb_url, link, res)| {
             res.and_then(|entries| {
-                if !is_auth {
-                    return Ok(HttpResponse::Unauthorized().json("Unauthorized"));
-                }
                 trakt_watched_seasons_worker(&link, &imdb_url, &entries)
             })
         })
@@ -173,14 +167,13 @@ pub fn trakt_watched_seasons(
 
 pub fn trakt_watched_list(
     path: Path<(String, i32)>,
-    user: LoggedUser,
+    _: LoggedUser,
     state: Data<AppState>,
 ) -> impl Future<Item = HttpResponse, Error = Error> {
     let (imdb_url, season) = path.into_inner();
 
     generic_route(
         WatchedListRequest { imdb_url, season },
-        user,
         state,
         move |body| Ok(form_http_response(body)),
     )
@@ -188,7 +181,7 @@ pub fn trakt_watched_list(
 
 pub fn trakt_watched_action(
     path: Path<(String, String, i32, i32)>,
-    user: LoggedUser,
+    _: LoggedUser,
     state: Data<AppState>,
 ) -> impl Future<Item = HttpResponse, Error = Error> {
     let (action, imdb_url, season, episode) = path.into_inner();
@@ -200,7 +193,6 @@ pub fn trakt_watched_action(
             season,
             episode,
         },
-        user,
         state,
         move |body| Ok(form_http_response(body)),
     )
@@ -217,10 +209,10 @@ fn trakt_cal_worker(entries: &[String]) -> Result<HttpResponse, Error> {
 }
 
 pub fn trakt_cal(
-    user: LoggedUser,
+    _: LoggedUser,
     state: Data<AppState>,
 ) -> impl Future<Item = HttpResponse, Error = Error> {
-    generic_route(TraktCalRequest {}, user, state, move |entries| {
+    generic_route(TraktCalRequest {}, state, move |entries| {
         trakt_cal_worker(&entries)
     })
 }

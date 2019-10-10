@@ -71,7 +71,7 @@ fn tvshows_worker(
 }
 
 pub fn tvshows(
-    user: LoggedUser,
+    _: LoggedUser,
     state: Data<AppState>,
 ) -> impl Future<Item = HttpResponse, Error = Error> {
     state
@@ -81,9 +81,6 @@ pub fn tvshows(
         .join(state.db.send(WatchlistShowsRequest {}).from_err())
         .and_then(move |(res0, res1)| {
             res0.and_then(|tvshows| {
-                if !state.user_list.is_authorized(&user) {
-                    return Ok(HttpResponse::Unauthorized().json("Unauthorized"));
-                }
                 tvshows_worker(res1, tvshows)
             })
         })

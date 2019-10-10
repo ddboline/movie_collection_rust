@@ -10,7 +10,7 @@ use futures::stream::Stream;
 use std::time;
 use tokio_timer::Interval;
 
-use super::logged_user::AuthorizedUsers;
+use super::logged_user::AUTHORIZED_USERS;
 use super::movie_queue_routes::{
     find_new_episodes, imdb_episodes_route, imdb_episodes_update, imdb_ratings_route,
     imdb_ratings_update, imdb_show, last_modified_route, movie_collection_route,
@@ -27,7 +27,6 @@ use movie_collection_lib::common::pgpool::PgPool;
 
 pub struct AppState {
     pub db: Addr<PgPool>,
-    pub user_list: AuthorizedUsers,
 }
 
 pub fn start_app(config: Config) {
@@ -36,9 +35,8 @@ pub fn start_app(config: Config) {
     let port = config.port;
     let nconn = config.n_db_workers;
     let pool = PgPool::new(&config.pgurl);
-    let user_list = AuthorizedUsers::new();
 
-    let _u = user_list.clone();
+    let _u = AUTHORIZED_USERS.clone();
     let _p = pool.clone();
 
     actix_rt::spawn(
@@ -54,10 +52,7 @@ pub fn start_app(config: Config) {
 
     HttpServer::new(move || {
         App::new()
-            .data(AppState {
-                db: addr.clone(),
-                user_list: user_list.clone(),
-            })
+            .data(AppState { db: addr.clone() })
             .wrap(IdentityService::new(
                 CookieIdentityPolicy::new(secret.as_bytes())
                     .name("auth")

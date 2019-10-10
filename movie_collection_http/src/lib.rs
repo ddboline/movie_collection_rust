@@ -11,7 +11,6 @@ use actix_web::web::Data;
 use actix_web::HttpResponse;
 use failure::Error;
 use futures::Future;
-use logged_user::LoggedUser;
 use movie_collection_lib::common::pgpool::PgPool;
 use movie_queue_app::AppState;
 use serde::Serialize;
@@ -31,7 +30,6 @@ where
 
 fn generic_route<T, U, V>(
     query: T,
-    user: LoggedUser,
     state: Data<AppState>,
     callback: V,
 ) -> impl Future<Item = HttpResponse, Error = Error>
@@ -41,19 +39,15 @@ where
     U: Send + 'static,
     V: FnOnce(U) -> Result<HttpResponse, Error>,
 {
-    state.db.send(query).from_err().and_then(move |res| {
-        res.and_then(|x| {
-            if !state.user_list.is_authorized(&user) {
-                return Ok(HttpResponse::Unauthorized().json("Unauthorized"));
-            }
-            callback(x)
-        })
-    })
+    state
+        .db
+        .send(query)
+        .from_err()
+        .and_then(move |res| res.and_then(|x| callback(x)))
 }
 
 fn json_route<T, U>(
     query: T,
-    user: LoggedUser,
     state: Data<AppState>,
 ) -> impl Future<Item = HttpResponse, Error = Error>
 where
@@ -61,14 +55,11 @@ where
     PgPool: Handler<T, Result = Result<U, failure::Error>>,
     U: Serialize + Send + 'static,
 {
-    state.db.send(query).from_err().and_then(move |res| {
-        res.and_then(|x| {
-            if !state.user_list.is_authorized(&user) {
-                return Ok(HttpResponse::Unauthorized().json("Unauthorized"));
-            }
-            to_json(&x)
-        })
-    })
+    state
+        .db
+        .send(query)
+        .from_err()
+        .and_then(move |res| res.and_then(|x| to_json(&x)))
 }
 
 #[cfg(test)]
