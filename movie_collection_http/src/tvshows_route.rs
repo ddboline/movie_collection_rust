@@ -79,11 +79,7 @@ pub fn tvshows(
         .send(TvShowsRequest {})
         .from_err()
         .join(state.db.send(WatchlistShowsRequest {}).from_err())
-        .and_then(move |(res0, res1)| {
-            res0.and_then(|tvshows| {
-                tvshows_worker(res1, tvshows)
-            })
-        })
+        .and_then(move |(res0, res1)| res0.and_then(|tvshows| tvshows_worker(res1, tvshows)))
 }
 
 fn process_shows(

@@ -15,10 +15,10 @@ use movie_collection_lib::common::pgpool::PgPool;
 use movie_queue_app::AppState;
 use serde::Serialize;
 
-fn form_http_response(body: String) -> HttpResponse {
-    HttpResponse::Ok()
+fn form_http_response(body: String) -> Result<HttpResponse, Error> {
+    Ok(HttpResponse::Ok()
         .content_type("text/html; charset=utf-8")
-        .body(body)
+        .body(body))
 }
 
 fn to_json<T>(js: &T) -> Result<HttpResponse, Error>

@@ -159,9 +159,7 @@ pub fn trakt_watched_seasons(
         })
         .flatten()
         .and_then(move |(imdb_url, link, res)| {
-            res.and_then(|entries| {
-                trakt_watched_seasons_worker(&link, &imdb_url, &entries)
-            })
+            res.and_then(|entries| trakt_watched_seasons_worker(&link, &imdb_url, &entries))
         })
 }
 
@@ -175,7 +173,7 @@ pub fn trakt_watched_list(
     generic_route(
         WatchedListRequest { imdb_url, season },
         state,
-        move |body| Ok(form_http_response(body)),
+        form_http_response,
     )
 }
 
@@ -194,7 +192,7 @@ pub fn trakt_watched_action(
             episode,
         },
         state,
-        move |body| Ok(form_http_response(body)),
+        form_http_response,
     )
 }
 
@@ -212,7 +210,7 @@ pub fn trakt_cal(
     _: LoggedUser,
     state: Data<AppState>,
 ) -> impl Future<Item = HttpResponse, Error = Error> {
-    generic_route(TraktCalRequest {}, state, move |entries| {
+    generic_route(TraktCalRequest {}, state, |entries| {
         trakt_cal_worker(&entries)
     })
 }

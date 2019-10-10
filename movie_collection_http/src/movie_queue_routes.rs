@@ -75,9 +75,7 @@ pub fn movie_queue_delete(
 ) -> impl Future<Item = HttpResponse, Error = Error> {
     let path = path.into_inner();
 
-    generic_route(QueueDeleteRequest { path }, state, move |path| {
-        Ok(form_http_response(path))
-    })
+    generic_route(QueueDeleteRequest { path }, state, form_http_response)
 }
 
 fn transcode_worker(
@@ -171,9 +169,7 @@ pub fn imdb_show(
     let show = path.into_inner();
     let query = query.into_inner();
 
-    generic_route(ImdbShowRequest { show, query }, state, move |body| {
-        Ok(form_http_response(body))
-    })
+    generic_route(ImdbShowRequest { show, query }, state, form_http_response)
 }
 
 fn new_episode_worker(entries: &[String]) -> Result<HttpResponse, Error> {
@@ -191,7 +187,7 @@ pub fn find_new_episodes(
     _: LoggedUser,
     state: Data<AppState>,
 ) -> impl Future<Item = HttpResponse, Error = Error> {
-    generic_route(query.into_inner(), state, move |entries| {
+    generic_route(query.into_inner(), state, |entries| {
         new_episode_worker(&entries)
     })
 }
@@ -211,8 +207,8 @@ pub fn imdb_episodes_update(
 ) -> impl Future<Item = HttpResponse, Error = Error> {
     let episodes = data.into_inner();
 
-    generic_route(episodes, state, move |_| {
-        Ok(form_http_response("Success".to_string()))
+    generic_route(episodes, state, |_| {
+        form_http_response("Success".to_string())
     })
 }
 
@@ -231,9 +227,7 @@ pub fn imdb_ratings_update(
 ) -> impl Future<Item = HttpResponse, Error = Error> {
     let shows = data.into_inner();
 
-    generic_route(shows, state, move |_| {
-        Ok(form_http_response("Success".to_string()))
-    })
+    generic_route(shows, state, |_| form_http_response("Success".to_string()))
 }
 
 pub fn movie_queue_route(
@@ -251,9 +245,7 @@ pub fn movie_queue_update(
 ) -> impl Future<Item = HttpResponse, Error = Error> {
     let queue = data.into_inner();
 
-    generic_route(queue, state, move |_| {
-        Ok(form_http_response("Success".to_string()))
-    })
+    generic_route(queue, state, |_| form_http_response("Success".to_string()))
 }
 
 pub fn movie_collection_route(
@@ -271,8 +263,8 @@ pub fn movie_collection_update(
 ) -> impl Future<Item = HttpResponse, Error = Error> {
     let collection = data.into_inner();
 
-    generic_route(collection, state, move |_| {
-        Ok(form_http_response("Success".to_string()))
+    generic_route(collection, state, |_| {
+        form_http_response("Success".to_string())
     })
 }
 
