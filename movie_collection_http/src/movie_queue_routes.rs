@@ -49,7 +49,7 @@ pub fn movie_queue(
             patterns: Vec::new(),
         },
         state,
-        move |(queue, _)| queue_body_resp(&[], &queue),
+        |(queue, _)| queue_body_resp(&[], &queue),
     )
 }
 
@@ -64,7 +64,7 @@ pub fn movie_queue_show(
     generic_route(
         MovieQueueRequest { patterns },
         state,
-        move |(queue, patterns)| queue_body_resp(&patterns, &queue),
+        |(queue, patterns)| queue_body_resp(&patterns, &queue),
     )
 }
 
@@ -103,11 +103,9 @@ pub fn movie_queue_transcode(
     let path = path.into_inner();
     let patterns = vec![path];
 
-    generic_route(
-        MovieQueueRequest { patterns },
-        state,
-        move |(entries, _)| transcode_worker(None, &entries),
-    )
+    generic_route(MovieQueueRequest { patterns }, state, |(entries, _)| {
+        transcode_worker(None, &entries)
+    })
 }
 
 pub fn movie_queue_transcode_directory(
