@@ -31,7 +31,7 @@ pub struct AppState {
 
 pub fn start_app(config: Config) {
     let secret: String = std::env::var("SECRET_KEY").unwrap_or_else(|_| "0123".repeat(8));
-    let domain = config.domain.clone();
+    let domain = config.domain.to_string();
     let port = config.port;
     let nconn = config.n_db_workers;
     let pool = PgPool::new(&config.pgurl);
