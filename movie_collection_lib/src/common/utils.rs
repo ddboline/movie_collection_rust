@@ -1,10 +1,9 @@
 use amqp::{protocol, Basic, Channel, Options, Session, Table};
 use failure::{err_msg, format_err, Error};
 use log::error;
-use rand::distributions::{Distribution, Uniform};
-use rand::thread_rng;
 use reqwest::Url;
 use reqwest::{Client, Response};
+use retry::{delay::jitter, delay::Exponential, retry};
 use serde::{Deserialize, Serialize};
 use std::env::var;
 use std::fs::create_dir_all;
@@ -13,8 +12,6 @@ use std::fs::{File, OpenOptions};
 use std::io::{stdout, Write};
 use std::io::{BufRead, BufReader};
 use std::path::Path;
-use std::thread::sleep;
-use std::time::Duration;
 use subprocess::{Exec, Redirection};
 
 use crate::common::config::Config;
@@ -345,20 +342,18 @@ pub trait ExponentialRetry {
     fn get_client(&self) -> &Client;
 
     fn get(&self, url: &Url) -> Result<Response, Error> {
-        let mut timeout: f64 = 1.0;
-        let mut rng = thread_rng();
-        let range = Uniform::from(0..1000);
-        loop {
-            match self.get_client().get(url.clone()).send() {
-                Ok(x) => return Ok(x),
-                Err(e) => {
-                    sleep(Duration::from_millis((timeout * 1000.0) as u64));
-                    timeout *= 4.0 * f64::from(range.sample(&mut rng)) / 1000.0;
-                    if timeout >= 64.0 {
-                        return Err(err_msg(e));
-                    }
-                }
-            }
-        }
+        retry(
+            Exponential::from_millis(2)
+                .map(jitter)
+                .map(|x| x * 500)
+                .take(6),
+            || {
+                self.get_client().get(url.clone()).send().map_err(|e| {
+                    error!("Got error {:?} , retrying", e);
+                    e
+                })
+            },
+        )
+        .map_err(|e| format_err!("{:?}", e))
     }
 }
