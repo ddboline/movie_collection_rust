@@ -1,0 +1,174 @@
+<!DOCTYPE HTML>
+<html>
+<head>
+<style>
+* {
+    box-sizing: border-box;
+}
+
+body {
+    font-family: Arial, Helvetica, sans-serif;
+}
+
+/* Style the header */
+header {
+    background-color: #ffffff;
+    padding: 30px;
+    text-align: center;
+    font-size: 35px;
+    color: white;
+}
+
+article {
+    float: center;
+    padding: 20px;
+    width: 100%;
+    background-color: #ffffff;
+    height: 300px; /* only for demonstration, should be removed */
+}
+
+/* Clear floats after the columns */
+section:after {
+    content: "";
+    display: table;
+    clear: both;
+}
+
+/* Style the footer */
+footer {
+    background-color: #ffffff;
+    padding: 10px;
+    text-align: center;
+    color: white;
+}
+
+/* Responsive layout - makes the two columns/boxes stack on top of each other instead of next to each other, on small screens */
+@media (max-width: 1000px) {
+    nav, article {
+    width: 100%;
+    height: auto;
+    }
+}
+</style>
+</head>
+
+<body>
+<center>
+
+<H3 align="center">
+<input type="button" name="tvshows" value="TVShows" onclick="updateMainArticle('/list/tvshows');"/>
+<input type="button" name="list_cal" value="LocalCalendar" onclick="updateMainArticle('/list/cal?source=all');"/>
+<input type="button" name="watchlist" value="WatchList" onclick="updateMainArticle('/list/trakt/watchlist');"/>
+<input type="button" name="trakt_cal" value="TraktCalendar" onclick="updateMainArticle('/list/trakt/cal');"/>
+<input type="button" name="list" value="FullQueue" onclick="updateMainArticle('/list');"/>
+</H3>
+
+<H3>
+<article id="main_article">
+BODY
+</article>
+</H3>
+</center>
+
+<script language="JavaScript" type="text/javascript">
+    function updateMainArticle( url ) {
+        let xmlhttp = new XMLHttpRequest();
+        xmlhttp.onload = function f() {
+            document.getElementById("main_article").innerHTML = xmlhttp.responseText;
+        }
+        xmlhttp.open("GET", url, true);
+        xmlhttp.send(null);
+    }
+    function watched_add(link, season, episode) {
+        let ostr = "/list/trakt/watched/add/" + link + "/" + season + "/" + episode;
+        let xmlhttp = new XMLHttpRequest();
+        xmlhttp.open("GET", ostr, true);
+        xmlhttp.onload = function nothing() {
+            let url = "/list/watched/list/" + link + "/" + season;
+            updateMainArticle(url);
+        }
+        xmlhttp.send(null);
+        let out = "requested " + link + "/" + season + "/" + episode
+        document.getElementById("remcomoutput").innerHTML = out;
+    }
+    function watched_rm(link, season, episode) {
+        let ostr = "/list/trakt/watched/rm/" + link + "/" + season + "/" + episode
+        let xmlhttp = new XMLHttpRequest();
+        xmlhttp.open("GET", ostr, true);
+        xmlhttp.onload = function nothing() {
+            let url = "/list/watched/list/" + link + "/" + season;
+            updateMainArticle(url);
+        }
+        xmlhttp.send(null);
+        let out = "requested " + link + "/" + season + "/" + episode
+        document.getElementById("remcomoutput").innerHTML = out;
+    }
+    function transcode(index) {
+        let ostr = "/list/transcode/" + index
+        let xmlhttp = new XMLHttpRequest();
+        xmlhttp.open("GET", ostr, true);
+        xmlhttp.onload = function nothing() {
+        }
+        xmlhttp.send(null);
+        let out = "requested " + index
+        document.getElementById("remcomoutput").innerHTML = out;
+    }
+    function transcode_directory(index, directory) {
+        let ostr = "/list/transcode/" + directory + "/" + index
+        let xmlhttp = new XMLHttpRequest();
+        xmlhttp.open("GET", ostr, true);
+        xmlhttp.onload = function nothing() {
+        }
+        xmlhttp.send(null);
+        let out = "requested " + index
+        document.getElementById("remcomoutput").innerHTML = out;
+    }
+
+    function delete_show(index) {
+        let ostr = "/list/delete/" + index
+        let xmlhttp = new XMLHttpRequest();
+        xmlhttp.open("GET", ostr, true);
+        xmlhttp.onload = function nothing() {
+        }
+        xmlhttp.send(null);
+    }
+    function watchlist_add(link) {
+        let ostr = "/list/trakt/watchlist/add/" + link
+        let xmlhttp = new XMLHttpRequest();
+        xmlhttp.open("GET", ostr, true);
+        xmlhttp.onload = function nothing() {
+            let url = "/list/tvshows";
+            updateMainArticle(url);
+        }
+        xmlhttp.send(null);
+        let out = "requested " + link
+        document.getElementById("remcomoutput").innerHTML = out;
+    }
+    function watchlist_rm(link) {
+        let ostr = "/list/trakt/watchlist/rm/" + link
+        let xmlhttp = new XMLHttpRequest();
+        xmlhttp.open("GET", ostr, true);
+        xmlhttp.onload = function nothing() {
+            let url = "/list/tvshows";
+            updateMainArticle(url);
+        }
+        xmlhttp.send(null);
+        let out = "requested " + link
+        document.getElementById("remcomoutput").innerHTML = out;
+    }
+    function imdb_update(show, link, season) {
+        let ostr = "/list/imdb/" + show + "?tv=true&update=true&database=true&link=" + link + "&season=" + season;
+        let xmlhttp = new XMLHttpRequest();
+        xmlhttp.open("GET", ostr, true);
+        xmlhttp.onload = function nothing() {
+            let url = "/list/cal?source=all";
+            updateMainArticle(url);
+        }
+        xmlhttp.send(null);
+        let out = "requested " + link
+        document.getElementById("remcomoutput").innerHTML = out;
+    }
+    </script>
+
+</body>
+</html>
