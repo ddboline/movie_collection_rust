@@ -286,10 +286,9 @@ impl Handler<ImdbShowRequest> for PgPool {
     type Result = Result<String, Error>;
 
     fn handle(&mut self, msg: ImdbShowRequest, _: &mut Self::Context) -> Self::Result {
-        let body = include_str!("../../templates/watchlist_template.html");
         let watchlist = get_watchlist_shows_db_map(&self)?;
         let pi = ParseImdb::with_pool(&self)?;
-        let body = body.replace("BODY", &pi.parse_imdb_http_worker(&msg.into(), &watchlist)?);
+        let body = pi.parse_imdb_http_worker(&msg.into(), &watchlist)?;
         Ok(body)
     }
 }

@@ -12,7 +12,7 @@ use tokio_timer::Interval;
 
 use super::logged_user::AUTHORIZED_USERS;
 use super::movie_queue_routes::{
-    find_new_episodes, imdb_episodes_route, imdb_episodes_update, imdb_ratings_route,
+    find_new_episodes, frontpage, imdb_episodes_route, imdb_episodes_update, imdb_ratings_route,
     imdb_ratings_update, imdb_show, last_modified_route, movie_collection_route,
     movie_collection_update, movie_queue, movie_queue_delete, movie_queue_play, movie_queue_route,
     movie_queue_show, movie_queue_transcode, movie_queue_transcode_directory, movie_queue_update,
@@ -61,6 +61,7 @@ pub fn start_app(config: Config) {
                     .max_age_time(Duration::days(1))
                     .secure(false), // this can only be true if you have https
             ))
+            .service(web::resource("/list/index.html").route(web::get().to(frontpage)))
             .service(web::resource("/list/cal").route(web::get().to_async(find_new_episodes)))
             .service(web::resource("/list/tvshows").route(web::get().to_async(tvshows)))
             .service(

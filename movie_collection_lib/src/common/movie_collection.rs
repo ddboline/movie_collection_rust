@@ -947,13 +947,13 @@ pub fn find_new_episodes_http_worker(
             format!(
                 "<tr><td>{}</td><td>{}</td><td>{}</td><td>{}</td><td>{}</td>{}</tr>",
                 format!(
-                    r#"<a href="/list/trakt/watched/list/{}/{}">{}</a>"#,
+                    r#"<a href="javascript:updateMainArticle('/list/trakt/watched/list/{}/{}')">{}</a>"#,
                     epi.link, epi.season, epi.title
                 ),
                 match queue.get(&key) {
                     Some(idx) => format!(
-                        "<a href={}>{}</a>",
-                        &format!(r#""{}/{}""#, "/list/play", idx),
+                        r#"<a href="javascript:updateMainArticle('{}');">{}</a>"#,
+                        &format!(r#"{}/{}"#, "/list/play", idx),
                         epi.eptitle
                     ),
                     None => epi.eptitle.to_string(),

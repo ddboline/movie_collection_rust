@@ -1,7 +1,7 @@
 #![allow(clippy::needless_pass_by_value)]
 
 use actix_web::web::{Data, Json, Path, Query};
-use actix_web::HttpResponse;
+use actix_web::{HttpResponse, Responder};
 use failure::{err_msg, Error};
 use futures::Future;
 use std::path;
@@ -21,14 +21,22 @@ use movie_collection_lib::common::movie_queue::MovieQueueResult;
 use movie_collection_lib::common::utils::remcom_single_file;
 
 fn movie_queue_body(patterns: &[String], entries: &[String]) -> String {
+    let previous = r#"<a href="javascript:updateMainArticle('/list/tvshows')">Go Back</a><br>"#;
+
     let watchlist_url = if patterns.is_empty() {
         "/list/trakt/watchlist".to_string()
     } else {
         format!("/list/trakt/watched/list/{}", patterns.join("_"))
     };
 
-    let body = include_str!("../../templates/queue_list.html").replace("WATCHLIST", &watchlist_url);
-    body.replace("BODY", &entries.join("\n"))
+    let entries = format!(
+        r#"{}<a href="javascript:updateMainArticle('{}')">Watch List</a><table border="0">{}</table>"#,
+        previous,
+        watchlist_url,
+        entries.join("\n")
+    );
+
+    entries
 }
 
 fn queue_body_resp(patterns: &[String], queue: &[MovieQueueResult]) -> Result<HttpResponse, Error> {
@@ -132,7 +140,16 @@ fn play_worker(full_path: String) -> Result<HttpResponse, Error> {
         .to_string_lossy();
     let url = format!("/videos/partial/{}", file_name);
 
-    let body = include_str!("../../templates/video_template.html").replace("VIDEO", &url);
+    let body = format!(
+        r#"
+        {}<br>
+        <video width="720" controls>
+        <source src="{}" type="video/mp4">
+        Your browser does not support HTML5 video.
+        </video>
+    "#,
+        file_name, url
+    );
 
     let command = format!("rm -f /var/www/html/videos/partial/{}", file_name);
     Exec::shell(&command).join().map_err(err_msg)?;
@@ -171,12 +188,22 @@ pub fn imdb_show(
 }
 
 fn new_episode_worker(entries: &[String]) -> Result<HttpResponse, Error> {
-    let body =
-        include_str!("../../templates/watched_template.html").replace("PREVIOUS", "/list/tvshows");
-    let body = body.replace("BODY", &entries.join("\n"));
+    let previous = r#"
+        <a href="javascript:updateMainArticle('/list/tvshows')">Go Back</a><br>
+        <input type="button" name="list_cal" value="TVCalendar" onclick="updateMainArticle('/list/cal');"/>
+        <input type="button" name="list_cal" value="NetflixCalendar" onclick="updateMainArticle('/list/cal?source=netflix');"/>
+        <input type="button" name="list_cal" value="AmazonCalendar" onclick="updateMainArticle('/list/cal?source=amazon');"/>
+        <input type="button" name="list_cal" value="HuluCalendar" onclick="updateMainArticle('/list/cal?source=hulu');"/><br>
+        <button name="remcomout" id="remcomoutput"> &nbsp; </button>
+    "#;
+    let entries = format!(
+        r#"{}<table border="0">{}</table>"#,
+        previous,
+        entries.join("\n")
+    );
     let resp = HttpResponse::Ok()
         .content_type("text/html; charset=utf-8")
-        .body(body);
+        .body(entries);
     Ok(resp)
 }
 
@@ -271,4 +298,8 @@ pub fn last_modified_route(
     state: Data<AppState>,
 ) -> impl Future<Item = HttpResponse, Error = Error> {
     json_route(LastModifiedRequest {}, state)
+}
+
+pub fn frontpage(_: LoggedUser, _: Data<AppState>) -> impl Responder {
+    form_http_response(include_str!("../../templates/index.html").replace("BODY", ""))
 }

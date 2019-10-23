@@ -101,9 +101,9 @@ pub fn movie_queue_http(queue: &[MovieQueueResult]) -> Result<Vec<String>, Error
             let entry = if ext == "mp4" {
                 let collection_idx = mc.get_collection_index(&row.path)?.unwrap_or(-1);
                 format!(
-                    "<a href={}>{}</a>",
+                    r#"<a href="javascript:updateMainArticle('{}');">{}</a>"#,
                     &format!(
-                        r#""{}/{}""#,
+                        "{}/{}",
                         "/list/play", collection_idx
                     ), file_name
                 )

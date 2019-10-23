@@ -28,9 +28,6 @@ fn watchlist_worker(
 
     shows.sort();
 
-    let body = include_str!("../../templates/watchlist_template.html")
-        .replace("PREVIOUS", "/list/tvshows");
-
     let shows: Vec<_> = shows
         .into_iter()
         .map(|(title, link, source)| {
@@ -38,7 +35,7 @@ fn watchlist_worker(
                 r#"<tr><td>{}</td>
             <td><a href="https://www.imdb.com/title/{}">imdb</a> {} </tr>"#,
                 format!(
-                    r#"<a href="/list/trakt/watched/list/{}">{}</a>"#,
+                    r#"<a href="javascript:updateMainArticle('/list/trakt/watched/list/{}')">{}</a>"#,
                     link, title
                 ),
                 link,
@@ -54,11 +51,16 @@ fn watchlist_worker(
         })
         .collect();
 
-    let body = body.replace("BODY", &shows.join("\n"));
+    let previous = r#"<a href="javascript:updateMainArticle('/list/tvshows')">Go Back</a><br>"#;
+    let entries = format!(
+        r#"{}<table border="0">{}</table>"#,
+        previous,
+        shows.join("\n")
+    );
 
     let resp = HttpResponse::Ok()
         .content_type("text/html; charset=utf-8")
-        .body(body);
+        .body(entries);
     Ok(resp)
 }
 
@@ -104,8 +106,6 @@ fn trakt_watched_seasons_worker(
     entries: &[ImdbSeason],
 ) -> Result<HttpResponse, Error> {
     let button_add = r#"<td><button type="submit" id="ID" onclick="imdb_update('SHOW', 'LINK', SEASON);">update database</button></td>"#;
-    let body = include_str!("../../templates/watchlist_template.html")
-        .replace("PREVIOUS", "/list/trakt/watchlist");
 
     let entries: Vec<_> = entries
         .iter()
@@ -113,7 +113,7 @@ fn trakt_watched_seasons_worker(
             format!(
                 "<tr><td>{}<td>{}<td>{}<td>{}</tr>",
                 format!(
-                    r#"<a href="/list/trakt/watched/list/{}/{}">{}</t>"#,
+                    r#"<a href="javascript:updateMainArticle('/list/trakt/watched/list/{}/{}')">{}</t>"#,
                     imdb_url, s.season, s.title
                 ),
                 s.season,
@@ -125,11 +125,18 @@ fn trakt_watched_seasons_worker(
             )
         })
         .collect();
-    let body = body.replace("BODY", &entries.join("\n"));
+
+    let previous =
+        r#"<a href="javascript:updateMainArticle('/list/trakt/watchlist')">Go Back</a><br>"#;
+    let entries = format!(
+        r#"{}<table border="0">{}</table>"#,
+        previous,
+        entries.join("\n")
+    );
 
     let resp = HttpResponse::Ok()
         .content_type("text/html; charset=utf-8")
-        .body(body);
+        .body(entries);
     Ok(resp)
 }
 
@@ -197,12 +204,15 @@ pub fn trakt_watched_action(
 }
 
 fn trakt_cal_worker(entries: &[String]) -> Result<HttpResponse, Error> {
-    let body =
-        include_str!("../../templates/watched_template.html").replace("PREVIOUS", "/list/tvshows");
-    let body = body.replace("BODY", &entries.join("\n"));
+    let previous = r#"<a href="javascript:updateMainArticle('/list/tvshows')">Go Back</a><br>"#;
+    let entries = format!(
+        r#"{}<table border="0">{}</table>"#,
+        previous,
+        entries.join("\n")
+    );
     let resp = HttpResponse::Ok()
         .content_type("text/html; charset=utf-8")
-        .body(body);
+        .body(entries);
     Ok(resp)
 }
 

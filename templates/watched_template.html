@@ -1,59 +1,196 @@
 <!DOCTYPE HTML>
 <html>
+<head>
+<style>
+* {
+    box-sizing: border-box;
+}
+
+body {
+    font-family: Arial, Helvetica, sans-serif;
+}
+
+/* Style the header */
+header {
+    background-color: #ffffff;
+    padding: 30px;
+    text-align: center;
+    font-size: 35px;
+    color: white;
+}
+
+article {
+    float: center;
+    padding: 20px;
+    width: 100%;
+    background-color: #ffffff;
+    height: 300px; /* only for demonstration, should be removed */
+}
+
+/* Clear floats after the columns */
+section:after {
+    content: "";
+    display: table;
+    clear: both;
+}
+
+/* Style the footer */
+footer {
+    background-color: #ffffff;
+    padding: 10px;
+    text-align: center;
+    color: white;
+}
+
+/* Responsive layout - makes the two columns/boxes stack on top of each other instead of next to each other, on small screens */
+@media (max-width: 1000px) {
+    nav, article {
+    width: 100%;
+    height: auto;
+    }
+}
+</style>
+</head>
+
 <body>
 <center>
 
 <H3 align="center">
-<a href="PREVIOUS">Go Back</a>
-</H3>
-<H3 align="center">
-        <button name="remcomout" id="remcomoutput"> &nbsp; </button>
-        <button type="submit" id="ID" onclick="imdb_update('SHOW', 'LINK', SEASON);">update database</button>
+<input type="button" name="tvshows" value="TVShows" onclick="replaceLocation('/list/tvshows');"/>
+<input type="button" name="list_cal" value="LocalCalendar" onclick="replaceLocation('/list/cal?source=all');"/>
+<input type="button" name="watchlist" value="WatchList" onclick="replaceLocation('/list/trakt/watchlist');"/>
+<input type="button" name="trakt_cal" value="TraktCalendar" onclick="replaceLocation('/list/trakt/cal');"/>
+<input type="button" name="list" value="FullQueue" onclick="replaceLocation('/list');"/>
 </H3>
 
 <H3>
-<table border="0">
+<article id="main_article">
 BODY
-</table>
+</article>
 </H3>
 </center>
 
 <script language="JavaScript" type="text/javascript">
-
+    function replaceLocation(url) {
+        location.replace(url);
+    }
     function watched_add(link, season, episode) {
-        var ostr = "/list/trakt/watched/add/" + link + "/" + season + "/" + episode
-        var xmlhttp = new XMLHttpRequest();
+        let ostr = "/list/trakt/watched/add/" + link + "/" + season + "/" + episode
+        let xmlhttp = new XMLHttpRequest();
         xmlhttp.open("GET", ostr, true);
         xmlhttp.onload = function nothing() {
             location.reload();
         }
         xmlhttp.send(null);
-        var out = "requested " + link + "/" + season + "/" + episode
+        let out = "requested " + link + "/" + season + "/" + episode
         document.getElementById("remcomoutput").innerHTML = out;
     }
     function watched_rm(link, season, episode) {
-        var ostr = "/list/trakt/watched/rm/" + link + "/" + season + "/" + episode
-        var xmlhttp = new XMLHttpRequest();
+        let ostr = "/list/trakt/watched/rm/" + link + "/" + season + "/" + episode
+        let xmlhttp = new XMLHttpRequest();
         xmlhttp.open("GET", ostr, true);
         xmlhttp.onload = function nothing() {
             location.reload();
         }
         xmlhttp.send(null);
-        var out = "requested " + link + "/" + season + "/" + episode
+        let out = "requested " + link + "/" + season + "/" + episode
         document.getElementById("remcomoutput").innerHTML = out;
     }
     function imdb_update(show, link, season) {
-        var ostr = "/list/imdb/" + show + "?tv=true&update=true&database=true&link=" + link + "&season=" + season;
-        var xmlhttp = new XMLHttpRequest();
+        let ostr = "/list/imdb/" + show + "?tv=true&update=true&database=true&link=" + link + "&season=" + season;
+        let xmlhttp = new XMLHttpRequest();
         xmlhttp.open("GET", ostr, true);
         xmlhttp.onload = function nothing() {
             location.reload();
         }
         xmlhttp.send(null);
-        var out = "requested " + link
+        let out = "requested " + link
+        document.getElementById("remcomoutput").innerHTML = out;
+    }
+    function transcode(index) {
+        let ostr = "/list/transcode/" + index
+        let xmlhttp = new XMLHttpRequest();
+        xmlhttp.open("GET", ostr, true);
+        xmlhttp.onload = function nothing() {
+        }
+        xmlhttp.send(null);
+        let out = "requested " + index
+        document.getElementById("remcomoutput").innerHTML = out;
+    }
+    function transcode_directory(index, directory) {
+        let ostr = "/list/transcode/" + directory + "/" + index
+        let xmlhttp = new XMLHttpRequest();
+        xmlhttp.open("GET", ostr, true);
+        xmlhttp.onload = function nothing() {
+        }
+        xmlhttp.send(null);
+        let out = "requested " + index
         document.getElementById("remcomoutput").innerHTML = out;
     }
 
+    function delete_show(index) {
+        let ostr = "/list/delete/" + index
+        let xmlhttp = new XMLHttpRequest();
+        xmlhttp.open("GET", ostr, true);
+        xmlhttp.onload = function nothing() {
+        }
+        xmlhttp.send(null);
+    }
+    function watchlist_add(link) {
+        let ostr = "/list/trakt/watchlist/add/" + link
+        let xmlhttp = new XMLHttpRequest();
+        xmlhttp.open("GET", ostr, true);
+        xmlhttp.onload = function nothing() {
+            location.reload();
+        }
+        xmlhttp.send(null);
+        let out = "requested " + link
+        document.getElementById("remcomoutput").innerHTML = out;
+    }
+    function watchlist_rm(link) {
+        let ostr = "/list/trakt/watchlist/rm/" + link
+        let xmlhttp = new XMLHttpRequest();
+        xmlhttp.open("GET", ostr, true);
+        xmlhttp.onload = function nothing() {
+            location.reload();
+        }
+        xmlhttp.send(null);
+        let out = "requested " + link
+        document.getElementById("remcomoutput").innerHTML = out;
+    }
+    function watchlist_add(link) {
+        let ostr = "/list/trakt/watchlist/add/" + link
+        let xmlhttp = new XMLHttpRequest();
+        xmlhttp.open("GET", ostr, true);
+        xmlhttp.onload = function nothing() {
+            location.reload();
+        }
+        xmlhttp.send(null);
+        let out = "requested " + link
+        document.getElementById("remcomoutput").innerHTML = out;
+    }
+    function watchlist_rm(link) {
+        let ostr = "/list/trakt/watchlist/rm/" + link
+        let xmlhttp = new XMLHttpRequest();
+        xmlhttp.open("GET", ostr, true);
+        xmlhttp.onload = function nothing() {
+            location.reload();
+        }
+        xmlhttp.send(null);
+        let out = "requested " + link
+        document.getElementById("remcomoutput").innerHTML = out;
+    }
+    function imdb_update(show, link, season) {
+        let ostr = "/list/imdb/" + show + "?tv=true&update=true&database=true&link=" + link + "&season=" + season;
+        let xmlhttp = new XMLHttpRequest();
+        xmlhttp.open("GET", ostr, true);
+        xmlhttp.onload = function nothing() {
+            location.reload();
+        }
+        xmlhttp.send(null);
+        let out = "requested " + link
+        document.getElementById("remcomoutput").innerHTML = out;
+    }
     </script>
 
 </body>

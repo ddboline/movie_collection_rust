@@ -718,21 +718,11 @@ pub fn watch_list_http_worker(pool: &PgPool, imdb_url: &str, season: i32) -> Res
         r#"onclick="watched_rm('SHOW', SEASON, EPISODE);">remove from watched</button>"#
     );
 
-    let body = include_str!("../../../templates/watched_template.html").replace(
-        "PREVIOUS",
-        &format!("/list/trakt/watched/list/{}", imdb_url),
-    );
-
     let mc = MovieCollection::with_pool(&pool)?;
     let mq = MovieQueueDB::with_pool(&pool);
 
     let show = ImdbRatings::get_show_by_link(imdb_url, &pool)?
         .ok_or_else(|| err_msg("Show Doesn't exist"))?;
-
-    let body = body
-        .replace("SHOW", &show.show)
-        .replace("LINK", &show.link)
-        .replace("SEASON", &season.to_string());
 
     let watched_episodes_db: HashSet<i32> = get_watched_shows_db(&pool, &show.show, Some(season))?
         .into_iter()
@@ -779,8 +769,8 @@ pub fn watch_list_http_worker(pool: &PgPool, imdb_url: &str, season: i32) -> Res
         .map(|s| {
             let entry = if let Some(collection_idx) = collection_idx_map.get(&s.episode) {
                 format!(
-                    "<a href={}>{}</a>",
-                    &format!(r#""{}/{}""#, "/list/play", collection_idx),
+                    r#"<a href="javascript:updateMainArticle('{}');">{}</a>"#,
+                    &format!("{}/{}", "/list/play", collection_idx),
                     s.eptitle
                 )
             } else {
@@ -816,9 +806,22 @@ pub fn watch_list_http_worker(pool: &PgPool, imdb_url: &str, season: i32) -> Res
         })
         .collect();
 
-    let body = body.replace("BODY", &entries.join("\n"));
+    let previous = format!(
+        r#"<a href="javascript:updateMainArticle('/list/trakt/watched/list/{}')">Go Back</a><br>"#,
+        imdb_url
+    );
+    let buttons = format!(r#"
+        <button name="remcomout" id="remcomoutput"> &nbsp; </button>
+        <button type="submit" id="ID" onclick="imdb_update('{}', '{}', {});">update database</button><br>
+    "#, show.show, show.link, season.to_string());
 
-    Ok(body)
+    let entries = format!(
+        r#"{}{}<table border="0">{}</table>"#,
+        previous,
+        buttons,
+        entries.join("\n")
+    );
+    Ok(entries)
 }
 
 pub fn watched_action_http_worker(
@@ -914,7 +917,7 @@ pub fn trakt_cal_http_worker(pool: &PgPool) -> Result<Vec<String>, Error> {
             let entry = format!(
                 "<tr><td>{}</td><td>{}</td><td>{}</td><td>{}</td>{}</tr>",
                 format!(
-                    r#"<a href="/list/trakt/watched/list/{}/{}">{}</a>"#,
+                    r#"<a href="javascript:updateMainArticle('/list/trakt/watched/list/{}/{}')">{}</a>"#,
                     cal.link, cal.season, cal.show,
                 ),
                 format!(

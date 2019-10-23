@@ -61,12 +61,21 @@ fn tvshows_worker(
 
     let shows = process_shows(tvshows, watchlist)?;
 
-    let body =
-        include_str!("../../templates/tvshows_template.html").replace("BODY", &shows.join("\n"));
+    let previous = r#"
+        <a href="javascript:updateMainArticle('/list/watchlist')">Go Back</a><br>
+        <a href="javascript:updateMainArticle('/list/trakt/watchlist')">Watch List</a>
+        <button name="remcomout" id="remcomoutput"> &nbsp; </button><br>
+    "#;
+
+    let entries = format!(
+        r#"{}<table border="0">{}</table>"#,
+        previous,
+        shows.join("\n")
+    );
 
     let resp = HttpResponse::Ok()
         .content_type("text/html; charset=utf-8")
-        .body(body);
+        .body(entries);
     Ok(resp)
 }
 
@@ -114,10 +123,10 @@ fn process_shows(
                 r#"<tr><td>{}</td>
                 <td><a href="https://www.imdb.com/title/{}">imdb</a></td><td>{}</td><td>{}</td><td>{}</td></tr>"#,
                 if tvshow_keys.contains(&item.link) {
-                    format!(r#"<a href="/list/{}">{}</a>"#, item.show, item.title)
+                    format!(r#"<a href="javascript:updateMainArticle('/list/{}')">{}</a>"#, item.show, item.title)
                 } else {
                     format!(
-                        r#"<a href="/list/trakt/watched/list/{}">{}</a>"#,
+                        r#"<a href="javascript:updateMainArticle('/list/trakt/watched/list/{}')">{}</a>"#,
                         item.link, item.title
                     )
                 },
@@ -129,7 +138,7 @@ fn process_shows(
                     _ => "",
                 },
                 if has_watchlist {
-                    format!(r#"<a href="/list/trakt/watched/list/{}">watchlist</a>"#, item.link)
+                    format!(r#"<a href="javascript:updateMainArticle('/list/trakt/watched/list/{}')">watchlist</a>"#, item.link)
                 } else {
                     "".to_string()
                 },
