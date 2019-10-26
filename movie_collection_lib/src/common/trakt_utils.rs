@@ -810,10 +810,18 @@ pub fn watch_list_http_worker(pool: &PgPool, imdb_url: &str, season: i32) -> Res
         r#"<a href="javascript:updateMainArticle('/list/trakt/watched/list/{}')">Go Back</a><br>"#,
         imdb_url
     );
-    let buttons = format!(r#"
+    let buttons = format!(
+        r#"
         <button name="remcomout" id="remcomoutput"> &nbsp; </button>
-        <button type="submit" id="ID" onclick="imdb_update('{}', '{}', {});">update database</button><br>
-    "#, show.show, show.link, season.to_string());
+        <button type="submit" id="ID"
+            onclick="imdb_update('{show}', '{link}', {season},
+            '/list/trakt/watched/list/{link}/{season}');"
+            >update database</button><br>
+    "#,
+        show = show.show,
+        link = show.link,
+        season = season
+    );
 
     let entries = format!(
         r#"{}{}<table border="0">{}</table>"#,
@@ -887,7 +895,8 @@ pub fn trakt_cal_http_worker(pool: &PgPool) -> Result<Vec<String>, Error> {
     let button_add = format!(
         "{}{}",
         r#"<td><button type="submit" id="ID" "#,
-        r#"onclick="imdb_update('SHOW', 'LINK', SEASON);">update database</button></td>"#
+        r#"onclick="imdb_update('SHOW', 'LINK', SEASON, '/list/trakt/cal');"
+            >update database</button></td>"#
     );
     let cal_list = TraktInstance::new().get_calendar()?;
     cal_list

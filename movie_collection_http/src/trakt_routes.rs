@@ -105,7 +105,11 @@ fn trakt_watched_seasons_worker(
     imdb_url: &str,
     entries: &[ImdbSeason],
 ) -> Result<HttpResponse, Error> {
-    let button_add = r#"<td><button type="submit" id="ID" onclick="imdb_update('SHOW', 'LINK', SEASON);">update database</button></td>"#;
+    let button_add = r#"
+        <td>
+        <button type="submit" id="ID"
+            onclick="imdb_update('SHOW', 'LINK', SEASON, '/list/trakt/watched/list/LINK');"
+            >update database</button></td>"#;
 
     let entries: Vec<_> = entries
         .iter()

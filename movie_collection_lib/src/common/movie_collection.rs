@@ -886,7 +886,15 @@ pub fn find_new_episodes_http_worker(
     let button_add = format!(
         "{}{}",
         r#"<td><button type="submit" id="ID" "#,
-        r#"onclick="imdb_update('SHOW', 'LINK', SEASON);">update database</button></td>"#
+        format!(
+            r#"onclick="imdb_update('SHOW', 'LINK', SEASON,
+            '/list/cal{}');"
+            >update database</button></td>"#,
+            match source.as_ref() {
+                Some(s) => format!("?source={}", s.to_string()),
+                None => "".to_string(),
+            }
+        ),
     );
 
     let mc = MovieCollection::with_pool(&pool)?;
