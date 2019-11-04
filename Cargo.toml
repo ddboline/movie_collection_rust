@@ -7,11 +7,11 @@ edition = "2018"
 [dependencies]
 movie_collection_lib = {path = "movie_collection_lib"}
 movie_collection_http = {path = "movie_collection_http"}
-rayon = "1.1"
+rayon = "1.2"
 clap = "2.33"
 failure = "0.1"
 log = "0.4"
-env_logger = "0.6"
+env_logger = "0.7"
 subprocess = "0.1"
 actix = "0.8.3"
 actix-rt = "0.2"
