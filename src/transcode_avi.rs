@@ -26,11 +26,9 @@ fn transcode_avi() -> Result<(), Error> {
         )
         .get_matches();
 
-    let files = matches
+    matches
         .values_of("files")
-        .ok_or_else(|| err_msg("No files given"))?;
-    files
-        .into_iter()
+        .ok_or_else(|| err_msg("No files given"))?
         .map(|f| {
             let path = PathBuf::from(f);
 

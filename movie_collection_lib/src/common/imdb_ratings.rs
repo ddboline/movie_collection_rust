@@ -94,7 +94,7 @@ impl ImdbRatings {
                 Some(s) => s.parse().ok(),
                 None => None,
             };
-            return Ok(Some(ImdbRatings {
+            Ok(Some(ImdbRatings {
                 index,
                 show,
                 title,
@@ -102,7 +102,7 @@ impl ImdbRatings {
                 rating,
                 istv,
                 source,
-            }));
+            }))
         } else {
             Ok(None)
         }
