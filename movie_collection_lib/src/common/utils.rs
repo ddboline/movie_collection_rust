@@ -321,7 +321,7 @@ pub fn remcom_single_file(
         match create_transcode_script(&config, &path) {
             Ok(s) => {
                 writeln!(stdout.lock(), "script {}", s)?;
-                publish_transcode_job_to_queue(&s, "transcode_work_queue", "transcode_work_queue")?;
+                publish_transcode_job_to_queue(&s, "remcom_single_file", "remcom_single_file")?;
             }
             Err(e) => writeln!(stdout.lock(), "error {}", e)?,
         }
@@ -330,7 +330,7 @@ pub fn remcom_single_file(
     create_move_script(&config, directory, unwatched, &path)
         .and_then(|s| {
             writeln!(stdout.lock(), "script {}", s)?;
-            publish_transcode_job_to_queue(&s, "transcode_work_queue", "transcode_work_queue")
+            publish_transcode_job_to_queue(&s, "remcom_single_file", "remcom_single_file")
         })
         .map_err(|e| {
             error!("{:?}", e);
