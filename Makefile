@@ -42,7 +42,6 @@ install:
 	cp target/$(build_type)/remcom /usr/bin/remcom
 	cp target/$(build_type)/transcode-avi /usr/bin/transcode-avi
 	cp target/$(build_type)/run-encoding /usr/bin/run-encoding
-	cp target/$(build_type)/run-copy-queue /usr/bin/run-copy-queue
 	cp target/$(build_type)/parse-imdb /usr/bin/parse-imdb
 	cp target/$(build_type)/make-collection /usr/bin/make-collection
 	cp target/$(build_type)/make-queue /usr/bin/make-queue

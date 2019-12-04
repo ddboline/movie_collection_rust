@@ -18,6 +18,8 @@ pub struct ConfigInner {
     pub port: u32,
     pub domain: String,
     pub n_db_workers: usize,
+    pub transcode_queue: String,
+    pub remcom_queue: String,
 }
 
 #[derive(Debug, Default, Clone)]
@@ -88,6 +90,10 @@ impl Config {
                 config.n_db_workers = n_db_workers
             }
         }
+        config.transcode_queue =
+            var("TRANSCODE_QUEUE").unwrap_or_else(|_| "transcode_work_queue".to_string());
+        config.remcom_queue =
+            var("REMCOM_QUEUE").unwrap_or_else(|_| "remcom_worker_queue".to_string());
 
         Ok(Config(Arc::new(config)))
     }

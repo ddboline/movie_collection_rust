@@ -50,8 +50,8 @@ fn transcode_avi() -> Result<(), Error> {
                     writeln!(stdout.lock(), "script {}", s)?;
                     publish_transcode_job_to_queue(
                         &s,
-                        "transcode_work_queue",
-                        "transcode_work_queue",
+                        &config.transcode_queue,
+                        &config.transcode_queue,
                     )
                 })
                 .map_err(|e| {
