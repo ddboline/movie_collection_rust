@@ -199,7 +199,7 @@ impl MovieCollection {
         let shows: Vec<String> = self
             .get_pool()
             .get()?
-            .query(&query, &[])?
+            .query(query.as_str(), &[])?
             .iter()
             .map(|r| r.get(0))
             .collect();
@@ -227,7 +227,7 @@ impl MovieCollection {
                 let results: Result<Vec<_>, Error> = self
                     .get_pool()
                     .get()?
-                    .query(&query, &[])?
+                    .query(query.as_str(), &[])?
                     .iter()
                     .map(|row| {
                         let index: i32 = row.get_idx(0)?;
@@ -275,7 +275,7 @@ impl MovieCollection {
 
         self.get_pool()
             .get()?
-            .query(&query, &[])?
+            .query(query.as_str(), &[])?
             .iter()
             .map(|row| {
                 let show: String = row.get_idx(0)?;
@@ -312,7 +312,7 @@ impl MovieCollection {
 
         self.get_pool()
             .get()?
-            .query(&query, &[])?
+            .query(query.as_str(), &[])?
             .iter()
             .map(|row| {
                 let show: String = row.get_idx(0)?;
@@ -355,7 +355,7 @@ impl MovieCollection {
         let results: Result<Vec<_>, Error> = self
             .get_pool()
             .get()?
-            .query(&query, &[])?
+            .query(query.as_str(), &[])?
             .iter()
             .map(|row| {
                 let path: String = row.get_idx(0)?;
@@ -460,7 +460,7 @@ impl MovieCollection {
         match self
             .get_pool()
             .get()?
-            .query(&query, &[])?
+            .query(query.as_str(), &[])?
             .iter()
             .map(|row| row.get_idx(0))
             .nth(0)
@@ -788,7 +788,7 @@ impl MovieCollection {
 
         self.get_pool()
             .get()?
-            .query(&query, &[&mindate, &maxdate])?
+            .query(query.as_str(), &[&mindate, &maxdate])?
             .iter()
             .map(|row| {
                 let show: String = row.get_idx(0)?;

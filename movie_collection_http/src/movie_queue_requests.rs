@@ -1,10 +1,10 @@
-use actix::{Handler, Message};
 use chrono::{DateTime, Utc};
 use failure::Error;
 use serde::{Deserialize, Serialize};
 use std::path;
 
 use super::logged_user::LoggedUser;
+use super::HandleRequest;
 use movie_collection_lib::common::imdb_episodes::ImdbEpisodes;
 use movie_collection_lib::common::imdb_ratings::ImdbRatings;
 use movie_collection_lib::common::movie_collection::{
@@ -24,28 +24,20 @@ use movie_collection_lib::common::tv_show_source::TvShowSource;
 
 pub struct TvShowsRequest {}
 
-impl Message for TvShowsRequest {
-    type Result = Result<Vec<TvShowsResult>, Error>;
-}
-
-impl Handler<TvShowsRequest> for PgPool {
+impl HandleRequest<TvShowsRequest> for PgPool {
     type Result = Result<Vec<TvShowsResult>, Error>;
 
-    fn handle(&mut self, _: TvShowsRequest, _: &mut Self::Context) -> Self::Result {
+    fn handle(&self, _: TvShowsRequest) -> Self::Result {
         MovieCollection::with_pool(&self)?.print_tv_shows()
     }
 }
 
 pub struct WatchlistShowsRequest {}
 
-impl Message for WatchlistShowsRequest {
-    type Result = Result<WatchListMap, Error>;
-}
-
-impl Handler<WatchlistShowsRequest> for PgPool {
+impl HandleRequest<WatchlistShowsRequest> for PgPool {
     type Result = Result<WatchListMap, Error>;
 
-    fn handle(&mut self, _: WatchlistShowsRequest, _: &mut Self::Context) -> Self::Result {
+    fn handle(&self, _: WatchlistShowsRequest) -> Self::Result {
         get_watchlist_shows_db_map(&self)
     }
 }
@@ -54,13 +46,9 @@ pub struct QueueDeleteRequest {
     pub path: String,
 }
 
-impl Message for QueueDeleteRequest {
+impl HandleRequest<QueueDeleteRequest> for PgPool {
     type Result = Result<String, Error>;
-}
-
-impl Handler<QueueDeleteRequest> for PgPool {
-    type Result = Result<String, Error>;
-    fn handle(&mut self, msg: QueueDeleteRequest, _: &mut Self::Context) -> Self::Result {
+    fn handle(&self, msg: QueueDeleteRequest) -> Self::Result {
         if path::Path::new(&msg.path).exists() {
             MovieQueueDB::with_pool(&self).remove_from_queue_by_path(&msg.path)?;
         }
@@ -72,14 +60,10 @@ pub struct MovieQueueRequest {
     pub patterns: Vec<String>,
 }
 
-impl Message for MovieQueueRequest {
-    type Result = Result<(Vec<MovieQueueResult>, Vec<String>), Error>;
-}
-
-impl Handler<MovieQueueRequest> for PgPool {
+impl HandleRequest<MovieQueueRequest> for PgPool {
     type Result = Result<(Vec<MovieQueueResult>, Vec<String>), Error>;
 
-    fn handle(&mut self, msg: MovieQueueRequest, _: &mut Self::Context) -> Self::Result {
+    fn handle(&self, msg: MovieQueueRequest) -> Self::Result {
         let patterns: Vec<_> = msg.patterns.iter().map(|s| s.as_str()).collect();
         let queue = MovieQueueDB::with_pool(&self).print_movie_queue(&patterns)?;
         Ok((queue, msg.patterns))
@@ -90,14 +74,10 @@ pub struct MoviePathRequest {
     pub idx: i32,
 }
 
-impl Message for MoviePathRequest {
-    type Result = Result<String, Error>;
-}
-
-impl Handler<MoviePathRequest> for PgPool {
+impl HandleRequest<MoviePathRequest> for PgPool {
     type Result = Result<String, Error>;
 
-    fn handle(&mut self, msg: MoviePathRequest, _: &mut Self::Context) -> Self::Result {
+    fn handle(&self, msg: MoviePathRequest) -> Self::Result {
         MovieCollection::with_pool(&self)?.get_collection_path(msg.idx)
     }
 }
@@ -106,14 +86,10 @@ pub struct ImdbRatingsRequest {
     pub imdb_url: String,
 }
 
-impl Message for ImdbRatingsRequest {
-    type Result = Result<Option<(String, ImdbRatings)>, Error>;
-}
-
-impl Handler<ImdbRatingsRequest> for PgPool {
+impl HandleRequest<ImdbRatingsRequest> for PgPool {
     type Result = Result<Option<(String, ImdbRatings)>, Error>;
 
-    fn handle(&mut self, msg: ImdbRatingsRequest, _: &mut Self::Context) -> Self::Result {
+    fn handle(&self, msg: ImdbRatingsRequest) -> Self::Result {
         ImdbRatings::get_show_by_link(&msg.imdb_url, &self).map(|s| s.map(|sh| (msg.imdb_url, sh)))
     }
 }
@@ -122,14 +98,10 @@ pub struct ImdbSeasonsRequest {
     pub show: String,
 }
 
-impl Message for ImdbSeasonsRequest {
-    type Result = Result<Vec<ImdbSeason>, Error>;
-}
-
-impl Handler<ImdbSeasonsRequest> for PgPool {
+impl HandleRequest<ImdbSeasonsRequest> for PgPool {
     type Result = Result<Vec<ImdbSeason>, Error>;
 
-    fn handle(&mut self, msg: ImdbSeasonsRequest, _: &mut Self::Context) -> Self::Result {
+    fn handle(&self, msg: ImdbSeasonsRequest) -> Self::Result {
         if msg.show.as_str() == "" {
             Ok(Vec::new())
         } else {
@@ -143,14 +115,10 @@ pub struct WatchlistActionRequest {
     pub imdb_url: String,
 }
 
-impl Message for WatchlistActionRequest {
-    type Result = Result<String, Error>;
-}
-
-impl Handler<WatchlistActionRequest> for PgPool {
+impl HandleRequest<WatchlistActionRequest> for PgPool {
     type Result = Result<String, Error>;
 
-    fn handle(&mut self, msg: WatchlistActionRequest, _: &mut Self::Context) -> Self::Result {
+    fn handle(&self, msg: WatchlistActionRequest) -> Self::Result {
         let ti = TraktInstance::new();
 
         match msg.action {
@@ -175,14 +143,10 @@ pub struct WatchedShowsRequest {
     pub season: i32,
 }
 
-impl Message for WatchedShowsRequest {
-    type Result = Result<Vec<WatchedEpisode>, Error>;
-}
-
-impl Handler<WatchedShowsRequest> for PgPool {
+impl HandleRequest<WatchedShowsRequest> for PgPool {
     type Result = Result<Vec<WatchedEpisode>, Error>;
 
-    fn handle(&mut self, msg: WatchedShowsRequest, _: &mut Self::Context) -> Self::Result {
+    fn handle(&self, msg: WatchedShowsRequest) -> Self::Result {
         get_watched_shows_db(&self, &msg.show, Some(msg.season))
     }
 }
@@ -192,14 +156,10 @@ pub struct ImdbEpisodesRequest {
     pub season: Option<i32>,
 }
 
-impl Message for ImdbEpisodesRequest {
-    type Result = Result<Vec<ImdbEpisodes>, Error>;
-}
-
-impl Handler<ImdbEpisodesRequest> for PgPool {
+impl HandleRequest<ImdbEpisodesRequest> for PgPool {
     type Result = Result<Vec<ImdbEpisodes>, Error>;
 
-    fn handle(&mut self, msg: ImdbEpisodesRequest, _: &mut Self::Context) -> Self::Result {
+    fn handle(&self, msg: ImdbEpisodesRequest) -> Self::Result {
         MovieCollection::with_pool(&self)?.print_imdb_episodes(&msg.show, msg.season)
     }
 }
@@ -209,14 +169,10 @@ pub struct WatchedListRequest {
     pub season: i32,
 }
 
-impl Message for WatchedListRequest {
-    type Result = Result<String, Error>;
-}
-
-impl Handler<WatchedListRequest> for PgPool {
+impl HandleRequest<WatchedListRequest> for PgPool {
     type Result = Result<String, Error>;
 
-    fn handle(&mut self, msg: WatchedListRequest, _: &mut Self::Context) -> Self::Result {
+    fn handle(&self, msg: WatchedListRequest) -> Self::Result {
         watch_list_http_worker(&self, &msg.imdb_url, msg.season)
     }
 }
@@ -228,14 +184,10 @@ pub struct WatchedActionRequest {
     pub episode: i32,
 }
 
-impl Message for WatchedActionRequest {
-    type Result = Result<String, Error>;
-}
-
-impl Handler<WatchedActionRequest> for PgPool {
+impl HandleRequest<WatchedActionRequest> for PgPool {
     type Result = Result<String, Error>;
 
-    fn handle(&mut self, msg: WatchedActionRequest, _: &mut Self::Context) -> Self::Result {
+    fn handle(&self, msg: WatchedActionRequest) -> Self::Result {
         watched_action_http_worker(&self, msg.action, &msg.imdb_url, msg.season, msg.episode)
     }
 }
@@ -278,14 +230,10 @@ impl From<ImdbShowRequest> for ParseImdbOptions {
     }
 }
 
-impl Message for ImdbShowRequest {
-    type Result = Result<String, Error>;
-}
-
-impl Handler<ImdbShowRequest> for PgPool {
+impl HandleRequest<ImdbShowRequest> for PgPool {
     type Result = Result<String, Error>;
 
-    fn handle(&mut self, msg: ImdbShowRequest, _: &mut Self::Context) -> Self::Result {
+    fn handle(&self, msg: ImdbShowRequest) -> Self::Result {
         let watchlist = get_watchlist_shows_db_map(&self)?;
         let pi = ParseImdb::with_pool(&self)?;
         let body = pi.parse_imdb_http_worker(&msg.into(), &watchlist)?;
@@ -295,14 +243,10 @@ impl Handler<ImdbShowRequest> for PgPool {
 
 pub struct TraktCalRequest {}
 
-impl Message for TraktCalRequest {
-    type Result = Result<Vec<String>, Error>;
-}
-
-impl Handler<TraktCalRequest> for PgPool {
+impl HandleRequest<TraktCalRequest> for PgPool {
     type Result = Result<Vec<String>, Error>;
 
-    fn handle(&mut self, _: TraktCalRequest, _: &mut Self::Context) -> Self::Result {
+    fn handle(&self, _: TraktCalRequest) -> Self::Result {
         trakt_cal_http_worker(&self)
     }
 }
@@ -313,14 +257,10 @@ pub struct FindNewEpisodeRequest {
     pub shows: Option<String>,
 }
 
-impl Message for FindNewEpisodeRequest {
-    type Result = Result<Vec<String>, Error>;
-}
-
-impl Handler<FindNewEpisodeRequest> for PgPool {
+impl HandleRequest<FindNewEpisodeRequest> for PgPool {
     type Result = Result<Vec<String>, Error>;
 
-    fn handle(&mut self, msg: FindNewEpisodeRequest, _: &mut Self::Context) -> Self::Result {
+    fn handle(&self, msg: FindNewEpisodeRequest) -> Self::Result {
         find_new_episodes_http_worker(&self, msg.shows, msg.source)
     }
 }
@@ -329,13 +269,9 @@ pub struct AuthorizedUserRequest {
     pub user: LoggedUser,
 }
 
-impl Message for AuthorizedUserRequest {
+impl HandleRequest<AuthorizedUserRequest> for PgPool {
     type Result = Result<bool, Error>;
-}
-
-impl Handler<AuthorizedUserRequest> for PgPool {
-    type Result = Result<bool, Error>;
-    fn handle(&mut self, msg: AuthorizedUserRequest, _: &mut Self::Context) -> Self::Result {
+    fn handle(&self, msg: AuthorizedUserRequest) -> Self::Result {
         msg.user.is_authorized(self)
     }
 }
@@ -345,14 +281,10 @@ pub struct ImdbEpisodesSyncRequest {
     pub start_timestamp: DateTime<Utc>,
 }
 
-impl Message for ImdbEpisodesSyncRequest {
-    type Result = Result<Vec<ImdbEpisodes>, Error>;
-}
-
-impl Handler<ImdbEpisodesSyncRequest> for PgPool {
+impl HandleRequest<ImdbEpisodesSyncRequest> for PgPool {
     type Result = Result<Vec<ImdbEpisodes>, Error>;
 
-    fn handle(&mut self, msg: ImdbEpisodesSyncRequest, _: &mut Self::Context) -> Self::Result {
+    fn handle(&self, msg: ImdbEpisodesSyncRequest) -> Self::Result {
         ImdbEpisodes::get_episodes_after_timestamp(msg.start_timestamp, &self)
     }
 }
@@ -362,14 +294,10 @@ pub struct ImdbRatingsSyncRequest {
     pub start_timestamp: DateTime<Utc>,
 }
 
-impl Message for ImdbRatingsSyncRequest {
-    type Result = Result<Vec<ImdbRatings>, Error>;
-}
-
-impl Handler<ImdbRatingsSyncRequest> for PgPool {
+impl HandleRequest<ImdbRatingsSyncRequest> for PgPool {
     type Result = Result<Vec<ImdbRatings>, Error>;
 
-    fn handle(&mut self, msg: ImdbRatingsSyncRequest, _: &mut Self::Context) -> Self::Result {
+    fn handle(&self, msg: ImdbRatingsSyncRequest) -> Self::Result {
         ImdbRatings::get_shows_after_timestamp(msg.start_timestamp, &self)
     }
 }
@@ -379,14 +307,10 @@ pub struct MovieQueueSyncRequest {
     pub start_timestamp: DateTime<Utc>,
 }
 
-impl Message for MovieQueueSyncRequest {
-    type Result = Result<Vec<MovieQueueRow>, Error>;
-}
-
-impl Handler<MovieQueueSyncRequest> for PgPool {
+impl HandleRequest<MovieQueueSyncRequest> for PgPool {
     type Result = Result<Vec<MovieQueueRow>, Error>;
 
-    fn handle(&mut self, msg: MovieQueueSyncRequest, _: &mut Self::Context) -> Self::Result {
+    fn handle(&self, msg: MovieQueueSyncRequest) -> Self::Result {
         let mq = MovieQueueDB::with_pool(&self);
         mq.get_queue_after_timestamp(msg.start_timestamp)
     }
@@ -397,14 +321,10 @@ pub struct MovieCollectionSyncRequest {
     pub start_timestamp: DateTime<Utc>,
 }
 
-impl Message for MovieCollectionSyncRequest {
-    type Result = Result<Vec<MovieCollectionRow>, Error>;
-}
-
-impl Handler<MovieCollectionSyncRequest> for PgPool {
+impl HandleRequest<MovieCollectionSyncRequest> for PgPool {
     type Result = Result<Vec<MovieCollectionRow>, Error>;
 
-    fn handle(&mut self, msg: MovieCollectionSyncRequest, _: &mut Self::Context) -> Self::Result {
+    fn handle(&self, msg: MovieCollectionSyncRequest) -> Self::Result {
         let mc = MovieCollection::with_pool(&self)?;
         mc.get_collection_after_timestamp(msg.start_timestamp)
     }
@@ -415,14 +335,10 @@ pub struct ImdbEpisodesUpdateRequest {
     pub episodes: Vec<ImdbEpisodes>,
 }
 
-impl Message for ImdbEpisodesUpdateRequest {
-    type Result = Result<(), Error>;
-}
-
-impl Handler<ImdbEpisodesUpdateRequest> for PgPool {
+impl HandleRequest<ImdbEpisodesUpdateRequest> for PgPool {
     type Result = Result<(), Error>;
 
-    fn handle(&mut self, msg: ImdbEpisodesUpdateRequest, _: &mut Self::Context) -> Self::Result {
+    fn handle(&self, msg: ImdbEpisodesUpdateRequest) -> Self::Result {
         for episode in msg.episodes {
             match episode.get_index(&self)? {
                 Some(_) => episode.update_episode(&self)?,
@@ -438,14 +354,10 @@ pub struct ImdbRatingsUpdateRequest {
     pub shows: Vec<ImdbRatings>,
 }
 
-impl Message for ImdbRatingsUpdateRequest {
-    type Result = Result<(), Error>;
-}
-
-impl Handler<ImdbRatingsUpdateRequest> for PgPool {
+impl HandleRequest<ImdbRatingsUpdateRequest> for PgPool {
     type Result = Result<(), Error>;
 
-    fn handle(&mut self, msg: ImdbRatingsUpdateRequest, _: &mut Self::Context) -> Self::Result {
+    fn handle(&self, msg: ImdbRatingsUpdateRequest) -> Self::Result {
         for show in msg.shows {
             match ImdbRatings::get_show_by_link(&show.link, &self)? {
                 Some(_) => show.update_show(&self)?,
@@ -461,14 +373,10 @@ pub struct MovieQueueUpdateRequest {
     pub queue: Vec<MovieQueueRow>,
 }
 
-impl Message for MovieQueueUpdateRequest {
-    type Result = Result<(), Error>;
-}
-
-impl Handler<MovieQueueUpdateRequest> for PgPool {
+impl HandleRequest<MovieQueueUpdateRequest> for PgPool {
     type Result = Result<(), Error>;
 
-    fn handle(&mut self, msg: MovieQueueUpdateRequest, _: &mut Self::Context) -> Self::Result {
+    fn handle(&self, msg: MovieQueueUpdateRequest) -> Self::Result {
         let mq = MovieQueueDB::with_pool(&self);
         let mc = MovieCollection::with_pool(&self)?;
         for entry in msg.queue {
@@ -491,14 +399,10 @@ pub struct MovieCollectionUpdateRequest {
     pub collection: Vec<MovieCollectionRow>,
 }
 
-impl Message for MovieCollectionUpdateRequest {
-    type Result = Result<(), Error>;
-}
-
-impl Handler<MovieCollectionUpdateRequest> for PgPool {
+impl HandleRequest<MovieCollectionUpdateRequest> for PgPool {
     type Result = Result<(), Error>;
 
-    fn handle(&mut self, msg: MovieCollectionUpdateRequest, _: &mut Self::Context) -> Self::Result {
+    fn handle(&self, msg: MovieCollectionUpdateRequest) -> Self::Result {
         let mc = MovieCollection::with_pool(&self)?;
         for entry in msg.collection {
             if let Some(cidx) = mc.get_collection_index(&entry.path)? {
@@ -521,14 +425,10 @@ pub struct LastModifiedResponse {
 
 pub struct LastModifiedRequest {}
 
-impl Message for LastModifiedRequest {
-    type Result = Result<Vec<LastModifiedResponse>, Error>;
-}
-
-impl Handler<LastModifiedRequest> for PgPool {
+impl HandleRequest<LastModifiedRequest> for PgPool {
     type Result = Result<Vec<LastModifiedResponse>, Error>;
 
-    fn handle(&mut self, _: LastModifiedRequest, _: &mut Self::Context) -> Self::Result {
+    fn handle(&self, _: LastModifiedRequest) -> Self::Result {
         let tables = vec![
             "imdb_episodes",
             "imdb_ratings",
@@ -540,7 +440,7 @@ impl Handler<LastModifiedRequest> for PgPool {
             .iter()
             .map(|table| {
                 let query = format!("SELECT max(last_modified) FROM {}", table);
-                let r = match self.get()?.query(&query, &[])?.iter().nth(0) {
+                let r = match self.get()?.query(query.as_str(), &[])?.iter().nth(0) {
                     Some(row) => {
                         let last_modified: DateTime<Utc> = row.get_idx(0)?;
                         Some(LastModifiedResponse {

@@ -159,7 +159,7 @@ impl ImdbEpisodes {
         let query = query.replace("RATING", &self.rating.to_string());
         pool.get()?
             .execute(
-                &query,
+                query.as_str(),
                 &[
                     &self.show,
                     &self.season,
@@ -183,7 +183,7 @@ impl ImdbEpisodes {
 
         pool.get()?
             .execute(
-                &query,
+                query.as_str(),
                 &[
                     &self.eptitle,
                     &self.epurl,

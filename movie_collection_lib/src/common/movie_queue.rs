@@ -59,8 +59,8 @@ impl MovieQueueDB {
     }
 
     pub fn remove_from_queue_by_idx(&self, idx: i32) -> Result<(), Error> {
-        let conn = self.pool.get()?;
-        let tran = conn.transaction()?;
+        let mut conn = self.pool.get()?;
+        let mut tran = conn.transaction()?;
 
         let query = r#"SELECT max(idx) FROM movie_queue"#;
         let max_idx: i32 = tran
@@ -152,8 +152,8 @@ impl MovieQueueDB {
             self.remove_from_queue_by_idx(current_idx)?;
         }
 
-        let conn = self.pool.get()?;
-        let tran = conn.transaction()?;
+        let mut conn = self.pool.get()?;
+        let mut tran = conn.transaction()?;
 
         let query = r#"SELECT max(idx) FROM movie_queue"#;
         let max_idx: i32 = tran
@@ -217,7 +217,7 @@ impl MovieQueueDB {
         let results: Result<Vec<_>, Error> = self
             .pool
             .get()?
-            .query(&query, &[])?
+            .query(query.as_str(), &[])?
             .iter()
             .map(|row| {
                 let idx: i32 = row.get_idx(0)?;

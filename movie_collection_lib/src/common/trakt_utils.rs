@@ -323,7 +323,7 @@ pub fn get_watched_shows_db(
     );
 
     pool.get()?
-        .query(&query, &[])?
+        .query(query.as_str(), &[])?
         .iter()
         .map(|row| {
             let imdb_url: String = row.get_idx(0)?;
