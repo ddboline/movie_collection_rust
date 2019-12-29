@@ -440,11 +440,11 @@ impl HandleRequest<LastModifiedRequest> for PgPool {
             .iter()
             .map(|table| {
                 let query = format!("SELECT max(last_modified) FROM {}", table);
-                let r = match self.get()?.query(query.as_str(), &[])?.iter().nth(0) {
+                let r = match self.get()?.query(query.as_str(), &[])?.get(0) {
                     Some(row) => {
                         let last_modified: DateTime<Utc> = row.get_idx(0)?;
                         Some(LastModifiedResponse {
-                            table: table.to_string(),
+                            table: (*table).to_string(),
                             last_modified,
                         })
                     }

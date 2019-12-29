@@ -110,7 +110,7 @@ impl fmt::Display for WatchListShow {
 impl WatchListShow {
     pub fn get_show_by_link(link: &str, pool: &PgPool) -> Result<Option<WatchListShow>, Error> {
         let query = "SELECT title, year FROM trakt_watchlist WHERE link = $1";
-        if let Some(row) = pool.get()?.query(query, &[&link])?.iter().nth(0) {
+        if let Some(row) = pool.get()?.query(query, &[&link])?.get(0) {
             let title: String = row.get_idx(0)?;
             let year: i32 = row.get_idx(1)?;
             Ok(Some(WatchListShow {
@@ -125,7 +125,7 @@ impl WatchListShow {
 
     pub fn get_index(&self, pool: &PgPool) -> Result<Option<i32>, Error> {
         let query = "SELECT id FROM trakt_watchlist WHERE link = $1";
-        if let Some(row) = pool.get()?.query(query, &[&self.link])?.iter().nth(0) {
+        if let Some(row) = pool.get()?.query(query, &[&self.link])?.get(0) {
             let id: i32 = row.get_idx(0)?;
             Ok(Some(id))
         } else {
@@ -226,8 +226,7 @@ impl WatchedEpisode {
         if let Some(row) = pool
             .get()?
             .query(query, &[&self.imdb_url, &self.season, &self.episode])?
-            .iter()
-            .nth(0)
+            .get(0)
         {
             let id: i32 = row.get_idx(0)?;
             Ok(Some(id))
@@ -251,8 +250,7 @@ impl WatchedEpisode {
         if let Some(row) = pool
             .get()?
             .query(query, &[&link, &season, &episode])?
-            .iter()
-            .nth(0)
+            .get(0)
         {
             let imdb_url: String = row.get_idx(0)?;
             let title: String = row.get_idx(1)?;
@@ -359,7 +357,7 @@ impl WatchedMovie {
             FROM trakt_watched_movies
             WHERE link=$1
         "#;
-        if let Some(row) = pool.get()?.query(query, &[&self.imdb_url])?.iter().nth(0) {
+        if let Some(row) = pool.get()?.query(query, &[&self.imdb_url])?.get(0) {
             let id: i32 = row.get_idx(0)?;
             Ok(Some(id))
         } else {
@@ -374,7 +372,7 @@ impl WatchedMovie {
             JOIN imdb_ratings b ON a.link = b.link
             WHERE a.link = $1
         "#;
-        if let Some(row) = pool.get()?.query(query, &[&link])?.iter().nth(0) {
+        if let Some(row) = pool.get()?.query(query, &[&link])?.get(0) {
             let imdb_url: String = row.get_idx(0)?;
             let title: String = row.get_idx(1)?;
             Ok(Some(WatchedMovie { title, imdb_url }))

@@ -64,8 +64,7 @@ impl ImdbEpisodes {
         if let Some(row) = pool
             .get()?
             .query(query, &[&self.show, &self.season, &self.episode])?
-            .iter()
-            .nth(0)
+            .get(0)
         {
             let id: i32 = row.get_idx(0)?;
             Ok(Some(id))
@@ -81,7 +80,7 @@ impl ImdbEpisodes {
             FROM imdb_episodes a
             JOIN imdb_ratings b ON a.show = b.show
             WHERE a.id = $1"#;
-        if let Some(row) = pool.get()?.query(query, &[&idx])?.iter().nth(0) {
+        if let Some(row) = pool.get()?.query(query, &[&idx])?.get(0) {
             let show: String = row.get_idx(0)?;
             let title: String = row.get_idx(1)?;
             let season: i32 = row.get_idx(2)?;

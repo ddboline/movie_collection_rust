@@ -108,7 +108,7 @@ impl ImdbConnection {
             .map(|(t, l)| {
                 let r = self.parse_imdb_rating(l)?;
                 Ok(ImdbTuple {
-                    title: t.to_string(),
+                    title: t,
                     link: l.to_string(),
                     rating: r.rating.unwrap_or(-1.0),
                 })

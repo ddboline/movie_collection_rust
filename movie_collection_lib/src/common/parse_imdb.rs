@@ -246,7 +246,7 @@ impl ParseImdb {
                             imdb_url = i.to_string();
                             format!(r#"<a href="https://www.imdb.com/title/{}">{}</a>"#, i, i)
                         } else {
-                            i.to_string()
+                            i
                         }
                     })
                     .collect();

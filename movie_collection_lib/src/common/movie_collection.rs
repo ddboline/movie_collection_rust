@@ -445,8 +445,7 @@ impl MovieCollection {
             .get_pool()
             .get()?
             .query(query, &[&idx])?
-            .iter()
-            .nth(0)
+            .get(0)
             .ok_or_else(|| err_msg("Index not found"))?
             .get(0);
         Ok(path)

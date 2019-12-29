@@ -5,8 +5,8 @@ use actix_web::web::block;
 use actix_web::{web, App, HttpServer};
 use chrono::Duration;
 use std::time;
-use tokio::time::interval;
 use subprocess::Exec;
+use tokio::time::interval;
 
 use super::logged_user::AUTHORIZED_USERS;
 use super::movie_queue_routes::{
@@ -116,5 +116,6 @@ pub async fn start_app(config: Config) {
     .bind(&format!("127.0.0.1:{}", port))
     .unwrap_or_else(|_| panic!("Failed to bind to port {}", port))
     .run()
-    .await.expect("Failed to start app");
+    .await
+    .expect("Failed to start app");
 }
