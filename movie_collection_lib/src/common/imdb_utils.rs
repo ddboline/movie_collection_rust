@@ -1,7 +1,8 @@
 use chrono::NaiveDate;
 use failure::{err_msg, Error};
 use rayon::iter::{IntoParallelIterator, ParallelIterator};
-use reqwest::{Client, Url};
+use reqwest::blocking::Client;
+use reqwest::Url;
 use select::document::Document;
 use select::predicate::{Class, Name};
 use std::fmt;

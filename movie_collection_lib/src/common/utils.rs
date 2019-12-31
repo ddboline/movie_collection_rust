@@ -1,8 +1,8 @@
 use amqp::{protocol, Basic, Channel, Options, Session, Table};
 use failure::{err_msg, format_err, Error};
 use log::error;
+use reqwest::blocking::{Client, Response};
 use reqwest::Url;
-use reqwest::{Client, Response};
 use retry::{delay::jitter, delay::Exponential, retry};
 use serde::{Deserialize, Serialize};
 use std::env::var;

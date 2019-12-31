@@ -70,7 +70,9 @@ impl LoggedUser {
 fn _from_request(req: &HttpRequest, pl: &mut Payload) -> Result<LoggedUser, actix_web::Error> {
     if let Ok(s) = env::var("TESTENV") {
         if &s == "true" {
-            return Ok(LoggedUser { email: "user@test".to_string() });
+            return Ok(LoggedUser {
+                email: "user@test".to_string(),
+            });
         }
     }
     if let Some(identity) = block_on(Identity::from_request(req, pl))
