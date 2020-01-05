@@ -1,6 +1,7 @@
 use chrono::NaiveDate;
 use failure::{err_msg, Error};
 use log::debug;
+use postgres_query::FromSqlRow;
 use rayon::iter::{IntoParallelRefIterator, ParallelIterator};
 use serde::{Deserialize, Serialize};
 use std::collections::{HashMap, HashSet};
@@ -94,7 +95,7 @@ impl fmt::Display for TraktResult {
     }
 }
 
-#[derive(Serialize, Deserialize, Debug, Default)]
+#[derive(Serialize, Deserialize, Debug, Default, FromSqlRow)]
 pub struct WatchListShow {
     pub link: String,
     pub title: String,
@@ -159,10 +160,8 @@ pub fn get_watchlist_shows_db(pool: &PgPool) -> Result<HashMap<String, WatchList
         .query(query, &[])?
         .iter()
         .map(|row| {
-            let link: String = row.try_get(0)?;
-            let title: String = row.try_get(1)?;
-            let year: i32 = row.try_get(2)?;
-            Ok((link.to_string(), WatchListShow { link, title, year }))
+            let val = WatchListShow::from_row(row)?;
+            Ok((val.link.to_string(), val))
         })
         .collect()
 }
@@ -268,23 +267,33 @@ impl WatchedEpisode {
     }
 
     pub fn insert_episode(&self, pool: &PgPool) -> Result<(), Error> {
-        let query = r#"
-            INSERT INTO trakt_watched_episodes (link, season, episode)
-            VALUES ($1, $2, $3)
-        "#;
+        let query = postgres_query::query!(
+            r#"
+                INSERT INTO trakt_watched_episodes (link, season, episode)
+                VALUES ($link, $season, $episode)
+            "#,
+            link = self.imdb_url,
+            season = self.season,
+            episode = self.episode
+        );
         pool.get()?
-            .execute(query, &[&self.imdb_url, &self.season, &self.episode])
+            .execute(query.sql, &query.parameters)
             .map(|_| ())
             .map_err(err_msg)
     }
 
     pub fn delete_episode(&self, pool: &PgPool) -> Result<(), Error> {
-        let query = r#"
+        let query = postgres_query::query!(
+            r#"
             DELETE FROM trakt_watched_episodes
-            WHERE link=$1 AND season=$2 AND episode=$3
-        "#;
+            WHERE link=$link AND season=$season AND episode=$episode
+        "#,
+            link = self.imdb_url,
+            season = self.season,
+            episode = self.episode
+        );
         pool.get()?
-            .execute(query, &[&self.imdb_url, &self.season, &self.episode])
+            .execute(query.sql, &query.parameters)
             .map(|_| ())
             .map_err(err_msg)
     }
