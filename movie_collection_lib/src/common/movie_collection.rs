@@ -724,7 +724,7 @@ impl MovieCollection {
                     d.epurl,
                     d.airdate,
                     c.rating,
-                    cast(d.rating as double precision),
+                    cast(d.rating as double precision) as eprating,
                     d.eptitle
             FROM imdb_ratings c
             JOIN imdb_episodes d ON c.show = d.show

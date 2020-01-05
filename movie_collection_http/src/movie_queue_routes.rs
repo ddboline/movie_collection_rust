@@ -61,9 +61,9 @@ fn movie_queue_body(patterns: &[String], entries: &[String]) -> String {
     entries
 }
 
-fn queue_body_resp(patterns: &[String], queue: &[MovieQueueResult]) -> Result<HttpResponse, Error> {
-    let entries = movie_queue_http(queue)?;
-    let body = movie_queue_body(patterns, &entries);
+async fn queue_body_resp(patterns: Vec<String>, queue: Vec<MovieQueueResult>) -> Result<HttpResponse, Error> {
+    let entries = block(move || movie_queue_http(&queue)).await.map_err(err_msg)?;
+    let body = movie_queue_body(&patterns, &entries);
     let resp = HttpResponse::Ok()
         .content_type("text/html; charset=utf-8")
         .body(body);
@@ -75,7 +75,7 @@ pub async fn movie_queue(_: LoggedUser, state: Data<AppState>) -> Result<HttpRes
         patterns: Vec::new(),
     };
     let (queue, _) = block(move || state.db.handle(req)).await.map_err(err_msg)?;
-    queue_body_resp(&[], &queue)
+    queue_body_resp(Vec::new(), queue).await
 }
 
 pub async fn movie_queue_show(
@@ -88,7 +88,7 @@ pub async fn movie_queue_show(
 
     let req = MovieQueueRequest { patterns };
     let (queue, patterns) = block(move || state.db.handle(req)).await.map_err(err_msg)?;
-    queue_body_resp(&patterns, &queue)
+    queue_body_resp(patterns, queue).await
 }
 
 pub async fn movie_queue_delete(
