@@ -37,8 +37,8 @@ pub async fn start_app(config: Config) {
         let mut i = interval(time::Duration::from_secs(60));
         loop {
             i.tick().await;
-            let _p = pool.clone();
-            block(move || AUTHORIZED_USERS.fill_from_db(&_p))
+            let p = pool.clone();
+            block(move || AUTHORIZED_USERS.fill_from_db(&p))
                 .await
                 .unwrap_or(());
         }

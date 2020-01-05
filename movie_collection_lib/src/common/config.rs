@@ -26,20 +26,20 @@ pub struct ConfigInner {
 pub struct Config(Arc<ConfigInner>);
 
 impl ConfigInner {
-    pub fn new() -> ConfigInner {
-        ConfigInner {
+    pub fn new() -> Self {
+        Self {
             home_dir: "/tmp".to_string(),
             suffixes: vec!["avi".to_string(), "mp4".to_string(), "mkv".to_string()],
             port: 8042,
             domain: "localhost".to_string(),
             n_db_workers: 2,
-            ..Default::default()
+            ..Self::default()
         }
     }
 }
 
 impl Config {
-    pub fn with_config() -> Result<Config, Error> {
+    pub fn with_config() -> Result<Self, Error> {
         let mut config = ConfigInner::new();
 
         config.home_dir = var("HOME").map_err(|_| err_msg("No HOME directory..."))?;
@@ -95,7 +95,7 @@ impl Config {
         config.remcom_queue =
             var("REMCOM_QUEUE").unwrap_or_else(|_| "remcom_worker_queue".to_string());
 
-        Ok(Config(Arc::new(config)))
+        Ok(Self(Arc::new(config)))
     }
 }
 

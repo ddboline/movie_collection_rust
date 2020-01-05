@@ -15,7 +15,7 @@ use crate::common::movie_collection::MovieCollection;
 use crate::common::movie_queue::MovieQueueDB;
 use crate::common::pgpool::PgPool;
 
-use crate::common::trakt_instance::TraktInstance;
+use crate::common::trakt_instance;
 use crate::common::tv_show_source::TvShowSource;
 use crate::common::utils::option_string_wrapper;
 
@@ -28,13 +28,12 @@ pub enum TraktActions {
 }
 
 impl TraktActions {
-    pub fn from_command(command: &str) -> TraktActions {
+    pub fn from_command(command: &str) -> Self {
         match command {
-            "list" => TraktActions::List,
-            "add" => TraktActions::Add,
-            "rm" => TraktActions::Remove,
-            "del" => TraktActions::Remove,
-            _ => TraktActions::None,
+            "list" => Self::List,
+            "add" => Self::Add,
+            "rm" | "del" => Self::Remove,
+            _ => Self::None,
         }
     }
 }
@@ -47,12 +46,12 @@ pub enum TraktCommands {
 }
 
 impl TraktCommands {
-    pub fn from_command(command: &str) -> TraktCommands {
+    pub fn from_command(command: &str) -> Self {
         match command {
-            "cal" | "calendar" => TraktCommands::Calendar,
-            "watchlist" => TraktCommands::WatchList,
-            "watched" => TraktCommands::Watched,
-            _ => TraktCommands::None,
+            "cal" | "calendar" => Self::Calendar,
+            "watchlist" => Self::WatchList,
+            "watched" => Self::Watched,
+            _ => Self::None,
         }
     }
 }
@@ -109,12 +108,12 @@ impl fmt::Display for WatchListShow {
 }
 
 impl WatchListShow {
-    pub fn get_show_by_link(link: &str, pool: &PgPool) -> Result<Option<WatchListShow>, Error> {
+    pub fn get_show_by_link(link: &str, pool: &PgPool) -> Result<Option<Self>, Error> {
         let query = "SELECT title, year FROM trakt_watchlist WHERE link = $1";
         if let Some(row) = pool.get()?.query(query, &[&link])?.get(0) {
             let title: String = row.try_get(0)?;
             let year: i32 = row.try_get(1)?;
-            Ok(Some(WatchListShow {
+            Ok(Some(Self {
                 link: link.to_string(),
                 title,
                 year,
@@ -239,9 +238,9 @@ impl WatchedEpisode {
         link: &str,
         season: i32,
         episode: i32,
-    ) -> Result<Option<WatchedEpisode>, Error> {
+    ) -> Result<Option<Self>, Error> {
         let query = r#"
-            SELECT a.link, b.title, a.season, a.episode
+            SELECT a.link, b.title
             FROM trakt_watched_episodes a
             JOIN imdb_ratings b ON a.link = b.link
             WHERE a.link = $1 AND a.season = $2 AND a.episode = $3
@@ -253,9 +252,7 @@ impl WatchedEpisode {
         {
             let imdb_url: String = row.try_get(0)?;
             let title: String = row.try_get(1)?;
-            let season: i32 = row.try_get(2)?;
-            let episode: i32 = row.try_get(3)?;
-            Ok(Some(WatchedEpisode {
+            Ok(Some(Self {
                 title,
                 imdb_url,
                 season,
@@ -312,10 +309,10 @@ pub fn get_watched_shows_db(
         where_vec.push(format!("season={}", season));
     }
 
-    let where_str = if !where_vec.is_empty() {
-        format!("WHERE {}", where_vec.join(" AND "))
-    } else {
+    let where_str = if where_vec.is_empty() {
         "".to_string()
+    } else {
+        format!("WHERE {}", where_vec.join(" AND "))
     };
 
     let query = format!(
@@ -374,7 +371,7 @@ impl WatchedMovie {
         }
     }
 
-    pub fn get_watched_movie(pool: &PgPool, link: &str) -> Result<Option<WatchedMovie>, Error> {
+    pub fn get_watched_movie(pool: &PgPool, link: &str) -> Result<Option<Self>, Error> {
         let query = r#"
             SELECT a.link, b.title
             FROM trakt_watched_movies a
@@ -384,7 +381,7 @@ impl WatchedMovie {
         if let Some(row) = pool.get()?.query(query, &[&link])?.get(0) {
             let imdb_url: String = row.try_get(0)?;
             let title: String = row.try_get(1)?;
-            Ok(Some(WatchedMovie { title, imdb_url }))
+            Ok(Some(Self { title, imdb_url }))
         } else {
             Ok(None)
         }
@@ -433,10 +430,9 @@ pub fn get_watched_movies_db(pool: &PgPool) -> Result<Vec<WatchedMovie>, Error> 
 
 pub fn sync_trakt_with_db() -> Result<(), Error> {
     let mc = MovieCollection::new();
-    let ti = TraktInstance::new();
 
     let watchlist_shows_db = get_watchlist_shows_db(&mc.pool)?;
-    let watchlist_shows = ti.get_watchlist_shows()?;
+    let watchlist_shows = trakt_instance::get_watchlist_shows()?;
     if watchlist_shows.is_empty() {
         return Ok(());
     }
@@ -460,7 +456,7 @@ pub fn sync_trakt_with_db() -> Result<(), Error> {
             .into_iter()
             .map(|s| ((s.imdb_url.to_string(), s.season, s.episode), s))
             .collect();
-    let watched_shows = ti.get_watched_shows()?;
+    let watched_shows = trakt_instance::get_watched_shows()?;
     if watched_shows.is_empty() {
         return Ok(());
     }
@@ -480,7 +476,7 @@ pub fn sync_trakt_with_db() -> Result<(), Error> {
         .into_iter()
         .map(|s| (s.imdb_url.to_string(), s))
         .collect();
-    let watched_movies = ti.get_watched_movies()?;
+    let watched_movies = trakt_instance::get_watched_movies()?;
     if watched_movies.is_empty() {
         return Ok(());
     }
@@ -530,24 +526,24 @@ fn get_imdb_url_from_show(
     Ok(result)
 }
 
-fn trakt_cal_list(ti: &TraktInstance, mc: &MovieCollection) -> Result<(), Error> {
-    let cal_entries = ti.get_calendar()?;
+fn trakt_cal_list(mc: &MovieCollection) -> Result<(), Error> {
+    let cal_entries = trakt_instance::get_calendar()?;
     for cal in cal_entries {
         let show = match ImdbRatings::get_show_by_link(&cal.link, &mc.pool)? {
             Some(s) => s.show,
             None => "".to_string(),
         };
-        let exists = if !show.is_empty() {
+        let exists = if show.is_empty() {
+            false
+        } else {
             ImdbEpisodes {
                 show: show.to_string(),
                 season: cal.season,
                 episode: cal.episode,
-                ..Default::default()
+                ..ImdbEpisodes::default()
             }
             .get_index(&mc.pool)?
             .is_some()
-        } else {
-            false
         };
         if !exists {
             writeln!(io::stdout().lock(), "{} {}", show, cal)?;
@@ -556,19 +552,15 @@ fn trakt_cal_list(ti: &TraktInstance, mc: &MovieCollection) -> Result<(), Error>
     Ok(())
 }
 
-fn watchlist_add(
-    ti: &TraktInstance,
-    mc: &MovieCollection,
-    show: Option<&str>,
-) -> Result<(), Error> {
+fn watchlist_add(mc: &MovieCollection, show: Option<&str>) -> Result<(), Error> {
     if let Some(imdb_url) = get_imdb_url_from_show(&mc, show)? {
         writeln!(
             io::stdout().lock(),
             "result: {}",
-            ti.add_watchlist_show(&imdb_url)?
+            trakt_instance::add_watchlist_show(&imdb_url)?
         )?;
         debug!("GOT HERE");
-        if let Some(show) = ti.get_watchlist_shows()?.get(&imdb_url) {
+        if let Some(show) = trakt_instance::get_watchlist_shows()?.get(&imdb_url) {
             debug!("INSERT SHOW {}", show);
             show.insert_show(&mc.pool)?;
         }
@@ -576,12 +568,12 @@ fn watchlist_add(
     Ok(())
 }
 
-fn watchlist_rm(ti: &TraktInstance, mc: &MovieCollection, show: Option<&str>) -> Result<(), Error> {
+fn watchlist_rm(mc: &MovieCollection, show: Option<&str>) -> Result<(), Error> {
     if let Some(imdb_url) = get_imdb_url_from_show(&mc, show)? {
         writeln!(
             io::stdout().lock(),
             "result: {}",
-            ti.remove_watchlist_show(&imdb_url)?
+            trakt_instance::remove_watchlist_show(&imdb_url)?
         )?;
         if let Some(show) = WatchListShow::get_show_by_link(&imdb_url, &mc.pool)? {
             show.delete_show(&mc.pool)?;
@@ -599,7 +591,6 @@ fn watchlist_list(mc: &MovieCollection) -> Result<(), Error> {
 }
 
 fn watched_add(
-    ti: &TraktInstance,
     mc: &MovieCollection,
     show: Option<&str>,
     season: i32,
@@ -608,17 +599,17 @@ fn watched_add(
     if let Some(imdb_url) = get_imdb_url_from_show(&mc, show)? {
         if season != -1 && !episode.is_empty() {
             for epi in episode {
-                ti.add_episode_to_watched(&imdb_url, season, *epi)?;
+                trakt_instance::add_episode_to_watched(&imdb_url, season, *epi)?;
                 WatchedEpisode {
                     imdb_url: imdb_url.to_string(),
                     season,
                     episode: *epi,
-                    ..Default::default()
+                    ..WatchedEpisode::default()
                 }
                 .insert_episode(&mc.pool)?;
             }
         } else {
-            ti.add_movie_to_watched(&imdb_url)?;
+            trakt_instance::add_movie_to_watched(&imdb_url)?;
             WatchedMovie {
                 imdb_url,
                 title: "".to_string(),
@@ -630,7 +621,6 @@ fn watched_add(
 }
 
 fn watched_rm(
-    ti: &TraktInstance,
     mc: &MovieCollection,
     show: Option<&str>,
     season: i32,
@@ -639,7 +629,7 @@ fn watched_rm(
     if let Some(imdb_url) = get_imdb_url_from_show(&mc, show)? {
         if season != -1 && !episode.is_empty() {
             for epi in episode {
-                ti.remove_episode_to_watched(&imdb_url, season, *epi)?;
+                trakt_instance::remove_episode_to_watched(&imdb_url, season, *epi)?;
                 if let Some(epi_) =
                     WatchedEpisode::get_watched_episode(&mc.pool, &imdb_url, season, *epi)?
                 {
@@ -647,7 +637,7 @@ fn watched_rm(
                 }
             }
         } else {
-            ti.remove_movie_to_watched(&imdb_url)?;
+            trakt_instance::remove_movie_to_watched(&imdb_url)?;
             if let Some(movie) = WatchedMovie::get_watched_movie(&mc.pool, &imdb_url)? {
                 movie.delete_movie(&mc.pool)?;
             }
@@ -693,18 +683,17 @@ pub fn trakt_app_parse(
     episode: &[i32],
 ) -> Result<(), Error> {
     let mc = MovieCollection::new();
-    let ti = TraktInstance::new();
     match trakt_command {
-        TraktCommands::Calendar => trakt_cal_list(&ti, &mc)?,
+        TraktCommands::Calendar => trakt_cal_list(&mc)?,
         TraktCommands::WatchList => match trakt_action {
-            TraktActions::Add => watchlist_add(&ti, &mc, show)?,
-            TraktActions::Remove => watchlist_rm(&ti, &mc, show)?,
+            TraktActions::Add => watchlist_add(&mc, show)?,
+            TraktActions::Remove => watchlist_rm(&mc, show)?,
             TraktActions::List => watchlist_list(&mc)?,
             _ => {}
         },
         TraktCommands::Watched => match trakt_action {
-            TraktActions::Add => watched_add(&ti, &mc, show, season, episode)?,
-            TraktActions::Remove => watched_rm(&ti, &mc, show, season, episode)?,
+            TraktActions::Add => watched_add(&mc, show, season, episode)?,
+            TraktActions::Remove => watched_rm(&mc, show, season, episode)?,
             TraktActions::List => watched_list(&mc, show, season)?,
             _ => {}
         },
@@ -846,22 +835,21 @@ pub fn watched_action_http_worker(
     season: i32,
     episode: i32,
 ) -> Result<String, Error> {
-    let ti = TraktInstance::new();
     let mc = MovieCollection::with_pool(&pool)?;
 
     let body = match action {
         TraktActions::Add => {
             let result = if season != -1 && episode != -1 {
-                ti.add_episode_to_watched(&imdb_url, season, episode)?
+                trakt_instance::add_episode_to_watched(&imdb_url, season, episode)?
             } else {
-                ti.add_movie_to_watched(&imdb_url)?
+                trakt_instance::add_movie_to_watched(&imdb_url)?
             };
             if season != -1 && episode != -1 {
                 WatchedEpisode {
                     imdb_url: imdb_url.to_string(),
                     season,
                     episode,
-                    ..Default::default()
+                    ..WatchedEpisode::default()
                 }
                 .insert_episode(&mc.pool)?;
             } else {
@@ -876,9 +864,9 @@ pub fn watched_action_http_worker(
         }
         TraktActions::Remove => {
             let result = if season != -1 && episode != -1 {
-                ti.remove_episode_to_watched(&imdb_url, season, episode)?
+                trakt_instance::remove_episode_to_watched(&imdb_url, season, episode)?
             } else {
-                ti.remove_movie_to_watched(&imdb_url)?
+                trakt_instance::remove_movie_to_watched(&imdb_url)?
             };
 
             if season != -1 && episode != -1 {
@@ -905,7 +893,7 @@ pub fn trakt_cal_http_worker(pool: &PgPool) -> Result<Vec<String>, Error> {
         r#"onclick="imdb_update('SHOW', 'LINK', SEASON, '/list/trakt/cal');"
             >update database</button></td>"#
     );
-    let cal_list = TraktInstance::new().get_calendar()?;
+    let cal_list = trakt_instance::get_calendar()?;
     cal_list
         .into_iter()
         .map(|cal| {
@@ -913,12 +901,12 @@ pub fn trakt_cal_http_worker(pool: &PgPool) -> Result<Vec<String>, Error> {
                 Some(s) => s.show,
                 None => "".to_string(),
             };
-            let exists = if !show.is_empty() {
+            let exists = if show.is_empty() {None} else {
                 let idx_opt = ImdbEpisodes {
                     show: show.to_string(),
                     season: cal.season,
                     episode: cal.episode,
-                    ..Default::default()
+                    ..ImdbEpisodes::default()
                 }
                 .get_index(&pool)?;
 
@@ -926,8 +914,6 @@ pub fn trakt_cal_http_worker(pool: &PgPool) -> Result<Vec<String>, Error> {
                     Some(idx) => ImdbEpisodes::from_index(idx, &pool)?,
                     None => None,
                 }
-            } else {
-                None
             };
 
             let entry = format!(
@@ -954,13 +940,11 @@ pub fn trakt_cal_http_worker(pool: &PgPool) -> Result<Vec<String>, Error> {
                     },
                 },
                 cal.airdate,
-                if !exists.is_some() {
+                if exists.is_some() {"".to_string()} else {
                     button_add
                         .replace("SHOW", &show)
                         .replace("LINK", &cal.link)
                         .replace("SEASON", &cal.season.to_string())
-                } else {
-                    "".to_string()
                 },
             );
             Ok(entry)

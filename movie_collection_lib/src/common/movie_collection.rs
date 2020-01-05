@@ -4,6 +4,7 @@ use postgres_query::FromSqlRow;
 use rayon::iter::{IntoParallelIterator, IntoParallelRefIterator, ParallelIterator};
 use serde::{Deserialize, Serialize};
 use std::collections::{HashMap, HashSet};
+use std::ffi::OsStr;
 use std::fmt;
 use std::io;
 use std::io::Write;
@@ -91,8 +92,7 @@ impl fmt::Display for TvShowsResult {
             self.count,
             self.source
                 .as_ref()
-                .map(|s| s.to_string())
-                .unwrap_or_else(|| "".to_string()),
+                .map_or_else(|| "".to_string(), ToString::to_string),
         )
     }
 }
@@ -120,13 +120,7 @@ pub struct MovieCollectionResult {
 
 impl fmt::Display for MovieCollectionResult {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        if !self.istv {
-            write!(
-                f,
-                "{} {} {:.1} {}",
-                self.path, self.show, self.rating, self.title
-            )
-        } else {
+        if self.istv {
             write!(
                 f,
                 "{} {} {:.1}/{:.1} s{:02} ep{:02} {} {} {}",
@@ -139,6 +133,12 @@ impl fmt::Display for MovieCollectionResult {
                 self.title,
                 option_string_wrapper(&self.eptitle),
                 option_string_wrapper(&self.epurl),
+            )
+        } else {
+            write!(
+                f,
+                "{} {} {:.1} {}",
+                self.path, self.show, self.rating, self.title
             )
         }
     }
@@ -180,24 +180,24 @@ pub struct MovieCollection {
 }
 
 impl Default for MovieCollection {
-    fn default() -> MovieCollection {
-        MovieCollection::new()
+    fn default() -> Self {
+        Self::new()
     }
 }
 
 impl MovieCollection {
-    pub fn new() -> MovieCollection {
+    pub fn new() -> Self {
         let config = Config::with_config().expect("Init config failed");
         let pgurl = &config.pgurl;
-        MovieCollection {
+        Self {
             pool: PgPool::new(&pgurl),
             config,
         }
     }
 
-    pub fn with_pool(pool: &PgPool) -> Result<MovieCollection, Error> {
+    pub fn with_pool(pool: &PgPool) -> Result<Self, Error> {
         let config = Config::with_config()?;
-        let mc = MovieCollection {
+        let mc = Self {
             config,
             pool: pool.clone(),
         };
@@ -265,7 +265,7 @@ impl MovieCollection {
                             title: Some(title),
                             link,
                             rating: Some(rating),
-                            ..Default::default()
+                            ..ImdbRatings::default()
                         })
                     })
                     .collect();
@@ -341,14 +341,14 @@ impl MovieCollection {
             FROM movie_collection a
             LEFT JOIN imdb_ratings b ON a.show_id = b.index
         "#;
-        let query = if !search_strs.is_empty() {
+        let query = if search_strs.is_empty() {
+            query.to_string()
+        } else {
             let search_strs: Vec<_> = search_strs
                 .iter()
                 .map(|s| format!("a.path like '%{}%'", s))
                 .collect();
             format!("{} WHERE {}", query, search_strs.join(" OR "))
-        } else {
-            query.to_string()
         };
 
         let results: Result<Vec<_>, Error> = self
@@ -369,7 +369,7 @@ impl MovieCollection {
                     rating,
                     title,
                     istv: istv.unwrap_or(false),
-                    ..Default::default()
+                    ..MovieCollectionResult::default()
                 })
             })
             .collect();
@@ -389,11 +389,10 @@ impl MovieCollection {
                         FROM imdb_episodes
                         WHERE show = $1 AND season = $2 AND episode = $3
                     "#;
-                    for row in self
+                    for row in &self
                         .get_pool()
                         .get()?
                         .query(query, &[&show, &season, &episode])?
-                        .iter()
                     {
                         result.season = Some(season);
                         result.episode = Some(episode);
@@ -534,19 +533,21 @@ impl MovieCollection {
 
         let episode_list: Result<HashSet<_>, Error> = file_list
             .par_iter()
-            .map(|f| {
-                let file_stem = Path::new(f)
-                    .file_stem()
-                    .map(|f| f.to_string_lossy())
-                    .ok_or_else(|| err_msg("file_stem failed"))?;
-                let (show, season, episode) = parse_file_stem(&file_stem);
-                if season == -1 || episode == -1 {
-                    Ok(None)
-                } else {
-                    Ok(Some((show, season, episode, f)))
-                }
+            .filter_map(|f| {
+                let res = || {
+                    let file_stem = Path::new(f)
+                        .file_stem()
+                        .map(OsStr::to_string_lossy)
+                        .ok_or_else(|| err_msg("file_stem failed"))?;
+                    let (show, season, episode) = parse_file_stem(&file_stem);
+                    if season == -1 || episode == -1 {
+                        Ok(None)
+                    } else {
+                        Ok(Some((show, season, episode, f)))
+                    }
+                };
+                res().transpose()
             })
-            .filter_map(|x| x.transpose())
             .collect();
         let episode_list = episode_list?;
 
@@ -605,7 +606,7 @@ impl MovieCollection {
                 if collection_map.get(f).is_none() {
                     let ext = Path::new(&f)
                         .extension()
-                        .map(|e| e.to_string_lossy())
+                        .map(OsStr::to_string_lossy)
                         .ok_or_else(|| err_msg("extension fail"))?
                         .to_string();
                     if self.get_config().suffixes.contains(&ext) {
@@ -621,7 +622,9 @@ impl MovieCollection {
         let results: Result<(), Error> = collection_map
             .par_iter()
             .map(|(key, val)| {
-                if !file_list.contains(key) {
+                if file_list.contains(key) {
+                    Ok(())
+                } else {
                     match movie_queue.get(key) {
                         Some(v) => {
                             writeln!(stdout.lock(), "in queue but not disk {} {}", key, v)?;
@@ -633,8 +636,6 @@ impl MovieCollection {
                         }
                     };
                     self.remove_from_collection(key)
-                } else {
-                    Ok(())
                 }
             })
             .collect();
@@ -694,7 +695,7 @@ impl MovieCollection {
                         rating: Some(rating),
                         istv: Some(istv),
                         source,
-                        ..Default::default()
+                        ..ImdbRatings::default()
                     },
                 ))
             })
@@ -836,7 +837,7 @@ impl MovieCollection {
 pub fn find_new_episodes_http_worker(
     pool: &PgPool,
     shows: Option<String>,
-    source: Option<TvShowSource>,
+    source: &Option<TvShowSource>,
 ) -> Result<Vec<String>, Error> {
     let button_add = format!(
         "{}{}",
@@ -854,7 +855,7 @@ pub fn find_new_episodes_http_worker(
 
     let mc = MovieCollection::with_pool(&pool)?;
     let shows_filter: Option<HashSet<String>> =
-        shows.map(|s| s.split(',').map(|s| s.to_string()).collect());
+        shows.map(|s| s.split(',').map(ToString::to_string).collect());
 
     let mindate = (Local::today() + Duration::days(-14)).naive_local();
     let maxdate = (Local::today() + Duration::days(7)).naive_local();
@@ -890,8 +891,7 @@ pub fn find_new_episodes_http_worker(
                     (
                         s.show
                             .as_ref()
-                            .map(|v| v.to_string())
-                            .unwrap_or_else(|| "".to_string()),
+                            .map_or_else(|| "".to_string(), ToString::to_string),
                         s.season.unwrap_or(-1),
                         s.episode.unwrap_or(-1),
                     ),

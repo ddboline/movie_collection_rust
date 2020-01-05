@@ -31,8 +31,7 @@ fn trakt_app() -> Result<(), Error> {
 
     let commands: Vec<String> = matches
         .values_of("commands")
-        .map(|v| v.map(|s| s.to_string()).collect())
-        .unwrap_or_else(Vec::new);
+        .map_or_else(Vec::new, |v| v.map(ToString::to_string).collect());
 
     let trakt_command = match commands.get(0) {
         Some(c) => TraktCommands::from_command(c),
@@ -42,7 +41,7 @@ fn trakt_app() -> Result<(), Error> {
         Some(a) => TraktActions::from_command(a),
         None => TraktActions::None,
     };
-    let show = commands.get(2).map(|s| s.as_str());
+    let show = commands.get(2).map(String::as_str);
     let season: i32 = match commands.get(3) {
         Some(c) => {
             if let Ok(s) = c.parse() {

@@ -23,7 +23,7 @@ use movie_collection_lib::common::make_queue::movie_queue_http;
 use movie_collection_lib::common::movie_collection::ImdbSeason;
 use movie_collection_lib::common::movie_collection::TvShowsResult;
 use movie_collection_lib::common::movie_queue::MovieQueueResult;
-use movie_collection_lib::common::trakt_instance::TraktInstance;
+use movie_collection_lib::common::trakt_instance;
 use movie_collection_lib::common::trakt_utils::TraktActions;
 use movie_collection_lib::common::trakt_utils::WatchListShow;
 use movie_collection_lib::common::tv_show_source::TvShowSource;
@@ -397,8 +397,8 @@ fn tvshows_worker(res1: TvShowsMap, tvshows: Vec<TvShowsResult>) -> Result<Strin
 }
 
 pub async fn tvshows(_: LoggedUser, state: Data<AppState>) -> Result<HttpResponse, Error> {
-    let _s = state.clone();
-    let shows = block(move || _s.db.handle(TvShowsRequest {}))
+    let s = state.clone();
+    let shows = block(move || s.db.handle(TvShowsRequest {}))
         .await
         .map_err(err_msg)?;
     let res1 = block(move || state.db.handle(WatchlistShowsRequest {}))
@@ -465,10 +465,10 @@ fn process_shows(
                 } else {
                     "".to_string()
                 },
-                if !has_watchlist {
-                    button_add.replace("SHOW", &item.link)
-                } else {
+                if has_watchlist {
                     button_rm.replace("SHOW", &item.link)
+                } else {
+                    button_add.replace("SHOW", &item.link)
                 },
             )
         })
@@ -529,11 +529,9 @@ pub async fn trakt_watchlist(_: LoggedUser, state: Data<AppState>) -> Result<Htt
 }
 
 fn watchlist_action_worker(action: TraktActions, imdb_url: &str) -> Result<HttpResponse, Error> {
-    let ti = TraktInstance::new();
-
     let body = match action {
-        TraktActions::Add => ti.add_watchlist_show(&imdb_url)?.to_string(),
-        TraktActions::Remove => ti.remove_watchlist_show(&imdb_url)?.to_string(),
+        TraktActions::Add => trakt_instance::add_watchlist_show(&imdb_url)?.to_string(),
+        TraktActions::Remove => trakt_instance::remove_watchlist_show(&imdb_url)?.to_string(),
         _ => "".to_string(),
     };
     let resp = HttpResponse::Ok()
@@ -601,14 +599,13 @@ pub async fn trakt_watched_seasons(
     state: Data<AppState>,
 ) -> Result<HttpResponse, Error> {
     let imdb_url = path.into_inner();
-    let _s = state.clone();
-    let show_opt = block(move || _s.db.handle(ImdbRatingsRequest { imdb_url }))
+    let s = state.clone();
+    let show_opt = block(move || s.db.handle(ImdbRatingsRequest { imdb_url }))
         .await
         .map_err(err_msg)?;
     let empty = || ("".to_string(), "".to_string(), "".to_string());
-    let (imdb_url, show, link) = show_opt
-        .map(|(imdb_url, t)| (imdb_url, t.show, t.link))
-        .unwrap_or_else(empty);
+    let (imdb_url, show, link) =
+        show_opt.map_or_else(empty, |(imdb_url, t)| (imdb_url, t.show, t.link));
     let entries = block(move || state.db.handle(ImdbSeasonsRequest { show }))
         .await
         .map_err(err_msg)?;

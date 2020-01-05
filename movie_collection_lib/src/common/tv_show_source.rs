@@ -22,10 +22,10 @@ impl fmt::Display for TvShowSource {
             f,
             "{}",
             match self {
-                TvShowSource::Netflix => "netflix",
-                TvShowSource::Hulu => "hulu",
-                TvShowSource::Amazon => "amazon",
-                TvShowSource::All => "all",
+                Self::Netflix => "netflix",
+                Self::Hulu => "hulu",
+                Self::Amazon => "amazon",
+                Self::All => "all",
             }
         )
     }
@@ -36,29 +36,29 @@ impl FromStr for TvShowSource {
 
     fn from_str(s: &str) -> Result<Self, Self::Err> {
         match s {
-            "netflix" => Ok(TvShowSource::Netflix),
-            "hulu" => Ok(TvShowSource::Hulu),
-            "amazon" => Ok(TvShowSource::Amazon),
-            "all" => Ok(TvShowSource::All),
+            "netflix" => Ok(Self::Netflix),
+            "hulu" => Ok(Self::Hulu),
+            "amazon" => Ok(Self::Amazon),
+            "all" => Ok(Self::All),
             _ => Err(err_msg("Is not TvShowSource")),
         }
     }
 }
 
 impl Ord for TvShowSource {
-    fn cmp(&self, other: &TvShowSource) -> Ordering {
+    fn cmp(&self, other: &Self) -> Ordering {
         self.to_string().cmp(&other.to_string())
     }
 }
 
 impl PartialOrd for TvShowSource {
-    fn partial_cmp(&self, other: &TvShowSource) -> Option<Ordering> {
+    fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
         Some(self.cmp(other))
     }
 }
 
 impl PartialEq for TvShowSource {
-    fn eq(&self, other: &TvShowSource) -> bool {
+    fn eq(&self, other: &Self) -> bool {
         self.to_string() == other.to_string()
     }
 }

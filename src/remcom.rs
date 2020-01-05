@@ -30,7 +30,7 @@ fn remcom() -> Result<(), Error> {
     let directory = matches.value_of("directory");
 
     if let Some(patterns) = matches.values_of("files") {
-        let files: Vec<String> = patterns.map(|x| x.to_string()).collect();
+        let files: Vec<String> = patterns.map(ToString::to_string).collect();
         for file in files {
             remcom_single_file(&file, directory, unwatched)?;
         }

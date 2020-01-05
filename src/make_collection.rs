@@ -40,13 +40,15 @@ fn make_collection() -> Result<(), Error> {
     let do_time = matches.is_present("time");
     let shows = matches
         .values_of("shows")
-        .map(|s| s.map(|x| x.to_string()).collect())
-        .unwrap_or_else(Vec::new);
+        .map_or_else(Vec::new, |s| s.map(ToString::to_string).collect());
 
     let stdout = io::stdout();
 
     let mc = MovieCollection::new();
-    if !do_parse {
+    if do_parse {
+        mc.make_collection()?;
+        mc.fix_collection_show_id()?;
+    } else {
         let shows = mc.search_movie_collection(&shows)?;
         if do_time {
             let shows: Result<Vec<_>, Error> = shows
@@ -64,9 +66,6 @@ fn make_collection() -> Result<(), Error> {
                 writeln!(stdout.lock(), "{}", show)?;
             }
         }
-    } else {
-        mc.make_collection()?;
-        mc.fix_collection_show_id()?;
     }
     Ok(())
 }

@@ -36,7 +36,7 @@ struct Claims {
 
 impl From<Claims> for LoggedUser {
     fn from(claims: Claims) -> Self {
-        LoggedUser {
+        Self {
             email: claims.email,
         }
     }
@@ -88,7 +88,7 @@ fn _from_request(req: &HttpRequest, pl: &mut Payload) -> Result<LoggedUser, acti
 
 impl FromRequest for LoggedUser {
     type Error = actix_web::Error;
-    type Future = Ready<Result<LoggedUser, actix_web::Error>>;
+    type Future = Ready<Result<Self, actix_web::Error>>;
     type Config = ();
 
     fn from_request(req: &HttpRequest, pl: &mut Payload) -> Self::Future {
@@ -112,8 +112,8 @@ enum AuthStatus {
 pub struct AuthorizedUsers(RwLock<HashMap<LoggedUser, AuthStatus>>);
 
 impl AuthorizedUsers {
-    pub fn new() -> AuthorizedUsers {
-        AuthorizedUsers(RwLock::new(HashMap::new()))
+    pub fn new() -> Self {
+        Self(RwLock::new(HashMap::new()))
     }
 
     pub fn fill_from_db(&self, pool: &PgPool) -> Result<(), Error> {

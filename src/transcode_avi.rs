@@ -34,10 +34,8 @@ fn transcode_avi() -> Result<(), Error> {
 
             let movie_path = format!("{}/Documents/movies", config.home_dir);
 
-            let path = if !path.exists() {
+            let path = if path.exists() {path} else {
                 Path::new(&movie_path).join(f)
-            } else {
-                path
             }
             .canonicalize()?;
 

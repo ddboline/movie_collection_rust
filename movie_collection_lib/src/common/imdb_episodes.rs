@@ -36,14 +36,14 @@ impl fmt::Display for ImdbEpisodes {
 }
 
 impl Default for ImdbEpisodes {
-    fn default() -> ImdbEpisodes {
-        ImdbEpisodes::new()
+    fn default() -> Self {
+        Self::new()
     }
 }
 
 impl ImdbEpisodes {
-    pub fn new() -> ImdbEpisodes {
-        ImdbEpisodes {
+    pub fn new() -> Self {
+        Self {
             show: "".to_string(),
             title: "".to_string(),
             season: -1,
@@ -74,7 +74,7 @@ impl ImdbEpisodes {
         }
     }
 
-    pub fn from_index(idx: i32, pool: &PgPool) -> Result<Option<ImdbEpisodes>, Error> {
+    pub fn from_index(idx: i32, pool: &PgPool) -> Result<Option<Self>, Error> {
         let query = r#"
             SELECT a.show, b.title, a.season, a.episode, a.airdate,
                    cast(a.rating as double precision), a.eptitle, a.epurl
@@ -82,7 +82,7 @@ impl ImdbEpisodes {
             JOIN imdb_ratings b ON a.show = b.show
             WHERE a.id = $1"#;
         if let Some(row) = pool.get()?.query(query, &[&idx])?.get(0) {
-            let epi = ImdbEpisodes::from_row(row)?;
+            let epi = Self::from_row(row)?;
             Ok(Some(epi))
         } else {
             Ok(None)
@@ -92,7 +92,7 @@ impl ImdbEpisodes {
     pub fn get_episodes_after_timestamp(
         timestamp: DateTime<Utc>,
         pool: &PgPool,
-    ) -> Result<Vec<ImdbEpisodes>, Error> {
+    ) -> Result<Vec<Self>, Error> {
         let query = r#"
             SELECT a.show, b.title, a.season, a.episode, a.airdate,
                    cast(a.rating as double precision), a.eptitle, a.epurl
@@ -104,7 +104,7 @@ impl ImdbEpisodes {
             .query(query, &[&timestamp])?
             .iter()
             .map(|row| {
-                let epi = ImdbEpisodes::from_row(row)?;
+                let epi = Self::from_row(row)?;
                 Ok(epi)
             })
             .collect()

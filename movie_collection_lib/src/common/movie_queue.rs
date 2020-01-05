@@ -42,21 +42,21 @@ pub struct MovieQueueDB {
 }
 
 impl Default for MovieQueueDB {
-    fn default() -> MovieQueueDB {
-        MovieQueueDB::new()
+    fn default() -> Self {
+        Self::new()
     }
 }
 
 impl MovieQueueDB {
-    pub fn new() -> MovieQueueDB {
+    pub fn new() -> Self {
         let config = Config::with_config().expect("Init config failed");
-        MovieQueueDB {
+        Self {
             pool: PgPool::new(&config.pgurl),
         }
     }
 
-    pub fn with_pool(pool: &PgPool) -> MovieQueueDB {
-        MovieQueueDB { pool: pool.clone() }
+    pub fn with_pool(pool: &PgPool) -> Self {
+        Self { pool: pool.clone() }
     }
 
     pub fn remove_from_queue_by_idx(&self, idx: i32) -> Result<(), Error> {
@@ -64,11 +64,7 @@ impl MovieQueueDB {
         let mut tran = conn.transaction()?;
 
         let query = r#"SELECT max(idx) FROM movie_queue"#;
-        let max_idx: i32 = tran
-            .query(query, &[])?
-            .get(0)
-            .map(|r| r.get(0))
-            .unwrap_or(-1);
+        let max_idx: i32 = tran.query(query, &[])?.get(0).map_or(-1, |r| r.get(0));
         if idx > max_idx || idx < 0 {
             return Ok(());
         }
@@ -145,8 +141,7 @@ impl MovieQueueDB {
             .query(query, &[&collection_idx])?
             .iter()
             .last()
-            .map(|row| row.try_get(0))
-            .unwrap_or(Ok(-1))?;
+            .map_or(Ok(-1), |row| row.try_get(0))?;
 
         if current_idx != -1 {
             self.remove_from_queue_by_idx(current_idx)?;
@@ -156,11 +151,7 @@ impl MovieQueueDB {
         let mut tran = conn.transaction()?;
 
         let query = r#"SELECT max(idx) FROM movie_queue"#;
-        let max_idx: i32 = tran
-            .query(query, &[])?
-            .get(0)
-            .map(|r| r.get(0))
-            .unwrap_or(-1);
+        let max_idx: i32 = tran.query(query, &[])?.get(0).map_or(-1, |r| r.get(0));
         let diff = max_idx - idx + 2;
         debug!("{} {} {}", max_idx, idx, diff);
 
@@ -204,14 +195,14 @@ impl MovieQueueDB {
             JOIN movie_collection b ON a.collection_idx = b.idx
             LEFT JOIN imdb_ratings c ON b.show_id = c.index
         "#;
-        let query = if !patterns.is_empty() {
+        let query = if patterns.is_empty() {
+            query.to_string()
+        } else {
             let constraints: Vec<_> = patterns
                 .iter()
                 .map(|p| format!("b.path like '%{}%'", p))
                 .collect();
             format!("{} WHERE {}", query, constraints.join(" OR "))
-        } else {
-            query.to_string()
         };
         let results: Result<Vec<_>, Error> = self
             .pool
@@ -228,7 +219,7 @@ impl MovieQueueDB {
                     path,
                     link,
                     istv: istv.unwrap_or(false),
-                    ..Default::default()
+                    ..MovieQueueResult::default()
                 })
             })
             .collect();
@@ -247,12 +238,7 @@ impl MovieQueueDB {
                         FROM imdb_episodes
                         WHERE show = $1 AND season = $2 AND episode = $3
                     "#;
-                    for row in self
-                        .pool
-                        .get()?
-                        .query(query, &[&show, &season, &episode])?
-                        .iter()
-                    {
+                    for row in &self.pool.get()?.query(query, &[&show, &season, &episode])? {
                         let epurl: String = row.try_get(0)?;
                         result.eplink = Some(epurl);
                         result.show = Some(show.to_string());

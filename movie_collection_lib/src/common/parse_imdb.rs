@@ -26,8 +26,8 @@ pub struct ParseImdb {
 }
 
 impl ParseImdb {
-    pub fn with_pool(pool: &PgPool) -> Result<ParseImdb, Error> {
-        let p = ParseImdb {
+    pub fn with_pool(pool: &PgPool) -> Result<Self, Error> {
+        let p = Self {
             mc: MovieCollection::with_pool(&pool)?,
         };
         Ok(p)
@@ -97,7 +97,7 @@ impl ParseImdb {
         let episodes: Option<HashMap<(i32, i32), _>> = episodes.map(|v| v.into_iter().collect());
 
         if opts.do_update {
-            self.parse_imdb_update_worker(&opts, shows, episodes, &mut output)?;
+            self.parse_imdb_update_worker(&opts, &shows, &episodes, &mut output)?;
         }
         Ok(output)
     }
@@ -105,8 +105,8 @@ impl ParseImdb {
     fn parse_imdb_update_worker(
         &self,
         opts: &ParseImdbOptions,
-        shows: HashMap<String, ImdbRatings>,
-        episodes: Option<HashMap<(i32, i32), ImdbEpisodes>>,
+        shows: &HashMap<String, ImdbRatings>,
+        episodes: &Option<HashMap<(i32, i32), ImdbEpisodes>>,
         output: &mut Vec<Vec<String>>,
     ) -> Result<(), Error> {
         let imdb_conn = ImdbConnection::new();
@@ -152,7 +152,7 @@ impl ParseImdb {
                                 link: result.link.to_string(),
                                 rating: Some(result.rating),
                                 istv: Some(istv),
-                                ..Default::default()
+                                ..ImdbRatings::default()
                             }
                             .insert_show(&self.mc.get_pool())?;
                         }

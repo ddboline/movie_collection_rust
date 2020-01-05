@@ -18,11 +18,11 @@ pub enum ServiceError {
 impl ResponseError for ServiceError {
     fn error_response(&self) -> HttpResponse {
         match *self {
-            ServiceError::InternalServerError => {
+            Self::InternalServerError => {
                 HttpResponse::InternalServerError().json("Internal Server Error, Please try later")
             }
-            ServiceError::BadRequest(ref message) => HttpResponse::BadRequest().json(message),
-            ServiceError::Unauthorized => HttpResponse::Ok()
+            Self::BadRequest(ref message) => HttpResponse::BadRequest().json(message),
+            Self::Unauthorized => HttpResponse::Ok()
                 .content_type("text/html; charset=utf-8")
                 .body(
                     include_str!("../../templates/login.html")

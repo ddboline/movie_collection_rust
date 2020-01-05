@@ -13,7 +13,7 @@ use movie_collection_lib::common::movie_collection::{
 use movie_collection_lib::common::movie_queue::{MovieQueueDB, MovieQueueResult, MovieQueueRow};
 use movie_collection_lib::common::parse_imdb::{ParseImdb, ParseImdbOptions};
 use movie_collection_lib::common::pgpool::PgPool;
-use movie_collection_lib::common::trakt_instance::TraktInstance;
+use movie_collection_lib::common::trakt_instance;
 use movie_collection_lib::common::trakt_utils::{
     get_watched_shows_db, get_watchlist_shows_db_map, trakt_cal_http_worker,
     watch_list_http_worker, watched_action_http_worker, TraktActions, WatchListMap, WatchListShow,
@@ -63,7 +63,7 @@ impl HandleRequest<MovieQueueRequest> for PgPool {
     type Result = Result<(Vec<MovieQueueResult>, Vec<String>), Error>;
 
     fn handle(&self, msg: MovieQueueRequest) -> Self::Result {
-        let patterns: Vec<_> = msg.patterns.iter().map(|s| s.as_str()).collect();
+        let patterns: Vec<_> = msg.patterns.iter().map(String::as_str).collect();
         let queue = MovieQueueDB::with_pool(&self).print_movie_queue(&patterns)?;
         Ok((queue, msg.patterns))
     }
@@ -118,11 +118,9 @@ impl HandleRequest<WatchlistActionRequest> for PgPool {
     type Result = Result<String, Error>;
 
     fn handle(&self, msg: WatchlistActionRequest) -> Self::Result {
-        let ti = TraktInstance::new();
-
         match msg.action {
             TraktActions::Add => {
-                if let Some(show) = ti.get_watchlist_shows()?.get(&msg.imdb_url) {
+                if let Some(show) = trakt_instance::get_watchlist_shows()?.get(&msg.imdb_url) {
                     show.insert_show(&self)?;
                 }
             }
@@ -203,7 +201,7 @@ pub struct ParseImdbRequest {
 
 impl From<ParseImdbRequest> for ParseImdbOptions {
     fn from(opts: ParseImdbRequest) -> Self {
-        ParseImdbOptions {
+        Self {
             show: "".to_string(),
             tv: opts.tv.unwrap_or(false),
             imdb_link: opts.link,
@@ -222,7 +220,7 @@ pub struct ImdbShowRequest {
 
 impl From<ImdbShowRequest> for ParseImdbOptions {
     fn from(opts: ImdbShowRequest) -> Self {
-        ParseImdbOptions {
+        Self {
             show: opts.show,
             ..opts.query.into()
         }
@@ -260,7 +258,7 @@ impl HandleRequest<FindNewEpisodeRequest> for PgPool {
     type Result = Result<Vec<String>, Error>;
 
     fn handle(&self, msg: FindNewEpisodeRequest) -> Self::Result {
-        find_new_episodes_http_worker(&self, msg.shows, msg.source)
+        find_new_episodes_http_worker(&self, msg.shows, &msg.source)
     }
 }
 
@@ -437,22 +435,24 @@ impl HandleRequest<LastModifiedRequest> for PgPool {
 
         tables
             .iter()
-            .map(|table| {
-                let query = format!("SELECT max(last_modified) FROM {}", table);
-                let r = match self.get()?.query(query.as_str(), &[])?.get(0) {
-                    Some(row) => {
-                        let last_modified: DateTime<Utc> = row.try_get(0)?;
-                        Some(LastModifiedResponse {
-                            table: (*table).to_string(),
-                            last_modified,
-                        })
-                    }
-                    None => None,
-                };
+            .filter_map(|table| {
+                let tmp = || {
+                    let query = format!("SELECT max(last_modified) FROM {}", table);
+                    let r = match self.get()?.query(query.as_str(), &[])?.get(0) {
+                        Some(row) => {
+                            let last_modified: DateTime<Utc> = row.try_get(0)?;
+                            Some(LastModifiedResponse {
+                                table: (*table).to_string(),
+                                last_modified,
+                            })
+                        }
+                        None => None,
+                    };
 
-                Ok(r)
+                    Ok(r)
+                };
+                tmp().transpose()
             })
-            .filter_map(|x| x.transpose())
             .collect()
     }
 }

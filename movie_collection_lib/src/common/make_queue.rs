@@ -133,8 +133,7 @@ pub fn movie_queue_http(queue: &[MovieQueueResult]) -> Result<Vec<String>, Error
                 button.replace("ID", &file_name).replace("SHOW", &file_name)
             );
 
-            let entry = if ext != "mp4" {
-                if season != -1 && episode != -1 {
+            let entry = if ext == "mp4" {entry} else if season != -1 && episode != -1 {
                     format!(
                         r#"{}<td><button type="submit" id="{}" onclick="transcode('{}');"> transcode </button></td>"#,
                         entry, file_name, file_name)
@@ -145,8 +144,7 @@ pub fn movie_queue_http(queue: &[MovieQueueResult]) -> Result<Vec<String>, Error
                     format!(
                         r#"{}<td><button type="submit" id="{}" onclick="transcode_directory('{}', '{}');"> transcode </button></td>"#,
                         entry, file_name, file_name, directory)
-                }
-            } else {entry};
+                };
 
             Ok(entry)
         })

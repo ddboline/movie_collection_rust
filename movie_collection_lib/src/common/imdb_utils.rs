@@ -61,8 +61,8 @@ pub struct ImdbConnection {
 }
 
 impl Default for ImdbConnection {
-    fn default() -> ImdbConnection {
-        ImdbConnection::new()
+    fn default() -> Self {
+        Self::new()
     }
 }
 
@@ -73,8 +73,8 @@ impl ExponentialRetry for ImdbConnection {
 }
 
 impl ImdbConnection {
-    pub fn new() -> ImdbConnection {
-        ImdbConnection {
+    pub fn new() -> Self {
+        Self {
             client: Client::new(),
         }
     }
@@ -156,8 +156,10 @@ impl ImdbConnection {
                 if let Some("season") = a.attr("class") {
                     let season_ = a.attr("season_number").unwrap_or("-1");
                     if let Some(link) = a.attr("href") {
-                        let episode_url = "http://www.imdb.com/title";
-                        let episodes_url = format!("{}/{}/episodes/{}", episode_url, imdb_id, link);
+                        let episodes_url = format!(
+                            "{}/{}/episodes/{}",
+                            "http://www.imdb.com/title", imdb_id, link
+                        );
                         Some((episodes_url, season_))
                     } else {
                         None

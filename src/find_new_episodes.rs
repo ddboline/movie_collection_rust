@@ -28,11 +28,10 @@ fn find_new_episodes() -> Result<(), Error> {
         )
         .get_matches();
 
-    let source = matches.value_of("source").map(|s| s.to_string());
+    let source = matches.value_of("source").map(ToString::to_string);
     let shows = matches
         .values_of("shows")
-        .map(|v| v.map(|s| s.to_string()).collect())
-        .unwrap_or_else(Vec::new);
+        .map_or_else(Vec::new, |v| v.map(ToString::to_string).collect());
 
     let source: Option<TvShowSource> = match source {
         Some(s) => s.parse().ok(),

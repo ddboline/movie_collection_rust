@@ -57,15 +57,14 @@ impl fmt::Display for ImdbRatings {
             self.istv.unwrap_or(false),
             self.source
                 .as_ref()
-                .map(|s| s.to_string())
-                .unwrap_or_else(|| "".to_string()),
+                .map_or_else(|| "".to_string(), ToString::to_string),
         )
     }
 }
 
 impl ImdbRatings {
     pub fn insert_show(&self, pool: &PgPool) -> Result<(), Error> {
-        let source = self.source.as_ref().map(|s| s.to_string());
+        let source = self.source.as_ref().map(ToString::to_string);
         let query = postgres_query::query!(
             r#"
                 INSERT INTO imdb_ratings
@@ -99,7 +98,7 @@ impl ImdbRatings {
             .map_err(err_msg)
     }
 
-    pub fn get_show_by_link(link: &str, pool: &PgPool) -> Result<Option<ImdbRatings>, Error> {
+    pub fn get_show_by_link(link: &str, pool: &PgPool) -> Result<Option<Self>, Error> {
         let query = r#"
             SELECT index, show, title, link, rating, istv, source
             FROM imdb_ratings
@@ -116,7 +115,7 @@ impl ImdbRatings {
     pub fn get_shows_after_timestamp(
         timestamp: DateTime<Utc>,
         pool: &PgPool,
-    ) -> Result<Vec<ImdbRatings>, Error> {
+    ) -> Result<Vec<Self>, Error> {
         let query = r#"
             SELECT index, show, title, link, rating, istv, source
             FROM imdb_ratings
@@ -141,8 +140,7 @@ impl ImdbRatings {
             self.istv.unwrap_or(false).to_string(),
             self.source
                 .as_ref()
-                .map(|s| s.to_string())
-                .unwrap_or_else(|| "".to_string()),
+                .map_or_else(|| "".to_string(), ToString::to_string),
         ]
     }
 }

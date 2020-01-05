@@ -49,18 +49,17 @@ fn make_queue() -> Result<(), Error> {
         .get_matches();
     let add_files: Option<Vec<_>> = matches
         .values_of("add")
-        .map(|v| v.map(|s| s.to_string()).collect());
+        .map(|v| v.map(ToString::to_string).collect());
     let del_files: Option<Vec<_>> = matches
         .values_of("remove")
-        .map(|v| v.map(|s| s.to_string()).collect());
+        .map(|v| v.map(ToString::to_string).collect());
     let do_time = matches.is_present("time");
     let patterns: Vec<_> = matches
         .values_of("patterns")
-        .map(|v| v.map(|s| s.to_string()).collect())
-        .unwrap_or_else(Vec::new);
+        .map_or_else(Vec::new, |v| v.map(|s| s.to_string()).collect());
     let do_shows = matches.is_present("shows");
 
-    let patterns: Vec<_> = patterns.iter().map(|s| s.as_str()).collect();
+    let patterns: Vec<_> = patterns.iter().map(String::as_str).collect();
     make_queue_worker(add_files, del_files, do_time, &patterns, do_shows)
 }
 

@@ -1,4 +1,5 @@
-use amqp::{protocol, Basic, Channel, Options, Session, Table};
+use amqp::protocol::basic::BasicProperties;
+use amqp::{Basic, Channel, Options, Session, Table};
 use failure::{err_msg, format_err, Error};
 use log::error;
 use reqwest::blocking::{Client, Response};
@@ -12,13 +13,14 @@ use std::fs::{File, OpenOptions};
 use std::io::{stdout, Write};
 use std::io::{BufRead, BufReader};
 use std::path::Path;
+use std::string::ToString;
 use subprocess::{Exec, Redirection};
 
 use crate::common::config::Config;
 
 #[inline]
 pub fn option_string_wrapper(s: &Option<String>) -> &str {
-    s.as_ref().map(|s| s.as_str()).unwrap_or("")
+    s.as_ref().map_or("", String::as_str)
 }
 
 pub fn walk_directory(path: &str, match_strs: &[String]) -> Result<Vec<String>, Error> {
@@ -47,10 +49,10 @@ pub fn walk_directory(path: &str, match_strs: &[String]) -> Result<Vec<String>, 
                                 }
                             })
                             .collect();
-                        if !path_names.is_empty() {
-                            Some(path_names)
-                        } else {
+                        if path_names.is_empty() {
                             None
+                        } else {
+                            Some(path_names)
                         }
                     }
                 }
@@ -74,7 +76,7 @@ pub fn get_version_number() -> String {
 }
 
 pub fn open_transcode_channel(queue: &str) -> Result<Channel, Error> {
-    let options: Options = Default::default();
+    let options: Options = Options::default();
     let mut session = Session::new(options)?;
     let mut channel = session.open_channel(1)?;
     channel.queue_declare(queue, false, true, false, false, false, Table::new())?;
@@ -98,9 +100,9 @@ pub fn publish_transcode_job_to_queue(
             routing_key,
             true,
             false,
-            protocol::basic::BasicProperties {
+            BasicProperties {
                 content_type: Some("text".to_string()),
-                ..Default::default()
+                ..BasicProperties::default()
             },
             serde_json::to_string(&ScriptStruct {
                 script: script.to_string(),
@@ -277,7 +279,7 @@ pub fn get_video_runtime(f: &str) -> Result<String, Error> {
     let results: Result<Vec<_>, Error> = BufReader::new(stream)
         .lines()
         .map(|l| {
-            let items: Vec<_> = l?.split_whitespace().map(|s| s.to_string()).collect();
+            let items: Vec<_> = l?.split_whitespace().map(ToString::to_string).collect();
             if items.len() > 5 && items[1] == "V:" {
                 let fps: f64 = items[2].parse()?;
                 let nframes: u64 = items[5]
