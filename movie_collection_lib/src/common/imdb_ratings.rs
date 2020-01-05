@@ -9,7 +9,7 @@ use crate::common::pgpool::PgPool;
 use crate::common::tv_show_source::TvShowSource;
 use crate::common::utils::option_string_wrapper;
 
-#[derive(Default, Clone, Debug, Serialize, Deserialize)]
+#[derive(Default, Clone, Debug, Serialize, Deserialize, FromSqlRow)]
 pub struct ImdbRatings {
     pub index: i32,
     pub show: String,
@@ -18,31 +18,6 @@ pub struct ImdbRatings {
     pub rating: Option<f64>,
     pub istv: Option<bool>,
     pub source: Option<TvShowSource>,
-}
-
-#[derive(FromSqlRow)]
-pub struct ImdbRatingsDB {
-    pub index: i32,
-    pub show: String,
-    pub title: Option<String>,
-    pub link: String,
-    pub rating: Option<f64>,
-    pub istv: Option<bool>,
-    pub source: Option<String>,
-}
-
-impl From<ImdbRatingsDB> for ImdbRatings {
-    fn from(item: ImdbRatingsDB) -> Self {
-        Self {
-            index: item.index,
-            show: item.show,
-            title: item.title,
-            link: item.link,
-            rating: item.rating,
-            istv: item.istv,
-            source: item.source.and_then(|s| s.parse().ok()),
-        }
-    }
 }
 
 impl fmt::Display for ImdbRatings {
@@ -105,8 +80,7 @@ impl ImdbRatings {
             WHERE (link = $1 OR show = $1)
         "#;
         if let Some(row) = pool.get()?.query(query, &[&link])?.get(0) {
-            let val = ImdbRatingsDB::from_row(row)?;
-            Ok(Some(val.into()))
+            Ok(Some(ImdbRatings::from_row(row)?))
         } else {
             Ok(None)
         }
@@ -124,10 +98,7 @@ impl ImdbRatings {
         pool.get()?
             .query(query, &[&timestamp])?
             .iter()
-            .map(|row| {
-                let val = ImdbRatingsDB::from_row(row)?;
-                Ok(val.into())
-            })
+            .map(|row| Ok(ImdbRatings::from_row(row)?))
             .collect()
     }
 

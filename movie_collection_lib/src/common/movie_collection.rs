@@ -52,34 +52,13 @@ impl fmt::Display for NewEpisodesResult {
     }
 }
 
-#[derive(Default)]
+#[derive(Default, FromSqlRow)]
 pub struct TvShowsResult {
     pub show: String,
     pub link: String,
     pub count: i64,
     pub title: String,
     pub source: Option<TvShowSource>,
-}
-
-#[derive(FromSqlRow)]
-pub struct TvShowsResultDB {
-    pub show: String,
-    pub link: String,
-    pub count: i64,
-    pub title: String,
-    pub source: Option<String>,
-}
-
-impl From<TvShowsResultDB> for TvShowsResult {
-    fn from(item: TvShowsResultDB) -> Self {
-        Self {
-            show: item.show,
-            link: item.link,
-            count: item.count,
-            title: item.title,
-            source: item.source.and_then(|s| s.parse().ok()),
-        }
-    }
 }
 
 impl fmt::Display for TvShowsResult {
@@ -716,11 +695,7 @@ impl MovieCollection {
             .get()?
             .query(query, &[])?
             .iter()
-            .map(|row| {
-                TvShowsResultDB::from_row(row)
-                    .map_err(err_msg)
-                    .map(Into::into)
-            })
+            .map(|row| TvShowsResult::from_row(row).map_err(err_msg))
             .collect()
     }
 
