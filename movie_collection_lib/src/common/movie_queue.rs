@@ -1,6 +1,7 @@
 use chrono::{DateTime, Utc};
 use failure::{err_msg, Error};
 use log::debug;
+use postgres_query::FromSqlRow;
 use rayon::iter::{IntoParallelIterator, ParallelIterator};
 use serde::{Deserialize, Serialize};
 use std::fmt;
@@ -9,7 +10,7 @@ use std::path::Path;
 use crate::common::config::Config;
 use crate::common::movie_collection::MovieCollection;
 use crate::common::pgpool::PgPool;
-use crate::common::row_index_trait::RowIndexTrait;
+
 use crate::common::utils::{option_string_wrapper, parse_file_stem};
 
 #[derive(Default, Serialize)]
@@ -100,7 +101,7 @@ impl MovieQueueDB {
             .query(query, &[&collection_idx])?
             .iter()
             .map(|row| {
-                let idx = row.get_idx(0)?;
+                let idx = row.try_get(0)?;
                 self.remove_from_queue_by_idx(idx)
             })
             .collect()
@@ -144,7 +145,7 @@ impl MovieQueueDB {
             .query(query, &[&collection_idx])?
             .iter()
             .last()
-            .map(|row| row.get_idx(0))
+            .map(|row| row.try_get(0))
             .unwrap_or(Ok(-1))?;
 
         if current_idx != -1 {
@@ -189,7 +190,7 @@ impl MovieQueueDB {
     pub fn get_max_queue_index(&self) -> Result<i32, Error> {
         let query = r#"SELECT max(idx) FROM movie_queue"#;
         if let Some(row) = self.pool.get()?.query(query, &[])?.get(0) {
-            let max_idx: i32 = row.get_idx(0)?;
+            let max_idx: i32 = row.try_get(0)?;
             Ok(max_idx)
         } else {
             Ok(-1)
@@ -218,10 +219,10 @@ impl MovieQueueDB {
             .query(query.as_str(), &[])?
             .iter()
             .map(|row| {
-                let idx: i32 = row.get_idx(0)?;
-                let path: String = row.get_idx(1)?;
-                let link: Option<String> = row.get_idx(2)?;
-                let istv: Option<bool> = row.get_idx(3)?;
+                let idx: i32 = row.try_get(0)?;
+                let path: String = row.try_get(1)?;
+                let link: Option<String> = row.try_get(2)?;
+                let istv: Option<bool> = row.try_get(3)?;
                 Ok(MovieQueueResult {
                     idx,
                     path,
@@ -252,7 +253,7 @@ impl MovieQueueDB {
                         .query(query, &[&show, &season, &episode])?
                         .iter()
                     {
-                        let epurl: String = row.get_idx(0)?;
+                        let epurl: String = row.try_get(0)?;
                         result.eplink = Some(epurl);
                         result.show = Some(show.to_string());
                         result.season = Some(season);
@@ -281,23 +282,12 @@ impl MovieQueueDB {
             .get()?
             .query(query, &[&timestamp])?
             .iter()
-            .map(|row| {
-                let idx: i32 = row.get_idx(0)?;
-                let collection_idx: i32 = row.get_idx(1)?;
-                let path: String = row.get_idx(2)?;
-                let show: String = row.get_idx(3)?;
-                Ok(MovieQueueRow {
-                    idx,
-                    collection_idx,
-                    path,
-                    show,
-                })
-            })
+            .map(|row| MovieQueueRow::from_row(row).map_err(err_msg))
             .collect()
     }
 }
 
-#[derive(Default, Debug, Serialize, Deserialize)]
+#[derive(Default, Debug, Serialize, Deserialize, FromSqlRow)]
 pub struct MovieQueueRow {
     pub idx: i32,
     pub collection_idx: i32,

@@ -13,7 +13,7 @@ use crate::common::imdb_ratings::ImdbRatings;
 use crate::common::movie_collection::MovieCollection;
 use crate::common::movie_queue::MovieQueueDB;
 use crate::common::pgpool::PgPool;
-use crate::common::row_index_trait::RowIndexTrait;
+
 use crate::common::trakt_instance::TraktInstance;
 use crate::common::tv_show_source::TvShowSource;
 use crate::common::utils::option_string_wrapper;
@@ -111,8 +111,8 @@ impl WatchListShow {
     pub fn get_show_by_link(link: &str, pool: &PgPool) -> Result<Option<WatchListShow>, Error> {
         let query = "SELECT title, year FROM trakt_watchlist WHERE link = $1";
         if let Some(row) = pool.get()?.query(query, &[&link])?.get(0) {
-            let title: String = row.get_idx(0)?;
-            let year: i32 = row.get_idx(1)?;
+            let title: String = row.try_get(0)?;
+            let year: i32 = row.try_get(1)?;
             Ok(Some(WatchListShow {
                 link: link.to_string(),
                 title,
@@ -126,7 +126,7 @@ impl WatchListShow {
     pub fn get_index(&self, pool: &PgPool) -> Result<Option<i32>, Error> {
         let query = "SELECT id FROM trakt_watchlist WHERE link = $1";
         if let Some(row) = pool.get()?.query(query, &[&self.link])?.get(0) {
-            let id: i32 = row.get_idx(0)?;
+            let id: i32 = row.try_get(0)?;
             Ok(Some(id))
         } else {
             Ok(None)
@@ -159,9 +159,9 @@ pub fn get_watchlist_shows_db(pool: &PgPool) -> Result<HashMap<String, WatchList
         .query(query, &[])?
         .iter()
         .map(|row| {
-            let link: String = row.get_idx(0)?;
-            let title: String = row.get_idx(1)?;
-            let year: i32 = row.get_idx(2)?;
+            let link: String = row.try_get(0)?;
+            let title: String = row.try_get(1)?;
+            let year: i32 = row.try_get(2)?;
             Ok((link.to_string(), WatchListShow { link, title, year }))
         })
         .collect()
@@ -179,11 +179,11 @@ pub fn get_watchlist_shows_db_map(pool: &PgPool) -> Result<WatchListMap, Error> 
         .query(query, &[])?
         .iter()
         .map(|row| {
-            let show: String = row.get_idx(0)?;
-            let link: String = row.get_idx(1)?;
-            let title: String = row.get_idx(2)?;
-            let year: i32 = row.get_idx(3)?;
-            let source: Option<String> = row.get_idx(4)?;
+            let show: String = row.try_get(0)?;
+            let link: String = row.try_get(1)?;
+            let title: String = row.try_get(2)?;
+            let year: i32 = row.try_get(3)?;
+            let source: Option<String> = row.try_get(4)?;
 
             let source: Option<TvShowSource> = match source {
                 Some(s) => s.parse().ok(),
@@ -228,7 +228,7 @@ impl WatchedEpisode {
             .query(query, &[&self.imdb_url, &self.season, &self.episode])?
             .get(0)
         {
-            let id: i32 = row.get_idx(0)?;
+            let id: i32 = row.try_get(0)?;
             Ok(Some(id))
         } else {
             Ok(None)
@@ -252,10 +252,10 @@ impl WatchedEpisode {
             .query(query, &[&link, &season, &episode])?
             .get(0)
         {
-            let imdb_url: String = row.get_idx(0)?;
-            let title: String = row.get_idx(1)?;
-            let season: i32 = row.get_idx(2)?;
-            let episode: i32 = row.get_idx(3)?;
+            let imdb_url: String = row.try_get(0)?;
+            let title: String = row.try_get(1)?;
+            let season: i32 = row.try_get(2)?;
+            let episode: i32 = row.try_get(3)?;
             Ok(Some(WatchedEpisode {
                 title,
                 imdb_url,
@@ -324,10 +324,10 @@ pub fn get_watched_shows_db(
         .query(query.as_str(), &[])?
         .iter()
         .map(|row| {
-            let imdb_url: String = row.get_idx(0)?;
-            let title: String = row.get_idx(1)?;
-            let season: i32 = row.get_idx(2)?;
-            let episode: i32 = row.get_idx(3)?;
+            let imdb_url: String = row.try_get(0)?;
+            let title: String = row.try_get(1)?;
+            let season: i32 = row.try_get(2)?;
+            let episode: i32 = row.try_get(3)?;
             Ok(WatchedEpisode {
                 title,
                 imdb_url,
@@ -358,7 +358,7 @@ impl WatchedMovie {
             WHERE link=$1
         "#;
         if let Some(row) = pool.get()?.query(query, &[&self.imdb_url])?.get(0) {
-            let id: i32 = row.get_idx(0)?;
+            let id: i32 = row.try_get(0)?;
             Ok(Some(id))
         } else {
             Ok(None)
@@ -373,8 +373,8 @@ impl WatchedMovie {
             WHERE a.link = $1
         "#;
         if let Some(row) = pool.get()?.query(query, &[&link])?.get(0) {
-            let imdb_url: String = row.get_idx(0)?;
-            let title: String = row.get_idx(1)?;
+            let imdb_url: String = row.try_get(0)?;
+            let title: String = row.try_get(1)?;
             Ok(Some(WatchedMovie { title, imdb_url }))
         } else {
             Ok(None)
@@ -415,8 +415,8 @@ pub fn get_watched_movies_db(pool: &PgPool) -> Result<Vec<WatchedMovie>, Error> 
         .query(query, &[])?
         .iter()
         .map(|row| {
-            let imdb_url: String = row.get_idx(0)?;
-            let title: String = row.get_idx(1)?;
+            let imdb_url: String = row.try_get(0)?;
+            let title: String = row.try_get(1)?;
             Ok(WatchedMovie { title, imdb_url })
         })
         .collect()

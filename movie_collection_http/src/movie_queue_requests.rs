@@ -13,7 +13,6 @@ use movie_collection_lib::common::movie_collection::{
 use movie_collection_lib::common::movie_queue::{MovieQueueDB, MovieQueueResult, MovieQueueRow};
 use movie_collection_lib::common::parse_imdb::{ParseImdb, ParseImdbOptions};
 use movie_collection_lib::common::pgpool::PgPool;
-use movie_collection_lib::common::row_index_trait::RowIndexTrait;
 use movie_collection_lib::common::trakt_instance::TraktInstance;
 use movie_collection_lib::common::trakt_utils::{
     get_watched_shows_db, get_watchlist_shows_db_map, trakt_cal_http_worker,
@@ -442,7 +441,7 @@ impl HandleRequest<LastModifiedRequest> for PgPool {
                 let query = format!("SELECT max(last_modified) FROM {}", table);
                 let r = match self.get()?.query(query.as_str(), &[])?.get(0) {
                     Some(row) => {
-                        let last_modified: DateTime<Utc> = row.get_idx(0)?;
+                        let last_modified: DateTime<Utc> = row.try_get(0)?;
                         Some(LastModifiedResponse {
                             table: (*table).to_string(),
                             last_modified,

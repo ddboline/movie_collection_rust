@@ -1,12 +1,12 @@
 use chrono::{DateTime, NaiveDate, Utc};
 use failure::{err_msg, Error};
+use postgres_query::FromSqlRow;
 use serde::{Deserialize, Serialize};
 use std::fmt;
 
 use crate::common::pgpool::PgPool;
-use crate::common::row_index_trait::RowIndexTrait;
 
-#[derive(Clone, Serialize, Deserialize)]
+#[derive(Clone, Serialize, Deserialize, FromSqlRow)]
 pub struct ImdbEpisodes {
     pub show: String,
     pub title: String,
@@ -56,17 +56,18 @@ impl ImdbEpisodes {
     }
 
     pub fn get_index(&self, pool: &PgPool) -> Result<Option<i32>, Error> {
-        let query = r#"
+        let query = postgres_query::query!(
+            r#"
             SELECT id
             FROM imdb_episodes
-            WHERE show=$1 AND season=$2 AND episode=$3
-        "#;
-        if let Some(row) = pool
-            .get()?
-            .query(query, &[&self.show, &self.season, &self.episode])?
-            .get(0)
-        {
-            let id: i32 = row.get_idx(0)?;
+            WHERE show=$show AND season=$season AND episode=$episode
+        "#,
+            show = self.show,
+            season = self.season,
+            episode = self.episode
+        );
+        if let Some(row) = pool.get()?.query(query.sql, &query.parameters)?.get(0) {
+            let id: i32 = row.try_get(0)?;
             Ok(Some(id))
         } else {
             Ok(None)
@@ -81,26 +82,7 @@ impl ImdbEpisodes {
             JOIN imdb_ratings b ON a.show = b.show
             WHERE a.id = $1"#;
         if let Some(row) = pool.get()?.query(query, &[&idx])?.get(0) {
-            let show: String = row.get_idx(0)?;
-            let title: String = row.get_idx(1)?;
-            let season: i32 = row.get_idx(2)?;
-            let episode: i32 = row.get_idx(3)?;
-            let airdate: NaiveDate = row.get_idx(4)?;
-            let rating: f64 = row.get_idx(5)?;
-            let eptitle: String = row.get_idx(6)?;
-            let epurl: String = row.get_idx(7)?;
-
-            let epi = ImdbEpisodes {
-                show,
-                title,
-                season,
-                episode,
-                airdate,
-                rating,
-                eptitle,
-                epurl,
-            };
-
+            let epi = ImdbEpisodes::from_row(row)?;
             Ok(Some(epi))
         } else {
             Ok(None)
@@ -122,25 +104,8 @@ impl ImdbEpisodes {
             .query(query, &[&timestamp])?
             .iter()
             .map(|row| {
-                let show: String = row.get_idx(0)?;
-                let title: String = row.get_idx(1)?;
-                let season: i32 = row.get_idx(2)?;
-                let episode: i32 = row.get_idx(3)?;
-                let airdate: NaiveDate = row.get_idx(4)?;
-                let rating: f64 = row.get_idx(5)?;
-                let eptitle: String = row.get_idx(6)?;
-                let epurl: String = row.get_idx(7)?;
-
-                Ok(ImdbEpisodes {
-                    show,
-                    title,
-                    season,
-                    episode,
-                    airdate,
-                    rating,
-                    eptitle,
-                    epurl,
-                })
+                let epi = ImdbEpisodes::from_row(row)?;
+                Ok(epi)
             })
             .collect()
     }
@@ -149,49 +114,45 @@ impl ImdbEpisodes {
         if self.get_index(pool)?.is_some() {
             return self.update_episode(pool);
         }
-        let query = r#"
+        let query = postgres_query::query!(
+            r#"
             INSERT INTO imdb_episodes
             (show, season, episode, airdate, rating, eptitle, epurl, last_modified)
             VALUES
-            ($1, $2, $3, $4, RATING, $5, $6, now())
-        "#;
-        let query = query.replace("RATING", &self.rating.to_string());
+            ($show, $season, $episode, $airdate, $rating, $eptitle, $epurl, now())
+        "#,
+            show = self.show,
+            season = self.season,
+            episode = self.episode,
+            airdate = self.airdate,
+            rating = self.rating,
+            eptitle = self.eptitle,
+            epurl = self.epurl
+        );
         pool.get()?
-            .execute(
-                query.as_str(),
-                &[
-                    &self.show,
-                    &self.season,
-                    &self.episode,
-                    &self.airdate,
-                    &self.eptitle,
-                    &self.epurl,
-                ],
-            )
+            .execute(query.sql, &query.parameters)
             .map(|_| ())
             .map_err(err_msg)
     }
 
     pub fn update_episode(&self, pool: &PgPool) -> Result<(), Error> {
-        let query = r#"
-            UPDATE imdb_episodes
-            SET rating=RATING,eptitle=$1,epurl=$2,airdate=$3,last_modified=now()
-            WHERE show=$4 AND season=$5 AND episode=$6
-        "#;
-        let query = query.replace("RATING", &self.rating.to_string());
+        let query = postgres_query::query!(
+            r#"
+                UPDATE imdb_episodes
+                SET rating=$rating,eptitle=$eptitle,epurl=$epurl,airdate=$airdate,last_modified=now()
+                WHERE show=$show AND season=$season AND episode=$episode
+            "#,
+            rating = self.rating,
+            eptitle = self.eptitle,
+            epurl = self.epurl,
+            airdate = self.airdate,
+            show = self.show,
+            season = self.season,
+            episode = self.episode
+        );
 
         pool.get()?
-            .execute(
-                query.as_str(),
-                &[
-                    &self.eptitle,
-                    &self.epurl,
-                    &self.airdate,
-                    &self.show,
-                    &self.season,
-                    &self.episode,
-                ],
-            )
+            .execute(query.sql, &query.parameters)
             .map(|_| ())
             .map_err(err_msg)
     }

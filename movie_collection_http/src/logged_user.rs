@@ -13,7 +13,6 @@ use std::convert::From;
 use std::env;
 
 use movie_collection_lib::common::pgpool::PgPool;
-use movie_collection_lib::common::row_index_trait::RowIndexTrait;
 
 use super::errors::ServiceError;
 
@@ -59,7 +58,7 @@ impl LoggedUser {
             .query(query, &[&self.email])?
             .get(0)
             .map(|row| {
-                let count: i64 = row.get_idx(0)?;
+                let count: i64 = row.try_get(0)?;
                 Ok(count > 0)
             })
             .ok_or_else(|| err_msg("User not found"))
@@ -124,7 +123,7 @@ impl AuthorizedUsers {
             .query(query, &[])?
             .iter()
             .map(|row| {
-                let email: String = row.get_idx(0)?;
+                let email: String = row.try_get(0)?;
                 Ok(LoggedUser { email })
             })
             .collect();

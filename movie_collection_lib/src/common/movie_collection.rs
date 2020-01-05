@@ -1,5 +1,6 @@
 use chrono::{DateTime, Duration, Local, NaiveDate, Utc};
 use failure::{err_msg, Error};
+use postgres_query::FromSqlRow;
 use rayon::iter::{IntoParallelIterator, IntoParallelRefIterator, ParallelIterator};
 use serde::{Deserialize, Serialize};
 use std::collections::{HashMap, HashSet};
@@ -13,10 +14,11 @@ use crate::common::imdb_episodes::ImdbEpisodes;
 use crate::common::imdb_ratings::ImdbRatings;
 use crate::common::movie_queue::MovieQueueDB;
 use crate::common::pgpool::PgPool;
-use crate::common::row_index_trait::RowIndexTrait;
+
 use crate::common::tv_show_source::TvShowSource;
 use crate::common::utils::{option_string_wrapper, parse_file_stem, walk_directory};
 
+#[derive(FromSqlRow)]
 pub struct NewEpisodesResult {
     pub show: String,
     pub link: String,
@@ -58,6 +60,27 @@ pub struct TvShowsResult {
     pub source: Option<TvShowSource>,
 }
 
+#[derive(FromSqlRow)]
+pub struct TvShowsResultDB {
+    pub show: String,
+    pub link: String,
+    pub count: i64,
+    pub title: String,
+    pub source: Option<String>,
+}
+
+impl From<TvShowsResultDB> for TvShowsResult {
+    fn from(item: TvShowsResultDB) -> Self {
+        Self {
+            show: item.show,
+            link: item.link,
+            count: item.count,
+            title: item.title,
+            source: item.source.and_then(|s| s.parse().ok()),
+        }
+    }
+}
+
 impl fmt::Display for TvShowsResult {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         write!(
@@ -74,14 +97,14 @@ impl fmt::Display for TvShowsResult {
     }
 }
 
-#[derive(Default, Serialize, Deserialize)]
+#[derive(Default, Serialize, Deserialize, FromSqlRow)]
 pub struct MovieCollectionRow {
     pub idx: i32,
     pub path: String,
     pub show: String,
 }
 
-#[derive(Default)]
+#[derive(Default, FromSqlRow)]
 pub struct MovieCollectionResult {
     pub path: String,
     pub show: String,
@@ -121,7 +144,7 @@ impl fmt::Display for MovieCollectionResult {
     }
 }
 
-#[derive(Debug, Default)]
+#[derive(Debug, Default, FromSqlRow)]
 pub struct ImdbSeason {
     pub show: String,
     pub title: String,
@@ -230,11 +253,11 @@ impl MovieCollection {
                     .query(query.as_str(), &[])?
                     .iter()
                     .map(|row| {
-                        let index: i32 = row.get_idx(0)?;
-                        let show: String = row.get_idx(1)?;
-                        let title: String = row.get_idx(2)?;
-                        let link: String = row.get_idx(3)?;
-                        let rating: f64 = row.get_idx(4)?;
+                        let index: i32 = row.try_get(0)?;
+                        let show: String = row.try_get(1)?;
+                        let title: String = row.try_get(2)?;
+                        let link: String = row.try_get(3)?;
+                        let rating: f64 = row.try_get(4)?;
 
                         Ok(ImdbRatings {
                             index,
@@ -278,25 +301,9 @@ impl MovieCollection {
             .query(query.as_str(), &[])?
             .iter()
             .map(|row| {
-                let show: String = row.get_idx(0)?;
-                let title: String = row.get_idx(1)?;
-                let season: i32 = row.get_idx(2)?;
-                let episode: i32 = row.get_idx(3)?;
-                let airdate: NaiveDate = row.get_idx(4)?;
-                let rating: f64 = row.get_idx(5)?;
-                let eptitle: String = row.get_idx(6)?;
-                let epurl: String = row.get_idx(7)?;
+                let val = ImdbEpisodes::from_row(row)?;
 
-                Ok(ImdbEpisodes {
-                    show,
-                    title,
-                    season,
-                    episode,
-                    airdate,
-                    rating,
-                    eptitle,
-                    epurl,
-                })
+                Ok(val)
             })
             .collect()
     }
@@ -315,17 +322,9 @@ impl MovieCollection {
             .query(query.as_str(), &[])?
             .iter()
             .map(|row| {
-                let show: String = row.get_idx(0)?;
-                let title: String = row.get_idx(1)?;
-                let season: i32 = row.get_idx(2)?;
-                let nepisodes: i64 = row.get_idx(3)?;
+                let val = ImdbSeason::from_row(row)?;
 
-                Ok(ImdbSeason {
-                    show,
-                    title,
-                    season,
-                    nepisodes,
-                })
+                Ok(val)
             })
             .collect()
     }
@@ -358,11 +357,11 @@ impl MovieCollection {
             .query(query.as_str(), &[])?
             .iter()
             .map(|row| {
-                let path: String = row.get_idx(0)?;
-                let show: String = row.get_idx(1)?;
-                let rating: f64 = row.get_idx(2)?;
-                let title: String = row.get_idx(3)?;
-                let istv: Option<bool> = row.get_idx(4)?;
+                let path: String = row.try_get(0)?;
+                let show: String = row.try_get(1)?;
+                let rating: f64 = row.try_get(2)?;
+                let title: String = row.try_get(3)?;
+                let istv: Option<bool> = row.try_get(4)?;
 
                 Ok(MovieCollectionResult {
                     path,
@@ -398,9 +397,9 @@ impl MovieCollection {
                     {
                         result.season = Some(season);
                         result.episode = Some(episode);
-                        result.eprating = row.get_idx(0)?;
-                        result.eptitle = row.get_idx(1)?;
-                        result.epurl = row.get_idx(2)?;
+                        result.eprating = row.try_get(0)?;
+                        result.eptitle = row.try_get(1)?;
+                        result.epurl = row.try_get(2)?;
                     }
                 }
                 Ok(result)
@@ -430,11 +429,11 @@ impl MovieCollection {
             .get()?
             .query(query, &[&path])?
             .iter()
-            .map(|row| row.get_idx(0))
+            .map(|row| row.try_get(0))
             .nth(0)
         {
             Some(Ok(x)) => Ok(Some(x)),
-            Some(Err(e)) => Err(e),
+            Some(Err(e)) => Err(err_msg(e)),
             None => Ok(None),
         }
     }
@@ -461,11 +460,11 @@ impl MovieCollection {
             .get()?
             .query(query.as_str(), &[])?
             .iter()
-            .map(|row| row.get_idx(0))
+            .map(|row| row.try_get(0))
             .nth(0)
         {
             Some(Ok(x)) => Ok(Some(x)),
-            Some(Err(e)) => Err(e),
+            Some(Err(e)) => Err(err_msg(e)),
             None => Ok(None),
         }
     }
@@ -562,8 +561,8 @@ impl MovieCollection {
             .query(query, &[])?
             .iter()
             .map(|row| {
-                let path: String = row.get_idx(0)?;
-                let idx: i32 = row.get_idx(1)?;
+                let path: String = row.try_get(0)?;
+                let idx: i32 = row.try_get(1)?;
                 Ok((path, idx))
             })
             .collect();
@@ -576,8 +575,8 @@ impl MovieCollection {
             .query(query, &[])?
             .iter()
             .map(|row| {
-                let path: String = row.get_idx(0)?;
-                let show: String = row.get_idx(1)?;
+                let path: String = row.try_get(0)?;
+                let show: String = row.try_get(1)?;
                 Ok((path, show))
             })
             .collect();
@@ -590,9 +589,9 @@ impl MovieCollection {
             .query(query, &[])?
             .iter()
             .map(|row| {
-                let show: String = row.get_idx(0)?;
-                let season: i32 = row.get_idx(1)?;
-                let episode: i32 = row.get_idx(2)?;
+                let show: String = row.try_get(0)?;
+                let season: i32 = row.try_get(1)?;
+                let episode: i32 = row.try_get(2)?;
                 Ok((show, season, episode))
             })
             .collect();
@@ -674,12 +673,12 @@ impl MovieCollection {
             .query(query, &[])?
             .iter()
             .map(|row| {
-                let link: String = row.get_idx(0)?;
-                let show: String = row.get_idx(1)?;
-                let title: String = row.get_idx(2)?;
-                let rating: f64 = row.get_idx(3)?;
-                let istv: bool = row.get_idx(4)?;
-                let source: Option<String> = row.get_idx(5)?;
+                let link: String = row.try_get(0)?;
+                let show: String = row.try_get(1)?;
+                let title: String = row.try_get(2)?;
+                let rating: f64 = row.try_get(3)?;
+                let istv: bool = row.try_get(4)?;
+                let source: Option<String> = row.try_get(5)?;
 
                 let source: Option<TvShowSource> = match source {
                     Some(s) => s.parse().ok(),
@@ -717,24 +716,9 @@ impl MovieCollection {
             .query(query, &[])?
             .iter()
             .map(|row| {
-                let show: String = row.get_idx(0)?;
-                let link: String = row.get_idx(1)?;
-                let title: String = row.get_idx(2)?;
-                let source: Option<String> = row.get_idx(3)?;
-                let count: i64 = row.get_idx(4)?;
-
-                let source: Option<TvShowSource> = match source {
-                    Some(s) => s.parse().ok(),
-                    None => None,
-                };
-
-                Ok(TvShowsResult {
-                    show,
-                    link,
-                    title,
-                    count,
-                    source,
-                })
+                TvShowsResultDB::from_row(row)
+                    .map_err(err_msg)
+                    .map(Into::into)
             })
             .collect()
     }
@@ -789,30 +773,7 @@ impl MovieCollection {
             .get()?
             .query(query.as_str(), &[&mindate, &maxdate])?
             .iter()
-            .map(|row| {
-                let show: String = row.get_idx(0)?;
-                let link: String = row.get_idx(1)?;
-                let title: String = row.get_idx(2)?;
-                let season: i32 = row.get_idx(3)?;
-                let episode: i32 = row.get_idx(4)?;
-                let epurl: String = row.get_idx(5)?;
-                let airdate: NaiveDate = row.get_idx(6)?;
-                let rating: f64 = row.get_idx(7)?;
-                let eprating: f64 = row.get_idx(8)?;
-                let eptitle: String = row.get_idx(9)?;
-                Ok(NewEpisodesResult {
-                    show,
-                    link,
-                    title,
-                    season,
-                    episode,
-                    epurl,
-                    airdate,
-                    rating,
-                    eprating,
-                    eptitle,
-                })
-            })
+            .map(|row| NewEpisodesResult::from_row(row).map_err(err_msg))
             .collect()
     }
 
@@ -867,12 +828,7 @@ impl MovieCollection {
             .get()?
             .query(query, &[&timestamp])?
             .iter()
-            .map(|row| {
-                let idx: i32 = row.get_idx(0)?;
-                let path: String = row.get_idx(1)?;
-                let show: String = row.get_idx(2)?;
-                Ok(MovieCollectionRow { idx, path, show })
-            })
+            .map(|row| MovieCollectionRow::from_row(row).map_err(err_msg))
             .collect()
     }
 }
