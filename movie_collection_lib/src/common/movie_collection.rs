@@ -289,7 +289,7 @@ impl MovieCollection {
 
     pub fn print_imdb_all_seasons(&self, show: &str) -> Result<Vec<ImdbSeason>, Error> {
         let query = r#"
-            SELECT a.show, b.title, a.season, count(distinct a.episode)
+            SELECT a.show, b.title, a.season, count(distinct a.episode) as nepisodes
             FROM imdb_episodes a
             JOIN imdb_ratings b ON a.show=b.show"#;
         let query = format!("{} WHERE a.show = '{}'", query, show);
