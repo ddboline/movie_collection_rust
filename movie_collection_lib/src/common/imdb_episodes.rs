@@ -114,45 +114,49 @@ impl ImdbEpisodes {
         if self.get_index(pool)?.is_some() {
             return self.update_episode(pool);
         }
-        let query = postgres_query::query!(
-            r#"
+        let query = r#"
             INSERT INTO imdb_episodes
             (show, season, episode, airdate, rating, eptitle, epurl, last_modified)
             VALUES
-            ($show, $season, $episode, $airdate, $rating, $eptitle, $epurl, now())
-        "#,
-            show = self.show,
-            season = self.season,
-            episode = self.episode,
-            airdate = self.airdate,
-            rating = self.rating,
-            eptitle = self.eptitle,
-            epurl = self.epurl
-        );
+            ($1, $2, $3, $4, RATING, $5, $6, now())
+        "#;
+        let query = query.replace("RATING", &self.rating.to_string());
         pool.get()?
-            .execute(query.sql, &query.parameters)
+            .execute(
+                query.as_str(),
+                &[
+                    &self.show,
+                    &self.season,
+                    &self.episode,
+                    &self.airdate,
+                    &self.eptitle,
+                    &self.epurl,
+                ],
+            )
             .map(|_| ())
             .map_err(err_msg)
     }
 
     pub fn update_episode(&self, pool: &PgPool) -> Result<(), Error> {
-        let query = postgres_query::query!(
-            r#"
-                UPDATE imdb_episodes
-                SET rating=$rating,eptitle=$eptitle,epurl=$epurl,airdate=$airdate,last_modified=now()
-                WHERE show=$show AND season=$season AND episode=$episode
-            "#,
-            rating = self.rating,
-            eptitle = self.eptitle,
-            epurl = self.epurl,
-            airdate = self.airdate,
-            show = self.show,
-            season = self.season,
-            episode = self.episode
-        );
+        let query = r#"
+            UPDATE imdb_episodes
+            SET rating=RATING,eptitle=$1,epurl=$2,airdate=$3,last_modified=now()
+            WHERE show=$4 AND season=$5 AND episode=$6
+        "#;
+        let query = query.replace("RATING", &self.rating.to_string());
 
         pool.get()?
-            .execute(query.sql, &query.parameters)
+            .execute(
+                query.as_str(),
+                &[
+                    &self.eptitle,
+                    &self.epurl,
+                    &self.airdate,
+                    &self.show,
+                    &self.season,
+                    &self.episode,
+                ],
+            )
             .map(|_| ())
             .map_err(err_msg)
     }

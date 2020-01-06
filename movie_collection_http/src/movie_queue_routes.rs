@@ -61,8 +61,13 @@ fn movie_queue_body(patterns: &[String], entries: &[String]) -> String {
     entries
 }
 
-async fn queue_body_resp(patterns: Vec<String>, queue: Vec<MovieQueueResult>) -> Result<HttpResponse, Error> {
-    let entries = block(move || movie_queue_http(&queue)).await.map_err(err_msg)?;
+async fn queue_body_resp(
+    patterns: Vec<String>,
+    queue: Vec<MovieQueueResult>,
+) -> Result<HttpResponse, Error> {
+    let entries = block(move || movie_queue_http(&queue))
+        .await
+        .map_err(err_msg)?;
     let body = movie_queue_body(&patterns, &entries);
     let resp = HttpResponse::Ok()
         .content_type("text/html; charset=utf-8")
