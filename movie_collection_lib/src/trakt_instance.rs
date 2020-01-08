@@ -1,8 +1,8 @@
+use anyhow::{format_err, Error};
 use cpython::{FromPyObject, PyResult, PyTuple, Python, PythonObject, ToPyObject};
-use failure::{format_err, Error};
 use std::collections::HashMap;
 
-use crate::common::trakt_utils::{
+use crate::trakt_utils::{
     TraktCalEntryList, TraktResult, WatchListShow, WatchedEpisode, WatchedMovie,
 };
 

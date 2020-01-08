@@ -1,13 +1,13 @@
+use anyhow::Error;
 use chrono::{DateTime, Utc};
-use failure::{err_msg, Error};
 use log::debug;
 use postgres_query::FromSqlRow;
 use serde::{Deserialize, Serialize};
 use std::fmt;
 
-use crate::common::pgpool::PgPool;
-use crate::common::tv_show_source::TvShowSource;
-use crate::common::utils::option_string_wrapper;
+use crate::pgpool::PgPool;
+use crate::tv_show_source::TvShowSource;
+use crate::utils::option_string_wrapper;
 
 #[derive(Default, Clone, Debug, Serialize, Deserialize, FromSqlRow)]
 pub struct ImdbRatings {
@@ -58,7 +58,7 @@ impl ImdbRatings {
         pool.get()?
             .execute(query.sql, &query.parameters)
             .map(|_| ())
-            .map_err(err_msg)
+            .map_err(Into::into)
     }
 
     pub fn update_show(&self, pool: &PgPool) -> Result<(), Error> {
@@ -70,7 +70,7 @@ impl ImdbRatings {
         pool.get()?
             .execute(query, &[&self.rating, &self.title, &self.show])
             .map(|_| ())
-            .map_err(err_msg)
+            .map_err(Into::into)
     }
 
     pub fn get_show_by_link(link: &str, pool: &PgPool) -> Result<Option<Self>, Error> {

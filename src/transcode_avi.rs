@@ -1,11 +1,11 @@
+use anyhow::{format_err, Error};
 use clap::{App, Arg};
-use failure::{err_msg, Error};
 use log::error;
 use std::io::{stdout, Write};
 use std::path::{Path, PathBuf};
 
-use movie_collection_lib::common::config::Config;
-use movie_collection_lib::common::utils::{
+use movie_collection_lib::config::Config;
+use movie_collection_lib::utils::{
     create_transcode_script, get_version_number, publish_transcode_job_to_queue,
 };
 
@@ -28,7 +28,7 @@ fn transcode_avi() -> Result<(), Error> {
 
     matches
         .values_of("files")
-        .ok_or_else(|| err_msg("No files given"))?
+        .ok_or_else(|| format_err!("No files given"))?
         .map(|f| {
             let path = PathBuf::from(f);
 

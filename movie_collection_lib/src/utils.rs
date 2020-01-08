@@ -1,6 +1,6 @@
 use amqp::protocol::basic::BasicProperties;
 use amqp::{Basic, Channel, Options, Session, Table};
-use failure::{err_msg, format_err, Error};
+use anyhow::{format_err, Error};
 use log::error;
 use reqwest::blocking::{Client, Response};
 use reqwest::Url;
@@ -16,7 +16,7 @@ use std::path::Path;
 use std::string::ToString;
 use subprocess::{Exec, Redirection};
 
-use crate::common::config::Config;
+use crate::config::Config;
 
 #[inline]
 pub fn option_string_wrapper(s: &Option<String>) -> &str {
@@ -110,7 +110,7 @@ pub fn publish_transcode_job_to_queue(
             .into_bytes(),
         )
         .map(|_| ())
-        .map_err(err_msg)
+        .map_err(Into::into)
 }
 
 pub fn read_transcode_jobs_from_queue(queue: &str) -> Result<(), Error> {
@@ -164,14 +164,14 @@ pub fn create_transcode_script(config: &Config, path: &Path) -> Result<String, E
     let full_path = path.to_string_lossy().to_string();
     let fstem = path
         .file_stem()
-        .ok_or_else(|| err_msg("No stem"))?
+        .ok_or_else(|| format_err!("No stem"))?
         .to_string_lossy();
     let script_file = format!("{}/dvdrip/jobs/{}.sh", config.home_dir, fstem);
     if Path::new(&script_file).exists() {
-        Err(err_msg("File exists"))
+        Err(format_err!("File exists"))
     } else {
         let output_file = format!("{}/dvdrip/avi/{}.mp4", config.home_dir, fstem);
-        let template_file = include_str!("../../../templates/transcode_script.sh")
+        let template_file = include_str!("../../templates/transcode_script.sh")
             .replace("INPUT_FILE", &full_path)
             .replace("OUTPUT_FILE", &output_file)
             .replace("PREFIX", &fstem);
@@ -222,7 +222,7 @@ pub fn create_move_script(
     };
     let mp4_script = format!("{}/dvdrip/jobs/{}_copy.sh", config.home_dir, prefix);
 
-    let script_str = include_str!("../../../templates/move_script.sh")
+    let script_str = include_str!("../../templates/move_script.sh")
         .replace("SHOW", &prefix)
         .replace("OUTNAME", &format!("{}/{}", output_dir, prefix))
         .replace("FNAME", &file)
@@ -314,7 +314,7 @@ pub fn remcom_single_file(
     let path = Path::new(&file);
     let ext = path
         .extension()
-        .ok_or_else(|| err_msg("no extension"))?
+        .ok_or_else(|| format_err!("no extension"))?
         .to_string_lossy();
 
     let stdout = stdout();

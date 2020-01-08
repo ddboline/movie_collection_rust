@@ -17,8 +17,8 @@ use super::movie_queue_routes::{
     trakt_cal, trakt_watched_action, trakt_watched_list, trakt_watched_seasons, trakt_watchlist,
     trakt_watchlist_action, tvshows,
 };
-use movie_collection_lib::common::config::Config;
-use movie_collection_lib::common::pgpool::PgPool;
+use movie_collection_lib::config::Config;
+use movie_collection_lib::pgpool::PgPool;
 
 pub struct AppState {
     pub db: PgPool,

@@ -1,10 +1,10 @@
+use anyhow::Error;
 use chrono::{DateTime, NaiveDate, Utc};
-use failure::{err_msg, Error};
 use postgres_query::FromSqlRow;
 use serde::{Deserialize, Serialize};
 use std::fmt;
 
-use crate::common::pgpool::PgPool;
+use crate::pgpool::PgPool;
 
 #[derive(Clone, Serialize, Deserialize, FromSqlRow)]
 pub struct ImdbEpisodes {
@@ -134,7 +134,7 @@ impl ImdbEpisodes {
                 ],
             )
             .map(|_| ())
-            .map_err(err_msg)
+            .map_err(Into::into)
     }
 
     pub fn update_episode(&self, pool: &PgPool) -> Result<(), Error> {
@@ -158,7 +158,7 @@ impl ImdbEpisodes {
                 ],
             )
             .map(|_| ())
-            .map_err(err_msg)
+            .map_err(Into::into)
     }
 
     pub fn get_string_vec(&self) -> Vec<String> {

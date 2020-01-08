@@ -1,5 +1,5 @@
+use anyhow::{format_err, Error};
 use chrono::NaiveDate;
-use failure::{err_msg, Error};
 use rayon::iter::{IntoParallelIterator, ParallelIterator};
 use reqwest::blocking::Client;
 use reqwest::Url;
@@ -7,7 +7,7 @@ use select::document::Document;
 use select::predicate::{Class, Name};
 use std::fmt;
 
-use crate::common::utils::{option_string_wrapper, ExponentialRetry};
+use crate::utils::{option_string_wrapper, ExponentialRetry};
 
 #[derive(Default)]
 pub struct ImdbTuple {
@@ -171,7 +171,7 @@ impl ImdbConnection {
             .flat_map(|(episodes_url, season_str)| {
                 let season_: i32 = match season_str.parse() {
                     Ok(s) => s,
-                    Err(e) => return vec![Err(err_msg(e))],
+                    Err(e) => return vec![Err(format_err!(e))],
                 };
                 if let Some(s) = season {
                     if s != season_ {
@@ -181,7 +181,7 @@ impl ImdbConnection {
                 let results: Vec<Result<_, Error>> =
                     match self.parse_episodes_url(&episodes_url, season_) {
                         Ok(v) => v.into_iter().map(Ok).collect(),
-                        Err(e) => vec![Err(err_msg(e))],
+                        Err(e) => vec![Err(format_err!(e))],
                     };
                 results
             })

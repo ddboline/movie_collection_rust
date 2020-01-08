@@ -1,11 +1,11 @@
+use anyhow::Error;
 use clap::{App, Arg};
-use failure::Error;
 use rayon::iter::{IntoParallelIterator, ParallelIterator};
 use std::io;
 use std::io::Write;
 
-use movie_collection_lib::common::movie_collection::MovieCollection;
-use movie_collection_lib::common::utils::{get_version_number, get_video_runtime};
+use movie_collection_lib::movie_collection::MovieCollection;
+use movie_collection_lib::utils::{get_version_number, get_video_runtime};
 
 fn make_collection() -> Result<(), Error> {
     let matches = App::new("Collection Query/Parser")

@@ -1,12 +1,12 @@
-use failure::{err_msg, Error};
+use anyhow::{format_err, Error};
 use rayon::iter::{IntoParallelIterator, IntoParallelRefIterator, ParallelIterator};
 use std::io;
 use std::io::Write;
 use std::path;
 
-use crate::common::movie_collection::MovieCollection;
-use crate::common::movie_queue::{MovieQueueDB, MovieQueueResult};
-use crate::common::utils::{get_video_runtime, parse_file_stem};
+use crate::movie_collection::MovieCollection;
+use crate::movie_queue::{MovieQueueDB, MovieQueueResult};
+use crate::utils::{get_video_runtime, parse_file_stem};
 
 pub fn make_queue_worker(
     add_files: Option<Vec<String>>,
@@ -86,15 +86,15 @@ pub fn movie_queue_http(queue: &[MovieQueueResult]) -> Result<Vec<String>, Error
         .map(|row| {
             let path = path::Path::new(&row.path);
             let ext = path.extension()
-                .ok_or_else(|| err_msg("Cannot determine extension"))?
+                .ok_or_else(|| format_err!("Cannot determine extension"))?
                 .to_string_lossy();
             let file_name = path
                 .file_name()
-                .ok_or_else(|| err_msg("Invalid path"))?
+                .ok_or_else(|| format_err!("Invalid path"))?
                 .to_string_lossy().to_string();
             let file_stem = path
                 .file_stem()
-                .ok_or_else(|| err_msg("Invalid path"))?
+                .ok_or_else(|| format_err!("Invalid path"))?
                 .to_string_lossy();
             let (_, season, episode) = parse_file_stem(&file_stem);
 

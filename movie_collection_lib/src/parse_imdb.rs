@@ -1,13 +1,13 @@
+use anyhow::Error;
 use chrono::NaiveDate;
-use failure::Error;
 use std::collections::HashMap;
 
-use crate::common::imdb_episodes::ImdbEpisodes;
-use crate::common::imdb_ratings::ImdbRatings;
-use crate::common::imdb_utils::ImdbConnection;
-use crate::common::movie_collection::MovieCollection;
-use crate::common::pgpool::PgPool;
-use crate::common::trakt_utils::WatchListMap;
+use crate::imdb_episodes::ImdbEpisodes;
+use crate::imdb_ratings::ImdbRatings;
+use crate::imdb_utils::ImdbConnection;
+use crate::movie_collection::MovieCollection;
+use crate::pgpool::PgPool;
+use crate::trakt_utils::WatchListMap;
 
 #[derive(Default, Debug)]
 pub struct ParseImdbOptions {

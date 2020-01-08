@@ -1,7 +1,7 @@
 use crossbeam_utils::thread;
 
-use movie_collection_lib::common::config::Config;
-use movie_collection_lib::common::utils::read_transcode_jobs_from_queue;
+use movie_collection_lib::config::Config;
+use movie_collection_lib::utils::read_transcode_jobs_from_queue;
 
 fn main() {
     env_logger::init();

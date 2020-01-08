@@ -1,4 +1,4 @@
-use failure::{err_msg, Error};
+use anyhow::{format_err, Error};
 use std::env::var;
 use std::ops::Deref;
 use std::path::Path;
@@ -42,7 +42,7 @@ impl Config {
     pub fn with_config() -> Result<Self, Error> {
         let mut config = ConfigInner::new();
 
-        config.home_dir = var("HOME").map_err(|_| err_msg("No HOME directory..."))?;
+        config.home_dir = var("HOME").map_err(|_| format_err!("No HOME directory..."))?;
 
         let env_file = format!(
             "{}/.config/movie_collection_rust/config.env",
@@ -59,7 +59,7 @@ impl Config {
             dotenv::from_filename("config.env").ok();
         }
 
-        config.pgurl = var("PGURL").map_err(|_| err_msg("No PGURL specified"))?;
+        config.pgurl = var("PGURL").map_err(|_| format_err!("No PGURL specified"))?;
 
         config.movie_dirs = var("MOVIEDIRS")
             .unwrap_or_else(|_| "".to_string())

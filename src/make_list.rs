@@ -1,4 +1,4 @@
-use movie_collection_lib::common::make_list::make_list;
+use movie_collection_lib::make_list::make_list;
 
 fn main() {
     env_logger::init();

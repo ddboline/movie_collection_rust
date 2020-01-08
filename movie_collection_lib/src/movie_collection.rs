@@ -1,5 +1,5 @@
+use anyhow::{format_err, Error};
 use chrono::{DateTime, Duration, Local, NaiveDate, Utc};
-use failure::{err_msg, Error};
 use postgres_query::FromSqlRow;
 use rayon::iter::{IntoParallelIterator, IntoParallelRefIterator, ParallelIterator};
 use serde::{Deserialize, Serialize};
@@ -10,14 +10,14 @@ use std::io;
 use std::io::Write;
 use std::path::Path;
 
-use crate::common::config::Config;
-use crate::common::imdb_episodes::ImdbEpisodes;
-use crate::common::imdb_ratings::ImdbRatings;
-use crate::common::movie_queue::MovieQueueDB;
-use crate::common::pgpool::PgPool;
+use crate::config::Config;
+use crate::imdb_episodes::ImdbEpisodes;
+use crate::imdb_ratings::ImdbRatings;
+use crate::movie_queue::MovieQueueDB;
+use crate::pgpool::PgPool;
 
-use crate::common::tv_show_source::TvShowSource;
-use crate::common::utils::{option_string_wrapper, parse_file_stem, walk_directory};
+use crate::tv_show_source::TvShowSource;
+use crate::utils::{option_string_wrapper, parse_file_stem, walk_directory};
 
 #[derive(FromSqlRow)]
 pub struct NewEpisodesResult {
@@ -397,23 +397,19 @@ impl MovieCollection {
             .get()?
             .execute(query, &[&path.to_string()])
             .map(|_| ())
-            .map_err(err_msg)
+            .map_err(Into::into)
     }
 
     pub fn get_collection_index(&self, path: &str) -> Result<Option<i32>, Error> {
         let query = r#"SELECT idx FROM movie_collection WHERE path = $1"#;
-        match self
-            .get_pool()
+        self.get_pool()
             .get()?
             .query(query, &[&path])?
             .iter()
             .map(|row| row.try_get(0))
             .nth(0)
-        {
-            Some(Ok(x)) => Ok(Some(x)),
-            Some(Err(e)) => Err(err_msg(e)),
-            None => Ok(None),
-        }
+            .transpose()
+            .map_err(Into::into)
     }
 
     pub fn get_collection_path(&self, idx: i32) -> Result<String, Error> {
@@ -423,7 +419,7 @@ impl MovieCollection {
             .get()?
             .query(query, &[&idx])?
             .get(0)
-            .ok_or_else(|| err_msg("Index not found"))?
+            .ok_or_else(|| format_err!("Index not found"))?
             .get(0);
         Ok(path)
     }
@@ -433,23 +429,19 @@ impl MovieCollection {
             r#"SELECT idx FROM movie_collection WHERE path like '%{}%'"#,
             path
         );
-        match self
-            .get_pool()
+        self.get_pool()
             .get()?
             .query(query.as_str(), &[])?
             .iter()
             .map(|row| row.try_get(0))
             .nth(0)
-        {
-            Some(Ok(x)) => Ok(Some(x)),
-            Some(Err(e)) => Err(err_msg(e)),
-            None => Ok(None),
-        }
+            .transpose()
+            .map_err(Into::into)
     }
 
     pub fn insert_into_collection(&self, path: &str) -> Result<(), Error> {
         if !Path::new(&path).exists() {
-            return Err(err_msg("No such file"));
+            return Err(format_err!("No such file"));
         }
         let file_stem = Path::new(&path).file_stem().unwrap().to_string_lossy();
         let (show, _, _) = parse_file_stem(&file_stem);
@@ -461,7 +453,7 @@ impl MovieCollection {
             .get()?
             .execute(query, &[&path.to_string(), &show])
             .map(|_| ())
-            .map_err(err_msg)
+            .map_err(Into::into)
     }
 
     pub fn insert_into_collection_by_idx(&self, idx: i32, path: &str) -> Result<(), Error> {
@@ -475,7 +467,7 @@ impl MovieCollection {
             .get()?
             .execute(query, &[&idx, &path.to_string(), &show])
             .map(|_| ())
-            .map_err(err_msg)
+            .map_err(Into::into)
     }
 
     pub fn fix_collection_show_id(&self) -> Result<u64, Error> {
@@ -517,7 +509,7 @@ impl MovieCollection {
                     let file_stem = Path::new(f)
                         .file_stem()
                         .map(OsStr::to_string_lossy)
-                        .ok_or_else(|| err_msg("file_stem failed"))?;
+                        .ok_or_else(|| format_err!("file_stem failed"))?;
                     let (show, season, episode) = parse_file_stem(&file_stem);
                     if season == -1 || episode == -1 {
                         Ok(None)
@@ -586,7 +578,7 @@ impl MovieCollection {
                     let ext = Path::new(&f)
                         .extension()
                         .map(OsStr::to_string_lossy)
-                        .ok_or_else(|| err_msg("extension fail"))?
+                        .ok_or_else(|| format_err!("extension fail"))?
                         .to_string();
                     if self.get_config().suffixes.contains(&ext) {
                         writeln!(stdout.lock(), "not in collection {}", f)?;
@@ -695,7 +687,7 @@ impl MovieCollection {
             .get()?
             .query(query, &[])?
             .iter()
-            .map(|row| TvShowsResult::from_row(row).map_err(err_msg))
+            .map(|row| TvShowsResult::from_row(row).map_err(Into::into))
             .collect()
     }
 
@@ -749,7 +741,7 @@ impl MovieCollection {
             .get()?
             .query(query.as_str(), &[&mindate, &maxdate])?
             .iter()
-            .map(|row| NewEpisodesResult::from_row(row).map_err(err_msg))
+            .map(|row| NewEpisodesResult::from_row(row).map_err(Into::into))
             .collect()
     }
 
@@ -804,7 +796,7 @@ impl MovieCollection {
             .get()?
             .query(query, &[&timestamp])?
             .iter()
-            .map(|row| MovieCollectionRow::from_row(row).map_err(err_msg))
+            .map(|row| MovieCollectionRow::from_row(row).map_err(Into::into))
             .collect()
     }
 }

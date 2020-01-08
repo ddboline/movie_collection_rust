@@ -9,13 +9,14 @@ movie_collection_lib = {path = "movie_collection_lib"}
 movie_collection_http = {path = "movie_collection_http"}
 rayon = "1.3"
 clap = "2.33"
-failure = "0.1"
 log = "0.4"
 env_logger = "0.7"
 subprocess = "0.1"
 actix = "0.9"
 actix-rt = "1.0"
 crossbeam-utils = "0.7"
+anyhow = "1.0"
+thiserror = "1.0"
 
 [workspace]
 members = [

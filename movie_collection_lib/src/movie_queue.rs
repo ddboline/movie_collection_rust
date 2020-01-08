@@ -1,5 +1,5 @@
+use anyhow::{format_err, Error};
 use chrono::{DateTime, Utc};
-use failure::{err_msg, Error};
 use log::debug;
 use postgres_query::FromSqlRow;
 use rayon::iter::{IntoParallelIterator, ParallelIterator};
@@ -7,11 +7,11 @@ use serde::{Deserialize, Serialize};
 use std::fmt;
 use std::path::Path;
 
-use crate::common::config::Config;
-use crate::common::movie_collection::MovieCollection;
-use crate::common::pgpool::PgPool;
+use crate::config::Config;
+use crate::movie_collection::MovieCollection;
+use crate::pgpool::PgPool;
 
-use crate::common::utils::{option_string_wrapper, parse_file_stem};
+use crate::utils::{option_string_wrapper, parse_file_stem};
 
 #[derive(Default, Serialize)]
 pub struct MovieQueueResult {
@@ -87,7 +87,7 @@ impl MovieQueueDB {
         "#;
         tran.execute(query, &[&diff, &idx])?;
 
-        tran.commit().map_err(err_msg)
+        tran.commit().map_err(Into::into)
     }
 
     pub fn remove_from_queue_by_collection_idx(&self, collection_idx: i32) -> Result<(), Error> {
@@ -114,7 +114,7 @@ impl MovieQueueDB {
 
     pub fn insert_into_queue(&self, idx: i32, path: &str) -> Result<(), Error> {
         if !Path::new(&path).exists() {
-            return Err(err_msg("File doesn't exist"));
+            return Err(format_err!("File doesn't exist"));
         }
         let mc = MovieCollection::with_pool(&self.pool)?;
         let collection_idx = match mc.get_collection_index(&path)? {
@@ -122,7 +122,7 @@ impl MovieQueueDB {
             None => {
                 mc.insert_into_collection(&path)?;
                 mc.get_collection_index(&path)?
-                    .ok_or_else(|| err_msg("Path not found"))?
+                    .ok_or_else(|| format_err!("Path not found"))?
             }
         };
 
@@ -175,7 +175,7 @@ impl MovieQueueDB {
         "#;
         tran.execute(query, &[&diff, &idx])?;
 
-        tran.commit().map_err(err_msg)
+        tran.commit().map_err(Into::into)
     }
 
     pub fn get_max_queue_index(&self) -> Result<i32, Error> {
@@ -268,7 +268,7 @@ impl MovieQueueDB {
             .get()?
             .query(query, &[&timestamp])?
             .iter()
-            .map(|row| MovieQueueRow::from_row(row).map_err(err_msg))
+            .map(|row| MovieQueueRow::from_row(row).map_err(Into::into))
             .collect()
     }
 }

@@ -1,5 +1,5 @@
+use anyhow::{format_err, Error};
 use bytes::BytesMut;
-use failure::{err_msg, Error};
 use postgres::types::{FromSql, IsNull, ToSql, Type};
 use serde::{Deserialize, Serialize};
 use std::cmp::Ordering;
@@ -42,7 +42,7 @@ impl FromStr for TvShowSource {
             "hulu" => Ok(Self::Hulu),
             "amazon" => Ok(Self::Amazon),
             "all" => Ok(Self::All),
-            _ => Err(err_msg("Is not TvShowSource")),
+            _ => Err(format_err!("Is not TvShowSource")),
         }
     }
 }

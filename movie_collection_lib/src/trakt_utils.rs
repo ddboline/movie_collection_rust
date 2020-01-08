@@ -1,5 +1,5 @@
+use anyhow::{format_err, Error};
 use chrono::NaiveDate;
-use failure::{err_msg, Error};
 use log::debug;
 use postgres_query::FromSqlRow;
 use rayon::iter::{IntoParallelRefIterator, ParallelIterator};
@@ -9,15 +9,15 @@ use std::fmt;
 use std::io;
 use std::io::Write;
 
-use crate::common::imdb_episodes::ImdbEpisodes;
-use crate::common::imdb_ratings::ImdbRatings;
-use crate::common::movie_collection::MovieCollection;
-use crate::common::movie_queue::MovieQueueDB;
-use crate::common::pgpool::PgPool;
+use crate::imdb_episodes::ImdbEpisodes;
+use crate::imdb_ratings::ImdbRatings;
+use crate::movie_collection::MovieCollection;
+use crate::movie_queue::MovieQueueDB;
+use crate::pgpool::PgPool;
 
-use crate::common::trakt_instance;
-use crate::common::tv_show_source::TvShowSource;
-use crate::common::utils::option_string_wrapper;
+use crate::trakt_instance;
+use crate::tv_show_source::TvShowSource;
+use crate::utils::option_string_wrapper;
 
 #[derive(Clone, Copy)]
 pub enum TraktActions {
@@ -138,7 +138,7 @@ impl WatchListShow {
         pool.get()?
             .execute(query, &[&self.link, &self.title, &self.year])
             .map(|_| ())
-            .map_err(err_msg)
+            .map_err(Into::into)
     }
 
     pub fn delete_show(&self, pool: &PgPool) -> Result<(), Error> {
@@ -146,7 +146,7 @@ impl WatchListShow {
         pool.get()?
             .execute(query, &[&self.link])
             .map(|_| ())
-            .map_err(err_msg)
+            .map_err(Into::into)
     }
 }
 
@@ -276,7 +276,7 @@ impl WatchedEpisode {
         pool.get()?
             .execute(query.sql, &query.parameters)
             .map(|_| ())
-            .map_err(err_msg)
+            .map_err(Into::into)
     }
 
     pub fn delete_episode(&self, pool: &PgPool) -> Result<(), Error> {
@@ -292,7 +292,7 @@ impl WatchedEpisode {
         pool.get()?
             .execute(query.sql, &query.parameters)
             .map(|_| ())
-            .map_err(err_msg)
+            .map_err(Into::into)
     }
 }
 
@@ -395,7 +395,7 @@ impl WatchedMovie {
         pool.get()?
             .execute(query, &[&self.imdb_url])
             .map(|_| ())
-            .map_err(err_msg)
+            .map_err(Into::into)
     }
 
     pub fn delete_movie(&self, pool: &PgPool) -> Result<(), Error> {
@@ -406,7 +406,7 @@ impl WatchedMovie {
         pool.get()?
             .execute(query, &[&self.imdb_url])
             .map(|_| ())
-            .map_err(err_msg)
+            .map_err(Into::into)
     }
 }
 
@@ -718,7 +718,7 @@ pub fn watch_list_http_worker(pool: &PgPool, imdb_url: &str, season: i32) -> Res
     let mq = MovieQueueDB::with_pool(&pool);
 
     let show = ImdbRatings::get_show_by_link(imdb_url, &pool)?
-        .ok_or_else(|| err_msg("Show Doesn't exist"))?;
+        .ok_or_else(|| format_err!("Show Doesn't exist"))?;
 
     let watched_episodes_db: HashSet<i32> = get_watched_shows_db(&pool, &show.show, Some(season))?
         .into_iter()
