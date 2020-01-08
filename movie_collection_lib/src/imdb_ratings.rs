@@ -80,7 +80,7 @@ impl ImdbRatings {
             WHERE (link = $1 OR show = $1)
         "#;
         if let Some(row) = pool.get()?.query(query, &[&link])?.get(0) {
-            Ok(Some(ImdbRatings::from_row(row)?))
+            Ok(Some(Self::from_row(row)?))
         } else {
             Ok(None)
         }
@@ -98,7 +98,7 @@ impl ImdbRatings {
         pool.get()?
             .query(query, &[&timestamp])?
             .iter()
-            .map(|row| Ok(ImdbRatings::from_row(row)?))
+            .map(|row| Ok(Self::from_row(row)?))
             .collect()
     }
 
