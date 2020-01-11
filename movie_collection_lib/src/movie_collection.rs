@@ -215,28 +215,31 @@ impl MovieCollection {
         let shows: Result<Vec<_>, Error> = shows
             .par_iter()
             .map(|show| {
-                let query = r#"
-                    SELECT index, show, title, link, rating
-                    FROM imdb_ratings
-                    WHERE link is not null AND rating is not null"#;
-                let query = format!("{} AND show = '{}'", query, show);
-                let query = if istv {
-                    format!("{} AND istv", query)
-                } else {
-                    query
-                };
+                let query = postgres_query::query_dyn!(
+                    &format!(
+                        r#"
+                            SELECT index, show, title, link, rating
+                            FROM imdb_ratings
+                            WHERE link is not null AND
+                                  rating is not null AND
+                                  show = $show {}
+                        "#,
+                        if istv { "AND istv" } else { "" },
+                    ),
+                    show = show
+                )?;
 
                 let results: Result<Vec<_>, Error> = self
                     .get_pool()
                     .get()?
-                    .query(query.as_str(), &[])?
+                    .query(query.sql(), query.parameters())?
                     .iter()
                     .map(|row| {
-                        let index: i32 = row.try_get(0)?;
-                        let show: String = row.try_get(1)?;
-                        let title: String = row.try_get(2)?;
-                        let link: String = row.try_get(3)?;
-                        let rating: f64 = row.try_get(4)?;
+                        let index: i32 = row.try_get("index")?;
+                        let show: String = row.try_get("show")?;
+                        let title: String = row.try_get("title")?;
+                        let link: String = row.try_get("link")?;
+                        let rating: f64 = row.try_get("rating")?;
 
                         Ok(ImdbRatings {
                             index,
@@ -260,24 +263,30 @@ impl MovieCollection {
         show: &str,
         season: Option<i32>,
     ) -> Result<Vec<ImdbEpisodes>, Error> {
-        let query = r#"
-            SELECT a.show, b.title, a.season, a.episode,
-                   a.airdate,
-                   cast(a.rating as double precision),
-                   a.eptitle, a.epurl
-            FROM imdb_episodes a
-            JOIN imdb_ratings b ON a.show=b.show"#;
-        let query = format!("{} WHERE a.show = '{}'", query, show);
-        let query = if let Some(season) = season {
-            format!("{} AND a.season = {}", query, season)
-        } else {
-            query
-        };
-        let query = format!("{} ORDER BY a.season, a.episode", query);
+        let query = postgres_query::query_dyn!(
+            &format!(
+                r#"
+                    SELECT a.show, b.title, a.season, a.episode,
+                        a.airdate,
+                        cast(a.rating as double precision),
+                        a.eptitle, a.epurl
+                    FROM imdb_episodes a
+                    JOIN imdb_ratings b ON a.show=b.show
+                    WHERE a.show = $show {}
+                    ORDER BY a.season, a.episode
+                "#,
+                if let Some(season) = season {
+                    format!("AND a.season = {}", season)
+                } else {
+                    "".to_string()
+                }
+            ),
+            show = show,
+        )?;
 
         self.get_pool()
             .get()?
-            .query(query.as_str(), &[])?
+            .query(query.sql(), query.parameters())?
             .iter()
             .map(|row| {
                 let val = ImdbEpisodes::from_row(row)?;
@@ -288,17 +297,21 @@ impl MovieCollection {
     }
 
     pub fn print_imdb_all_seasons(&self, show: &str) -> Result<Vec<ImdbSeason>, Error> {
-        let query = r#"
-            SELECT a.show, b.title, a.season, count(distinct a.episode) as nepisodes
-            FROM imdb_episodes a
-            JOIN imdb_ratings b ON a.show=b.show"#;
-        let query = format!("{} WHERE a.show = '{}'", query, show);
-        let query = format!("{} GROUP BY a.show, b.title, a.season", query);
-        let query = format!("{} ORDER BY a.season", query);
+        let query = postgres_query::query!(
+            r#"
+                SELECT a.show, b.title, a.season, count(distinct a.episode) as nepisodes
+                FROM imdb_episodes a
+                JOIN imdb_ratings b ON a.show=b.show"
+                WHERE a.show = $show
+                GROUP BY a.show, b.title, a.season
+                ORDER BY a.season
+            "#,
+            show = show
+        );
 
         self.get_pool()
             .get()?
-            .query(query.as_str(), &[])?
+            .query(query.sql(), query.parameters())?
             .iter()
             .map(|row| {
                 let val = ImdbSeason::from_row(row)?;
@@ -312,28 +325,31 @@ impl MovieCollection {
         &self,
         search_strs: &[String],
     ) -> Result<Vec<MovieCollectionResult>, Error> {
-        let query = r#"
-            SELECT a.path, a.show,
-            COALESCE(b.rating, -1),
-            COALESCE(b.title, ''),
-            COALESCE(b.istv, FALSE)
-            FROM movie_collection a
-            LEFT JOIN imdb_ratings b ON a.show_id = b.index
-        "#;
-        let query = if search_strs.is_empty() {
-            query.to_string()
-        } else {
-            let search_strs: Vec<_> = search_strs
-                .iter()
-                .map(|s| format!("a.path like '%{}%'", s))
-                .collect();
-            format!("{} WHERE {}", query, search_strs.join(" OR "))
-        };
+        let query = postgres_query::query_dyn!(&format!(
+            r#"
+                SELECT a.path, a.show,
+                COALESCE(b.rating, -1),
+                COALESCE(b.title, ''),
+                COALESCE(b.istv, FALSE)
+                FROM movie_collection a
+                LEFT JOIN imdb_ratings b ON a.show_id = b.index
+                {}
+            "#,
+            if search_strs.is_empty() {
+                "".to_string()
+            } else {
+                let search_strs: Vec<_> = search_strs
+                    .iter()
+                    .map(|s| format!("a.path like '%{}%'", s))
+                    .collect();
+                format!("WHERE {}", search_strs.join(" OR "))
+            },
+        ),)?;
 
         let results: Result<Vec<_>, Error> = self
             .get_pool()
             .get()?
-            .query(query.as_str(), &[])?
+            .query(query.sql(), &[])?
             .iter()
             .map(|row| {
                 let path: String = row.try_get(0)?;
@@ -363,15 +379,20 @@ impl MovieCollection {
                 let (show, season, episode) = parse_file_stem(&file_stem);
 
                 if season != -1 && episode != -1 && show == result.show {
-                    let query = r#"
-                        SELECT cast(rating as double precision), eptitle, epurl
-                        FROM imdb_episodes
-                        WHERE show = $1 AND season = $2 AND episode = $3
-                    "#;
+                    let query = postgres_query::query!(
+                        r#"
+                            SELECT cast(rating as double precision), eptitle, epurl
+                            FROM imdb_episodes
+                            WHERE show = $show AND season = $season AND episode = $episode
+                        "#,
+                        show = show,
+                        season = season,
+                        episode = episode
+                    );
                     for row in &self
                         .get_pool()
                         .get()?
-                        .query(query, &[&show, &season, &episode])?
+                        .query(query.sql(), query.parameters())?
                     {
                         result.season = Some(season);
                         result.episode = Some(episode);
@@ -389,22 +410,25 @@ impl MovieCollection {
     }
 
     pub fn remove_from_collection(&self, path: &str) -> Result<(), Error> {
-        let query = r#"
-            DELETE FROM movie_collection
-            WHERE path = $1
-        "#;
+        let query = postgres_query::query!(
+            r#"DELETE FROM movie_collection WHERE path = $path"#,
+            path = path
+        );
         self.get_pool()
             .get()?
-            .execute(query, &[&path.to_string()])
+            .execute(query.sql(), query.parameters())
             .map(|_| ())
             .map_err(Into::into)
     }
 
     pub fn get_collection_index(&self, path: &str) -> Result<Option<i32>, Error> {
-        let query = r#"SELECT idx FROM movie_collection WHERE path = $1"#;
+        let query = postgres_query::query!(
+            r#"SELECT idx FROM movie_collection WHERE path = $path"#,
+            path = path
+        );
         self.get_pool()
             .get()?
-            .query(query, &[&path])?
+            .query(query.sql(), query.parameters())?
             .iter()
             .map(|row| row.try_get(0))
             .nth(0)
@@ -413,11 +437,14 @@ impl MovieCollection {
     }
 
     pub fn get_collection_path(&self, idx: i32) -> Result<String, Error> {
-        let query = "SELECT path FROM movie_collection WHERE idx = $1";
+        let query = postgres_query::query!(
+            "SELECT path FROM movie_collection WHERE idx = $idx",
+            idx = idx
+        );
         let path: String = self
             .get_pool()
             .get()?
-            .query(query, &[&idx])?
+            .query(query.sql(), query.parameters())?
             .get(0)
             .ok_or_else(|| format_err!("Index not found"))?
             .get(0);
@@ -425,13 +452,13 @@ impl MovieCollection {
     }
 
     pub fn get_collection_index_match(&self, path: &str) -> Result<Option<i32>, Error> {
-        let query = format!(
+        let query = postgres_query::query_dyn!(&format!(
             r#"SELECT idx FROM movie_collection WHERE path like '%{}%'"#,
             path
-        );
+        ))?;
         self.get_pool()
             .get()?
-            .query(query.as_str(), &[])?
+            .query(query.sql(), &[])?
             .iter()
             .map(|row| row.try_get(0))
             .nth(0)
@@ -445,13 +472,17 @@ impl MovieCollection {
         }
         let file_stem = Path::new(&path).file_stem().unwrap().to_string_lossy();
         let (show, _, _) = parse_file_stem(&file_stem);
-        let query = r#"
-            INSERT INTO movie_collection (idx, path, show, last_modified)
-            VALUES ((SELECT max(idx)+1 FROM movie_collection), $1, $2, now())
-        "#;
+        let query = postgres_query::query!(
+            r#"
+                INSERT INTO movie_collection (idx, path, show, last_modified)
+                VALUES ((SELECT max(idx)+1 FROM movie_collection), $path, $show, now())
+            "#,
+            path = path,
+            show = show
+        );
         self.get_pool()
             .get()?
-            .execute(query, &[&path.to_string(), &show])
+            .execute(query.sql(), query.parameters())
             .map(|_| ())
             .map_err(Into::into)
     }
@@ -459,13 +490,18 @@ impl MovieCollection {
     pub fn insert_into_collection_by_idx(&self, idx: i32, path: &str) -> Result<(), Error> {
         let file_stem = Path::new(&path).file_stem().unwrap().to_string_lossy();
         let (show, _, _) = parse_file_stem(&file_stem);
-        let query = r#"
-            INSERT INTO movie_collection (idx, path, show, last_modified)
-            VALUES ($1, $2, $3, now())
-        "#;
+        let query = postgres_query::query!(
+            r#"
+                INSERT INTO movie_collection (idx, path, show, last_modified)
+                VALUES ($idx, $path, $show, now())
+            "#,
+            idx = idx,
+            path = path,
+            show = show
+        );
         self.get_pool()
             .get()?
-            .execute(query, &[&idx, &path.to_string(), &show])
+            .execute(query.sql(), query.parameters())
             .map(|_| ())
             .map_err(Into::into)
     }
@@ -697,49 +733,52 @@ impl MovieCollection {
         maxdate: NaiveDate,
         source: &Option<TvShowSource>,
     ) -> Result<Vec<NewEpisodesResult>, Error> {
-        let query = r#"
-            WITH active_links AS (
-                SELECT c.link
-                FROM movie_queue a
-                JOIN movie_collection b ON a.collection_idx=b.idx
-                JOIN imdb_ratings c ON b.show_id=c.index
-                JOIN imdb_episodes d ON c.show = d.show
-                UNION
-                SELECT link
-                FROM trakt_watchlist
-            )
-            SELECT c.show,
-                    c.link,
-                    c.title,
-                    d.season,
-                    d.episode,
-                    d.epurl,
-                    d.airdate,
-                    c.rating,
-                    cast(d.rating as double precision) as eprating,
-                    d.eptitle
-            FROM imdb_ratings c
-            JOIN imdb_episodes d ON c.show = d.show
-            LEFT JOIN trakt_watched_episodes e ON c.link=e.link AND d.season=e.season AND d.episode=e.episode
-            WHERE c.link in (SELECT link FROM active_links GROUP BY link) AND
-                e.episode is null AND
-                c.istv AND d.airdate >= $1 AND
-                d.airdate <= $2
-        "#;
-        let groupby = r#"
-            GROUP BY 1,2,3,4,5,6,7,8,9,10
-            ORDER BY d.airdate, c.show, d.season, d.episode
-        "#;
-        let query: String = match source {
-            Some(TvShowSource::All) => query.to_string(),
-            Some(s) => format!("{} AND c.source = '{}'", query, s),
-            None => format!("{} AND c.source is null", query),
-        };
-        let query = format!("{} {}", query, groupby);
-
+        let query = postgres_query::query_dyn!(
+            &format!(
+                r#"
+                    WITH active_links AS (
+                        SELECT c.link
+                        FROM movie_queue a
+                        JOIN movie_collection b ON a.collection_idx=b.idx
+                        JOIN imdb_ratings c ON b.show_id=c.index
+                        JOIN imdb_episodes d ON c.show = d.show
+                        UNION
+                        SELECT link
+                        FROM trakt_watchlist
+                    )
+                    SELECT c.show,
+                            c.link,
+                            c.title,
+                            d.season,
+                            d.episode,
+                            d.epurl,
+                            d.airdate,
+                            c.rating,
+                            cast(d.rating as double precision) as eprating,
+                            d.eptitle
+                    FROM imdb_ratings c
+                    JOIN imdb_episodes d ON c.show = d.show
+                    LEFT JOIN trakt_watched_episodes e
+                        ON c.link=e.link AND d.season=e.season AND d.episode=e.episode
+                    WHERE c.link in (SELECT link FROM active_links GROUP BY link) AND
+                        e.episode is null AND
+                        c.istv AND d.airdate >= $mindate AND
+                        d.airdate <= $maxdate {}
+                    GROUP BY 1,2,3,4,5,6,7,8,9,10
+                    ORDER BY d.airdate, c.show, d.season, d.episode
+                "#,
+                match source {
+                    Some(TvShowSource::All) => "",
+                    Some(s) => "AND c.source = $source",
+                    None => "AND c.source is null",
+                }
+            ),
+            mindate = mindate,
+            maxdate = maxdate
+        )?;
         self.get_pool()
             .get()?
-            .query(query.as_str(), &[&mindate, &maxdate])?
+            .query(query.sql(), query.parameters())?
             .iter()
             .map(|row| NewEpisodesResult::from_row(row).map_err(Into::into))
             .collect()
@@ -787,14 +826,17 @@ impl MovieCollection {
         &self,
         timestamp: DateTime<Utc>,
     ) -> Result<Vec<MovieCollectionRow>, Error> {
-        let query = r#"
-            SELECT idx, path, show
-            FROM movie_collection
-            WHERE last_modified >= $1
-        "#;
+        let query = postgres_query::query!(
+            r#"
+                SELECT idx, path, show
+                FROM movie_collection
+                WHERE last_modified >= $timestamp
+            "#,
+            timestamp = timestamp
+        );
         self.get_pool()
             .get()?
-            .query(query, &[&timestamp])?
+            .query(query.sql(), query.parameters())?
             .iter()
             .map(|row| MovieCollectionRow::from_row(row).map_err(Into::into))
             .collect()

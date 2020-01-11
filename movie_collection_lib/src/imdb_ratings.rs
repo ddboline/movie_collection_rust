@@ -56,30 +56,38 @@ impl ImdbRatings {
         );
         debug!("{:?}", self);
         pool.get()?
-            .execute(query.sql, &query.parameters)
+            .execute(query.sql(), query.parameters())
             .map(|_| ())
             .map_err(Into::into)
     }
 
     pub fn update_show(&self, pool: &PgPool) -> Result<(), Error> {
-        let query = r#"
-            UPDATE imdb_ratings
-            SET rating=$1,title=$2,last_modified=now()
-            WHERE show=$3
-        "#;
+        let query = postgres_query::query!(
+            r#"
+                UPDATE imdb_ratings
+                SET rating=$rating,title=$title,last_modified=now()
+                WHERE show=$show
+            "#,
+            rating = self.rating,
+            title = self.title,
+            show = self.show
+        );
         pool.get()?
-            .execute(query, &[&self.rating, &self.title, &self.show])
+            .execute(query.sql(), query.parameters())
             .map(|_| ())
             .map_err(Into::into)
     }
 
     pub fn get_show_by_link(link: &str, pool: &PgPool) -> Result<Option<Self>, Error> {
-        let query = r#"
-            SELECT index, show, title, link, rating, istv, source
-            FROM imdb_ratings
-            WHERE (link = $1 OR show = $1)
-        "#;
-        if let Some(row) = pool.get()?.query(query, &[&link])?.get(0) {
+        let query = postgres_query::query!(
+            r#"
+                SELECT index, show, title, link, rating, istv, source
+                FROM imdb_ratings
+                WHERE (link = $link OR show = $link)
+            "#,
+            link = link
+        );
+        if let Some(row) = pool.get()?.query(query.sql(), query.parameters())?.get(0) {
             Ok(Some(Self::from_row(row)?))
         } else {
             Ok(None)
@@ -90,13 +98,16 @@ impl ImdbRatings {
         timestamp: DateTime<Utc>,
         pool: &PgPool,
     ) -> Result<Vec<Self>, Error> {
-        let query = r#"
-            SELECT index, show, title, link, rating, istv, source
-            FROM imdb_ratings
-            WHERE last_modified >= $1
-        "#;
+        let query = postgres_query::query!(
+            r#"
+                SELECT index, show, title, link, rating, istv, source
+                FROM imdb_ratings
+                WHERE last_modified >= $timestamp
+            "#,
+            timestamp = timestamp
+        );
         pool.get()?
-            .query(query, &[&timestamp])?
+            .query(query.sql(), query.parameters())?
             .iter()
             .map(|row| Ok(Self::from_row(row)?))
             .collect()

@@ -70,31 +70,43 @@ impl MovieQueueDB {
         }
         let diff = max_idx - idx;
 
-        let query = r#"DELETE FROM movie_queue WHERE idx = $1"#;
-        tran.execute(query, &[&idx])?;
+        let query =
+            postgres_query::query!(r#"DELETE FROM movie_queue WHERE idx = $idx"#, idx = idx);
+        tran.execute(query.sql(), query.parameters())?;
 
-        let query = r#"
-            UPDATE movie_queue
-            SET idx = idx + $1, last_modified = now()
-            WHERE idx > $2
-        "#;
-        tran.execute(query, &[&diff, &idx])?;
+        let query = postgres_query::query!(
+            r#"
+                UPDATE movie_queue
+                SET idx = idx + $diff, last_modified = now()
+                WHERE idx > $idx
+            "#,
+            diff = diff,
+            idx = idx
+        );
+        tran.execute(query.sql(), query.parameters())?;
 
-        let query = r#"
-            UPDATE movie_queue
-            SET idx = idx - $1 - 1, last_modified = now()
-            WHERE idx > $2
-        "#;
-        tran.execute(query, &[&diff, &idx])?;
+        let query = postgres_query::query!(
+            r#"
+                UPDATE movie_queue
+                SET idx = idx - $diff - 1, last_modified = now()
+                WHERE idx > $idx
+            "#,
+            diff = diff,
+            idx = idx
+        );
+        tran.execute(query.sql(), query.parameters())?;
 
         tran.commit().map_err(Into::into)
     }
 
     pub fn remove_from_queue_by_collection_idx(&self, collection_idx: i32) -> Result<(), Error> {
-        let query = r#"SELECT idx FROM movie_queue WHERE collection_idx=$1"#;
+        let query = postgres_query::query!(
+            r#"SELECT idx FROM movie_queue WHERE collection_idx=$idx"#,
+            idx = collection_idx
+        );
         self.pool
             .get()?
-            .query(query, &[&collection_idx])?
+            .query(query.sql(), query.parameters())?
             .iter()
             .map(|row| {
                 let idx = row.try_get(0)?;
@@ -134,11 +146,14 @@ impl MovieQueueDB {
         idx: i32,
         collection_idx: i32,
     ) -> Result<(), Error> {
-        let query = r#"SELECT idx FROM movie_queue WHERE collection_idx = $1"#;
+        let query = postgres_query::query!(
+            r#"SELECT idx FROM movie_queue WHERE collection_idx = $idx"#,
+            idx = collection_idx
+        );
         let current_idx: i32 = self
             .pool
             .get()?
-            .query(query, &[&collection_idx])?
+            .query(query.sql(), query.parameters())?
             .iter()
             .last()
             .map_or(Ok(-1), |row| row.try_get(0))?;
@@ -155,25 +170,37 @@ impl MovieQueueDB {
         let diff = max_idx - idx + 2;
         debug!("{} {} {}", max_idx, idx, diff);
 
-        let query = r#"
-            UPDATE movie_queue
-            SET idx = idx + $1, last_modified = now()
-            WHERE idx >= $2
-        "#;
-        tran.execute(query, &[&diff, &idx])?;
+        let query = postgres_query::query!(
+            r#"
+                UPDATE movie_queue
+                SET idx = idx + $diff, last_modified = now()
+                WHERE idx >= $idx
+            "#,
+            diff = diff,
+            idx = idx
+        );
+        tran.execute(query.sql(), query.parameters())?;
 
-        let query = r#"
-            INSERT INTO movie_queue (idx, collection_idx, last_modified)
-            VALUES ($1, $2, now())
-        "#;
-        tran.execute(query, &[&idx, &collection_idx])?;
+        let query = postgres_query::query!(
+            r#"
+                INSERT INTO movie_queue (idx, collection_idx, last_modified)
+                VALUES ($idx, $collection_idx, now())
+            "#,
+            idx = idx,
+            collection_idx = collection_idx
+        );
+        tran.execute(query.sql(), query.parameters())?;
 
-        let query = r#"
-            UPDATE movie_queue
-            SET idx = idx - $1 + 1, last_modified = now()
-            WHERE idx > $2
-        "#;
-        tran.execute(query, &[&diff, &idx])?;
+        let query = postgres_query::query!(
+            r#"
+                UPDATE movie_queue
+                SET idx = idx - $diff + 1, last_modified = now()
+                WHERE idx > $idx
+            "#,
+            diff = diff,
+            idx = idx
+        );
+        tran.execute(query.sql(), query.parameters())?;
 
         tran.commit().map_err(Into::into)
     }
@@ -189,31 +216,34 @@ impl MovieQueueDB {
     }
 
     pub fn print_movie_queue(&self, patterns: &[&str]) -> Result<Vec<MovieQueueResult>, Error> {
-        let query = r#"
-            SELECT a.idx, b.path, c.link, c.istv
-            FROM movie_queue a
-            JOIN movie_collection b ON a.collection_idx = b.idx
-            LEFT JOIN imdb_ratings c ON b.show_id = c.index
-        "#;
-        let query = if patterns.is_empty() {
-            query.to_string()
-        } else {
-            let constraints: Vec<_> = patterns
-                .iter()
-                .map(|p| format!("b.path like '%{}%'", p))
-                .collect();
-            format!("{} WHERE {}", query, constraints.join(" OR "))
-        };
+        let query = postgres_query::query_dyn!(&format!(
+            r#"
+                SELECT a.idx, b.path, c.link, c.istv
+                FROM movie_queue a
+                JOIN movie_collection b ON a.collection_idx = b.idx
+                LEFT JOIN imdb_ratings c ON b.show_id = c.index
+                {}
+            "#,
+            if patterns.is_empty() {
+                "".to_string()
+            } else {
+                let constraints: Vec<_> = patterns
+                    .iter()
+                    .map(|p| format!("b.path like '%{}%'", p))
+                    .collect();
+                format!("WHERE {}", constraints.join(" OR "))
+            }
+        ),)?;
         let results: Result<Vec<_>, Error> = self
             .pool
             .get()?
-            .query(query.as_str(), &[])?
+            .query(query.sql(), &[])?
             .iter()
             .map(|row| {
-                let idx: i32 = row.try_get(0)?;
-                let path: String = row.try_get(1)?;
-                let link: Option<String> = row.try_get(2)?;
-                let istv: Option<bool> = row.try_get(3)?;
+                let idx: i32 = row.try_get("idx")?;
+                let path: String = row.try_get("path")?;
+                let link: Option<String> = row.try_get("link")?;
+                let istv: Option<bool> = row.try_get("istv")?;
                 Ok(MovieQueueResult {
                     idx,
                     path,
@@ -233,13 +263,18 @@ impl MovieQueueDB {
                         .unwrap()
                         .to_string_lossy();
                     let (show, season, episode) = parse_file_stem(&file_stem);
-                    let query = r#"
-                        SELECT epurl
-                        FROM imdb_episodes
-                        WHERE show = $1 AND season = $2 AND episode = $3
-                    "#;
-                    for row in &self.pool.get()?.query(query, &[&show, &season, &episode])? {
-                        let epurl: String = row.try_get(0)?;
+                    let query = postgres_query::query!(
+                        r#"
+                            SELECT epurl
+                            FROM imdb_episodes
+                            WHERE show = $show AND season = $season AND episode = $episode
+                        "#,
+                        show = show,
+                        season = season,
+                        episode = episode
+                    );
+                    for row in &self.pool.get()?.query(query.sql(), query.parameters())? {
+                        let epurl: String = row.try_get("epurl")?;
                         result.eplink = Some(epurl);
                         result.show = Some(show.to_string());
                         result.season = Some(season);
@@ -258,15 +293,18 @@ impl MovieQueueDB {
         &self,
         timestamp: DateTime<Utc>,
     ) -> Result<Vec<MovieQueueRow>, Error> {
-        let query = r#"
-            SELECT a.idx, a.collection_idx, b.path, b.show
-            FROM movie_queue a
-            JOIN movie_collection b ON a.collection_idx = b.idx
-            WHERE a.last_modified >= $1
-        "#;
+        let query = postgres_query::query!(
+            r#"
+                SELECT a.idx, a.collection_idx, b.path, b.show
+                FROM movie_queue a
+                JOIN movie_collection b ON a.collection_idx = b.idx
+                WHERE a.last_modified >= $timestamp
+            "#,
+            timestamp = timestamp
+        );
         self.pool
             .get()?
-            .query(query, &[&timestamp])?
+            .query(query.sql(), query.parameters())?
             .iter()
             .map(|row| MovieQueueRow::from_row(row).map_err(Into::into))
             .collect()

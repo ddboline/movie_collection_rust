@@ -109,10 +109,13 @@ impl fmt::Display for WatchListShow {
 
 impl WatchListShow {
     pub fn get_show_by_link(link: &str, pool: &PgPool) -> Result<Option<Self>, Error> {
-        let query = "SELECT title, year FROM trakt_watchlist WHERE link = $1";
-        if let Some(row) = pool.get()?.query(query, &[&link])?.get(0) {
-            let title: String = row.try_get(0)?;
-            let year: i32 = row.try_get(1)?;
+        let query = postgres_query::query!(
+            "SELECT title, year FROM trakt_watchlist WHERE link = $link",
+            link = link
+        );
+        if let Some(row) = pool.get()?.query(query.sql(), query.parameters())?.get(0) {
+            let title: String = row.try_get("title")?;
+            let year: i32 = row.try_get("year")?;
             Ok(Some(Self {
                 link: link.to_string(),
                 title,
@@ -124,9 +127,12 @@ impl WatchListShow {
     }
 
     pub fn get_index(&self, pool: &PgPool) -> Result<Option<i32>, Error> {
-        let query = "SELECT id FROM trakt_watchlist WHERE link = $1";
-        if let Some(row) = pool.get()?.query(query, &[&self.link])?.get(0) {
-            let id: i32 = row.try_get(0)?;
+        let query = postgres_query::query!(
+            "SELECT id FROM trakt_watchlist WHERE link = $link",
+            link = self.link
+        );
+        if let Some(row) = pool.get()?.query(query.sql(), query.parameters())?.get(0) {
+            let id: i32 = row.try_get("id")?;
             Ok(Some(id))
         } else {
             Ok(None)
@@ -134,17 +140,25 @@ impl WatchListShow {
     }
 
     pub fn insert_show(&self, pool: &PgPool) -> Result<(), Error> {
-        let query = "INSERT INTO trakt_watchlist (link, title, year) VALUES ($1, $2, $3)";
+        let query = postgres_query::query!(
+            "INSERT INTO trakt_watchlist (link, title, year) VALUES ($link, $title, $year)",
+            link = self.link,
+            title = self.title,
+            year = self.year
+        );
         pool.get()?
-            .execute(query, &[&self.link, &self.title, &self.year])
+            .execute(query.sql(), query.parameters())
             .map(|_| ())
             .map_err(Into::into)
     }
 
     pub fn delete_show(&self, pool: &PgPool) -> Result<(), Error> {
-        let query = "DELETE FROM trakt_watchlist WHERE link=$1";
+        let query = postgres_query::query!(
+            "DELETE FROM trakt_watchlist WHERE link=$link",
+            link = self.link
+        );
         pool.get()?
-            .execute(query, &[&self.link])
+            .execute(query.sql(), query.parameters())
             .map(|_| ())
             .map_err(Into::into)
     }
@@ -177,11 +191,11 @@ pub fn get_watchlist_shows_db_map(pool: &PgPool) -> Result<WatchListMap, Error> 
         .query(query, &[])?
         .iter()
         .map(|row| {
-            let show: String = row.try_get(0)?;
-            let link: String = row.try_get(1)?;
-            let title: String = row.try_get(2)?;
-            let year: i32 = row.try_get(3)?;
-            let source: Option<String> = row.try_get(4)?;
+            let show: String = row.try_get("show")?;
+            let link: String = row.try_get("link")?;
+            let title: String = row.try_get("title")?;
+            let year: i32 = row.try_get("year")?;
+            let source: Option<String> = row.try_get("source")?;
 
             let source: Option<TvShowSource> = match source {
                 Some(s) => s.parse().ok(),
@@ -216,17 +230,18 @@ impl fmt::Display for WatchedEpisode {
 
 impl WatchedEpisode {
     pub fn get_index(&self, pool: &PgPool) -> Result<Option<i32>, Error> {
-        let query = r#"
-            SELECT id
-            FROM trakt_watched_episodes
-            WHERE link=$1 AND season=$2 AND episode=$3
-        "#;
-        if let Some(row) = pool
-            .get()?
-            .query(query, &[&self.imdb_url, &self.season, &self.episode])?
-            .get(0)
-        {
-            let id: i32 = row.try_get(0)?;
+        let query = postgres_query::query!(
+            r#"
+                SELECT id
+                FROM trakt_watched_episodes
+                WHERE link=$link AND season=$season AND episode=$episode
+            "#,
+            link = self.imdb_url,
+            season = self.season,
+            episode = self.episode
+        );
+        if let Some(row) = pool.get()?.query(query.sql(), query.parameters())?.get(0) {
+            let id: i32 = row.try_get("id")?;
             Ok(Some(id))
         } else {
             Ok(None)
@@ -239,19 +254,20 @@ impl WatchedEpisode {
         season: i32,
         episode: i32,
     ) -> Result<Option<Self>, Error> {
-        let query = r#"
-            SELECT a.link, b.title
-            FROM trakt_watched_episodes a
-            JOIN imdb_ratings b ON a.link = b.link
-            WHERE a.link = $1 AND a.season = $2 AND a.episode = $3
-        "#;
-        if let Some(row) = pool
-            .get()?
-            .query(query, &[&link, &season, &episode])?
-            .get(0)
-        {
-            let imdb_url: String = row.try_get(0)?;
-            let title: String = row.try_get(1)?;
+        let query = postgres_query::query!(
+            r#"
+                SELECT a.link, b.title
+                FROM trakt_watched_episodes a
+                JOIN imdb_ratings b ON a.link = b.link
+                WHERE a.link = $link AND a.season = $season AND a.episode = $episode
+            "#,
+            link = link,
+            season = season,
+            episode = episode
+        );
+        if let Some(row) = pool.get()?.query(query.sql(), query.parameters())?.get(0) {
+            let imdb_url: String = row.try_get("link")?;
+            let title: String = row.try_get("title")?;
             Ok(Some(Self {
                 title,
                 imdb_url,
@@ -274,7 +290,7 @@ impl WatchedEpisode {
             episode = self.episode
         );
         pool.get()?
-            .execute(query.sql, &query.parameters)
+            .execute(query.sql(), query.parameters())
             .map(|_| ())
             .map_err(Into::into)
     }
@@ -290,7 +306,7 @@ impl WatchedEpisode {
             episode = self.episode
         );
         pool.get()?
-            .execute(query.sql, &query.parameters)
+            .execute(query.sql(), query.parameters())
             .map(|_| ())
             .map_err(Into::into)
     }
@@ -315,25 +331,25 @@ pub fn get_watched_shows_db(
         format!("WHERE {}", where_vec.join(" AND "))
     };
 
-    let query = format!(
+    let query = postgres_query::query_dyn!(&format!(
         r#"
-        SELECT a.link, b.title, a.season, a.episode
-        FROM trakt_watched_episodes a
-        JOIN imdb_ratings b ON a.link = b.link
-        {}
-        ORDER BY 2,3,4
-    "#,
+            SELECT a.link, b.title, a.season, a.episode
+            FROM trakt_watched_episodes a
+            JOIN imdb_ratings b ON a.link = b.link
+            {}
+            ORDER BY 2,3,4
+        "#,
         where_str
-    );
+    ))?;
 
     pool.get()?
-        .query(query.as_str(), &[])?
+        .query(query.sql(), &[])?
         .iter()
         .map(|row| {
-            let imdb_url: String = row.try_get(0)?;
-            let title: String = row.try_get(1)?;
-            let season: i32 = row.try_get(2)?;
-            let episode: i32 = row.try_get(3)?;
+            let imdb_url: String = row.try_get("link")?;
+            let title: String = row.try_get("title")?;
+            let season: i32 = row.try_get("season")?;
+            let episode: i32 = row.try_get("episode")?;
             Ok(WatchedEpisode {
                 title,
                 imdb_url,
@@ -358,13 +374,16 @@ impl fmt::Display for WatchedMovie {
 
 impl WatchedMovie {
     pub fn get_index(&self, pool: &PgPool) -> Result<Option<i32>, Error> {
-        let query = r#"
-            SELECT id
-            FROM trakt_watched_movies
-            WHERE link=$1
-        "#;
-        if let Some(row) = pool.get()?.query(query, &[&self.imdb_url])?.get(0) {
-            let id: i32 = row.try_get(0)?;
+        let query = postgres_query::query!(
+            r#"
+                SELECT id
+                FROM trakt_watched_movies
+                WHERE link=$link
+            "#,
+            link = self.imdb_url
+        );
+        if let Some(row) = pool.get()?.query(query.sql(), query.parameters())?.get(0) {
+            let id: i32 = row.try_get("id")?;
             Ok(Some(id))
         } else {
             Ok(None)
@@ -372,15 +391,18 @@ impl WatchedMovie {
     }
 
     pub fn get_watched_movie(pool: &PgPool, link: &str) -> Result<Option<Self>, Error> {
-        let query = r#"
-            SELECT a.link, b.title
-            FROM trakt_watched_movies a
-            JOIN imdb_ratings b ON a.link = b.link
-            WHERE a.link = $1
-        "#;
-        if let Some(row) = pool.get()?.query(query, &[&link])?.get(0) {
-            let imdb_url: String = row.try_get(0)?;
-            let title: String = row.try_get(1)?;
+        let query = postgres_query::query!(
+            r#"
+                SELECT a.link, b.title
+                FROM trakt_watched_movies a
+                JOIN imdb_ratings b ON a.link = b.link
+                WHERE a.link = $link
+            "#,
+            link = link
+        );
+        if let Some(row) = pool.get()?.query(query.sql(), query.parameters())?.get(0) {
+            let imdb_url: String = row.try_get("link")?;
+            let title: String = row.try_get("title")?;
             Ok(Some(Self { title, imdb_url }))
         } else {
             Ok(None)
@@ -388,41 +410,49 @@ impl WatchedMovie {
     }
 
     pub fn insert_movie(&self, pool: &PgPool) -> Result<(), Error> {
-        let query = r#"
-            INSERT INTO trakt_watched_movies (link)
-            VALUES ($1)
-        "#;
+        let query = postgres_query::query!(
+            r#"
+                INSERT INTO trakt_watched_movies (link)
+                VALUES ($link)
+            "#,
+            link = self.imdb_url
+        );
         pool.get()?
-            .execute(query, &[&self.imdb_url])
+            .execute(query.sql(), query.parameters())
             .map(|_| ())
             .map_err(Into::into)
     }
 
     pub fn delete_movie(&self, pool: &PgPool) -> Result<(), Error> {
-        let query = r#"
-            DELETE FROM trakt_watched_movies
-            WHERE link=$1
-        "#;
+        let query = postgres_query::query!(
+            r#"
+                DELETE FROM trakt_watched_movies
+                WHERE link=$link
+            "#,
+            link = self.imdb_url
+        );
         pool.get()?
-            .execute(query, &[&self.imdb_url])
+            .execute(query.sql(), query.parameters())
             .map(|_| ())
             .map_err(Into::into)
     }
 }
 
 pub fn get_watched_movies_db(pool: &PgPool) -> Result<Vec<WatchedMovie>, Error> {
-    let query = r#"
-        SELECT a.link, b.title
-        FROM trakt_watched_movies a
-        JOIN imdb_ratings b ON a.link = b.link
-        ORDER BY b.show
-    "#;
+    let query = postgres_query::query!(
+        r#"
+            SELECT a.link, b.title
+            FROM trakt_watched_movies a
+            JOIN imdb_ratings b ON a.link = b.link
+            ORDER BY b.show
+        "#
+    );
     pool.get()?
-        .query(query, &[])?
+        .query(query.sql(), &[])?
         .iter()
         .map(|row| {
-            let imdb_url: String = row.try_get(0)?;
-            let title: String = row.try_get(1)?;
+            let imdb_url: String = row.try_get("link")?;
+            let title: String = row.try_get("title")?;
             Ok(WatchedMovie { title, imdb_url })
         })
         .collect()

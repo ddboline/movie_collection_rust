@@ -66,7 +66,7 @@ impl ImdbEpisodes {
             season = self.season,
             episode = self.episode
         );
-        if let Some(row) = pool.get()?.query(query.sql, &query.parameters)?.get(0) {
+        if let Some(row) = pool.get()?.query(query.sql(), query.parameters())?.get(0) {
             let id: i32 = row.try_get(0)?;
             Ok(Some(id))
         } else {
@@ -93,15 +93,18 @@ impl ImdbEpisodes {
         timestamp: DateTime<Utc>,
         pool: &PgPool,
     ) -> Result<Vec<Self>, Error> {
-        let query = r#"
+        let query = postgres_query::query!(
+            r#"
             SELECT a.show, b.title, a.season, a.episode, a.airdate,
                    cast(a.rating as double precision) as rating, a.eptitle, a.epurl
             FROM imdb_episodes a
             JOIN imdb_ratings b ON a.show = b.show
-            WHERE a.last_modified >= $1
-        "#;
+            WHERE a.last_modified >= $timestamp
+        "#,
+            timestamp = timestamp
+        );
         pool.get()?
-            .query(query, &[&timestamp])?
+            .query(query.sql(), query.parameters())?
             .iter()
             .map(|row| {
                 let epi = Self::from_row(row)?;
@@ -114,49 +117,48 @@ impl ImdbEpisodes {
         if self.get_index(pool)?.is_some() {
             return self.update_episode(pool);
         }
-        let query = r#"
-            INSERT INTO imdb_episodes
-            (show, season, episode, airdate, rating, eptitle, epurl, last_modified)
-            VALUES
-            ($1, $2, $3, $4, RATING, $5, $6, now())
-        "#;
-        let query = query.replace("RATING", &self.rating.to_string());
+        let query = postgres_query::query_dyn!(
+            &format!(
+                r#"
+                    INSERT INTO imdb_episodes
+                    (show, season, episode, airdate, rating, eptitle, epurl, last_modified)
+                    VALUES
+                    ($show, $season, $episode, $airdate, {}, $eptitle, $epurl, now())
+                "#,
+                self.rating
+            ),
+            show = self.show,
+            season = self.season,
+            episode = self.episode,
+            airdate = self.airdate,
+            eptitle = self.eptitle,
+            epurl = self.epurl
+        )?;
         pool.get()?
-            .execute(
-                query.as_str(),
-                &[
-                    &self.show,
-                    &self.season,
-                    &self.episode,
-                    &self.airdate,
-                    &self.eptitle,
-                    &self.epurl,
-                ],
-            )
+            .execute(query.sql(), query.parameters())
             .map(|_| ())
             .map_err(Into::into)
     }
 
     pub fn update_episode(&self, pool: &PgPool) -> Result<(), Error> {
-        let query = r#"
-            UPDATE imdb_episodes
-            SET rating=RATING,eptitle=$1,epurl=$2,airdate=$3,last_modified=now()
-            WHERE show=$4 AND season=$5 AND episode=$6
-        "#;
-        let query = query.replace("RATING", &self.rating.to_string());
-
+        let query = postgres_query::query_dyn!(
+            &format!(
+                r#"
+                UPDATE imdb_episodes
+                SET rating={},eptitle=$eptitle,epurl=$epurl,airdate=$airdate,last_modified=now()
+                WHERE show=$show AND season=$season AND episode=$episode
+            "#,
+                self.rating
+            ),
+            eptitle = self.eptitle,
+            epurl = self.epurl,
+            airdate = self.airdate,
+            show = self.show,
+            season = self.season,
+            episode = self.episode
+        )?;
         pool.get()?
-            .execute(
-                query.as_str(),
-                &[
-                    &self.eptitle,
-                    &self.epurl,
-                    &self.airdate,
-                    &self.show,
-                    &self.season,
-                    &self.episode,
-                ],
-            )
+            .execute(query.sql(), query.parameters())
             .map(|_| ())
             .map_err(Into::into)
     }
