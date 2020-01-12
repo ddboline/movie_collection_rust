@@ -301,7 +301,7 @@ impl MovieCollection {
             r#"
                 SELECT a.show, b.title, a.season, count(distinct a.episode) as nepisodes
                 FROM imdb_episodes a
-                JOIN imdb_ratings b ON a.show=b.show"
+                JOIN imdb_ratings b ON a.show=b.show
                 WHERE a.show = $show
                 GROUP BY a.show, b.title, a.season
                 ORDER BY a.season
