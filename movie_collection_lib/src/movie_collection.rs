@@ -768,9 +768,9 @@ impl MovieCollection {
                     ORDER BY d.airdate, c.show, d.season, d.episode
                 "#,
                 match source {
-                    Some(TvShowSource::All) => "",
-                    Some(s) => "AND c.source = $source",
-                    None => "AND c.source is null",
+                    Some(TvShowSource::All) => "".to_string(),
+                    Some(s) => format!("AND c.source = '{}'", s),
+                    None => "AND c.source is null".to_string(),
                 }
             ),
             mindate = mindate,
