@@ -109,7 +109,7 @@ impl MovieQueueDB {
             .query(query.sql(), query.parameters())?
             .iter()
             .map(|row| {
-                let idx = row.try_get(0)?;
+                let idx = row.try_get("idx")?;
                 self.remove_from_queue_by_idx(idx)
             })
             .collect()
@@ -156,7 +156,7 @@ impl MovieQueueDB {
             .query(query.sql(), query.parameters())?
             .iter()
             .last()
-            .map_or(Ok(-1), |row| row.try_get(0))?;
+            .map_or(Ok(-1), |row| row.try_get("idx"))?;
 
         if current_idx != -1 {
             self.remove_from_queue_by_idx(current_idx)?;
@@ -234,21 +234,27 @@ impl MovieQueueDB {
                 format!("WHERE {}", constraints.join(" OR "))
             }
         ),)?;
+
+        #[derive(FromSqlRow)]
+        struct PrintMovieQueue {
+            idx: i32,
+            path: String,
+            link: Option<String>,
+            istv: Option<bool>,
+        }
+
         let results: Result<Vec<_>, Error> = self
             .pool
             .get()?
             .query(query.sql(), &[])?
             .iter()
             .map(|row| {
-                let idx: i32 = row.try_get("idx")?;
-                let path: String = row.try_get("path")?;
-                let link: Option<String> = row.try_get("link")?;
-                let istv: Option<bool> = row.try_get("istv")?;
+                let row = PrintMovieQueue::from_row(row)?;
                 Ok(MovieQueueResult {
-                    idx,
-                    path,
-                    link,
-                    istv: istv.unwrap_or(false),
+                    idx: row.idx,
+                    path: row.path,
+                    link: row.link,
+                    istv: row.istv.unwrap_or(false),
                     ..MovieQueueResult::default()
                 })
             })

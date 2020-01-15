@@ -229,24 +229,29 @@ impl MovieCollection {
                     show = show
                 )?;
 
+                #[derive(FromSqlRow)]
+                struct TempImdbRating {
+                    index: i32,
+                    show: String,
+                    title: String,
+                    link: String,
+                    rating: f64,
+                }
+
                 let results: Result<Vec<_>, Error> = self
                     .get_pool()
                     .get()?
                     .query(query.sql(), query.parameters())?
                     .iter()
                     .map(|row| {
-                        let index: i32 = row.try_get("index")?;
-                        let show: String = row.try_get("show")?;
-                        let title: String = row.try_get("title")?;
-                        let link: String = row.try_get("link")?;
-                        let rating: f64 = row.try_get("rating")?;
+                        let row = TempImdbRating::from_row(row)?;
 
                         Ok(ImdbRatings {
-                            index,
-                            show,
-                            title: Some(title),
-                            link,
-                            rating: Some(rating),
+                            index: row.index,
+                            show: row.show,
+                            title: Some(row.title),
+                            link: row.link,
+                            rating: Some(row.rating),
                             ..ImdbRatings::default()
                         })
                     })
@@ -328,9 +333,9 @@ impl MovieCollection {
         let query = postgres_query::query_dyn!(&format!(
             r#"
                 SELECT a.path, a.show,
-                COALESCE(b.rating, -1),
-                COALESCE(b.title, ''),
-                COALESCE(b.istv, FALSE)
+                COALESCE(b.rating, -1) as rating,
+                COALESCE(b.title, '') as title,
+                COALESCE(b.istv, FALSE) as istv
                 FROM movie_collection a
                 LEFT JOIN imdb_ratings b ON a.show_id = b.index
                 {}
@@ -346,24 +351,29 @@ impl MovieCollection {
             },
         ),)?;
 
+        #[derive(FromSqlRow)]
+        struct SearchMovieCollection {
+            path: String,
+            show: String,
+            rating: f64,
+            title: String,
+            istv: Option<bool>,
+        }
+
         let results: Result<Vec<_>, Error> = self
             .get_pool()
             .get()?
             .query(query.sql(), &[])?
             .iter()
             .map(|row| {
-                let path: String = row.try_get(0)?;
-                let show: String = row.try_get(1)?;
-                let rating: f64 = row.try_get(2)?;
-                let title: String = row.try_get(3)?;
-                let istv: Option<bool> = row.try_get(4)?;
+                let row = SearchMovieCollection::from_row(row)?;
 
                 Ok(MovieCollectionResult {
-                    path,
-                    show,
-                    rating,
-                    title,
-                    istv: istv.unwrap_or(false),
+                    path: row.path,
+                    show: row.show,
+                    rating: row.rating,
+                    title: row.title,
+                    istv: row.istv.unwrap_or(false),
                     ..MovieCollectionResult::default()
                 })
             })
@@ -381,7 +391,7 @@ impl MovieCollection {
                 if season != -1 && episode != -1 && show == result.show {
                     let query = postgres_query::query!(
                         r#"
-                            SELECT cast(rating as double precision), eptitle, epurl
+                            SELECT cast(rating as double precision) as rating, eptitle, epurl
                             FROM imdb_episodes
                             WHERE show = $show AND season = $season AND episode = $episode
                         "#,
@@ -389,16 +399,25 @@ impl MovieCollection {
                         season = season,
                         episode = episode
                     );
+
+                    #[derive(FromSqlRow)]
+                    struct TempImdbEpisodes {
+                        eprating: Option<f64>,
+                        eptitle: Option<String>,
+                        epurl: Option<String>,
+                    }
+
                     for row in &self
                         .get_pool()
                         .get()?
                         .query(query.sql(), query.parameters())?
                     {
+                        let row = TempImdbEpisodes::from_row(row)?;
                         result.season = Some(season);
                         result.episode = Some(episode);
-                        result.eprating = row.try_get(0)?;
-                        result.eptitle = row.try_get(1)?;
-                        result.epurl = row.try_get(2)?;
+                        result.eprating = row.eprating;
+                        result.eptitle = row.eptitle;
+                        result.epurl = row.epurl;
                     }
                 }
                 Ok(result)
@@ -430,7 +449,7 @@ impl MovieCollection {
             .get()?
             .query(query.sql(), query.parameters())?
             .iter()
-            .map(|row| row.try_get(0))
+            .map(|row| row.try_get("idx"))
             .nth(0)
             .transpose()
             .map_err(Into::into)
@@ -460,7 +479,7 @@ impl MovieCollection {
             .get()?
             .query(query.sql(), &[])?
             .iter()
-            .map(|row| row.try_get(0))
+            .map(|row| row.try_get("idx"))
             .nth(0)
             .transpose()
             .map_err(Into::into)
@@ -569,8 +588,8 @@ impl MovieCollection {
             .query(query, &[])?
             .iter()
             .map(|row| {
-                let path: String = row.try_get(0)?;
-                let idx: i32 = row.try_get(1)?;
+                let path: String = row.try_get("path")?;
+                let idx: i32 = row.try_get("idx")?;
                 Ok((path, idx))
             })
             .collect();
@@ -583,8 +602,8 @@ impl MovieCollection {
             .query(query, &[])?
             .iter()
             .map(|row| {
-                let path: String = row.try_get(0)?;
-                let show: String = row.try_get(1)?;
+                let path: String = row.try_get("path")?;
+                let show: String = row.try_get("show")?;
                 Ok((path, show))
             })
             .collect();
@@ -597,9 +616,9 @@ impl MovieCollection {
             .query(query, &[])?
             .iter()
             .map(|row| {
-                let show: String = row.try_get(0)?;
-                let season: i32 = row.try_get(1)?;
-                let episode: i32 = row.try_get(2)?;
+                let show: String = row.try_get("show")?;
+                let season: i32 = row.try_get("season")?;
+                let episode: i32 = row.try_get("episode")?;
                 Ok((show, season, episode))
             })
             .collect();
@@ -676,31 +695,36 @@ impl MovieCollection {
             FROM imdb_ratings
             WHERE link IS NOT null AND rating IS NOT null
         "#;
+
+        #[derive(FromSqlRow)]
+        struct ImdbShowMap {
+            link: String,
+            show: String,
+            title: String,
+            rating: f64,
+            istv: bool,
+            source: Option<String>,
+        }
         self.get_pool()
             .get()?
             .query(query, &[])?
             .iter()
             .map(|row| {
-                let link: String = row.try_get(0)?;
-                let show: String = row.try_get(1)?;
-                let title: String = row.try_get(2)?;
-                let rating: f64 = row.try_get(3)?;
-                let istv: bool = row.try_get(4)?;
-                let source: Option<String> = row.try_get(5)?;
+                let row = ImdbShowMap::from_row(row)?;
 
-                let source: Option<TvShowSource> = match source {
+                let source: Option<TvShowSource> = match row.source {
                     Some(s) => s.parse().ok(),
                     None => None,
                 };
 
                 Ok((
-                    link.to_string(),
+                    row.link.to_string(),
                     ImdbRatings {
-                        show,
-                        title: Some(title),
-                        link,
-                        rating: Some(rating),
-                        istv: Some(istv),
+                        show: row.show,
+                        title: Some(row.title),
+                        link: row.link,
+                        rating: Some(row.rating),
+                        istv: Some(row.istv),
                         source,
                         ..ImdbRatings::default()
                     },

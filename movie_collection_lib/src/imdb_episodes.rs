@@ -67,7 +67,7 @@ impl ImdbEpisodes {
             episode = self.episode
         );
         if let Some(row) = pool.get()?.query(query.sql(), query.parameters())?.get(0) {
-            let id: i32 = row.try_get(0)?;
+            let id: i32 = row.try_get("id")?;
             Ok(Some(id))
         } else {
             Ok(None)

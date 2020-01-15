@@ -187,24 +187,38 @@ pub fn get_watchlist_shows_db_map(pool: &PgPool) -> Result<WatchListMap, Error> 
         FROM trakt_watchlist a
         JOIN imdb_ratings b ON a.link=b.link
     "#;
+
+    #[derive(FromSqlRow)]
+    struct WatchlistShowDbMap {
+        show: String,
+        link: String,
+        title: String,
+        year: i32,
+        source: Option<String>,
+    }
+
     pool.get()?
         .query(query, &[])?
         .iter()
         .map(|row| {
-            let show: String = row.try_get("show")?;
-            let link: String = row.try_get("link")?;
-            let title: String = row.try_get("title")?;
-            let year: i32 = row.try_get("year")?;
-            let source: Option<String> = row.try_get("source")?;
+            let row = WatchlistShowDbMap::from_row(row)?;
 
-            let source: Option<TvShowSource> = match source {
+            let source: Option<TvShowSource> = match row.source {
                 Some(s) => s.parse().ok(),
                 None => None,
             };
 
             Ok((
-                link.to_string(),
-                (show, WatchListShow { link, title, year }, source),
+                row.link.to_string(),
+                (
+                    row.show,
+                    WatchListShow {
+                        link: row.link,
+                        title: row.title,
+                        year: row.year,
+                    },
+                    source,
+                ),
             ))
         })
         .collect()
