@@ -8,7 +8,7 @@ use std::time;
 use subprocess::Exec;
 use tokio::time::interval;
 
-use super::logged_user::AUTHORIZED_USERS;
+use super::logged_user::fill_from_db;
 use super::movie_queue_routes::{
     find_new_episodes, frontpage, imdb_episodes_route, imdb_episodes_update, imdb_ratings_route,
     imdb_ratings_update, imdb_show, last_modified_route, movie_collection_route,
@@ -38,9 +38,7 @@ pub async fn start_app(config: Config) {
         loop {
             i.tick().await;
             let p = pool.clone();
-            block(move || AUTHORIZED_USERS.fill_from_db(&p))
-                .await
-                .unwrap_or(());
+            block(move || fill_from_db(&p)).await.unwrap_or(());
         }
     }
 

@@ -3,7 +3,6 @@ use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 use std::path;
 
-use super::logged_user::LoggedUser;
 use super::HandleRequest;
 use movie_collection_lib::imdb_episodes::ImdbEpisodes;
 use movie_collection_lib::imdb_ratings::ImdbRatings;
@@ -259,17 +258,6 @@ impl HandleRequest<FindNewEpisodeRequest> for PgPool {
 
     fn handle(&self, msg: FindNewEpisodeRequest) -> Self::Result {
         find_new_episodes_http_worker(&self, msg.shows, &msg.source)
-    }
-}
-
-pub struct AuthorizedUserRequest {
-    pub user: LoggedUser,
-}
-
-impl HandleRequest<AuthorizedUserRequest> for PgPool {
-    type Result = Result<bool, Error>;
-    fn handle(&self, msg: AuthorizedUserRequest) -> Self::Result {
-        msg.user.is_authorized(self)
     }
 }
 
