@@ -215,6 +215,15 @@ impl MovieCollection {
         let shows: Result<Vec<_>, Error> = shows
             .par_iter()
             .map(|show| {
+                #[derive(FromSqlRow)]
+                struct TempImdbRating {
+                    index: i32,
+                    show: String,
+                    title: String,
+                    link: String,
+                    rating: f64,
+                }
+
                 let query = postgres_query::query_dyn!(
                     &format!(
                         r#"
@@ -228,15 +237,6 @@ impl MovieCollection {
                     ),
                     show = show
                 )?;
-
-                #[derive(FromSqlRow)]
-                struct TempImdbRating {
-                    index: i32,
-                    show: String,
-                    title: String,
-                    link: String,
-                    rating: f64,
-                }
 
                 let results: Result<Vec<_>, Error> = self
                     .get_pool()
@@ -330,6 +330,15 @@ impl MovieCollection {
         &self,
         search_strs: &[String],
     ) -> Result<Vec<MovieCollectionResult>, Error> {
+        #[derive(FromSqlRow)]
+        struct SearchMovieCollection {
+            path: String,
+            show: String,
+            rating: f64,
+            title: String,
+            istv: Option<bool>,
+        }
+
         let query = postgres_query::query_dyn!(&format!(
             r#"
                 SELECT a.path, a.show,
@@ -350,15 +359,6 @@ impl MovieCollection {
                 format!("WHERE {}", search_strs.join(" OR "))
             },
         ),)?;
-
-        #[derive(FromSqlRow)]
-        struct SearchMovieCollection {
-            path: String,
-            show: String,
-            rating: f64,
-            title: String,
-            istv: Option<bool>,
-        }
 
         let results: Result<Vec<_>, Error> = self
             .get_pool()
@@ -389,6 +389,13 @@ impl MovieCollection {
                 let (show, season, episode) = parse_file_stem(&file_stem);
 
                 if season != -1 && episode != -1 && show == result.show {
+                    #[derive(FromSqlRow)]
+                    struct TempImdbEpisodes {
+                        eprating: Option<f64>,
+                        eptitle: Option<String>,
+                        epurl: Option<String>,
+                    }
+
                     let query = postgres_query::query!(
                         r#"
                             SELECT cast(rating as double precision) as rating, eptitle, epurl
@@ -399,13 +406,6 @@ impl MovieCollection {
                         season = season,
                         episode = episode
                     );
-
-                    #[derive(FromSqlRow)]
-                    struct TempImdbEpisodes {
-                        eprating: Option<f64>,
-                        eptitle: Option<String>,
-                        epurl: Option<String>,
-                    }
 
                     for row in &self
                         .get_pool()
@@ -651,16 +651,13 @@ impl MovieCollection {
                 if file_list.contains(key) {
                     Ok(())
                 } else {
-                    match movie_queue.get(key) {
-                        Some(v) => {
-                            writeln!(stdout.lock(), "in queue but not disk {} {}", key, v)?;
-                            let mq = MovieQueueDB::with_pool(self.get_pool());
-                            mq.remove_from_queue_by_path(key)?;
-                        }
-                        None => {
-                            writeln!(stdout.lock(), "not on disk {} {}", key, val)?;
-                        }
-                    };
+                    if let Some(v) = movie_queue.get(key) {
+                        writeln!(stdout.lock(), "in queue but not disk {} {}", key, v)?;
+                        let mq = MovieQueueDB::with_pool(self.get_pool());
+                        mq.remove_from_queue_by_path(key)?;
+                    } else {
+                        writeln!(stdout.lock(), "not on disk {} {}", key, val)?;
+                    }
                     self.remove_from_collection(key)
                 }
             })
@@ -690,12 +687,6 @@ impl MovieCollection {
     }
 
     pub fn get_imdb_show_map(&self) -> Result<HashMap<String, ImdbRatings>, Error> {
-        let query = r#"
-            SELECT link, show, title, rating, istv, source
-            FROM imdb_ratings
-            WHERE link IS NOT null AND rating IS NOT null
-        "#;
-
         #[derive(FromSqlRow)]
         struct ImdbShowMap {
             link: String,
@@ -705,6 +696,13 @@ impl MovieCollection {
             istv: bool,
             source: Option<String>,
         }
+
+        let query = r#"
+            SELECT link, show, title, rating, istv, source
+            FROM imdb_ratings
+            WHERE link IS NOT null AND rating IS NOT null
+        "#;
+
         self.get_pool()
             .get()?
             .query(query, &[])?

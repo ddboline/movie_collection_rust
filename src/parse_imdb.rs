@@ -65,7 +65,7 @@ fn parse_imdb_parser() -> Result<(), Error> {
         None => return Ok(()),
     };
     let tv = matches.is_present("tv");
-    let imdb_link = matches.value_of("imdblink").map(|s| s.to_string());
+    let imdb_link = matches.value_of("imdblink").map(ToString::to_string);
 
     let all_seasons = matches.is_present("all_seasons");
 

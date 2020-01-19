@@ -129,13 +129,12 @@ impl MovieQueueDB {
             return Err(format_err!("File doesn't exist"));
         }
         let mc = MovieCollection::with_pool(&self.pool)?;
-        let collection_idx = match mc.get_collection_index(&path)? {
-            Some(i) => i,
-            None => {
-                mc.insert_into_collection(&path)?;
-                mc.get_collection_index(&path)?
-                    .ok_or_else(|| format_err!("Path not found"))?
-            }
+        let collection_idx = if let Some(i) = mc.get_collection_index(&path)? {
+            i
+        } else {
+            mc.insert_into_collection(&path)?;
+            mc.get_collection_index(&path)?
+                .ok_or_else(|| format_err!("Path not found"))?
         };
 
         self.insert_into_queue_by_collection_idx(idx, collection_idx)
@@ -216,6 +215,14 @@ impl MovieQueueDB {
     }
 
     pub fn print_movie_queue(&self, patterns: &[&str]) -> Result<Vec<MovieQueueResult>, Error> {
+        #[derive(FromSqlRow)]
+        struct PrintMovieQueue {
+            idx: i32,
+            path: String,
+            link: Option<String>,
+            istv: Option<bool>,
+        }
+
         let query = postgres_query::query_dyn!(&format!(
             r#"
                 SELECT a.idx, b.path, c.link, c.istv
@@ -234,14 +241,6 @@ impl MovieQueueDB {
                 format!("WHERE {}", constraints.join(" OR "))
             }
         ),)?;
-
-        #[derive(FromSqlRow)]
-        struct PrintMovieQueue {
-            idx: i32,
-            path: String,
-            link: Option<String>,
-            istv: Option<bool>,
-        }
 
         let results: Result<Vec<_>, Error> = self
             .pool

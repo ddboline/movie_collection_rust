@@ -25,14 +25,6 @@ pub struct AppState {
 }
 
 pub async fn start_app(config: Config) {
-    let command = "rm -f /var/www/html/videos/partial/*";
-    block(move || Exec::shell(command).join()).await.unwrap();
-
-    let secret: String = std::env::var("SECRET_KEY").unwrap_or_else(|_| "0123".repeat(8));
-    let domain = config.domain.to_string();
-    let port = config.port;
-    let pool = PgPool::new(&config.pgurl);
-
     async fn _update_db(pool: PgPool) {
         let mut i = interval(time::Duration::from_secs(60));
         loop {
@@ -41,6 +33,14 @@ pub async fn start_app(config: Config) {
             block(move || fill_from_db(&p)).await.unwrap_or(());
         }
     }
+
+    let command = "rm -f /var/www/html/videos/partial/*";
+    block(move || Exec::shell(command).join()).await.unwrap();
+
+    let secret: String = std::env::var("SECRET_KEY").unwrap_or_else(|_| "0123".repeat(8));
+    let domain = config.domain.to_string();
+    let port = config.port;
+    let pool = PgPool::new(&config.pgurl);
 
     actix_rt::spawn(_update_db(pool.clone()));
 

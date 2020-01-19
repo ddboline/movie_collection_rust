@@ -128,38 +128,34 @@ impl ParseImdb {
         if !opts.tv {
             if opts.update_database {
                 if let Some(result) = results.get(0) {
-                    match shows.get(&result.link) {
-                        Some(s) => {
-                            if (result.rating - s.rating.unwrap_or(-1.0)).abs() > 0.1 {
-                                let mut new = s.clone();
-                                new.title = Some(result.title.to_string());
-                                new.rating = Some(result.rating);
-                                new.update_show(&self.mc.get_pool())?;
-                                output.push(vec![format!(
-                                    "exists {} {} {}",
-                                    opts.show, s, result.rating
-                                )]);
-                            }
+                    if let Some(s) = shows.get(&result.link) {
+                        if (result.rating - s.rating.unwrap_or(-1.0)).abs() > 0.1 {
+                            let mut new = s.clone();
+                            new.title = Some(result.title.to_string());
+                            new.rating = Some(result.rating);
+                            new.update_show(&self.mc.get_pool())?;
+                            output.push(vec![format!(
+                                "exists {} {} {}",
+                                opts.show, s, result.rating
+                            )]);
                         }
-                        None => {
-                            output.push(vec![format!("not exists {} {}", opts.show, result)]);
-                            let istv = result.title.contains("TV Series")
-                                || result.title.contains("TV Mini-Series");
+                    } else {
+                        output.push(vec![format!("not exists {} {}", opts.show, result)]);
+                        let istv = result.title.contains("TV Series")
+                            || result.title.contains("TV Mini-Series");
 
-                            ImdbRatings {
-                                show: opts.show.to_string(),
-                                title: Some(result.title.to_string()),
-                                link: result.link.to_string(),
-                                rating: Some(result.rating),
-                                istv: Some(istv),
-                                ..ImdbRatings::default()
-                            }
-                            .insert_show(&self.mc.get_pool())?;
+                        ImdbRatings {
+                            show: opts.show.to_string(),
+                            title: Some(result.title.to_string()),
+                            link: result.link.to_string(),
+                            rating: Some(result.rating),
+                            istv: Some(istv),
+                            ..ImdbRatings::default()
                         }
+                        .insert_show(&self.mc.get_pool())?;
                     }
                 }
             }
-
             for result in &results {
                 output.push(vec![format!("{}", result)]);
             }
@@ -175,40 +171,34 @@ impl ParseImdb {
                             let airdate = episode
                                 .airdate
                                 .unwrap_or_else(|| NaiveDate::from_ymd(1970, 1, 1));
-                            match episodes.get(&key) {
-                                Some(e) => {
-                                    if (e.rating - episode.rating.unwrap_or(-1.0)).abs() > 0.1
-                                        || e.airdate != airdate
-                                    {
-                                        output.push(vec![format!(
-                                            "exists {} {} {}",
-                                            result, episode, e.rating
-                                        )]);
-                                        let mut new = e.clone();
-                                        new.eptitle =
-                                            episode.eptitle.unwrap_or_else(|| "".to_string());
-                                        new.rating = episode.rating.unwrap_or(-1.0);
-                                        new.airdate = airdate;
-                                        new.update_episode(&self.mc.get_pool())?;
-                                    }
+
+                            if let Some(e) = episodes.get(&key) {
+                                if (e.rating - episode.rating.unwrap_or(-1.0)).abs() > 0.1
+                                    || e.airdate != airdate
+                                {
+                                    output.push(vec![format!(
+                                        "exists {} {} {}",
+                                        result, episode, e.rating
+                                    )]);
+                                    let mut new = e.clone();
+                                    new.eptitle = episode.eptitle.unwrap_or_else(|| "".to_string());
+                                    new.rating = episode.rating.unwrap_or(-1.0);
+                                    new.airdate = airdate;
+                                    new.update_episode(&self.mc.get_pool())?;
                                 }
-                                None => {
-                                    output.push(vec![format!("not exists {} {}", result, episode)]);
-                                    ImdbEpisodes {
-                                        show: opts.show.to_string(),
-                                        title: result
-                                            .title
-                                            .clone()
-                                            .unwrap_or_else(|| "".to_string()),
-                                        season: episode.season,
-                                        episode: episode.episode,
-                                        airdate,
-                                        rating: episode.rating.unwrap_or(-1.0),
-                                        eptitle: episode.eptitle.unwrap_or_else(|| "".to_string()),
-                                        epurl: episode.epurl.unwrap_or_else(|| "".to_string()),
-                                    }
-                                    .insert_episode(&self.mc.get_pool())?;
+                            } else {
+                                output.push(vec![format!("not exists {} {}", result, episode)]);
+                                ImdbEpisodes {
+                                    show: opts.show.to_string(),
+                                    title: result.title.clone().unwrap_or_else(|| "".to_string()),
+                                    season: episode.season,
+                                    episode: episode.episode,
+                                    airdate,
+                                    rating: episode.rating.unwrap_or(-1.0),
+                                    eptitle: episode.eptitle.unwrap_or_else(|| "".to_string()),
+                                    epurl: episode.epurl.unwrap_or_else(|| "".to_string()),
                                 }
+                                .insert_episode(&self.mc.get_pool())?;
                             }
                         }
                     }

@@ -365,12 +365,11 @@ impl HandleRequest<MovieQueueUpdateRequest> for PgPool {
         let mq = MovieQueueDB::with_pool(&self);
         let mc = MovieCollection::with_pool(&self)?;
         for entry in msg.queue {
-            let cidx = match mc.get_collection_index(&entry.path)? {
-                Some(i) => i,
-                None => {
-                    mc.insert_into_collection_by_idx(entry.collection_idx, &entry.path)?;
-                    entry.collection_idx
-                }
+            let cidx = if let Some(i) = mc.get_collection_index(&entry.path)? {
+                i
+            } else {
+                mc.insert_into_collection_by_idx(entry.collection_idx, &entry.path)?;
+                entry.collection_idx
             };
             assert_eq!(cidx, entry.collection_idx);
             mq.insert_into_queue_by_collection_idx(entry.idx, entry.collection_idx)?;

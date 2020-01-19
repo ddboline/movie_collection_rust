@@ -182,12 +182,6 @@ pub fn get_watchlist_shows_db(pool: &PgPool) -> Result<HashMap<String, WatchList
 pub type WatchListMap = HashMap<String, (String, WatchListShow, Option<TvShowSource>)>;
 
 pub fn get_watchlist_shows_db_map(pool: &PgPool) -> Result<WatchListMap, Error> {
-    let query = r#"
-        SELECT b.show, a.link, a.title, a.year, b.source
-        FROM trakt_watchlist a
-        JOIN imdb_ratings b ON a.link=b.link
-    "#;
-
     #[derive(FromSqlRow)]
     struct WatchlistShowDbMap {
         show: String,
@@ -196,6 +190,12 @@ pub fn get_watchlist_shows_db_map(pool: &PgPool) -> Result<WatchListMap, Error> 
         year: i32,
         source: Option<String>,
     }
+
+    let query = r#"
+        SELECT b.show, a.link, a.title, a.year, b.source
+        FROM trakt_watchlist a
+        JOIN imdb_ratings b ON a.link=b.link
+    "#;
 
     pool.get()?
         .query(query, &[])?

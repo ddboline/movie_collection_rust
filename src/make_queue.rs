@@ -56,7 +56,7 @@ fn make_queue() -> Result<(), Error> {
     let do_time = matches.is_present("time");
     let patterns: Vec<_> = matches
         .values_of("patterns")
-        .map_or_else(Vec::new, |v| v.map(|s| s.to_string()).collect());
+        .map_or_else(Vec::new, |v| v.map(ToString::to_string).collect());
     let do_shows = matches.is_present("shows");
 
     let patterns: Vec<_> = patterns.iter().map(String::as_str).collect();
