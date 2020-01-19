@@ -1,6 +1,6 @@
 [package]
 name = "movie_collection_http"
-version = "0.4.11"
+version = "0.4.12"
 authors = ["Daniel Boline <ddboline@gmail.com>"]
 edition = "2018"
 
@@ -22,4 +22,4 @@ lazy_static = "1.4"
 anyhow = "1.0"
 thiserror = "1.0"
 actix-threadpool = "0.3"
-rust_auth_server = { git = "https://github.com/ddboline/rust-auth-server.git", tag="0.4.3" }
+rust_auth_server = { git = "https://github.com/ddboline/rust-auth-server.git", tag="0.4.4" }
