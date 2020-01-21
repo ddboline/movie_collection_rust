@@ -25,6 +25,36 @@ pub struct ConfigInner {
 #[derive(Debug, Default, Clone)]
 pub struct Config(Arc<ConfigInner>);
 
+macro_rules! set_config {
+    ($s:ident, $id:ident) => {
+        if let Ok($id) = var(&stringify!($id).to_uppercase()) {
+            $s.$id = $id;
+        }
+    };
+}
+
+macro_rules! set_config_parse {
+    ($s:ident, $id:ident, $d:expr) => {
+        $s.$id = var(&stringify!($id).to_uppercase())
+            .ok()
+            .and_then(|x| x.parse().ok())
+            .unwrap_or_else(|| $d);
+    };
+}
+
+macro_rules! set_config_must {
+    ($s:ident, $id:ident) => {
+        $s.$id = var(&stringify!($id).to_uppercase())
+            .map_err(|e| format_err!("{} must be set: {}", stringify!($id).to_uppercase(), e))?;
+    };
+}
+
+macro_rules! set_config_default {
+    ($s:ident, $id:ident, $d:expr) => {
+        $s.$id = var(&stringify!($id).to_uppercase()).unwrap_or_else(|_| $d);
+    };
+}
+
 impl ConfigInner {
     pub fn new() -> Self {
         Self {
@@ -40,26 +70,35 @@ impl ConfigInner {
 
 impl Config {
     pub fn with_config() -> Result<Self, Error> {
-        let mut config = ConfigInner::new();
-
-        config.home_dir = var("HOME").map_err(|_| format_err!("No HOME directory..."))?;
-
-        let env_file = format!(
-            "{}/.config/movie_collection_rust/config.env",
-            config.home_dir
-        );
+        let config_dir = dirs::config_dir().ok_or_else(|| format_err!("No CONFIG directory"))?;
+        let env_file = config_dir.join("movie_collection_rust").join("config.env");
 
         dotenv::dotenv().ok();
 
         if Path::new("config.env").exists() {
             dotenv::from_filename("config.env").ok();
-        } else if Path::new(&env_file).exists() {
+        } else if env_file.exists() {
             dotenv::from_path(&env_file).ok();
-        } else if Path::new("config.env").exists() {
-            dotenv::from_filename("config.env").ok();
         }
 
-        config.pgurl = var("PGURL").map_err(|_| format_err!("No PGURL specified"))?;
+        let mut config = ConfigInner::new();
+
+        set_config_must!(config, pgurl);
+        set_config_default!(config, preferred_dir, "/tmp".to_string());
+        set_config_default!(config, queue_table, "movie_queue".to_string());
+        set_config_default!(config, collection_table, "movie_collection".to_string());
+        set_config_default!(config, ratings_table, "imdb_ratings".to_string());
+        set_config_default!(config, episode_table, "imdb_episodes".to_string());
+        set_config_parse!(config, port, 8042);
+        set_config!(config, domain);
+        set_config_parse!(config, n_db_workers, 2);
+        set_config_default!(config, transcode_queue, "transcode_work_queue".to_string());
+        set_config_default!(config, remcom_queue, "remcom_worker_queue".to_string());
+
+        config.home_dir = dirs::home_dir()
+            .ok_or_else(|| format_err!("No HOME directory..."))?
+            .to_string_lossy()
+            .into();
 
         config.movie_dirs = var("MOVIEDIRS")
             .unwrap_or_else(|_| "".to_string())
@@ -72,28 +111,6 @@ impl Config {
                 }
             })
             .collect();
-
-        config.preferred_dir = var("PREFERED_DISK").unwrap_or_else(|_| "/tmp".to_string());
-        config.queue_table = var("QUEUE_TABLE").unwrap_or_else(|_| "movie_queue".to_string());
-        config.collection_table =
-            var("COLLECTION_TABLE").unwrap_or_else(|_| "movie_collection".to_string());
-        config.ratings_table = var("RATINGS_TABLE").unwrap_or_else(|_| "imdb_ratings".to_string());
-        config.episode_table = var("EPISODE_TABLE").unwrap_or_else(|_| "imdb_episodes".to_string());
-        if let Ok(port) = var("PORT") {
-            config.port = port.parse().unwrap_or(8042);
-        }
-        if let Ok(domain) = var("DOMAIN") {
-            config.domain = domain;
-        }
-        if let Ok(n_db_workers_str) = var("N_DB_WORKERS") {
-            if let Ok(n_db_workers) = n_db_workers_str.parse() {
-                config.n_db_workers = n_db_workers
-            }
-        }
-        config.transcode_queue =
-            var("TRANSCODE_QUEUE").unwrap_or_else(|_| "transcode_work_queue".to_string());
-        config.remcom_queue =
-            var("REMCOM_QUEUE").unwrap_or_else(|_| "remcom_worker_queue".to_string());
 
         Ok(Self(Arc::new(config)))
     }
