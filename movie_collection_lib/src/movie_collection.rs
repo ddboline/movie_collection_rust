@@ -398,7 +398,7 @@ impl MovieCollection {
 
                     let query = postgres_query::query!(
                         r#"
-                            SELECT cast(rating as double precision) as rating, eptitle, epurl
+                            SELECT cast(rating as double precision) as eprating, eptitle, epurl
                             FROM imdb_episodes
                             WHERE show = $show AND season = $season AND episode = $episode
                         "#,
