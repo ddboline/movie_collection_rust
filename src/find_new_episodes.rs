@@ -7,7 +7,7 @@ use movie_collection_lib::movie_collection::MovieCollection;
 use movie_collection_lib::tv_show_source::TvShowSource;
 use movie_collection_lib::utils::get_version_number;
 
-fn find_new_episodes() -> Result<(), Error> {
+async fn find_new_episodes() -> Result<(), Error> {
     let matches = App::new("Find new episodes")
         .version(get_version_number().as_str())
         .author("Daniel Boline <ddboline@gmail.com>")
@@ -46,7 +46,7 @@ fn find_new_episodes() -> Result<(), Error> {
 
     let mc = MovieCollection::new();
 
-    let output = mc.find_new_episodes(&source, &shows)?;
+    let output = mc.find_new_episodes(&source, &shows).await?;
 
     let stdout = io::stdout();
 
@@ -57,10 +57,11 @@ fn find_new_episodes() -> Result<(), Error> {
     Ok(())
 }
 
-fn main() {
+#[tokio::main]
+async fn main() {
     env_logger::init();
 
-    match find_new_episodes() {
+    match find_new_episodes().await {
         Ok(_) => (),
         Err(e) => {
             if e.to_string().contains("Broken pipe") {

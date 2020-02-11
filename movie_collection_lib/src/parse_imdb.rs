@@ -33,10 +33,14 @@ impl ParseImdb {
         Ok(p)
     }
 
-    pub fn parse_imdb_worker(&self, opts: &ParseImdbOptions) -> Result<Vec<Vec<String>>, Error> {
+    pub async fn parse_imdb_worker(
+        &self,
+        opts: &ParseImdbOptions,
+    ) -> Result<Vec<Vec<String>>, Error> {
         let shows: Vec<_> = if let Some(ilink) = &opts.imdb_link {
             self.mc
-                .print_imdb_shows(&opts.show, opts.tv)?
+                .print_imdb_shows(&opts.show, opts.tv)
+                .await?
                 .into_iter()
                 .filter_map(|s| {
                     if &s.link == ilink {
@@ -48,7 +52,8 @@ impl ParseImdb {
                 .collect()
         } else {
             self.mc
-                .print_imdb_shows(&opts.show, opts.tv)?
+                .print_imdb_shows(&opts.show, opts.tv)
+                .await?
                 .into_iter()
                 .map(|s| (s.link.to_string(), s))
                 .collect()
@@ -67,7 +72,7 @@ impl ParseImdb {
         let episodes: Option<Vec<_>> = if opts.tv {
             if opts.all_seasons {
                 if !opts.do_update {
-                    let seasons = self.mc.print_imdb_all_seasons(&opts.show)?;
+                    let seasons = self.mc.print_imdb_all_seasons(&opts.show).await?;
                     for s in seasons {
                         output.push(s.get_string_vec());
                     }
@@ -76,7 +81,8 @@ impl ParseImdb {
             } else {
                 let r = self
                     .mc
-                    .print_imdb_episodes(&opts.show, opts.season)?
+                    .print_imdb_episodes(&opts.show, opts.season)
+                    .await?
                     .into_iter()
                     .map(|e| ((e.season, e.episode), e))
                     .collect();
@@ -97,12 +103,13 @@ impl ParseImdb {
         let episodes: Option<HashMap<(i32, i32), _>> = episodes.map(|v| v.into_iter().collect());
 
         if opts.do_update {
-            self.parse_imdb_update_worker(&opts, &shows, &episodes, &mut output)?;
+            self.parse_imdb_update_worker(&opts, &shows, &episodes, &mut output)
+                .await?;
         }
         Ok(output)
     }
 
-    fn parse_imdb_update_worker(
+    async fn parse_imdb_update_worker(
         &self,
         opts: &ParseImdbOptions,
         shows: &HashMap<String, ImdbRatings>,
@@ -133,7 +140,7 @@ impl ParseImdb {
                             let mut new = s.clone();
                             new.title = Some(result.title.to_string());
                             new.rating = Some(result.rating);
-                            new.update_show(&self.mc.get_pool())?;
+                            new.update_show(&self.mc.get_pool()).await?;
                             output.push(vec![format!(
                                 "exists {} {} {}",
                                 opts.show, s, result.rating
@@ -152,7 +159,8 @@ impl ParseImdb {
                             istv: Some(istv),
                             ..ImdbRatings::default()
                         }
-                        .insert_show(&self.mc.get_pool())?;
+                        .insert_show(&self.mc.get_pool())
+                        .await?;
                     }
                 }
             }
@@ -184,7 +192,7 @@ impl ParseImdb {
                                     new.eptitle = episode.eptitle.unwrap_or_else(|| "".to_string());
                                     new.rating = episode.rating.unwrap_or(-1.0);
                                     new.airdate = airdate;
-                                    new.update_episode(&self.mc.get_pool())?;
+                                    new.update_episode(&self.mc.get_pool()).await?;
                                 }
                             } else {
                                 output.push(vec![format!("not exists {} {}", result, episode)]);
@@ -198,7 +206,8 @@ impl ParseImdb {
                                     eptitle: episode.eptitle.unwrap_or_else(|| "".to_string()),
                                     epurl: episode.epurl.unwrap_or_else(|| "".to_string()),
                                 }
-                                .insert_episode(&self.mc.get_pool())?;
+                                .insert_episode(&self.mc.get_pool())
+                                .await?;
                             }
                         }
                     }
@@ -208,7 +217,7 @@ impl ParseImdb {
         Ok(())
     }
 
-    pub fn parse_imdb_http_worker(
+    pub async fn parse_imdb_http_worker(
         &self,
         opts: &ParseImdbOptions,
         watchlist: &WatchListMap,
@@ -225,7 +234,8 @@ impl ParseImdb {
         );
 
         let output: Vec<_> = self
-            .parse_imdb_worker(&opts)?
+            .parse_imdb_worker(&opts)
+            .await?
             .into_iter()
             .map(|line| {
                 let mut imdb_url = "".to_string();

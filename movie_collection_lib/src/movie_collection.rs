@@ -1,7 +1,8 @@
 use anyhow::{format_err, Error};
 use chrono::{DateTime, Duration, Local, NaiveDate, Utc};
+use futures::future::join_all;
 use postgres_query::FromSqlRow;
-use rayon::iter::{IntoParallelIterator, IntoParallelRefIterator, ParallelIterator};
+use rayon::iter::{IntoParallelRefIterator, ParallelIterator};
 use serde::{Deserialize, Serialize};
 use std::collections::{HashMap, HashSet};
 use std::ffi::OsStr;
@@ -191,7 +192,11 @@ impl MovieCollection {
         &self.config
     }
 
-    pub fn print_imdb_shows(&self, show: &str, istv: bool) -> Result<Vec<ImdbRatings>, Error> {
+    pub async fn print_imdb_shows(
+        &self,
+        show: &str,
+        istv: bool,
+    ) -> Result<Vec<ImdbRatings>, Error> {
         let query = format!("SELECT show FROM imdb_ratings WHERE show like '%{}%'", show);
         let query = if istv {
             format!("{} AND istv", query)
@@ -200,8 +205,10 @@ impl MovieCollection {
         };
         let shows: Vec<String> = self
             .get_pool()
-            .get()?
-            .query(query.as_str(), &[])?
+            .get()
+            .await?
+            .query(query.as_str(), &[])
+            .await?
             .iter()
             .map(|r| r.get(0))
             .collect();
@@ -212,9 +219,9 @@ impl MovieCollection {
             shows
         };
 
-        let shows: Result<Vec<_>, Error> = shows
-            .par_iter()
-            .map(|show| {
+        let shows: Vec<_> = shows
+            .into_iter()
+            .map(|show| async move {
                 #[derive(FromSqlRow)]
                 struct TempImdbRating {
                     index: i32,
@@ -240,8 +247,10 @@ impl MovieCollection {
 
                 let results: Result<Vec<_>, Error> = self
                     .get_pool()
-                    .get()?
-                    .query(query.sql(), query.parameters())?
+                    .get()
+                    .await?
+                    .query(query.sql(), query.parameters())
+                    .await?
                     .iter()
                     .map(|row| {
                         let row = TempImdbRating::from_row(row)?;
@@ -259,11 +268,12 @@ impl MovieCollection {
                 results
             })
             .collect();
-        let results: Vec<_> = shows?.into_iter().flatten().collect();
+        let results: Result<Vec<_>, Error> = join_all(shows).await.into_iter().collect();
+        let results: Vec<_> = results?.into_iter().flatten().collect();
         Ok(results)
     }
 
-    pub fn print_imdb_episodes(
+    pub async fn print_imdb_episodes(
         &self,
         show: &str,
         season: Option<i32>,
@@ -290,8 +300,10 @@ impl MovieCollection {
         )?;
 
         self.get_pool()
-            .get()?
-            .query(query.sql(), query.parameters())?
+            .get()
+            .await?
+            .query(query.sql(), query.parameters())
+            .await?
             .iter()
             .map(|row| {
                 let val = ImdbEpisodes::from_row(row)?;
@@ -301,7 +313,7 @@ impl MovieCollection {
             .collect()
     }
 
-    pub fn print_imdb_all_seasons(&self, show: &str) -> Result<Vec<ImdbSeason>, Error> {
+    pub async fn print_imdb_all_seasons(&self, show: &str) -> Result<Vec<ImdbSeason>, Error> {
         let query = postgres_query::query!(
             r#"
                 SELECT a.show, b.title, a.season, count(distinct a.episode) as nepisodes
@@ -315,8 +327,10 @@ impl MovieCollection {
         );
 
         self.get_pool()
-            .get()?
-            .query(query.sql(), query.parameters())?
+            .get()
+            .await?
+            .query(query.sql(), query.parameters())
+            .await?
             .iter()
             .map(|row| {
                 let val = ImdbSeason::from_row(row)?;
@@ -326,7 +340,7 @@ impl MovieCollection {
             .collect()
     }
 
-    pub fn search_movie_collection(
+    pub async fn search_movie_collection(
         &self,
         search_strs: &[String],
     ) -> Result<Vec<MovieCollectionResult>, Error> {
@@ -362,8 +376,10 @@ impl MovieCollection {
 
         let results: Result<Vec<_>, Error> = self
             .get_pool()
-            .get()?
-            .query(query.sql(), &[])?
+            .get()
+            .await?
+            .query(query.sql(), &[])
+            .await?
             .iter()
             .map(|row| {
                 let row = SearchMovieCollection::from_row(row)?;
@@ -379,9 +395,9 @@ impl MovieCollection {
             })
             .collect();
 
-        let results: Result<Vec<_>, Error> = results?
-            .into_par_iter()
-            .map(|mut result| {
+        let results: Vec<_> = results?
+            .into_iter()
+            .map(|mut result| async {
                 let file_stem = Path::new(&result.path)
                     .file_stem()
                     .unwrap()
@@ -409,8 +425,10 @@ impl MovieCollection {
 
                     for row in &self
                         .get_pool()
-                        .get()?
-                        .query(query.sql(), query.parameters())?
+                        .get()
+                        .await?
+                        .query(query.sql(), query.parameters())
+                        .await?
                     {
                         let row = TempImdbEpisodes::from_row(row)?;
                         result.season = Some(season);
@@ -423,31 +441,36 @@ impl MovieCollection {
                 Ok(result)
             })
             .collect();
+        let results: Result<Vec<_>, Error> = join_all(results).await.into_iter().collect();
         let mut results = results?;
         results.sort_by_key(|r| (r.season, r.episode));
         Ok(results)
     }
 
-    pub fn remove_from_collection(&self, path: &str) -> Result<(), Error> {
+    pub async fn remove_from_collection(&self, path: &str) -> Result<(), Error> {
         let query = postgres_query::query!(
             r#"DELETE FROM movie_collection WHERE path = $path"#,
             path = path
         );
         self.get_pool()
-            .get()?
+            .get()
+            .await?
             .execute(query.sql(), query.parameters())
+            .await
             .map(|_| ())
             .map_err(Into::into)
     }
 
-    pub fn get_collection_index(&self, path: &str) -> Result<Option<i32>, Error> {
+    pub async fn get_collection_index(&self, path: &str) -> Result<Option<i32>, Error> {
         let query = postgres_query::query!(
             r#"SELECT idx FROM movie_collection WHERE path = $path"#,
             path = path
         );
         self.get_pool()
-            .get()?
-            .query(query.sql(), query.parameters())?
+            .get()
+            .await?
+            .query(query.sql(), query.parameters())
+            .await?
             .iter()
             .map(|row| row.try_get("idx"))
             .nth(0)
@@ -455,29 +478,33 @@ impl MovieCollection {
             .map_err(Into::into)
     }
 
-    pub fn get_collection_path(&self, idx: i32) -> Result<String, Error> {
+    pub async fn get_collection_path(&self, idx: i32) -> Result<String, Error> {
         let query = postgres_query::query!(
             "SELECT path FROM movie_collection WHERE idx = $idx",
             idx = idx
         );
         let path: String = self
             .get_pool()
-            .get()?
-            .query(query.sql(), query.parameters())?
+            .get()
+            .await?
+            .query(query.sql(), query.parameters())
+            .await?
             .get(0)
             .ok_or_else(|| format_err!("Index not found"))?
             .get(0);
         Ok(path)
     }
 
-    pub fn get_collection_index_match(&self, path: &str) -> Result<Option<i32>, Error> {
+    pub async fn get_collection_index_match(&self, path: &str) -> Result<Option<i32>, Error> {
         let query = postgres_query::query_dyn!(&format!(
             r#"SELECT idx FROM movie_collection WHERE path like '%{}%'"#,
             path
         ))?;
         self.get_pool()
-            .get()?
-            .query(query.sql(), &[])?
+            .get()
+            .await?
+            .query(query.sql(), &[])
+            .await?
             .iter()
             .map(|row| row.try_get("idx"))
             .nth(0)
@@ -485,7 +512,7 @@ impl MovieCollection {
             .map_err(Into::into)
     }
 
-    pub fn insert_into_collection(&self, path: &str) -> Result<(), Error> {
+    pub async fn insert_into_collection(&self, path: &str) -> Result<(), Error> {
         if !Path::new(&path).exists() {
             return Err(format_err!("No such file"));
         }
@@ -500,13 +527,15 @@ impl MovieCollection {
             show = show
         );
         self.get_pool()
-            .get()?
+            .get()
+            .await?
             .execute(query.sql(), query.parameters())
+            .await
             .map(|_| ())
             .map_err(Into::into)
     }
 
-    pub fn insert_into_collection_by_idx(&self, idx: i32, path: &str) -> Result<(), Error> {
+    pub async fn insert_into_collection_by_idx(&self, idx: i32, path: &str) -> Result<(), Error> {
         let file_stem = Path::new(&path).file_stem().unwrap().to_string_lossy();
         let (show, _, _) = parse_file_stem(&file_stem);
         let query = postgres_query::query!(
@@ -519,13 +548,15 @@ impl MovieCollection {
             show = show
         );
         self.get_pool()
-            .get()?
+            .get()
+            .await?
             .execute(query.sql(), query.parameters())
+            .await
             .map(|_| ())
             .map_err(Into::into)
     }
 
-    pub fn fix_collection_show_id(&self) -> Result<u64, Error> {
+    pub async fn fix_collection_show_id(&self) -> Result<u64, Error> {
         let query = r#"
             WITH a AS (
                 SELECT a.idx, a.show, b.index
@@ -538,11 +569,11 @@ impl MovieCollection {
                 last_modified=now()
             WHERE idx in (SELECT a.idx FROM a)
         "#;
-        let rows = self.get_pool().get()?.execute(query, &[])?;
+        let rows = self.get_pool().get().await?.execute(query, &[]).await?;
         Ok(rows)
     }
 
-    pub fn make_collection(&self) -> Result<(), Error> {
+    pub async fn make_collection(&self) -> Result<(), Error> {
         let file_list: Result<Vec<_>, Error> = self
             .get_config()
             .movie_dirs
@@ -584,8 +615,10 @@ impl MovieCollection {
         "#;
         let movie_queue: Result<HashMap<String, i32>, Error> = self
             .get_pool()
-            .get()?
-            .query(query, &[])?
+            .get()
+            .await?
+            .query(query, &[])
+            .await?
             .iter()
             .map(|row| {
                 let path: String = row.try_get("path")?;
@@ -598,8 +631,10 @@ impl MovieCollection {
         let query = "SELECT path, show FROM movie_collection";
         let collection_map: Result<HashMap<String, String>, Error> = self
             .get_pool()
-            .get()?
-            .query(query, &[])?
+            .get()
+            .await?
+            .query(query, &[])
+            .await?
             .iter()
             .map(|row| {
                 let path: String = row.try_get("path")?;
@@ -612,8 +647,10 @@ impl MovieCollection {
         let query = "SELECT show, season, episode from imdb_episodes";
         let episodes_set: Result<HashSet<(String, i32, i32)>, Error> = self
             .get_pool()
-            .get()?
-            .query(query, &[])?
+            .get()
+            .await?
+            .query(query, &[])
+            .await?
             .iter()
             .map(|row| {
                 let show: String = row.try_get("show")?;
@@ -626,43 +663,32 @@ impl MovieCollection {
 
         let stdout = io::stdout();
 
-        let results: Result<(), Error> = file_list
-            .iter()
-            .map(|f| {
-                if collection_map.get(f).is_none() {
-                    let ext = Path::new(&f)
-                        .extension()
-                        .map(OsStr::to_string_lossy)
-                        .ok_or_else(|| format_err!("extension fail"))?
-                        .to_string();
-                    if self.get_config().suffixes.contains(&ext) {
-                        writeln!(stdout.lock(), "not in collection {}", f)?;
-                        self.insert_into_collection(f)?;
-                    }
+        for f in &file_list {
+            if collection_map.get(f).is_none() {
+                let ext = Path::new(f)
+                    .extension()
+                    .map(OsStr::to_string_lossy)
+                    .ok_or_else(|| format_err!("extension fail"))?
+                    .to_string();
+                if self.get_config().suffixes.contains(&ext) {
+                    writeln!(stdout.lock(), "not in collection {}", f)?;
+                    self.insert_into_collection(f).await?;
                 }
-                Ok(())
-            })
-            .collect();
-        results?;
+            }
+        }
 
-        let results: Result<(), Error> = collection_map
-            .par_iter()
-            .map(|(key, val)| {
-                if file_list.contains(key) {
-                    Ok(())
+        for (key, val) in &collection_map {
+            if !file_list.contains(key) {
+                if let Some(v) = movie_queue.get(key) {
+                    writeln!(stdout.lock(), "in queue but not disk {} {}", key, v)?;
+                    let mq = MovieQueueDB::with_pool(self.get_pool());
+                    mq.remove_from_queue_by_path(key).await?;
                 } else {
-                    if let Some(v) = movie_queue.get(key) {
-                        writeln!(stdout.lock(), "in queue but not disk {} {}", key, v)?;
-                        let mq = MovieQueueDB::with_pool(self.get_pool());
-                        mq.remove_from_queue_by_path(key)?;
-                    } else {
-                        writeln!(stdout.lock(), "not on disk {} {}", key, val)?;
-                    }
-                    self.remove_from_collection(key)
+                    writeln!(stdout.lock(), "not on disk {} {}", key, val)?;
                 }
-            })
-            .collect();
-        results?;
+                self.remove_from_collection(key).await?;
+            }
+        }
 
         for (key, val) in collection_map {
             if !file_list.contains(&key) {
@@ -686,7 +712,7 @@ impl MovieCollection {
         Ok(())
     }
 
-    pub fn get_imdb_show_map(&self) -> Result<HashMap<String, ImdbRatings>, Error> {
+    pub async fn get_imdb_show_map(&self) -> Result<HashMap<String, ImdbRatings>, Error> {
         #[derive(FromSqlRow)]
         struct ImdbShowMap {
             link: String,
@@ -704,8 +730,10 @@ impl MovieCollection {
         "#;
 
         self.get_pool()
-            .get()?
-            .query(query, &[])?
+            .get()
+            .await?
+            .query(query, &[])
+            .await?
             .iter()
             .map(|row| {
                 let row = ImdbShowMap::from_row(row)?;
@@ -731,7 +759,7 @@ impl MovieCollection {
             .collect()
     }
 
-    pub fn print_tv_shows(&self) -> Result<Vec<TvShowsResult>, Error> {
+    pub async fn print_tv_shows(&self) -> Result<Vec<TvShowsResult>, Error> {
         let query = r#"
             SELECT b.show, c.link, c.title, c.source, count(*) as count
             FROM movie_queue a
@@ -742,14 +770,16 @@ impl MovieCollection {
             ORDER BY 1,2,3,4
         "#;
         self.get_pool()
-            .get()?
-            .query(query, &[])?
+            .get()
+            .await?
+            .query(query, &[])
+            .await?
             .iter()
             .map(|row| TvShowsResult::from_row(row).map_err(Into::into))
             .collect()
     }
 
-    pub fn get_new_episodes(
+    pub async fn get_new_episodes(
         &self,
         mindate: NaiveDate,
         maxdate: NaiveDate,
@@ -799,14 +829,16 @@ impl MovieCollection {
             maxdate = maxdate
         )?;
         self.get_pool()
-            .get()?
-            .query(query.sql(), query.parameters())?
+            .get()
+            .await?
+            .query(query.sql(), query.parameters())
+            .await?
             .iter()
             .map(|row| NewEpisodesResult::from_row(row).map_err(Into::into))
             .collect()
     }
 
-    pub fn find_new_episodes(
+    pub async fn find_new_episodes(
         &self,
         source: &Option<TvShowSource>,
         shows: &[String],
@@ -818,10 +850,11 @@ impl MovieCollection {
 
         let mut output = Vec::new();
 
-        let episodes =
-            self.get_new_episodes(mindate.naive_local(), maxdate.naive_local(), source)?;
+        let episodes = self
+            .get_new_episodes(mindate.naive_local(), maxdate.naive_local(), source)
+            .await?;
         'outer: for epi in episodes {
-            let movie_queue = mq.print_movie_queue(&[&epi.show])?;
+            let movie_queue = mq.print_movie_queue(&[&epi.show]).await?;
             for s in movie_queue {
                 if let Some(show) = &s.show {
                     if let Some(season) = &s.season {
@@ -844,7 +877,7 @@ impl MovieCollection {
         Ok(output)
     }
 
-    pub fn get_collection_after_timestamp(
+    pub async fn get_collection_after_timestamp(
         &self,
         timestamp: DateTime<Utc>,
     ) -> Result<Vec<MovieCollectionRow>, Error> {
@@ -857,15 +890,17 @@ impl MovieCollection {
             timestamp = timestamp
         );
         self.get_pool()
-            .get()?
-            .query(query.sql(), query.parameters())?
+            .get()
+            .await?
+            .query(query.sql(), query.parameters())
+            .await?
             .iter()
             .map(|row| MovieCollectionRow::from_row(row).map_err(Into::into))
             .collect()
     }
 }
 
-pub fn find_new_episodes_http_worker(
+pub async fn find_new_episodes_http_worker(
     pool: &PgPool,
     shows: Option<String>,
     source: &Option<TvShowSource>,
@@ -893,7 +928,7 @@ pub fn find_new_episodes_http_worker(
 
     let mq = MovieQueueDB::with_pool(&pool);
 
-    let episodes = mc.get_new_episodes(mindate, maxdate, &source)?;
+    let episodes = mc.get_new_episodes(mindate, maxdate, &source).await?;
 
     let shows: HashSet<String> = episodes
         .iter()
@@ -915,9 +950,9 @@ pub fn find_new_episodes_http_worker(
     let mut queue = Vec::new();
 
     for show in shows {
-        let movie_queue = mq.print_movie_queue(&[&show])?;
+        let movie_queue = mq.print_movie_queue(&[&show]).await?;
         for s in movie_queue {
-            if let Some(u) = mc.get_collection_index(&s.path)? {
+            if let Some(u) = mc.get_collection_index(&s.path).await? {
                 queue.push((
                     (
                         s.show

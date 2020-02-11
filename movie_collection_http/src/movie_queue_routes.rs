@@ -1,6 +1,6 @@
 #![allow(clippy::needless_pass_by_value)]
 
-use actix_web::web::{block, Data, Json, Path, Query};
+use actix_web::web::{Data, Json, Path, Query};
 use actix_web::HttpResponse;
 use anyhow::format_err;
 use serde::Serialize;
@@ -67,7 +67,7 @@ async fn queue_body_resp(
     patterns: Vec<String>,
     queue: Vec<MovieQueueResult>,
 ) -> Result<HttpResponse, Error> {
-    let entries = block(move || movie_queue_http(&queue)).await?;
+    let entries = movie_queue_http(&queue).await?;
     let body = movie_queue_body(&patterns, &entries);
     let resp = HttpResponse::Ok()
         .content_type("text/html; charset=utf-8")
@@ -79,7 +79,7 @@ pub async fn movie_queue(_: LoggedUser, state: Data<AppState>) -> Result<HttpRes
     let req = MovieQueueRequest {
         patterns: Vec::new(),
     };
-    let (queue, _) = block(move || state.db.handle(req)).await?;
+    let (queue, _) = state.db.handle(req).await?;
     queue_body_resp(Vec::new(), queue).await
 }
 
@@ -92,7 +92,7 @@ pub async fn movie_queue_show(
     let patterns = vec![path];
 
     let req = MovieQueueRequest { patterns };
-    let (queue, patterns) = block(move || state.db.handle(req)).await?;
+    let (queue, patterns) = state.db.handle(req).await?;
     queue_body_resp(patterns, queue).await
 }
 
@@ -104,7 +104,7 @@ pub async fn movie_queue_delete(
     let path = path.into_inner();
 
     let req = QueueDeleteRequest { path };
-    let body = block(move || state.db.handle(req)).await?;
+    let body = state.db.handle(req).await?;
     form_http_response(body)
 }
 
@@ -134,7 +134,7 @@ pub async fn movie_queue_transcode(
     let patterns = vec![path];
 
     let req = MovieQueueRequest { patterns };
-    let (entries, _) = block(move || state.db.handle(req)).await?;
+    let (entries, _) = state.db.handle(req).await?;
     transcode_worker(None, &entries)
 }
 
@@ -147,7 +147,7 @@ pub async fn movie_queue_transcode_directory(
     let patterns = vec![file];
 
     let req = MovieQueueRequest { patterns };
-    let (entries, _) = block(move || state.db.handle(req)).await?;
+    let (entries, _) = state.db.handle(req).await?;
     transcode_worker(Some(&directory), &entries)
 }
 
@@ -193,7 +193,7 @@ pub async fn movie_queue_play(
     let idx = idx.into_inner();
 
     let req = MoviePathRequest { idx };
-    let x = block(move || state.db.handle(req)).await?;
+    let x = state.db.handle(req).await?;
     play_worker(x)
 }
 
@@ -207,7 +207,7 @@ pub async fn imdb_show(
     let query = query.into_inner();
 
     let req = ImdbShowRequest { show, query };
-    let x = block(move || state.db.handle(req)).await?;
+    let x = state.db.handle(req).await?;
     form_http_response(x)
 }
 
@@ -237,7 +237,7 @@ pub async fn find_new_episodes(
     state: Data<AppState>,
 ) -> Result<HttpResponse, Error> {
     let req = query.into_inner();
-    let entries = block(move || state.db.handle(req)).await?;
+    let entries = state.db.handle(req).await?;
     new_episode_worker(&entries)
 }
 
@@ -247,7 +247,7 @@ pub async fn imdb_episodes_route(
     state: Data<AppState>,
 ) -> Result<HttpResponse, Error> {
     let req = query.into_inner();
-    let x = block(move || state.db.handle(req)).await?;
+    let x = state.db.handle(req).await?;
     to_json(&x)
 }
 
@@ -259,7 +259,7 @@ pub async fn imdb_episodes_update(
     let episodes = data.into_inner();
 
     let req = episodes;
-    block(move || state.db.handle(req)).await?;
+    state.db.handle(req).await?;
     form_http_response("Success".to_string())
 }
 
@@ -269,7 +269,7 @@ pub async fn imdb_ratings_route(
     state: Data<AppState>,
 ) -> Result<HttpResponse, Error> {
     let req = query.into_inner();
-    let x = block(move || state.db.handle(req)).await?;
+    let x = state.db.handle(req).await?;
     to_json(&x)
 }
 
@@ -281,7 +281,7 @@ pub async fn imdb_ratings_update(
     let shows = data.into_inner();
 
     let req = shows;
-    block(move || state.db.handle(req)).await?;
+    state.db.handle(req).await?;
     form_http_response("Success".to_string())
 }
 
@@ -291,7 +291,7 @@ pub async fn movie_queue_route(
     state: Data<AppState>,
 ) -> Result<HttpResponse, Error> {
     let req = query.into_inner();
-    let x = block(move || state.db.handle(req)).await?;
+    let x = state.db.handle(req).await?;
     to_json(&x)
 }
 
@@ -303,7 +303,7 @@ pub async fn movie_queue_update(
     let queue = data.into_inner();
 
     let req = queue;
-    block(move || state.db.handle(req)).await?;
+    state.db.handle(req).await?;
     form_http_response("Success".to_string())
 }
 
@@ -313,7 +313,7 @@ pub async fn movie_collection_route(
     state: Data<AppState>,
 ) -> Result<HttpResponse, Error> {
     let req = query.into_inner();
-    let x = block(move || state.db.handle(req)).await?;
+    let x = state.db.handle(req).await?;
     to_json(&x)
 }
 
@@ -325,7 +325,7 @@ pub async fn movie_collection_update(
     let collection = data.into_inner();
 
     let req = collection;
-    block(move || state.db.handle(req)).await?;
+    state.db.handle(req).await?;
     form_http_response("Success".to_string())
 }
 
@@ -334,7 +334,7 @@ pub async fn last_modified_route(
     state: Data<AppState>,
 ) -> Result<HttpResponse, Error> {
     let req = LastModifiedRequest {};
-    let x = block(move || state.db.handle(req)).await?;
+    let x = state.db.handle(req).await?;
     to_json(&x)
 }
 
@@ -403,9 +403,9 @@ fn tvshows_worker(res1: TvShowsMap, tvshows: Vec<TvShowsResult>) -> Result<Strin
 
 pub async fn tvshows(_: LoggedUser, state: Data<AppState>) -> Result<HttpResponse, Error> {
     let s = state.clone();
-    let shows = block(move || s.db.handle(TvShowsRequest {})).await?;
-    let res1 = block(move || state.db.handle(WatchlistShowsRequest {})).await?;
-    let entries = block(move || tvshows_worker(res1, shows)).await?;
+    let shows = s.db.handle(TvShowsRequest {}).await?;
+    let res1 = state.db.handle(WatchlistShowsRequest {}).await?;
+    let entries = tvshows_worker(res1, shows)?;
 
     let resp = HttpResponse::Ok()
         .content_type("text/html; charset=utf-8")
@@ -523,7 +523,7 @@ fn watchlist_worker(
 
 pub async fn trakt_watchlist(_: LoggedUser, state: Data<AppState>) -> Result<HttpResponse, Error> {
     let req = WatchlistShowsRequest {};
-    let x = block(move || state.db.handle(req)).await?;
+    let x = state.db.handle(req).await?;
     watchlist_worker(x)
 }
 
@@ -548,7 +548,7 @@ pub async fn trakt_watchlist_action(
     let action = TraktActions::from_command(&action);
 
     let req = WatchlistActionRequest { action, imdb_url };
-    let imdb_url = block(move || state.db.handle(req)).await?;
+    let imdb_url = state.db.handle(req).await?;
     watchlist_action_worker(action, &imdb_url)
 }
 
@@ -599,12 +599,12 @@ pub async fn trakt_watched_seasons(
 ) -> Result<HttpResponse, Error> {
     let imdb_url = path.into_inner();
     let s = state.clone();
-    let show_opt = block(move || s.db.handle(ImdbRatingsRequest { imdb_url })).await?;
+    let show_opt = s.db.handle(ImdbRatingsRequest { imdb_url }).await?;
     let empty = || ("".to_string(), "".to_string(), "".to_string());
     let (imdb_url, show, link) =
         show_opt.map_or_else(empty, |(imdb_url, t)| (imdb_url, t.show, t.link));
-    let entries = block(move || state.db.handle(ImdbSeasonsRequest { show })).await?;
-    let entries = block(move || trakt_watched_seasons_worker(&link, &imdb_url, &entries)).await?;
+    let entries = state.db.handle(ImdbSeasonsRequest { show }).await?;
+    let entries = trakt_watched_seasons_worker(&link, &imdb_url, &entries)?;
     let resp = HttpResponse::Ok()
         .content_type("text/html; charset=utf-8")
         .body(entries);
@@ -619,7 +619,7 @@ pub async fn trakt_watched_list(
     let (imdb_url, season) = path.into_inner();
 
     let req = WatchedListRequest { imdb_url, season };
-    let x = block(move || state.db.handle(req)).await?;
+    let x = state.db.handle(req).await?;
     form_http_response(x)
 }
 
@@ -636,7 +636,7 @@ pub async fn trakt_watched_action(
         season,
         episode,
     };
-    let x = block(move || state.db.handle(req)).await?;
+    let x = state.db.handle(req).await?;
     form_http_response(x)
 }
 
@@ -655,6 +655,6 @@ fn trakt_cal_worker(entries: &[String]) -> Result<HttpResponse, Error> {
 
 pub async fn trakt_cal(_: LoggedUser, state: Data<AppState>) -> Result<HttpResponse, Error> {
     let req = TraktCalRequest {};
-    let entries = block(move || state.db.handle(req)).await?;
+    let entries = state.db.handle(req).await?;
     trakt_cal_worker(&entries)
 }

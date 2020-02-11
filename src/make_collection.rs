@@ -7,7 +7,7 @@ use std::io::Write;
 use movie_collection_lib::movie_collection::MovieCollection;
 use movie_collection_lib::utils::{get_version_number, get_video_runtime};
 
-fn make_collection() -> Result<(), Error> {
+async fn make_collection() -> Result<(), Error> {
     let matches = App::new("Collection Query/Parser")
         .version(get_version_number().as_str())
         .author("Daniel Boline <ddboline@gmail.com>")
@@ -46,10 +46,10 @@ fn make_collection() -> Result<(), Error> {
 
     let mc = MovieCollection::new();
     if do_parse {
-        mc.make_collection()?;
-        mc.fix_collection_show_id()?;
+        mc.make_collection().await?;
+        mc.fix_collection_show_id().await?;
     } else {
-        let shows = mc.search_movie_collection(&shows)?;
+        let shows = mc.search_movie_collection(&shows).await?;
         if do_time {
             let shows: Result<Vec<_>, Error> = shows
                 .into_par_iter()
@@ -70,10 +70,11 @@ fn make_collection() -> Result<(), Error> {
     Ok(())
 }
 
-fn main() {
+#[tokio::main]
+async fn main() {
     env_logger::init();
 
-    match make_collection() {
+    match make_collection().await {
         Ok(_) => {}
         Err(e) => {
             if !e.to_string().contains("Broken pipe") {

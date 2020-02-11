@@ -6,7 +6,7 @@ use movie_collection_lib::movie_collection::MovieCollection;
 use movie_collection_lib::parse_imdb::{ParseImdb, ParseImdbOptions};
 use movie_collection_lib::utils::get_version_number;
 
-fn parse_imdb_parser() -> Result<(), Error> {
+async fn parse_imdb_parser() -> Result<(), Error> {
     let matches = App::new("Parse IMDB")
         .version(get_version_number().as_str())
         .author("Daniel Boline <ddboline@gmail.com>")
@@ -91,7 +91,7 @@ fn parse_imdb_parser() -> Result<(), Error> {
         update_database,
     };
 
-    let output = pi.parse_imdb_worker(&opts)?;
+    let output = pi.parse_imdb_worker(&opts).await?;
 
     let stdout = stdout();
 
@@ -102,10 +102,11 @@ fn parse_imdb_parser() -> Result<(), Error> {
     Ok(())
 }
 
-fn main() {
+#[tokio::main]
+async fn main() {
     env_logger::init();
 
-    match parse_imdb_parser() {
+    match parse_imdb_parser().await {
         Ok(_) => (),
         Err(e) => {
             if e.to_string().contains("Broken pipe") {

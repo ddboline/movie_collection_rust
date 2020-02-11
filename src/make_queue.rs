@@ -4,7 +4,7 @@ use clap::{App, Arg};
 use movie_collection_lib::make_queue::make_queue_worker;
 use movie_collection_lib::utils::get_version_number;
 
-fn make_queue() -> Result<(), Error> {
+async fn make_queue() -> Result<(), Error> {
     let matches = App::new("Parse IMDB")
         .version(get_version_number().as_str())
         .author("Daniel Boline <ddboline@gmail.com>")
@@ -60,13 +60,14 @@ fn make_queue() -> Result<(), Error> {
     let do_shows = matches.is_present("shows");
 
     let patterns: Vec<_> = patterns.iter().map(String::as_str).collect();
-    make_queue_worker(add_files, del_files, do_time, &patterns, do_shows)
+    make_queue_worker(add_files, del_files, do_time, &patterns, do_shows).await
 }
 
-fn main() {
+#[tokio::main]
+async fn main() {
     env_logger::init();
 
-    match make_queue() {
+    match make_queue().await {
         Ok(_) => (),
         Err(e) => {
             if e.to_string().contains("Broken pipe") {

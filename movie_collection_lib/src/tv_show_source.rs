@@ -1,10 +1,10 @@
 use anyhow::{format_err, Error};
 use bytes::BytesMut;
-use postgres::types::{FromSql, IsNull, ToSql, Type};
 use serde::{Deserialize, Serialize};
 use std::cmp::Ordering;
 use std::fmt;
 use std::str::FromStr;
+use tokio_postgres::types::{FromSql, IsNull, ToSql, Type};
 
 #[derive(Serialize, Deserialize, Clone, Debug, Eq)]
 pub enum TvShowSource {

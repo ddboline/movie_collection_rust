@@ -4,11 +4,13 @@ use std::env::var;
 
 use movie_collection_lib::pgpool::PgPool;
 
-pub fn fill_from_db(pool: &PgPool) -> Result<(), Error> {
+pub async fn fill_from_db(pool: &PgPool) -> Result<(), Error> {
     let query = "SELECT email FROM authorized_users";
     let results: Result<Vec<_>, Error> = pool
-        .get()?
-        .query(query, &[])?
+        .get()
+        .await?
+        .query(query, &[])
+        .await?
         .iter()
         .map(|row| {
             let email: String = row.try_get(0)?;

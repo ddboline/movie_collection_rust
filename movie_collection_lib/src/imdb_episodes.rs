@@ -55,7 +55,7 @@ impl ImdbEpisodes {
         }
     }
 
-    pub fn get_index(&self, pool: &PgPool) -> Result<Option<i32>, Error> {
+    pub async fn get_index(&self, pool: &PgPool) -> Result<Option<i32>, Error> {
         let query = postgres_query::query!(
             r#"
             SELECT id
@@ -66,7 +66,13 @@ impl ImdbEpisodes {
             season = self.season,
             episode = self.episode
         );
-        if let Some(row) = pool.get()?.query(query.sql(), query.parameters())?.get(0) {
+        if let Some(row) = pool
+            .get()
+            .await?
+            .query(query.sql(), query.parameters())
+            .await?
+            .get(0)
+        {
             let id: i32 = row.try_get("id")?;
             Ok(Some(id))
         } else {
@@ -74,14 +80,14 @@ impl ImdbEpisodes {
         }
     }
 
-    pub fn from_index(idx: i32, pool: &PgPool) -> Result<Option<Self>, Error> {
+    pub async fn from_index(idx: i32, pool: &PgPool) -> Result<Option<Self>, Error> {
         let query = r#"
             SELECT a.show, b.title, a.season, a.episode, a.airdate,
                    cast(a.rating as double precision) as rating, a.eptitle, a.epurl
             FROM imdb_episodes a
             JOIN imdb_ratings b ON a.show = b.show
             WHERE a.id = $1"#;
-        if let Some(row) = pool.get()?.query(query, &[&idx])?.get(0) {
+        if let Some(row) = pool.get().await?.query(query, &[&idx]).await?.get(0) {
             let epi = Self::from_row(row)?;
             Ok(Some(epi))
         } else {
@@ -89,7 +95,7 @@ impl ImdbEpisodes {
         }
     }
 
-    pub fn get_episodes_after_timestamp(
+    pub async fn get_episodes_after_timestamp(
         timestamp: DateTime<Utc>,
         pool: &PgPool,
     ) -> Result<Vec<Self>, Error> {
@@ -103,8 +109,10 @@ impl ImdbEpisodes {
         "#,
             timestamp = timestamp
         );
-        pool.get()?
-            .query(query.sql(), query.parameters())?
+        pool.get()
+            .await?
+            .query(query.sql(), query.parameters())
+            .await?
             .iter()
             .map(|row| {
                 let epi = Self::from_row(row)?;
@@ -113,9 +121,9 @@ impl ImdbEpisodes {
             .collect()
     }
 
-    pub fn insert_episode(&self, pool: &PgPool) -> Result<(), Error> {
-        if self.get_index(pool)?.is_some() {
-            return self.update_episode(pool);
+    pub async fn insert_episode(&self, pool: &PgPool) -> Result<(), Error> {
+        if self.get_index(pool).await?.is_some() {
+            return self.update_episode(pool).await;
         }
         let query = postgres_query::query_dyn!(
             &format!(
@@ -134,13 +142,15 @@ impl ImdbEpisodes {
             eptitle = self.eptitle,
             epurl = self.epurl
         )?;
-        pool.get()?
+        pool.get()
+            .await?
             .execute(query.sql(), query.parameters())
+            .await
             .map(|_| ())
             .map_err(Into::into)
     }
 
-    pub fn update_episode(&self, pool: &PgPool) -> Result<(), Error> {
+    pub async fn update_episode(&self, pool: &PgPool) -> Result<(), Error> {
         let query = postgres_query::query_dyn!(
             &format!(
                 r#"
@@ -157,8 +167,10 @@ impl ImdbEpisodes {
             season = self.season,
             episode = self.episode
         )?;
-        pool.get()?
+        pool.get()
+            .await?
             .execute(query.sql(), query.parameters())
+            .await
             .map(|_| ())
             .map_err(Into::into)
     }

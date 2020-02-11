@@ -38,7 +38,7 @@ impl fmt::Display for ImdbRatings {
 }
 
 impl ImdbRatings {
-    pub fn insert_show(&self, pool: &PgPool) -> Result<(), Error> {
+    pub async fn insert_show(&self, pool: &PgPool) -> Result<(), Error> {
         let source = self.source.as_ref().map(ToString::to_string);
         let query = postgres_query::query!(
             r#"
@@ -55,13 +55,15 @@ impl ImdbRatings {
             source = source
         );
         debug!("{:?}", self);
-        pool.get()?
+        pool.get()
+            .await?
             .execute(query.sql(), query.parameters())
+            .await
             .map(|_| ())
             .map_err(Into::into)
     }
 
-    pub fn update_show(&self, pool: &PgPool) -> Result<(), Error> {
+    pub async fn update_show(&self, pool: &PgPool) -> Result<(), Error> {
         let query = postgres_query::query!(
             r#"
                 UPDATE imdb_ratings
@@ -72,13 +74,15 @@ impl ImdbRatings {
             title = self.title,
             show = self.show
         );
-        pool.get()?
+        pool.get()
+            .await?
             .execute(query.sql(), query.parameters())
+            .await
             .map(|_| ())
             .map_err(Into::into)
     }
 
-    pub fn get_show_by_link(link: &str, pool: &PgPool) -> Result<Option<Self>, Error> {
+    pub async fn get_show_by_link(link: &str, pool: &PgPool) -> Result<Option<Self>, Error> {
         let query = postgres_query::query!(
             r#"
                 SELECT index, show, title, link, rating, istv, source
@@ -87,14 +91,20 @@ impl ImdbRatings {
             "#,
             link = link
         );
-        if let Some(row) = pool.get()?.query(query.sql(), query.parameters())?.get(0) {
+        if let Some(row) = pool
+            .get()
+            .await?
+            .query(query.sql(), query.parameters())
+            .await?
+            .get(0)
+        {
             Ok(Some(Self::from_row(row)?))
         } else {
             Ok(None)
         }
     }
 
-    pub fn get_shows_after_timestamp(
+    pub async fn get_shows_after_timestamp(
         timestamp: DateTime<Utc>,
         pool: &PgPool,
     ) -> Result<Vec<Self>, Error> {
@@ -106,8 +116,10 @@ impl ImdbRatings {
             "#,
             timestamp = timestamp
         );
-        pool.get()?
-            .query(query.sql(), query.parameters())?
+        pool.get()
+            .await?
+            .query(query.sql(), query.parameters())
+            .await?
             .iter()
             .map(|row| Ok(Self::from_row(row)?))
             .collect()

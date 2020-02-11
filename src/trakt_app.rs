@@ -6,7 +6,7 @@ use movie_collection_lib::trakt_utils::{
 };
 use movie_collection_lib::utils::get_version_number;
 
-fn trakt_app() -> Result<(), Error> {
+async fn trakt_app() -> Result<(), Error> {
     let matches = App::new("Trakt Query/Parser")
         .version(get_version_number().as_str())
         .author("Daniel Boline <ddboline@gmail.com>")
@@ -58,16 +58,17 @@ fn trakt_app() -> Result<(), Error> {
     };
 
     if do_parse {
-        sync_trakt_with_db()
+        sync_trakt_with_db().await
     } else {
-        trakt_app_parse(&trakt_command, trakt_action, show, season, &episode)
+        trakt_app_parse(&trakt_command, trakt_action, show, season, &episode).await
     }
 }
 
-fn main() {
+#[tokio::main]
+async fn main() {
     env_logger::init();
 
-    match trakt_app() {
+    match trakt_app().await {
         Ok(_) => (),
         Err(e) => {
             if e.to_string().contains("Broken pipe") {

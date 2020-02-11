@@ -1,13 +1,15 @@
-use anyhow::Error;
-use postgres::NoTls;
-use r2d2::{Pool, PooledConnection};
-use r2d2_postgres::PostgresConnectionManager;
+use anyhow::{format_err, Error};
+use deadpool::managed::Object;
+use deadpool_postgres::{ClientWrapper, Config, Pool};
+use std::env::set_var;
 use std::fmt;
+use tokio_postgres::error::Error as PgError;
+use tokio_postgres::{Config as PgConfig, NoTls};
 
-#[derive(Clone)]
+#[derive(Clone, Default)]
 pub struct PgPool {
     pgurl: String,
-    pool: Pool<PostgresConnectionManager<NoTls>>,
+    pool: Option<Pool>,
 }
 
 impl fmt::Debug for PgPool {
@@ -16,19 +18,42 @@ impl fmt::Debug for PgPool {
     }
 }
 
+impl PartialEq for PgPool {
+    fn eq(&self, other: &Self) -> bool {
+        self.pgurl == other.pgurl
+    }
+}
+
 impl PgPool {
     pub fn new(pgurl: &str) -> Self {
-        let manager = PostgresConnectionManager::new(
-            pgurl.parse().expect("Failed to parse DB connection"),
-            NoTls,
-        );
+        let pgconf: PgConfig = pgurl.parse().expect("Failed to parse Url");
+
+        if let tokio_postgres::config::Host::Tcp(s) = &pgconf.get_hosts()[0] {
+            set_var("PG_HOST", s);
+        }
+        pgconf.get_user().map(|u| set_var("PG_USER", u));
+        pgconf
+            .get_password()
+            .map(|u| set_var("PG_PASSWORD", String::from_utf8_lossy(u).to_string()));
+        pgconf.get_dbname().map(|u| set_var("PG_DBNAME", u));
+
+        let config = Config::from_env("PG").expect("Failed to create config");
         Self {
             pgurl: pgurl.to_string(),
-            pool: Pool::new(manager).expect("Failed to open DB connection"),
+            pool: Some(
+                config
+                    .create_pool(NoTls)
+                    .expect(&format!("Failed to create pool {}", pgurl)),
+            ),
         }
     }
 
-    pub fn get(&self) -> Result<PooledConnection<PostgresConnectionManager<NoTls>>, Error> {
-        self.pool.get().map_err(Into::into)
+    pub async fn get(&self) -> Result<Object<ClientWrapper, PgError>, Error> {
+        self.pool
+            .as_ref()
+            .ok_or_else(|| format_err!("No Pool Exists"))?
+            .get()
+            .await
+            .map_err(Into::into)
     }
 }
