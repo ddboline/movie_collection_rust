@@ -16,7 +16,7 @@ clap = "2.33"
 dotenv = "0.15"
 amqp = {version="0.1", default_features=false}
 select = "0.4"
-reqwest = {version="0.10", features=["cookies", "blocking", "json"]}
+reqwest = {version="0.10", features=["cookies", "json"]}
 chrono = { version = "0.4", features = ["serde"] }
 rand = "0.7"
 futures = "0.3"
@@ -32,3 +32,5 @@ anyhow = "1.0"
 thiserror = "1.0"
 dirs = "2.0"
 tokio = {version="0.2", features=["full"]}
+async-trait = "0.1"
+futures-retry = "0.4"

@@ -117,7 +117,7 @@ impl ParseImdb {
         output: &mut Vec<Vec<String>>,
     ) -> Result<(), Error> {
         let imdb_conn = ImdbConnection::new();
-        let results = imdb_conn.parse_imdb(&opts.show.replace("_", " "))?;
+        let results = imdb_conn.parse_imdb(&opts.show.replace("_", " ")).await?;
         let results = if let Some(ilink) = &opts.imdb_link {
             results.into_iter().filter(|r| &r.link == ilink).collect()
         } else {
@@ -170,7 +170,9 @@ impl ParseImdb {
         } else if let Some(link) = link {
             output.push(vec![format!("Using {}", link)]);
             if let Some(result) = shows.get(&link) {
-                let episode_list = imdb_conn.parse_imdb_episode_list(&link, opts.season)?;
+                let episode_list = imdb_conn
+                    .parse_imdb_episode_list(&link, opts.season)
+                    .await?;
                 for episode in episode_list {
                     output.push(vec![format!("{} {}", result, episode)]);
                     if opts.update_database {

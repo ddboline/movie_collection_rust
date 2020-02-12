@@ -1,8 +1,7 @@
-use anyhow::{format_err, Error};
+use anyhow::{ Error};
 use chrono::NaiveDate;
-use rayon::iter::{IntoParallelIterator, ParallelIterator};
-use reqwest::blocking::Client;
-use reqwest::Url;
+use futures::future::try_join_all;
+use reqwest::{Client, Url};
 use select::document::Document;
 use select::predicate::{Class, Name};
 use std::fmt;
@@ -79,12 +78,12 @@ impl ImdbConnection {
         }
     }
 
-    pub fn parse_imdb(&self, title: &str) -> Result<Vec<ImdbTuple>, Error> {
+    pub async fn parse_imdb(&self, title: &str) -> Result<Vec<ImdbTuple>, Error> {
         let endpoint = "http://www.imdb.com/find?";
         let url = Url::parse_with_params(endpoint, &[("s", "all"), ("q", title)])?;
-        let body = self.get(&url)?.text()?;
+        let body = self.get(&url).await?.text().await?;
 
-        Document::from(body.as_str())
+        let tl_vec: Vec<_> = Document::from(body.as_str())
             .find(Class("result_text"))
             .flat_map(|tr| {
                 let title = tr.text().trim().to_string();
@@ -93,7 +92,7 @@ impl ImdbConnection {
                         if let Some(link) = a.attr("href") {
                             if let Some(link) = link.split('/').nth(2) {
                                 if link.starts_with("tt") {
-                                    Some((title.to_string(), link))
+                                    Some((title.to_string(), link.to_string()))
                                 } else {
                                     None
                                 }
@@ -106,18 +105,23 @@ impl ImdbConnection {
                     })
                     .collect::<Vec<_>>()
             })
-            .map(|(t, l)| {
-                let r = self.parse_imdb_rating(l)?;
+            .collect();
+
+        let futures: Vec<_> = tl_vec
+            .into_iter()
+            .map(|(t, l)| async move {
+                let r = self.parse_imdb_rating(&l).await?;
                 Ok(ImdbTuple {
                     title: t,
                     link: l.to_string(),
                     rating: r.rating.unwrap_or(-1.0),
                 })
             })
-            .collect()
+            .collect();
+        try_join_all(futures).await
     }
 
-    pub fn parse_imdb_rating(&self, title: &str) -> Result<RatingOutput, Error> {
+    pub async fn parse_imdb_rating(&self, title: &str) -> Result<RatingOutput, Error> {
         let mut output = RatingOutput {
             rating: None,
             count: None,
@@ -128,9 +132,9 @@ impl ImdbConnection {
         };
 
         let url = Url::parse("http://www.imdb.com/title/")?.join(title)?;
-        let body = self.get(&url)?.text()?;
-        let document = Document::from(body.as_str());
+        let body = self.get(&url).await?.text().await?;
 
+        let document = Document::from(body.as_str());
         for span in document.find(Name("span")) {
             if let Some("ratingValue") = span.attr("itemprop") {
                 output.rating = Some(span.text().parse()?);
@@ -142,15 +146,16 @@ impl ImdbConnection {
         Ok(output)
     }
 
-    pub fn parse_imdb_episode_list(
+    pub async fn parse_imdb_episode_list(
         &self,
         imdb_id: &str,
         season: Option<i32>,
     ) -> Result<Vec<ImdbEpisodeResult>, Error> {
         let endpoint: String = format!("http://m.imdb.com/title/{}/episodes", imdb_id);
         let url = Url::parse(&endpoint)?;
-        let body = self.get(&url)?.text()?;
-        Document::from(body.as_str())
+        let body = self.get(&url).await?.text().await?;
+
+        let ep_season_vec: Vec<_> = Document::from(body.as_str())
             .find(Name("a"))
             .filter_map(|a| {
                 if let Some("season") = a.attr("class") {
@@ -160,7 +165,7 @@ impl ImdbConnection {
                             "{}/{}/episodes/{}",
                             "http://www.imdb.com/title", imdb_id, link
                         );
-                        Some((episodes_url, season_))
+                        Some((episodes_url, season_.to_string()))
                     } else {
                         None
                     }
@@ -168,38 +173,36 @@ impl ImdbConnection {
                     None
                 }
             })
-            .flat_map(|(episodes_url, season_str)| {
-                let season_: i32 = match season_str.parse() {
-                    Ok(s) => s,
-                    Err(e) => return vec![Err(format_err!(e))],
-                };
+            .collect();
+
+        let futures: Vec<_> = ep_season_vec
+            .into_iter()
+            .map(|(episodes_url, season_str)| async move {
+                let season_: i32 = season_str.parse()?;
                 if let Some(s) = season {
                     if s != season_ {
-                        return Vec::new();
+                        return Ok(Vec::new());
                     }
                 }
-                let results: Vec<Result<_, Error>> =
-                    match self.parse_episodes_url(&episodes_url, season_) {
-                        Ok(v) => v.into_iter().map(Ok).collect(),
-                        Err(e) => vec![Err(format_err!(e))],
-                    };
-                results
+                self.parse_episodes_url(&episodes_url, season_).await
             })
-            .collect()
+            .collect();
+
+        let results: Vec<_> = try_join_all(futures).await?.into_iter().flatten().collect();
+        Ok(results)
     }
 
-    fn parse_episodes_url(
+    async fn parse_episodes_url(
         &self,
         episodes_url: &str,
         season: i32,
     ) -> Result<Vec<ImdbEpisodeResult>, Error> {
         let episodes_url = Url::parse(&episodes_url)?;
-        let body = self.get(&episodes_url)?.text()?;
-        let document = Document::from(body.as_str());
+        let body = self.get(&episodes_url).await?.text().await?;
 
         let mut results = Vec::new();
 
-        for div in document.find(Name("div")) {
+        for div in Document::from(body.as_str()).find(Name("div")) {
             if let Some("info") = div.attr("class") {
                 if let Some("episodes") = div.attr("itemprop") {
                     let mut result = ImdbEpisodeResult::default();
@@ -239,17 +242,20 @@ impl ImdbConnection {
                 }
             }
         }
+        let results = results;
 
-        results
-            .into_par_iter()
-            .map(|mut result| {
+        let futures: Vec<_> = results
+            .into_iter()
+            .map(|mut result| async {
                 if let Some(link) = result.epurl.as_ref() {
-                    let r = self.parse_imdb_rating(&link)?;
+                    let r = self.parse_imdb_rating(&link).await?;
                     result.rating = r.rating;
                     result.nrating = r.count;
                 }
                 Ok(result)
             })
-            .collect()
+            .collect();
+
+        try_join_all(futures).await
     }
 }
