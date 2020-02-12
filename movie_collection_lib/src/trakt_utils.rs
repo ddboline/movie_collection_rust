@@ -8,6 +8,7 @@ use std::collections::{HashMap, HashSet};
 use std::fmt;
 use std::io;
 use std::io::Write;
+use std::sync::Arc;
 use tokio::task::spawn_blocking;
 
 use crate::imdb_episodes::ImdbEpisodes;
@@ -535,7 +536,7 @@ pub async fn sync_trakt_with_db() -> Result<(), Error> {
     let mc = MovieCollection::new();
 
     let watchlist_shows_db = get_watchlist_shows_db(&mc.pool).await?;
-    let watchlist_shows = trakt_instance::get_watchlist_shows()?;
+    let watchlist_shows = spawn_blocking(move || trakt_instance::get_watchlist_shows()).await??;
     if watchlist_shows.is_empty() {
         return Ok(());
     }
@@ -554,7 +555,7 @@ pub async fn sync_trakt_with_db() -> Result<(), Error> {
         .into_iter()
         .map(|s| ((s.imdb_url.to_string(), s.season, s.episode), s))
         .collect();
-    let watched_shows = trakt_instance::get_watched_shows()?;
+    let watched_shows = spawn_blocking(move || trakt_instance::get_watched_shows()).await??;
     if watched_shows.is_empty() {
         return Ok(());
     }
@@ -570,7 +571,7 @@ pub async fn sync_trakt_with_db() -> Result<(), Error> {
         .into_iter()
         .map(|s| (s.imdb_url.to_string(), s))
         .collect();
-    let watched_movies = trakt_instance::get_watched_movies()?;
+    let watched_movies = spawn_blocking(move || trakt_instance::get_watched_movies()).await??;
     if watched_movies.is_empty() {
         return Ok(());
     }
@@ -613,7 +614,7 @@ async fn get_imdb_url_from_show(
 }
 
 async fn trakt_cal_list(mc: &MovieCollection) -> Result<(), Error> {
-    let cal_entries = trakt_instance::get_calendar()?;
+    let cal_entries = spawn_blocking(move || trakt_instance::get_calendar()).await??;
     for cal in cal_entries {
         let show = match ImdbRatings::get_show_by_link(&cal.link, &mc.pool).await? {
             Some(s) => s.show,
@@ -641,13 +642,17 @@ async fn trakt_cal_list(mc: &MovieCollection) -> Result<(), Error> {
 
 async fn watchlist_add(mc: &MovieCollection, show: Option<&str>) -> Result<(), Error> {
     if let Some(imdb_url) = get_imdb_url_from_show(&mc, show).await? {
+        let imdb_url_ = imdb_url.clone();
         writeln!(
             io::stdout().lock(),
             "result: {}",
-            trakt_instance::add_watchlist_show(&imdb_url)?
+            spawn_blocking(move || trakt_instance::add_watchlist_show(&imdb_url_)).await??
         )?;
         debug!("GOT HERE");
-        if let Some(show) = trakt_instance::get_watchlist_shows()?.get(&imdb_url) {
+        if let Some(show) = spawn_blocking(move || trakt_instance::get_watchlist_shows())
+            .await??
+            .get(&imdb_url)
+        {
             debug!("INSERT SHOW {}", show);
             show.insert_show(&mc.pool).await?;
         }
@@ -657,10 +662,11 @@ async fn watchlist_add(mc: &MovieCollection, show: Option<&str>) -> Result<(), E
 
 async fn watchlist_rm(mc: &MovieCollection, show: Option<&str>) -> Result<(), Error> {
     if let Some(imdb_url) = get_imdb_url_from_show(&mc, show).await? {
+        let imdb_url_ = imdb_url.clone();
         writeln!(
             io::stdout().lock(),
             "result: {}",
-            trakt_instance::remove_watchlist_show(&imdb_url)?
+            spawn_blocking(move || trakt_instance::remove_watchlist_show(&imdb_url_)).await??
         )?;
         if let Some(show) = WatchListShow::get_show_by_link(&imdb_url, &mc.pool).await? {
             show.delete_show(&mc.pool).await?;
@@ -686,7 +692,12 @@ async fn watched_add(
     if let Some(imdb_url) = get_imdb_url_from_show(&mc, show).await? {
         if season != -1 && !episode.is_empty() {
             for epi in episode {
-                trakt_instance::add_episode_to_watched(&imdb_url, season, *epi)?;
+                let epi_ = *epi;
+                let imdb_url_ = imdb_url.clone();
+                spawn_blocking(move || {
+                    trakt_instance::add_episode_to_watched(&imdb_url_, season, epi_)
+                })
+                .await??;
                 WatchedEpisode {
                     imdb_url: imdb_url.to_string(),
                     season,
@@ -697,7 +708,8 @@ async fn watched_add(
                 .await?;
             }
         } else {
-            trakt_instance::add_movie_to_watched(&imdb_url)?;
+            let imdb_url_ = imdb_url.clone();
+            spawn_blocking(move || trakt_instance::add_movie_to_watched(&imdb_url_)).await??;
             WatchedMovie {
                 imdb_url,
                 title: "".to_string(),
@@ -718,7 +730,12 @@ async fn watched_rm(
     if let Some(imdb_url) = get_imdb_url_from_show(&mc, show).await? {
         if season != -1 && !episode.is_empty() {
             for epi in episode {
-                trakt_instance::remove_episode_to_watched(&imdb_url, season, *epi)?;
+                let epi_ = *epi;
+                let imdb_url_ = imdb_url.clone();
+                spawn_blocking(move || {
+                    trakt_instance::remove_episode_to_watched(&imdb_url_, season, epi_)
+                })
+                .await??;
                 if let Some(epi_) =
                     WatchedEpisode::get_watched_episode(&mc.pool, &imdb_url, season, *epi).await?
                 {
@@ -726,7 +743,8 @@ async fn watched_rm(
                 }
             }
         } else {
-            trakt_instance::remove_movie_to_watched(&imdb_url)?;
+            let imdb_url_ = imdb_url.clone();
+            spawn_blocking(move || trakt_instance::remove_movie_to_watched(&imdb_url_)).await??;
             if let Some(movie) = WatchedMovie::get_watched_movie(&mc.pool, &imdb_url).await? {
                 movie.delete_movie(&mc.pool).await?;
             }
@@ -923,13 +941,19 @@ pub async fn watched_action_http_worker(
     episode: i32,
 ) -> Result<String, Error> {
     let mc = MovieCollection::with_pool(&pool)?;
+    let imdb_url = Arc::new(imdb_url.to_owned());
 
     let body = match action {
         TraktActions::Add => {
             let result = if season != -1 && episode != -1 {
-                trakt_instance::add_episode_to_watched(&imdb_url, season, episode)?
+                let imdb_url_ = Arc::clone(&imdb_url);
+                spawn_blocking(move || {
+                    trakt_instance::add_episode_to_watched(&imdb_url_, season, episode)
+                })
+                .await??
             } else {
-                trakt_instance::add_movie_to_watched(&imdb_url)?
+                let imdb_url_ = Arc::clone(&imdb_url);
+                spawn_blocking(move || trakt_instance::add_movie_to_watched(&imdb_url_)).await??
             };
             if season != -1 && episode != -1 {
                 WatchedEpisode {
@@ -952,10 +976,15 @@ pub async fn watched_action_http_worker(
             format!("{}", result)
         }
         TraktActions::Remove => {
+            let imdb_url_ = Arc::clone(&imdb_url);
             let result = if season != -1 && episode != -1 {
-                trakt_instance::remove_episode_to_watched(&imdb_url, season, episode)?
+                spawn_blocking(move || {
+                    trakt_instance::remove_episode_to_watched(&imdb_url_, season, episode)
+                })
+                .await??
             } else {
-                trakt_instance::remove_movie_to_watched(&imdb_url)?
+                spawn_blocking(move || trakt_instance::remove_movie_to_watched(&imdb_url_))
+                    .await??
             };
 
             if season != -1 && episode != -1 {

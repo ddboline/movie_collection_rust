@@ -1,4 +1,4 @@
-use anyhow::{ Error};
+use anyhow::Error;
 use chrono::NaiveDate;
 use futures::future::try_join_all;
 use reqwest::{Client, Url};
