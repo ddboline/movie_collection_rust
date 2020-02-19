@@ -186,7 +186,7 @@ pub fn create_transcode_script(config: &Config, path: &Path) -> Result<String, E
 
 pub fn create_move_script(
     config: &Config,
-    directory: Option<&str>,
+    directory: Option<&Path>,
     unwatched: bool,
     path: &Path,
 ) -> Result<String, Error> {
@@ -194,19 +194,30 @@ pub fn create_move_script(
     let file_name = path.file_name().unwrap().to_string_lossy();
     let prefix = path.file_stem().unwrap().to_string_lossy().to_string();
     let output_dir = if let Some(d) = directory {
-        let d = format!("{}/Documents/movies/{}", config.preferred_dir, d);
-        if !Path::new(&d).exists() {
-            return Err(format_err!("Directory {} does not exist", d));
+        let d = Path::new(&config.preferred_dir)
+            .join("Documents")
+            .join("movies")
+            .join(d);
+        if !d.exists() {
+            return Err(format_err!(
+                "Directory {} does not exist",
+                d.to_string_lossy()
+            ));
         }
         d
     } else if unwatched {
-        let d = format!("{}/television/unwatched", config.preferred_dir);
-        if !Path::new(&d).exists() {
-            return Err(format_err!("Directory {} does not exist", d));
+        let d = Path::new(&config.preferred_dir)
+            .join("television")
+            .join("unwatched");
+        if !d.exists() {
+            return Err(format_err!(
+                "Directory {} does not exist",
+                d.to_string_lossy()
+            ));
         }
         d
     } else {
-        let file_stem = path.file_stem().unwrap().to_string_lossy().to_string();
+        let file_stem = path.file_stem().unwrap().to_string_lossy();
 
         let (show, season, episode) = parse_file_stem(&file_stem);
 
@@ -214,29 +225,35 @@ pub fn create_move_script(
             panic!("Failed to parse show season {} episode {}", season, episode);
         }
 
-        let d = format!(
-            "{}/Documents/television/{}/season{}",
-            config.preferred_dir, show, season
-        );
-        if !Path::new(&d).exists() {
+        let d = Path::new(&config.preferred_dir)
+            .join("Documents")
+            .join("television")
+            .join(show)
+            .join(format!("season{}", season));
+        if !d.exists() {
             create_dir_all(&d)?;
         }
         d
     };
-    let mp4_script = format!("{}/dvdrip/jobs/{}_copy.sh", config.home_dir, prefix);
+    let mp4_script = Path::new(&config.home_dir)
+        .join("dvdrip")
+        .join("jobs")
+        .join(format!("{}_copy.sh", prefix));
+    let outname = output_dir.join(&prefix).to_string_lossy().to_string();
+    let output_dir = output_dir.to_string_lossy();
 
     let script_str = include_str!("../../templates/move_script.sh")
         .replace("SHOW", &prefix)
-        .replace("OUTNAME", &format!("{}/{}", output_dir, prefix))
+        .replace("OUTNAME", &outname)
         .replace("FNAME", &file)
         .replace("BNAME", &file_name)
-        .replace("ONAME", &format!("{}/{}", output_dir, prefix));
+        .replace("ONAME", &outname);
 
     let mut f = File::create(&mp4_script)?;
     f.write_all(&script_str.into_bytes())?;
 
     writeln!(stdout().lock(), "dir {} file {}", output_dir, file)?;
-    Ok(mp4_script)
+    Ok(mp4_script.to_string_lossy().to_string())
 }
 
 pub fn parse_file_stem(file_stem: &str) -> (String, i32, i32) {
@@ -309,12 +326,11 @@ pub fn get_video_runtime(f: &str) -> Result<String, Error> {
 }
 
 pub fn remcom_single_file(
-    file: &str,
-    directory: Option<&str>,
+    path: &Path,
+    directory: Option<&Path>,
     unwatched: bool,
 ) -> Result<(), Error> {
     let config = Config::with_config()?;
-    let path = Path::new(&file);
     let ext = path
         .extension()
         .ok_or_else(|| format_err!("no extension"))?

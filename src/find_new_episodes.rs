@@ -9,9 +9,10 @@ use movie_collection_lib::tv_show_source::TvShowSource;
 #[derive(StructOpt)]
 /// Query and Parse Video Collection
 struct FindNewEpisodesOpt {
-    #[structopt(long, short)]
     /// Restrict Source (possible values: all, netflix, hulu, amazon)
+    #[structopt(long, short)]
     source: Option<TvShowSource>,
+
     /// Only Show Some Shows
     shows: Vec<String>,
 }

@@ -13,12 +13,14 @@ use movie_collection_lib::utils::get_video_runtime;
 ///
 /// Query and Parse Video Collection
 struct MakeCollectionOpts {
-    #[structopt(short, long)]
     /// Parse collection for new videos
-    parse: bool,
     #[structopt(short, long)]
+    parse: bool,
+
     /// Compute Runtime
+    #[structopt(short, long)]
     time: bool,
+
     /// Shows to display
     shows: Vec<String>,
 }

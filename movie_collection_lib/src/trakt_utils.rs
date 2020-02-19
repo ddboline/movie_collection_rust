@@ -8,6 +8,7 @@ use std::collections::{HashMap, HashSet};
 use std::fmt;
 use std::io;
 use std::io::Write;
+use std::str::FromStr;
 use std::sync::Arc;
 use tokio::task::spawn_blocking;
 
@@ -29,14 +30,21 @@ pub enum TraktActions {
     Remove,
 }
 
-impl TraktActions {
-    pub fn from_command(command: &str) -> Self {
-        match command {
+impl From<&str> for TraktActions {
+    fn from(s: &str) -> Self {
+        match s {
             "list" => Self::List,
             "add" => Self::Add,
             "rm" | "del" => Self::Remove,
             _ => Self::None,
         }
+    }
+}
+
+impl FromStr for TraktActions {
+    type Err = ();
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        Ok(Self::from(s))
     }
 }
 
@@ -47,14 +55,21 @@ pub enum TraktCommands {
     Watched,
 }
 
-impl TraktCommands {
-    pub fn from_command(command: &str) -> Self {
-        match command {
+impl From<&str> for TraktCommands {
+    fn from(s: &str) -> Self {
+        match s {
             "cal" | "calendar" => Self::Calendar,
             "watchlist" => Self::WatchList,
             "watched" => Self::Watched,
             _ => Self::None,
         }
+    }
+}
+
+impl FromStr for TraktCommands {
+    type Err = ();
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        Ok(Self::from(s))
     }
 }
 

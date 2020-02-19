@@ -1,10 +1,10 @@
 use anyhow::{format_err, Error};
 use derive_more::Display;
 use rayon::iter::{IntoParallelIterator, ParallelIterator};
+use std::ffi::OsStr;
 use std::io;
 use std::io::Write;
 use std::path::{Path, PathBuf};
-use std::ffi::OsStr;
 
 use crate::movie_collection::MovieCollection;
 use crate::movie_queue::{MovieQueueDB, MovieQueueResult};
@@ -12,7 +12,7 @@ use crate::utils::{get_video_runtime, parse_file_stem};
 
 #[derive(Debug, Display)]
 pub enum PathOrIndex {
-    #[display(fmt="{:?}", _0)]
+    #[display(fmt = "{:?}", _0)]
     Path(PathBuf),
     Index(i32),
 }

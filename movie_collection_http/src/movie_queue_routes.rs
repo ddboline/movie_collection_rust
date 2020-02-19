@@ -109,13 +109,13 @@ pub async fn movie_queue_delete(
 }
 
 fn transcode_worker(
-    directory: Option<&str>,
+    directory: Option<&path::Path>,
     entries: &[MovieQueueResult],
 ) -> Result<HttpResponse, Error> {
     let entries: Result<Vec<_>, Error> = entries
         .iter()
         .map(|entry| {
-            remcom_single_file(&entry.path, directory, false)?;
+            remcom_single_file(&path::Path::new(&entry.path), directory, false)?;
             Ok(format!("{}", entry))
         })
         .collect();
@@ -148,7 +148,7 @@ pub async fn movie_queue_transcode_directory(
 
     let req = MovieQueueRequest { patterns };
     let (entries, _) = state.db.handle(req).await?;
-    transcode_worker(Some(&directory), &entries)
+    transcode_worker(Some(&path::Path::new(&directory)), &entries)
 }
 
 fn play_worker(full_path: String) -> Result<HttpResponse, Error> {
@@ -545,7 +545,7 @@ pub async fn trakt_watchlist_action(
     state: Data<AppState>,
 ) -> Result<HttpResponse, Error> {
     let (action, imdb_url) = path.into_inner();
-    let action = TraktActions::from_command(&action);
+    let action = action.parse().expect("impossible");
 
     let req = WatchlistActionRequest { action, imdb_url };
     let imdb_url = state.db.handle(req).await?;
@@ -631,7 +631,7 @@ pub async fn trakt_watched_action(
     let (action, imdb_url, season, episode) = path.into_inner();
 
     let req = WatchedActionRequest {
-        action: TraktActions::from_command(&action),
+        action: action.parse().expect("impossible"),
         imdb_url,
         season,
         episode,

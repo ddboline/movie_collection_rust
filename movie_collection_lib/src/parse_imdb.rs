@@ -1,6 +1,7 @@
 use anyhow::Error;
 use chrono::NaiveDate;
 use std::collections::HashMap;
+use structopt::StructOpt;
 
 use crate::imdb_episodes::ImdbEpisodes;
 use crate::imdb_ratings::ImdbRatings;
@@ -9,15 +10,35 @@ use crate::movie_collection::MovieCollection;
 use crate::pgpool::PgPool;
 use crate::trakt_utils::WatchListMap;
 
-#[derive(Default, Debug)]
+#[derive(StructOpt, Default, Debug)]
+/// Parse IMDB.com
 pub struct ParseImdbOptions {
-    pub show: String,
+    /// Entry is TV
+    #[structopt(long, short)]
     pub tv: bool,
-    pub imdb_link: Option<String>,
-    pub all_seasons: bool,
+
+    /// Season Number
+    #[structopt(long, short)]
     pub season: Option<i32>,
+
+    /// List Seasons
+    #[structopt(long, short)]
+    pub all_seasons: bool,
+
+    /// Pull from IMDB
+    #[structopt(long = "update", short = "u")]
     pub do_update: bool,
+
+    /// Manually over-ride imdb link
+    #[structopt(long = "imdblink", short)]
+    pub imdb_link: Option<String>,
+
+    /// Update database
+    #[structopt(long = "database", short = "d")]
     pub update_database: bool,
+
+    /// Show
+    pub show: String,
 }
 
 #[derive(Default)]

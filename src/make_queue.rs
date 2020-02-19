@@ -4,20 +4,24 @@ use structopt::StructOpt;
 use movie_collection_lib::make_queue::{make_queue_worker, PathOrIndex};
 
 #[derive(StructOpt)]
-/// Parse IMDB.com
+/// Manage Video Queue
 struct MakeQueueOpts {
-    #[structopt(long, short, parse(from_os_str))]
     /// Add files(s) to queue
-    add: Vec<PathOrIndex>,
     #[structopt(long, short, parse(from_os_str))]
+    add: Vec<PathOrIndex>,
+
     /// Remove entries by index OR filename
+    #[structopt(long, short, parse(from_os_str))]
     remove: Vec<PathOrIndex>,
-    #[structopt(long, short)]
+
     /// Compute Runtime of Files
-    time: bool,
     #[structopt(long, short)]
+    time: bool,
+
     /// Display information about tv shows in queue
+    #[structopt(long, short)]
     shows: bool,
+
     /// String patterns to filter on
     patterns: Vec<String>,
 }
