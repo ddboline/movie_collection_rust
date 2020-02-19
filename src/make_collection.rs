@@ -1,46 +1,33 @@
 use anyhow::Error;
-use clap::{App, Arg};
-use rayon::iter::{IntoParallelIterator, ParallelIterator};
+use futures::future::try_join_all;
 use std::io;
 use std::io::Write;
+use structopt::StructOpt;
+use tokio::task::spawn_blocking;
 
 use movie_collection_lib::movie_collection::MovieCollection;
-use movie_collection_lib::utils::{get_version_number, get_video_runtime};
+use movie_collection_lib::utils::get_video_runtime;
+
+#[derive(StructOpt)]
+/// Collection Query/Parser
+///
+/// Query and Parse Video Collection
+struct MakeCollectionOpts {
+    #[structopt(short, long)]
+    /// Parse collection for new videos
+    parse: bool,
+    #[structopt(short, long)]
+    /// Compute Runtime
+    time: bool,
+    /// Shows to display
+    shows: Vec<String>,
+}
 
 async fn make_collection() -> Result<(), Error> {
-    let matches = App::new("Collection Query/Parser")
-        .version(get_version_number().as_str())
-        .author("Daniel Boline <ddboline@gmail.com>")
-        .about("Query and Parse Video Collectioin")
-        .arg(
-            Arg::with_name("parse")
-                .short("p")
-                .long("parse")
-                .value_name("PARSE")
-                .takes_value(false)
-                .help("Parse collection for new videos"),
-        )
-        .arg(
-            Arg::with_name("time")
-                .short("t")
-                .long("time")
-                .value_name("TIME")
-                .takes_value(false)
-                .help("Run time"),
-        )
-        .arg(
-            Arg::with_name("shows")
-                .value_name("SHOWS")
-                .help("Shows")
-                .multiple(true),
-        )
-        .get_matches();
+    let opts = MakeCollectionOpts::from_args();
 
-    let do_parse = matches.is_present("parse");
-    let do_time = matches.is_present("time");
-    let shows = matches
-        .values_of("shows")
-        .map_or_else(Vec::new, |s| s.map(ToString::to_string).collect());
+    let do_parse = opts.parse;
+    let do_time = opts.time;
 
     let stdout = io::stdout();
 
@@ -49,15 +36,17 @@ async fn make_collection() -> Result<(), Error> {
         mc.make_collection().await?;
         mc.fix_collection_show_id().await?;
     } else {
-        let shows = mc.search_movie_collection(&shows).await?;
+        let shows = mc.search_movie_collection(&opts.shows).await?;
         if do_time {
-            let shows: Result<Vec<_>, Error> = shows
-                .into_par_iter()
-                .map(|result| {
-                    let timeval = get_video_runtime(&result.path)?;
+            let futures: Vec<_> = shows
+                .into_iter()
+                .map(|result| async move {
+                    let path = result.path.clone();
+                    let timeval = spawn_blocking(move || get_video_runtime(&path)).await??;
                     Ok((timeval, result))
                 })
                 .collect();
+            let shows: Result<Vec<_>, Error> = try_join_all(futures).await;
             for (timeval, show) in shows? {
                 writeln!(stdout.lock(), "{} {}", timeval, show)?;
             }

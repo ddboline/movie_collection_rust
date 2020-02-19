@@ -1,52 +1,33 @@
 use anyhow::Error;
-use clap::{App, Arg};
 use std::io;
 use std::io::Write;
+use structopt::StructOpt;
 
 use movie_collection_lib::movie_collection::MovieCollection;
 use movie_collection_lib::tv_show_source::TvShowSource;
-use movie_collection_lib::utils::get_version_number;
+
+#[derive(StructOpt)]
+/// Query and Parse Video Collection
+struct FindNewEpisodesOpt {
+    #[structopt(long, short)]
+    /// Restrict Source (possible values: all, netflix, hulu, amazon)
+    source: Option<TvShowSource>,
+    /// Only Show Some Shows
+    shows: Vec<String>,
+}
 
 async fn find_new_episodes() -> Result<(), Error> {
-    let matches = App::new("Find new episodes")
-        .version(get_version_number().as_str())
-        .author("Daniel Boline <ddboline@gmail.com>")
-        .about("Query and Parse Video Collectioin")
-        .arg(
-            Arg::with_name("source")
-                .short("s")
-                .long("source")
-                .value_name("SOURCE")
-                .takes_value(true)
-                .help("Restrict source"),
-        )
-        .arg(
-            Arg::with_name("shows")
-                .value_name("SHOWS")
-                .help("Shows")
-                .multiple(true),
-        )
-        .get_matches();
+    let opts = FindNewEpisodesOpt::from_args();
 
-    let source = matches.value_of("source").map(ToString::to_string);
-    let shows = matches
-        .values_of("shows")
-        .map_or_else(Vec::new, |v| v.map(ToString::to_string).collect());
-
-    let source: Option<TvShowSource> = match source {
-        Some(s) => s.parse().ok(),
-        None => None,
-    };
-
-    let source = if shows.is_empty() {
-        source
+    let source = if opts.shows.is_empty() {
+        opts.source
     } else {
         Some(TvShowSource::All)
     };
 
     let mc = MovieCollection::new();
 
-    let output = mc.find_new_episodes(&source, &shows).await?;
+    let output = mc.find_new_episodes(&source, &opts.shows).await?;
 
     let stdout = io::stdout();
 

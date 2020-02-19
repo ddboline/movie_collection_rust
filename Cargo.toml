@@ -18,6 +18,8 @@ crossbeam-utils = "0.7"
 anyhow = "1.0"
 thiserror = "1.0"
 tokio = {version="0.2", features=["full"]}
+structopt = "0.3"
+futures = "0.3"
 
 [workspace]
 members = [
