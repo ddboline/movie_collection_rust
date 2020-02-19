@@ -6,7 +6,7 @@ use std::fmt;
 use std::str::FromStr;
 use tokio_postgres::types::{FromSql, IsNull, ToSql, Type};
 
-#[derive(Serialize, Deserialize, Clone, Debug, Eq)]
+#[derive(Serialize, Deserialize, Clone, Debug, Eq, Copy)]
 pub enum TvShowSource {
     #[serde(rename = "netflix")]
     Netflix,

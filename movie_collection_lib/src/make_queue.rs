@@ -1,16 +1,35 @@
 use anyhow::{format_err, Error};
+use derive_more::Display;
 use rayon::iter::{IntoParallelIterator, ParallelIterator};
 use std::io;
 use std::io::Write;
-use std::path;
+use std::path::{Path, PathBuf};
+use std::ffi::OsStr;
 
 use crate::movie_collection::MovieCollection;
 use crate::movie_queue::{MovieQueueDB, MovieQueueResult};
 use crate::utils::{get_video_runtime, parse_file_stem};
 
+#[derive(Debug, Display)]
+pub enum PathOrIndex {
+    #[display(fmt="{:?}", _0)]
+    Path(PathBuf),
+    Index(i32),
+}
+
+impl From<&OsStr> for PathOrIndex {
+    fn from(s: &OsStr) -> Self {
+        if let Some(Ok(idx)) = s.to_str().map(str::parse::<i32>) {
+            Self::Index(idx)
+        } else {
+            Self::Path(s.to_os_string().into())
+        }
+    }
+}
+
 pub async fn make_queue_worker(
-    add_files: Option<Vec<String>>,
-    del_files: Option<Vec<String>>,
+    add_files: &[PathOrIndex],
+    del_files: &[PathOrIndex],
     do_time: bool,
     patterns: &[&str],
     do_shows: bool,
@@ -25,32 +44,53 @@ pub async fn make_queue_worker(
         for show in shows {
             writeln!(stdout.lock(), "{}", show)?;
         }
-    } else if let Some(files) = del_files {
-        for file in files {
-            if let Ok(idx) = file.parse::<i32>() {
-                mq.remove_from_queue_by_idx(idx).await?;
-            } else {
-                mq.remove_from_queue_by_path(&file).await?;
-            }
+    } else if !del_files.is_empty() {
+        for file in del_files {
+            match file {
+                PathOrIndex::Index(idx) => mq.remove_from_queue_by_idx(*idx).await?,
+                PathOrIndex::Path(path) => {
+                    mq.remove_from_queue_by_path(&path.to_string_lossy())
+                        .await?
+                }
+            };
         }
-    } else if let Some(files) = add_files {
-        if files.len() == 1 {
+    } else if !add_files.is_empty() {
+        if add_files.len() == 1 {
             let max_idx = mq.get_max_queue_index().await?;
-            mq.insert_into_queue(max_idx + 1, &files[0]).await?;
-        } else if files.len() == 2 {
-            if let Ok(idx) = files[0].parse::<i32>() {
-                writeln!(stdout.lock(), "inserting into {}", idx)?;
-                mq.insert_into_queue(idx, &files[1]).await?;
+            if let PathOrIndex::Path(path) = &add_files[0] {
+                mq.insert_into_queue(max_idx + 1, &path.to_string_lossy())
+                    .await?;
             } else {
-                for file in &files {
+                panic!("No file specified");
+            }
+        } else if add_files.len() == 2 {
+            if let PathOrIndex::Index(idx) = &add_files[0] {
+                writeln!(stdout.lock(), "inserting into {}", idx)?;
+                if let PathOrIndex::Path(path) = &add_files[1] {
+                    mq.insert_into_queue(*idx, &path.to_string_lossy()).await?;
+                } else {
+                    panic!("{} is not a path", add_files[1]);
+                }
+            } else {
+                for file in add_files {
                     let max_idx = mq.get_max_queue_index().await?;
-                    mq.insert_into_queue(max_idx + 1, &file).await?;
+                    if let PathOrIndex::Path(path) = file {
+                        mq.insert_into_queue(max_idx + 1, &path.to_string_lossy())
+                            .await?;
+                    } else {
+                        panic!("{} is not a path", file);
+                    }
                 }
             }
         } else {
-            for file in &files {
+            for file in add_files {
                 let max_idx = mq.get_max_queue_index().await?;
-                mq.insert_into_queue(max_idx + 1, &file).await?;
+                if let PathOrIndex::Path(path) = file {
+                    mq.insert_into_queue(max_idx + 1, &path.to_string_lossy())
+                        .await?;
+                } else {
+                    panic!("{} is not a path", file);
+                }
             }
         }
     } else {
@@ -83,7 +123,7 @@ pub async fn movie_queue_http(queue: &[MovieQueueResult]) -> Result<Vec<String>,
 
     let mut output = Vec::new();
     for row in queue {
-        let path = path::Path::new(&row.path);
+        let path = Path::new(&row.path);
         let ext = path
             .extension()
             .ok_or_else(|| format_err!("Cannot determine extension"))?

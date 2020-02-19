@@ -34,3 +34,4 @@ dirs = "2.0"
 tokio = {version="0.2", features=["full"]}
 async-trait = "0.1"
 futures-retry = "0.4"
+derive_more = "0.99"
