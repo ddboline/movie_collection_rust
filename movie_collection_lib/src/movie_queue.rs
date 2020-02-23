@@ -111,7 +111,7 @@ impl MovieQueueDB {
             r#"SELECT idx FROM movie_queue WHERE collection_idx=$idx"#,
             idx = collection_idx
         );
-        let futures: Vec<_> = self
+        let futures = self
             .pool
             .get()
             .await?
@@ -121,8 +121,7 @@ impl MovieQueueDB {
             .map(|row| async move {
                 let idx = row.try_get("idx")?;
                 self.remove_from_queue_by_idx(idx).await
-            })
-            .collect();
+            });
         try_join_all(futures).await.map(|_| ())
     }
 
@@ -284,43 +283,40 @@ impl MovieQueueDB {
             })
             .collect();
 
-        let futures: Vec<_> = results?
-            .into_iter()
-            .map(|mut result| async {
-                if result.istv {
-                    let file_stem = Path::new(&result.path)
-                        .file_stem()
-                        .unwrap()
-                        .to_string_lossy();
-                    let (show, season, episode) = parse_file_stem(&file_stem);
-                    let query = postgres_query::query!(
-                        r#"
+        let futures = results?.into_iter().map(|mut result| async {
+            if result.istv {
+                let file_stem = Path::new(&result.path)
+                    .file_stem()
+                    .unwrap()
+                    .to_string_lossy();
+                let (show, season, episode) = parse_file_stem(&file_stem);
+                let query = postgres_query::query!(
+                    r#"
                             SELECT epurl
                             FROM imdb_episodes
                             WHERE show = $show AND season = $season AND episode = $episode
                         "#,
-                        show = show,
-                        season = season,
-                        episode = episode
-                    );
-                    if let Some(row) = self
-                        .pool
-                        .get()
-                        .await?
-                        .query(query.sql(), query.parameters())
-                        .await?
-                        .get(0)
-                    {
-                        let epurl: String = row.try_get("epurl")?;
-                        result.eplink = Some(epurl);
-                        result.show = Some(show.to_string());
-                        result.season = Some(season);
-                        result.episode = Some(episode);
-                    }
+                    show = show,
+                    season = season,
+                    episode = episode
+                );
+                if let Some(row) = self
+                    .pool
+                    .get()
+                    .await?
+                    .query(query.sql(), query.parameters())
+                    .await?
+                    .get(0)
+                {
+                    let epurl: String = row.try_get("epurl")?;
+                    result.eplink = Some(epurl);
+                    result.show = Some(show.to_string());
+                    result.season = Some(season);
+                    result.episode = Some(episode);
                 }
-                Ok(result)
-            })
-            .collect();
+            }
+            Ok(result)
+        });
         let results: Result<Vec<_>, Error> = try_join_all(futures).await;
         let mut results = results?;
 

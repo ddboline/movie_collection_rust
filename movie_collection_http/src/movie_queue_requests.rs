@@ -1,6 +1,7 @@
 use anyhow::Error;
 use async_trait::async_trait;
 use chrono::{DateTime, Utc};
+use futures::future::try_join_all;
 use serde::{Deserialize, Serialize};
 use std::path;
 
@@ -460,17 +461,20 @@ impl HandleRequest<LastModifiedRequest> for PgPool {
             "movie_queue",
         ];
 
-        let mut results = Vec::new();
-        for table in tables {
+        let futures = tables.into_iter().map(|table| async move {
             let query = format!("SELECT max(last_modified) FROM {}", table);
             if let Some(row) = self.get().await?.query(query.as_str(), &[]).await?.get(0) {
                 let last_modified: DateTime<Utc> = row.try_get(0)?;
-                results.push(LastModifiedResponse {
+                Ok(Some(LastModifiedResponse {
                     table: (*table).to_string(),
                     last_modified,
-                });
+                }))
+            } else {
+                Ok(None)
             }
-        }
+        });
+        let results: Result<Vec<_>, Error> = try_join_all(futures).await;
+        let results: Vec<_> = results?.into_iter().filter_map(|x| x).collect();
         Ok(results)
     }
 }

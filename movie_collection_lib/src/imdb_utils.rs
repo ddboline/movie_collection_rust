@@ -107,17 +107,14 @@ impl ImdbConnection {
             })
             .collect();
 
-        let futures: Vec<_> = tl_vec
-            .into_iter()
-            .map(|(t, l)| async move {
-                let r = self.parse_imdb_rating(&l).await?;
-                Ok(ImdbTuple {
-                    title: t,
-                    link: l.to_string(),
-                    rating: r.rating.unwrap_or(-1.0),
-                })
+        let futures = tl_vec.into_iter().map(|(t, l)| async move {
+            let r = self.parse_imdb_rating(&l).await?;
+            Ok(ImdbTuple {
+                title: t,
+                link: l.to_string(),
+                rating: r.rating.unwrap_or(-1.0),
             })
-            .collect();
+        });
         try_join_all(futures).await
     }
 
@@ -175,7 +172,7 @@ impl ImdbConnection {
             })
             .collect();
 
-        let futures: Vec<_> = ep_season_vec
+        let futures = ep_season_vec
             .into_iter()
             .map(|(episodes_url, season_str)| async move {
                 let season_: i32 = season_str.parse()?;
@@ -185,8 +182,7 @@ impl ImdbConnection {
                     }
                 }
                 self.parse_episodes_url(&episodes_url, season_).await
-            })
-            .collect();
+            });
 
         let results: Vec<_> = try_join_all(futures).await?.into_iter().flatten().collect();
         Ok(results)
@@ -244,17 +240,14 @@ impl ImdbConnection {
         }
         let results = results;
 
-        let futures: Vec<_> = results
-            .into_iter()
-            .map(|mut result| async {
-                if let Some(link) = result.epurl.as_ref() {
-                    let r = self.parse_imdb_rating(&link).await?;
-                    result.rating = r.rating;
-                    result.nrating = r.count;
-                }
-                Ok(result)
-            })
-            .collect();
+        let futures = results.into_iter().map(|mut result| async {
+            if let Some(link) = result.epurl.as_ref() {
+                let r = self.parse_imdb_rating(&link).await?;
+                result.rating = r.rating;
+                result.nrating = r.count;
+            }
+            Ok(result)
+        });
 
         try_join_all(futures).await
     }

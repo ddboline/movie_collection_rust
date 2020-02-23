@@ -40,14 +40,11 @@ async fn make_collection() -> Result<(), Error> {
     } else {
         let shows = mc.search_movie_collection(&opts.shows).await?;
         if do_time {
-            let futures: Vec<_> = shows
-                .into_iter()
-                .map(|result| async move {
-                    let path = result.path.clone();
-                    let timeval = spawn_blocking(move || get_video_runtime(&path)).await??;
-                    Ok((timeval, result))
-                })
-                .collect();
+            let futures = shows.into_iter().map(|result| async move {
+                let path = result.path.clone();
+                let timeval = spawn_blocking(move || get_video_runtime(&path)).await??;
+                Ok((timeval, result))
+            });
             let shows: Result<Vec<_>, Error> = try_join_all(futures).await;
             for (timeval, show) in shows? {
                 writeln!(stdout.lock(), "{} {}", timeval, show)?;
