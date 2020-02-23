@@ -7,5 +7,5 @@ RELEASE="$2"
 
 cargo build --release
 
-printf "Process and display info about gps activity files\n" > description-pak
+printf "Utilities for maintaining a collection of videos.\n" > description-pak
 checkinstall --pkgversion ${VERSION} --pkgrelease ${RELEASE} -y
