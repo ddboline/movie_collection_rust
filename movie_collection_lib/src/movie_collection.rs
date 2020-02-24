@@ -1,6 +1,6 @@
 use anyhow::{format_err, Error};
 use chrono::{DateTime, Duration, Local, NaiveDate, Utc};
-use futures::future::join_all;
+use futures::future::try_join_all;
 use postgres_query::FromSqlRow;
 use rayon::iter::{IntoParallelRefIterator, ParallelIterator};
 use serde::{Deserialize, Serialize};
@@ -219,7 +219,7 @@ impl MovieCollection {
             shows
         };
 
-        let shows: Vec<_> = shows
+        let futures = shows
             .into_iter()
             .map(|show| async move {
                 #[derive(FromSqlRow)]
@@ -266,9 +266,8 @@ impl MovieCollection {
                     })
                     .collect();
                 results
-            })
-            .collect();
-        let results: Result<Vec<_>, Error> = join_all(shows).await.into_iter().collect();
+            });
+        let results: Result<Vec<_>, Error> = try_join_all(futures).await;
         let results: Vec<_> = results?.into_iter().flatten().collect();
         Ok(results)
     }
@@ -395,7 +394,7 @@ impl MovieCollection {
             })
             .collect();
 
-        let results: Vec<_> = results?
+        let futures = results?
             .into_iter()
             .map(|mut result| async {
                 let file_stem = Path::new(&result.path)
@@ -439,9 +438,8 @@ impl MovieCollection {
                     }
                 }
                 Ok(result)
-            })
-            .collect();
-        let results: Result<Vec<_>, Error> = join_all(results).await.into_iter().collect();
+            });
+        let results: Result<Vec<_>, Error> = try_join_all(futures).await;
         let mut results = results?;
         results.sort_by_key(|r| (r.season, r.episode));
         Ok(results)
