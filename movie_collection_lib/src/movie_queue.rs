@@ -1,8 +1,8 @@
 use anyhow::{format_err, Error};
 use chrono::{DateTime, Utc};
+use futures::future::try_join_all;
 use log::debug;
 use postgres_query::FromSqlRow;
-use rayon::iter::{IntoParallelIterator, ParallelIterator};
 use serde::{Deserialize, Serialize};
 use std::fmt;
 use std::path::Path;
@@ -59,12 +59,16 @@ impl MovieQueueDB {
         Self { pool: pool.clone() }
     }
 
-    pub fn remove_from_queue_by_idx(&self, idx: i32) -> Result<(), Error> {
-        let mut conn = self.pool.get()?;
-        let mut tran = conn.transaction()?;
+    pub async fn remove_from_queue_by_idx(&self, idx: i32) -> Result<(), Error> {
+        let mut conn = self.pool.get().await?;
+        let tran = conn.transaction().await?;
 
         let query = r#"SELECT max(idx) FROM movie_queue"#;
-        let max_idx: i32 = tran.query(query, &[])?.get(0).map_or(-1, |r| r.get(0));
+        let max_idx: i32 = tran
+            .query(query, &[])
+            .await?
+            .get(0)
+            .map_or(-1, |r| r.get(0));
         if idx > max_idx || idx < 0 {
             return Ok(());
         }
@@ -72,7 +76,7 @@ impl MovieQueueDB {
 
         let query =
             postgres_query::query!(r#"DELETE FROM movie_queue WHERE idx = $idx"#, idx = idx);
-        tran.execute(query.sql(), query.parameters())?;
+        tran.execute(query.sql(), query.parameters()).await?;
 
         let query = postgres_query::query!(
             r#"
@@ -83,7 +87,7 @@ impl MovieQueueDB {
             diff = diff,
             idx = idx
         );
-        tran.execute(query.sql(), query.parameters())?;
+        tran.execute(query.sql(), query.parameters()).await?;
 
         let query = postgres_query::query!(
             r#"
@@ -94,53 +98,62 @@ impl MovieQueueDB {
             diff = diff,
             idx = idx
         );
-        tran.execute(query.sql(), query.parameters())?;
+        tran.execute(query.sql(), query.parameters()).await?;
 
-        tran.commit().map_err(Into::into)
+        tran.commit().await.map_err(Into::into)
     }
 
-    pub fn remove_from_queue_by_collection_idx(&self, collection_idx: i32) -> Result<(), Error> {
+    pub async fn remove_from_queue_by_collection_idx(
+        &self,
+        collection_idx: i32,
+    ) -> Result<(), Error> {
         let query = postgres_query::query!(
             r#"SELECT idx FROM movie_queue WHERE collection_idx=$idx"#,
             idx = collection_idx
         );
-        self.pool
-            .get()?
-            .query(query.sql(), query.parameters())?
-            .iter()
-            .map(|row| {
-                let idx = row.try_get("idx")?;
-                self.remove_from_queue_by_idx(idx)
-            })
-            .collect()
+        if let Some(row) = self
+            .pool
+            .get()
+            .await?
+            .query(query.sql(), query.parameters())
+            .await?
+            .get(0)
+        {
+            let idx = row.try_get("idx")?;
+            self.remove_from_queue_by_idx(idx).await?;
+        }
+        Ok(())
     }
 
-    pub fn remove_from_queue_by_path(&self, path: &str) -> Result<(), Error> {
+    pub async fn remove_from_queue_by_path(&self, path: &str) -> Result<(), Error> {
         let mc = MovieCollection::with_pool(&self.pool)?;
-        if let Some(collection_idx) = mc.get_collection_index(&path)? {
+        if let Some(collection_idx) = mc.get_collection_index(&path).await? {
             self.remove_from_queue_by_collection_idx(collection_idx)
+                .await
         } else {
             Ok(())
         }
     }
 
-    pub fn insert_into_queue(&self, idx: i32, path: &str) -> Result<(), Error> {
+    pub async fn insert_into_queue(&self, idx: i32, path: &str) -> Result<(), Error> {
         if !Path::new(&path).exists() {
             return Err(format_err!("File doesn't exist"));
         }
         let mc = MovieCollection::with_pool(&self.pool)?;
-        let collection_idx = if let Some(i) = mc.get_collection_index(&path)? {
+        let collection_idx = if let Some(i) = mc.get_collection_index(&path).await? {
             i
         } else {
-            mc.insert_into_collection(&path)?;
-            mc.get_collection_index(&path)?
+            mc.insert_into_collection(&path).await?;
+            mc.get_collection_index(&path)
+                .await?
                 .ok_or_else(|| format_err!("Path not found"))?
         };
 
         self.insert_into_queue_by_collection_idx(idx, collection_idx)
+            .await
     }
 
-    pub fn insert_into_queue_by_collection_idx(
+    pub async fn insert_into_queue_by_collection_idx(
         &self,
         idx: i32,
         collection_idx: i32,
@@ -151,21 +164,27 @@ impl MovieQueueDB {
         );
         let current_idx: i32 = self
             .pool
-            .get()?
-            .query(query.sql(), query.parameters())?
+            .get()
+            .await?
+            .query(query.sql(), query.parameters())
+            .await?
             .iter()
             .last()
             .map_or(Ok(-1), |row| row.try_get("idx"))?;
 
         if current_idx != -1 {
-            self.remove_from_queue_by_idx(current_idx)?;
+            self.remove_from_queue_by_idx(current_idx).await?;
         }
 
-        let mut conn = self.pool.get()?;
-        let mut tran = conn.transaction()?;
+        let mut conn = self.pool.get().await?;
+        let tran = conn.transaction().await?;
 
         let query = r#"SELECT max(idx) FROM movie_queue"#;
-        let max_idx: i32 = tran.query(query, &[])?.get(0).map_or(-1, |r| r.get(0));
+        let max_idx: i32 = tran
+            .query(query, &[])
+            .await?
+            .get(0)
+            .map_or(-1, |r| r.get(0));
         let diff = max_idx - idx + 2;
         debug!("{} {} {}", max_idx, idx, diff);
 
@@ -178,7 +197,7 @@ impl MovieQueueDB {
             diff = diff,
             idx = idx
         );
-        tran.execute(query.sql(), query.parameters())?;
+        tran.execute(query.sql(), query.parameters()).await?;
 
         let query = postgres_query::query!(
             r#"
@@ -188,7 +207,7 @@ impl MovieQueueDB {
             idx = idx,
             collection_idx = collection_idx
         );
-        tran.execute(query.sql(), query.parameters())?;
+        tran.execute(query.sql(), query.parameters()).await?;
 
         let query = postgres_query::query!(
             r#"
@@ -199,14 +218,14 @@ impl MovieQueueDB {
             diff = diff,
             idx = idx
         );
-        tran.execute(query.sql(), query.parameters())?;
+        tran.execute(query.sql(), query.parameters()).await?;
 
-        tran.commit().map_err(Into::into)
+        tran.commit().await.map_err(Into::into)
     }
 
-    pub fn get_max_queue_index(&self) -> Result<i32, Error> {
+    pub async fn get_max_queue_index(&self) -> Result<i32, Error> {
         let query = r#"SELECT max(idx) FROM movie_queue"#;
-        if let Some(row) = self.pool.get()?.query(query, &[])?.get(0) {
+        if let Some(row) = self.pool.get().await?.query(query, &[]).await?.get(0) {
             let max_idx: i32 = row.try_get(0)?;
             Ok(max_idx)
         } else {
@@ -214,7 +233,10 @@ impl MovieQueueDB {
         }
     }
 
-    pub fn print_movie_queue(&self, patterns: &[&str]) -> Result<Vec<MovieQueueResult>, Error> {
+    pub async fn print_movie_queue(
+        &self,
+        patterns: &[&str],
+    ) -> Result<Vec<MovieQueueResult>, Error> {
         #[derive(FromSqlRow)]
         struct PrintMovieQueue {
             idx: i32,
@@ -244,8 +266,10 @@ impl MovieQueueDB {
 
         let results: Result<Vec<_>, Error> = self
             .pool
-            .get()?
-            .query(query.sql(), &[])?
+            .get()
+            .await?
+            .query(query.sql(), &[])
+            .await?
             .iter()
             .map(|row| {
                 let row = PrintMovieQueue::from_row(row)?;
@@ -259,42 +283,48 @@ impl MovieQueueDB {
             })
             .collect();
 
-        let results: Result<Vec<_>, Error> = results?
-            .into_par_iter()
-            .map(|mut result| {
-                if result.istv {
-                    let file_stem = Path::new(&result.path)
-                        .file_stem()
-                        .unwrap()
-                        .to_string_lossy();
-                    let (show, season, episode) = parse_file_stem(&file_stem);
-                    let query = postgres_query::query!(
-                        r#"
+        let futures = results?.into_iter().map(|mut result| async {
+            if result.istv {
+                let file_stem = Path::new(&result.path)
+                    .file_stem()
+                    .unwrap()
+                    .to_string_lossy();
+                let (show, season, episode) = parse_file_stem(&file_stem);
+                let query = postgres_query::query!(
+                    r#"
                             SELECT epurl
                             FROM imdb_episodes
                             WHERE show = $show AND season = $season AND episode = $episode
                         "#,
-                        show = show,
-                        season = season,
-                        episode = episode
-                    );
-                    for row in &self.pool.get()?.query(query.sql(), query.parameters())? {
-                        let epurl: String = row.try_get("epurl")?;
-                        result.eplink = Some(epurl);
-                        result.show = Some(show.to_string());
-                        result.season = Some(season);
-                        result.episode = Some(episode);
-                    }
+                    show = show,
+                    season = season,
+                    episode = episode
+                );
+                if let Some(row) = self
+                    .pool
+                    .get()
+                    .await?
+                    .query(query.sql(), query.parameters())
+                    .await?
+                    .get(0)
+                {
+                    let epurl: String = row.try_get("epurl")?;
+                    result.eplink = Some(epurl);
+                    result.show = Some(show.to_string());
+                    result.season = Some(season);
+                    result.episode = Some(episode);
                 }
-                Ok(result)
-            })
-            .collect();
+            }
+            Ok(result)
+        });
+        let results: Result<Vec<_>, Error> = try_join_all(futures).await;
         let mut results = results?;
+
         results.sort_by_key(|r| r.idx);
         Ok(results)
     }
 
-    pub fn get_queue_after_timestamp(
+    pub async fn get_queue_after_timestamp(
         &self,
         timestamp: DateTime<Utc>,
     ) -> Result<Vec<MovieQueueRow>, Error> {
@@ -308,8 +338,10 @@ impl MovieQueueDB {
             timestamp = timestamp
         );
         self.pool
-            .get()?
-            .query(query.sql(), query.parameters())?
+            .get()
+            .await?
+            .query(query.sql(), query.parameters())
+            .await?
             .iter()
             .map(|row| MovieQueueRow::from_row(row).map_err(Into::into))
             .collect()

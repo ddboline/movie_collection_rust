@@ -1,65 +1,40 @@
-use anyhow::{format_err, Error};
-use clap::{App, Arg};
-use log::error;
+use anyhow::Error;
 use std::io::{stdout, Write};
 use std::path::{Path, PathBuf};
+use structopt::StructOpt;
 
 use movie_collection_lib::config::Config;
-use movie_collection_lib::utils::{
-    create_transcode_script, get_version_number, publish_transcode_job_to_queue,
-};
+use movie_collection_lib::utils::{create_transcode_script, publish_transcode_job_to_queue};
+
+#[derive(StructOpt)]
+struct TranscodeAviOpts {
+    files: Vec<PathBuf>,
+}
 
 fn transcode_avi() -> Result<(), Error> {
     let stdout = stdout();
-
     let config = Config::with_config()?;
 
-    let matches = App::new("Transcode AVI")
-        .version(get_version_number().as_str())
-        .author("Daniel Boline <ddboline@gmail.com>")
-        .about("Create script to do stuff")
-        .arg(
-            Arg::with_name("files")
-                .multiple(true)
-                .help("Files")
-                .required(true),
-        )
-        .get_matches();
+    let opts = TranscodeAviOpts::from_args();
 
-    matches
-        .values_of("files")
-        .ok_or_else(|| format_err!("No files given"))?
-        .map(|f| {
-            let path = PathBuf::from(f);
+    for path in opts.files {
+        let movie_path = Path::new(&config.home_dir).join("Documents").join("movies");
+        let path = if path.exists() {
+            path
+        } else {
+            movie_path.join(path)
+        }
+        .canonicalize()?;
 
-            let movie_path = format!("{}/Documents/movies", config.home_dir);
-
-            let path = if path.exists() {
-                path
-            } else {
-                Path::new(&movie_path).join(f)
-            }
-            .canonicalize()?;
-
-            if !path.exists() {
-                panic!("file doesn't exist {}", f);
-            }
-
-            create_transcode_script(&config, &path)
-                .and_then(|s| {
-                    writeln!(stdout.lock(), "script {}", s)?;
-                    publish_transcode_job_to_queue(
-                        &s,
-                        &config.transcode_queue,
-                        &config.transcode_queue,
-                    )
-                })
-                .map_err(|e| {
-                    error!("error {}", e);
-                    e
-                })
-        })
-        .collect()
+        if !path.exists() {
+            panic!("file doesn't exist {}", path.to_string_lossy());
+        }
+        create_transcode_script(&config, &path).and_then(|s| {
+            writeln!(stdout.lock(), "script {}", s)?;
+            publish_transcode_job_to_queue(&s, &config.transcode_queue, &config.transcode_queue)
+        })?;
+    }
+    Ok(())
 }
 
 fn main() {

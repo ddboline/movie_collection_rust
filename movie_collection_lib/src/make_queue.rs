@@ -1,16 +1,37 @@
 use anyhow::{format_err, Error};
-use rayon::iter::{IntoParallelIterator, IntoParallelRefIterator, ParallelIterator};
+use derive_more::Display;
+use futures::future::try_join_all;
+use rayon::iter::{IntoParallelIterator, ParallelIterator};
+use std::ffi::OsStr;
 use std::io;
 use std::io::Write;
-use std::path;
+use std::path::{Path, PathBuf};
+use std::sync::Arc;
 
 use crate::movie_collection::MovieCollection;
 use crate::movie_queue::{MovieQueueDB, MovieQueueResult};
 use crate::utils::{get_video_runtime, parse_file_stem};
 
-pub fn make_queue_worker(
-    add_files: Option<Vec<String>>,
-    del_files: Option<Vec<String>>,
+#[derive(Debug, Display)]
+pub enum PathOrIndex {
+    #[display(fmt = "{:?}", _0)]
+    Path(PathBuf),
+    Index(i32),
+}
+
+impl From<&OsStr> for PathOrIndex {
+    fn from(s: &OsStr) -> Self {
+        if let Some(Ok(idx)) = s.to_str().map(str::parse::<i32>) {
+            Self::Index(idx)
+        } else {
+            Self::Path(s.to_os_string().into())
+        }
+    }
+}
+
+pub async fn make_queue_worker(
+    add_files: &[PathOrIndex],
+    del_files: &[PathOrIndex],
     do_time: bool,
     patterns: &[&str],
     do_shows: bool,
@@ -21,40 +42,61 @@ pub fn make_queue_worker(
     let stdout = io::stdout();
 
     if do_shows {
-        let shows = mc.print_tv_shows()?;
+        let shows = mc.print_tv_shows().await?;
         for show in shows {
             writeln!(stdout.lock(), "{}", show)?;
         }
-    } else if let Some(files) = del_files {
-        for file in files {
-            if let Ok(idx) = file.parse::<i32>() {
-                mq.remove_from_queue_by_idx(idx)?;
-            } else {
-                mq.remove_from_queue_by_path(&file)?;
-            }
+    } else if !del_files.is_empty() {
+        for file in del_files {
+            match file {
+                PathOrIndex::Index(idx) => mq.remove_from_queue_by_idx(*idx).await?,
+                PathOrIndex::Path(path) => {
+                    mq.remove_from_queue_by_path(&path.to_string_lossy())
+                        .await?
+                }
+            };
         }
-    } else if let Some(files) = add_files {
-        if files.len() == 1 {
-            let max_idx = mq.get_max_queue_index()?;
-            mq.insert_into_queue(max_idx + 1, &files[0])?;
-        } else if files.len() == 2 {
-            if let Ok(idx) = files[0].parse::<i32>() {
-                writeln!(stdout.lock(), "inserting into {}", idx)?;
-                mq.insert_into_queue(idx, &files[1])?;
+    } else if !add_files.is_empty() {
+        if add_files.len() == 1 {
+            let max_idx = mq.get_max_queue_index().await?;
+            if let PathOrIndex::Path(path) = &add_files[0] {
+                mq.insert_into_queue(max_idx + 1, &path.to_string_lossy())
+                    .await?;
             } else {
-                for file in &files {
-                    let max_idx = mq.get_max_queue_index()?;
-                    mq.insert_into_queue(max_idx + 1, &file)?;
+                panic!("No file specified");
+            }
+        } else if add_files.len() == 2 {
+            if let PathOrIndex::Index(idx) = &add_files[0] {
+                writeln!(stdout.lock(), "inserting into {}", idx)?;
+                if let PathOrIndex::Path(path) = &add_files[1] {
+                    mq.insert_into_queue(*idx, &path.to_string_lossy()).await?;
+                } else {
+                    panic!("{} is not a path", add_files[1]);
+                }
+            } else {
+                for file in add_files {
+                    let max_idx = mq.get_max_queue_index().await?;
+                    if let PathOrIndex::Path(path) = file {
+                        mq.insert_into_queue(max_idx + 1, &path.to_string_lossy())
+                            .await?;
+                    } else {
+                        panic!("{} is not a path", file);
+                    }
                 }
             }
         } else {
-            for file in &files {
-                let max_idx = mq.get_max_queue_index()?;
-                mq.insert_into_queue(max_idx + 1, &file)?;
+            for file in add_files {
+                let max_idx = mq.get_max_queue_index().await?;
+                if let PathOrIndex::Path(path) = file {
+                    mq.insert_into_queue(max_idx + 1, &path.to_string_lossy())
+                        .await?;
+                } else {
+                    panic!("{} is not a path", file);
+                }
             }
         }
     } else {
-        let movie_queue = mq.print_movie_queue(&patterns)?;
+        let movie_queue = mq.print_movie_queue(&patterns).await?;
         if do_time {
             let results: Result<Vec<_>, Error> = movie_queue
                 .into_par_iter()
@@ -76,77 +118,73 @@ pub fn make_queue_worker(
     Ok(())
 }
 
-pub fn movie_queue_http(queue: &[MovieQueueResult]) -> Result<Vec<String>, Error> {
-    let mc = MovieCollection::new();
+pub async fn movie_queue_http(queue: &[MovieQueueResult]) -> Result<Vec<String>, Error> {
+    let mc = Arc::new(MovieCollection::new());
 
     let button = r#"<td><button type="submit" id="ID" onclick="delete_show('SHOW');"> remove </button></td>"#;
 
-    queue
-        .par_iter()
-        .map(|row| {
-            let path = path::Path::new(&row.path);
-            let ext = path.extension()
-                .ok_or_else(|| format_err!("Cannot determine extension"))?
-                .to_string_lossy();
-            let file_name = path
-                .file_name()
-                .ok_or_else(|| format_err!("Invalid path"))?
-                .to_string_lossy().to_string();
-            let file_stem = path
-                .file_stem()
-                .ok_or_else(|| format_err!("Invalid path"))?
-                .to_string_lossy();
-            let (_, season, episode) = parse_file_stem(&file_stem);
+    let futures = queue.into_iter().map(|row| {
+        let mc = mc.clone();
+        async move {
+        let path = Path::new(&row.path);
+        let ext = path
+            .extension()
+            .ok_or_else(|| format_err!("Cannot determine extension"))?
+            .to_string_lossy();
+        let file_name = path
+            .file_name()
+            .ok_or_else(|| format_err!("Invalid path"))?
+            .to_string_lossy()
+            .to_string();
+        let file_stem = path
+            .file_stem()
+            .ok_or_else(|| format_err!("Invalid path"))?
+            .to_string_lossy();
+        let (_, season, episode) = parse_file_stem(&file_stem);
 
-            let entry = if ext == "mp4" {
-                let collection_idx = mc.get_collection_index(&row.path)?.unwrap_or(-1);
-                format!(
-                    r#"<a href="javascript:updateMainArticle('{}');">{}</a>"#,
-                    &format!(
-                        "{}/{}",
-                        "/list/play", collection_idx
-                    ), file_name
-                )
-            } else {
-                file_name.to_string()
-            };
+        let entry = if ext == "mp4" {
+            let collection_idx = mc.get_collection_index(&row.path).await?.unwrap_or(-1);
+            format!(
+                r#"<a href="javascript:updateMainArticle('{}');">{}</a>"#,
+                &format!("{}/{}", "/list/play", collection_idx),
+                file_name
+            )
+        } else {
+            file_name.to_string()
+        };
 
-            let entry = match row.link.as_ref() {
-                Some(link) => {
-                    format!("<tr>\n<td>{}</td>\n<td><a href={}>imdb</a></td>",
-                        entry,
-                        &format!(
-                            "https://www.imdb.com/title/{}",
-                            link
-                        )
-                    )
-                },
-                None => {
-                    format!("<tr>\n<td>{}</td>\n",
-                        entry
-                    )
-                },
-            };
-            let entry = format!(
-                "{}\n{}",
+        let entry = match row.link.as_ref() {
+            Some(link) => format!(
+                "<tr>\n<td>{}</td>\n<td><a href={}>imdb</a></td>",
                 entry,
-                button.replace("ID", &file_name).replace("SHOW", &file_name)
-            );
+                &format!("https://www.imdb.com/title/{}", link)
+            ),
+            None => format!("<tr>\n<td>{}</td>\n", entry),
+        };
+        let entry = format!(
+            "{}\n{}",
+            entry,
+            button.replace("ID", &file_name).replace("SHOW", &file_name)
+        );
 
-            let entry = if ext == "mp4" {entry} else if season != -1 && episode != -1 {
-                    format!(
-                        r#"{}<td><button type="submit" id="{}" onclick="transcode('{}');"> transcode </button></td>"#,
-                        entry, file_name, file_name)
-                } else {
-                    let entries: Vec<_> = row.path.split('/').collect();
-                    let len_entries = entries.len();
-                    let directory = entries[len_entries-2];
-                    format!(
-                        r#"{}<td><button type="submit" id="{}" onclick="transcode_directory('{}', '{}');"> transcode </button></td>"#,
-                        entry, file_name, file_name, directory)
-                };
-
-            Ok(entry)
-        })
-        .collect()
+        let entry = if ext == "mp4" {
+            entry
+        } else if season != -1 && episode != -1 {
+            format!(
+                r#"{}<td><button type="submit" id="{}" onclick="transcode('{}');"> transcode </button></td>"#,
+                entry, file_name, file_name
+            )
+        } else {
+            let entries: Vec<_> = row.path.split('/').collect();
+            let len_entries = entries.len();
+            let directory = entries[len_entries - 2];
+            format!(
+                r#"{}<td><button type="submit" id="{}" onclick="transcode_directory('{}', '{}');"> transcode </button></td>"#,
+                entry, file_name, file_name, directory
+            )
+        };
+        Ok(entry)
+        }
+    });
+    try_join_all(futures).await
 }

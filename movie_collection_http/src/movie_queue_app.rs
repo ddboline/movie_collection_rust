@@ -30,7 +30,7 @@ pub async fn start_app(config: Config) {
         loop {
             i.tick().await;
             let p = pool.clone();
-            block(move || fill_from_db(&p)).await.unwrap_or(());
+            fill_from_db(&p).await.unwrap_or(());
         }
     }
 

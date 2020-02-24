@@ -1,40 +1,33 @@
 use anyhow::Error;
-use clap::{App, Arg};
+use std::path::PathBuf;
+use structopt::StructOpt;
 
-use movie_collection_lib::utils::{get_version_number, remcom_single_file};
+use movie_collection_lib::utils::remcom_single_file;
+
+#[derive(StructOpt)]
+/// Create script to copy files, push job to queue
+struct RemcomOpts {
+    /// Directory
+    #[structopt(long, short)]
+    directory: Option<PathBuf>,
+
+    #[structopt(long, short)]
+    unwatched: bool,
+
+    files: Vec<PathBuf>,
+}
 
 fn remcom() -> Result<(), Error> {
-    let matches = App::new("Remcom")
-        .version(get_version_number().as_str())
-        .author("Daniel Boline <ddboline@gmail.com>")
-        .about("Create script to do stuff")
-        .arg(
-            Arg::with_name("directory")
-                .short("d")
-                .long("directory")
-                .value_name("DIRECTORY")
-                .help("Directory"),
-        )
-        .arg(
-            Arg::with_name("unwatched")
-                .short("u")
-                .long("unwatched")
-                .value_name("UNWATCHED")
-                .takes_value(false),
-        )
-        .arg(Arg::with_name("files").multiple(true))
-        .get_matches();
+    let opts = RemcomOpts::from_args();
 
-    let unwatched = matches.is_present("unwatched");
-
-    let directory = matches.value_of("directory");
-
-    if let Some(patterns) = matches.values_of("files") {
-        let files: Vec<String> = patterns.map(ToString::to_string).collect();
-        for file in files {
-            remcom_single_file(&file, directory, unwatched)?;
-        }
+    for file in opts.files {
+        remcom_single_file(
+            &file,
+            opts.directory.as_ref().map(|d| d.as_path()),
+            opts.unwatched,
+        )?;
     }
+
     Ok(())
 }
 
