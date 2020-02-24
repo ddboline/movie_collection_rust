@@ -1,13 +1,13 @@
 use anyhow::{format_err, Error};
 use chrono::NaiveDate;
 use futures::future::join_all;
+use futures::future::try_join_all;
 use log::debug;
 use postgres_query::FromSqlRow;
 use serde::{Deserialize, Serialize};
 use std::collections::{HashMap, HashSet};
 use std::fmt;
-use std::io;
-use std::io::Write;
+use std::io::{stdout, Write};
 use std::str::FromStr;
 use std::sync::Arc;
 use tokio::task::spawn_blocking;
@@ -548,61 +548,91 @@ pub async fn get_watched_movies_db(pool: &PgPool) -> Result<Vec<WatchedMovie>, E
 }
 
 pub async fn sync_trakt_with_db() -> Result<(), Error> {
-    let mc = MovieCollection::new();
+    let mc = Arc::new(MovieCollection::new());
 
-    let watchlist_shows_db = get_watchlist_shows_db(&mc.pool).await?;
+    let watchlist_shows_db = Arc::new(get_watchlist_shows_db(&mc.pool).await?);
     let watchlist_shows = spawn_blocking(move || trakt_instance::get_watchlist_shows()).await??;
     if watchlist_shows.is_empty() {
         return Ok(());
     }
 
-    let stdout = io::stdout();
-
-    for (link, show) in watchlist_shows {
-        if !watchlist_shows_db.contains_key(&link) {
-            show.insert_show(&mc.pool).await?;
-            writeln!(stdout.lock(), "insert watchlist {}", show)?;
+    let futures = watchlist_shows.into_iter().map(|(link, show)| {
+        let watchlist_shows_db = watchlist_shows_db.clone();
+        let mc = mc.clone();
+        async move {
+            if !watchlist_shows_db.contains_key(&link) {
+                show.insert_show(&mc.pool).await?;
+                writeln!(stdout(), "insert watchlist {}", show)?;
+            }
+            Ok(())
         }
-    }
+    });
+    let results: Result<Vec<_>, Error> = try_join_all(futures).await;
+    results?;
 
     let watched_shows_db: HashMap<(String, i32, i32), _> = get_watched_shows_db(&mc.pool, "", None)
         .await?
         .into_iter()
         .map(|s| ((s.imdb_url.to_string(), s.season, s.episode), s))
         .collect();
+    let watched_shows_db = Arc::new(watched_shows_db);
     let watched_shows = spawn_blocking(move || trakt_instance::get_watched_shows()).await??;
     if watched_shows.is_empty() {
         return Ok(());
     }
-    for (key, episode) in watched_shows {
-        if !watched_shows_db.contains_key(&key) {
-            episode.insert_episode(&mc.pool).await?;
-            writeln!(stdout.lock(), "insert watched {}", episode)?;
+    let futures = watched_shows.into_iter().map(|(key, episode)| {
+        let watched_shows_db = watched_shows_db.clone();
+        let mc = mc.clone();
+        async move {
+            if !watched_shows_db.contains_key(&key) {
+                episode.insert_episode(&mc.pool).await?;
+                writeln!(stdout(), "insert watched {}", episode)?;
+            }
+            Ok(())
         }
-    }
+    });
+    let results: Result<Vec<_>, Error> = try_join_all(futures).await;
+    results?;
 
     let watched_movies_db: HashMap<String, _> = get_watched_movies_db(&mc.pool)
         .await?
         .into_iter()
         .map(|s| (s.imdb_url.to_string(), s))
         .collect();
+    let watched_movies_db = Arc::new(watched_movies_db);
     let watched_movies = spawn_blocking(move || trakt_instance::get_watched_movies()).await??;
+    let watched_movies = Arc::new(watched_movies);
     if watched_movies.is_empty() {
         return Ok(());
     }
-    for (key, movie) in &watched_movies {
-        if !watched_movies_db.contains_key(key) {
-            movie.insert_movie(&mc.pool).await?;
-            writeln!(stdout.lock(), "insert watched {}", movie)?;
-        }
-    }
 
-    for (key, movie) in watched_movies_db {
-        if !watched_movies.contains_key(&key) {
-            movie.delete_movie(&mc.pool).await?;
-            writeln!(stdout.lock(), "delete watched {}", movie)?;
+    let futures = watched_movies.iter().map(|(key, movie)| {
+        let watched_movies_db = watched_movies_db.clone();
+        let mc = mc.clone();
+        async move {
+            if !watched_movies_db.contains_key(key) {
+                movie.insert_movie(&mc.pool).await?;
+                writeln!(stdout(), "insert watched {}", movie)?;
+            }
+            Ok(())
         }
-    }
+    });
+    let results: Result<Vec<_>, Error> = try_join_all(futures).await;
+    results?;
+
+    let futures = watched_movies_db.iter().map(|(key, movie)| {
+        let watched_movies = watched_movies.clone();
+        let mc = mc.clone();
+        async move {
+            if !watched_movies.contains_key(key) {
+                movie.delete_movie(&mc.pool).await?;
+                writeln!(stdout(), "delete watched {}", movie)?;
+            }
+            Ok(())
+        }
+    });
+    let results: Result<Vec<_>, Error> = try_join_all(futures).await;
+    results?;
     Ok(())
 }
 
@@ -610,13 +640,11 @@ async fn get_imdb_url_from_show(
     mc: &MovieCollection,
     show: Option<&str>,
 ) -> Result<Option<String>, Error> {
-    let stdout = io::stdout();
-
     let result = if let Some(show) = show {
         let imdb_shows = mc.print_imdb_shows(show, false).await?;
         if imdb_shows.len() > 1 {
             for show in imdb_shows {
-                writeln!(stdout.lock(), "{}", show)?;
+                writeln!(stdout(), "{}", show)?;
             }
             None
         } else {
@@ -649,7 +677,7 @@ async fn trakt_cal_list(mc: &MovieCollection) -> Result<(), Error> {
             .is_some()
         };
         if !exists {
-            writeln!(io::stdout().lock(), "{} {}", show, cal)?;
+            writeln!(stdout().lock(), "{} {}", show, cal)?;
         }
     }
     Ok(())
@@ -659,7 +687,7 @@ async fn watchlist_add(mc: &MovieCollection, show: Option<&str>) -> Result<(), E
     if let Some(imdb_url) = get_imdb_url_from_show(&mc, show).await? {
         let imdb_url_ = imdb_url.clone();
         writeln!(
-            io::stdout().lock(),
+            stdout().lock(),
             "result: {}",
             spawn_blocking(move || trakt_instance::add_watchlist_show(&imdb_url_)).await??
         )?;
@@ -679,7 +707,7 @@ async fn watchlist_rm(mc: &MovieCollection, show: Option<&str>) -> Result<(), Er
     if let Some(imdb_url) = get_imdb_url_from_show(&mc, show).await? {
         let imdb_url_ = imdb_url.clone();
         writeln!(
-            io::stdout().lock(),
+            stdout().lock(),
             "result: {}",
             spawn_blocking(move || trakt_instance::remove_watchlist_show(&imdb_url_)).await??
         )?;
@@ -693,7 +721,7 @@ async fn watchlist_rm(mc: &MovieCollection, show: Option<&str>) -> Result<(), Er
 async fn watchlist_list(mc: &MovieCollection) -> Result<(), Error> {
     let show_map = get_watchlist_shows_db(&mc.pool).await?;
     for (_, show) in show_map {
-        writeln!(io::stdout().lock(), "{}", show)?;
+        writeln!(stdout().lock(), "{}", show)?;
     }
     Ok(())
 }
@@ -778,20 +806,20 @@ async fn watched_list(mc: &MovieCollection, show: Option<&str>, season: i32) -> 
                 continue;
             }
             if show.imdb_url == imdb_url {
-                writeln!(io::stdout().lock(), "{}", show)?;
+                writeln!(stdout().lock(), "{}", show)?;
             }
         }
         for show in &watched_movies {
             if show.imdb_url == imdb_url {
-                writeln!(io::stdout().lock(), "{}", show)?;
+                writeln!(stdout().lock(), "{}", show)?;
             }
         }
     } else {
         for show in &watched_shows {
-            writeln!(io::stdout().lock(), "{}", show)?;
+            writeln!(stdout().lock(), "{}", show)?;
         }
         for show in &watched_movies {
-            writeln!(io::stdout().lock(), "{}", show)?;
+            writeln!(stdout().lock(), "{}", show)?;
         }
     }
     Ok(())
