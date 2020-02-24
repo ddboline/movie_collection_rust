@@ -7,9 +7,10 @@ use serde::{Deserialize, Serialize};
 use std::collections::{HashMap, HashSet};
 use std::ffi::OsStr;
 use std::fmt;
-use std::io;
-use std::io::Write;
+use std::io::{stdout, Write};
 use std::path::Path;
+use rayon::iter::IntoParallelIterator;
+use std::sync::Arc;
 
 use crate::config::Config;
 use crate::imdb_episodes::ImdbEpisodes;
@@ -585,6 +586,7 @@ impl MovieCollection {
         }
 
         let file_list: HashSet<_> = file_list.into_iter().flatten().collect();
+        let file_list = Arc::new(file_list);
 
         let episode_list: Result<HashSet<_>, Error> = file_list
             .par_iter()
@@ -624,7 +626,7 @@ impl MovieCollection {
                 Ok((path, idx))
             })
             .collect();
-        let movie_queue = movie_queue?;
+        let movie_queue = Arc::new(movie_queue?);
 
         let query = "SELECT path, show FROM movie_collection";
         let collection_map: Result<HashMap<String, String>, Error> = self
@@ -640,7 +642,7 @@ impl MovieCollection {
                 Ok((path, show))
             })
             .collect();
-        let collection_map = collection_map?;
+        let collection_map = Arc::new(collection_map?);
 
         let query = "SELECT show, season, episode from imdb_episodes";
         let episodes_set: Result<HashSet<(String, i32, i32)>, Error> = self
@@ -659,9 +661,9 @@ impl MovieCollection {
             .collect();
         let episodes_set = episodes_set?;
 
-        let stdout = io::stdout();
-
-        for f in &file_list {
+        let futures = file_list.iter().map(|f| {
+            let collection_map = collection_map.clone();
+            async move {
             if collection_map.get(f).is_none() {
                 let ext = Path::new(f)
                     .extension()
@@ -669,43 +671,61 @@ impl MovieCollection {
                     .ok_or_else(|| format_err!("extension fail"))?
                     .to_string();
                 if self.get_config().suffixes.contains(&ext) {
-                    writeln!(stdout.lock(), "not in collection {}", f)?;
+                    writeln!(stdout(), "not in collection {}", f)?;
                     self.insert_into_collection(f).await?;
                 }
             }
-        }
+            Ok(())
+            }
+        });
+        let results: Result<Vec<_>, Error> = try_join_all(futures).await;
+        results?;
 
-        for (key, val) in &collection_map {
+        let futures = collection_map.iter().map(|(key, val)| {
+            let file_list = file_list.clone();
+            let movie_queue = movie_queue.clone();
+            async move {
             if !file_list.contains(key) {
                 if let Some(v) = movie_queue.get(key) {
-                    writeln!(stdout.lock(), "in queue but not disk {} {}", key, v)?;
+                    writeln!(stdout(), "in queue but not disk {} {}", key, v)?;
                     let mq = MovieQueueDB::with_pool(self.get_pool());
                     mq.remove_from_queue_by_path(key).await?;
                 } else {
-                    writeln!(stdout.lock(), "not on disk {} {}", key, val)?;
+                    writeln!(stdout(), "not on disk {} {}", key, val)?;
                 }
                 self.remove_from_collection(key).await?;
             }
-        }
+            Ok(())}
+        });
+        let results: Result<Vec<_>, Error> = try_join_all(futures).await;
+        results?;
 
-        for (key, val) in collection_map {
-            if !file_list.contains(&key) {
-                if movie_queue.contains_key(&key) {
-                    writeln!(stdout.lock(), "in queue but not disk {}", key)?;
+        let futures = collection_map.iter().map(|(key, val)| {
+            let file_list = file_list.clone();
+            let movie_queue = movie_queue.clone();
+            async move {
+            if !file_list.contains(key) {
+                if movie_queue.contains_key(key) {
+                    writeln!(stdout(), "in queue but not disk {}", key)?;
                 } else {
-                    writeln!(stdout.lock(), "not on disk {} {}", key, val)?;
+                    writeln!(stdout(), "not on disk {} {}", key, val)?;
                 }
             }
-        }
-        let mut shows_not_in_db: HashSet<String> = HashSet::new();
-        for (show, season, episode, _) in episode_list {
+            Ok(())
+            }
+        });
+        let results: Result<Vec<_>, Error> = try_join_all(futures).await;
+        results?;
+
+        let shows_not_in_db: HashSet<_> = episode_list.into_par_iter().filter_map(|(show, season, episode, _)| {
             let key = (show.to_string(), season, episode);
             if !episodes_set.contains(&key) {
-                shows_not_in_db.insert(show);
-            }
-        }
+                Some(show)
+            } else {None}
+        }).collect();
+
         for show in shows_not_in_db {
-            writeln!(stdout.lock(), "show has episode not in db {} ", show)?;
+            writeln!(stdout(), "show has episode not in db {} ", show)?;
         }
         Ok(())
     }
