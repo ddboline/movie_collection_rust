@@ -5,6 +5,8 @@ use std::ffi::OsStr;
 use std::io;
 use std::io::Write;
 use std::path::{Path, PathBuf};
+use futures::future::try_join_all;
+use std::sync::Arc;
 
 use crate::movie_collection::MovieCollection;
 use crate::movie_queue::{MovieQueueDB, MovieQueueResult};
@@ -117,12 +119,13 @@ pub async fn make_queue_worker(
 }
 
 pub async fn movie_queue_http(queue: &[MovieQueueResult]) -> Result<Vec<String>, Error> {
-    let mc = MovieCollection::new();
+    let mc = Arc::new(MovieCollection::new());
 
     let button = r#"<td><button type="submit" id="ID" onclick="delete_show('SHOW');"> remove </button></td>"#;
 
-    let mut output = Vec::new();
-    for row in queue {
+    let futures = queue.into_iter().map(|row| {
+        let mc = mc.clone();
+        async move {
         let path = Path::new(&row.path);
         let ext = path
             .extension()
@@ -180,8 +183,8 @@ pub async fn movie_queue_http(queue: &[MovieQueueResult]) -> Result<Vec<String>,
                 entry, file_name, file_name, directory
             )
         };
-
-        output.push(entry);
-    }
-    Ok(output)
+        Ok(entry)
+        }
+    });
+    try_join_all(futures).await
 }
