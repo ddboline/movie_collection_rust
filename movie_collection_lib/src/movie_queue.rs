@@ -111,18 +111,18 @@ impl MovieQueueDB {
             r#"SELECT idx FROM movie_queue WHERE collection_idx=$idx"#,
             idx = collection_idx
         );
-        let futures = self
+        if let Some(row) = self
             .pool
             .get()
             .await?
             .query(query.sql(), query.parameters())
             .await?
-            .into_iter()
-            .map(|row| async move {
-                let idx = row.try_get("idx")?;
-                self.remove_from_queue_by_idx(idx).await
-            });
-        try_join_all(futures).await.map(|_| ())
+            .get(0)
+        {
+            let idx = row.try_get("idx")?;
+            self.remove_from_queue_by_idx(idx).await?;
+        }
+        Ok(())
     }
 
     pub async fn remove_from_queue_by_path(&self, path: &str) -> Result<(), Error> {

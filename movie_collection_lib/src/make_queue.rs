@@ -1,11 +1,11 @@
 use anyhow::{format_err, Error};
 use derive_more::Display;
+use futures::future::try_join_all;
 use rayon::iter::{IntoParallelIterator, ParallelIterator};
 use std::ffi::OsStr;
 use std::io;
 use std::io::Write;
 use std::path::{Path, PathBuf};
-use futures::future::try_join_all;
 use std::sync::Arc;
 
 use crate::movie_collection::MovieCollection;

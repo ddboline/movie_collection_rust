@@ -2,6 +2,7 @@ use anyhow::{format_err, Error};
 use chrono::{DateTime, Duration, Local, NaiveDate, Utc};
 use futures::future::try_join_all;
 use postgres_query::FromSqlRow;
+use rayon::iter::IntoParallelIterator;
 use rayon::iter::{IntoParallelRefIterator, ParallelIterator};
 use serde::{Deserialize, Serialize};
 use std::collections::{HashMap, HashSet};
@@ -9,7 +10,6 @@ use std::ffi::OsStr;
 use std::fmt;
 use std::io::{stdout, Write};
 use std::path::Path;
-use rayon::iter::IntoParallelIterator;
 use std::sync::Arc;
 
 use crate::config::Config;
@@ -220,54 +220,52 @@ impl MovieCollection {
             shows
         };
 
-        let futures = shows
-            .into_iter()
-            .map(|show| async move {
-                #[derive(FromSqlRow)]
-                struct TempImdbRating {
-                    index: i32,
-                    show: String,
-                    title: String,
-                    link: String,
-                    rating: f64,
-                }
+        let futures = shows.into_iter().map(|show| async move {
+            #[derive(FromSqlRow)]
+            struct TempImdbRating {
+                index: i32,
+                show: String,
+                title: String,
+                link: String,
+                rating: f64,
+            }
 
-                let query = postgres_query::query_dyn!(
-                    &format!(
-                        r#"
+            let query = postgres_query::query_dyn!(
+                &format!(
+                    r#"
                             SELECT index, show, title, link, rating
                             FROM imdb_ratings
                             WHERE link is not null AND
                                   rating is not null AND
                                   show = $show {}
                         "#,
-                        if istv { "AND istv" } else { "" },
-                    ),
-                    show = show
-                )?;
+                    if istv { "AND istv" } else { "" },
+                ),
+                show = show
+            )?;
 
-                let results: Result<Vec<_>, Error> = self
-                    .get_pool()
-                    .get()
-                    .await?
-                    .query(query.sql(), query.parameters())
-                    .await?
-                    .iter()
-                    .map(|row| {
-                        let row = TempImdbRating::from_row(row)?;
+            let results: Result<Vec<_>, Error> = self
+                .get_pool()
+                .get()
+                .await?
+                .query(query.sql(), query.parameters())
+                .await?
+                .iter()
+                .map(|row| {
+                    let row = TempImdbRating::from_row(row)?;
 
-                        Ok(ImdbRatings {
-                            index: row.index,
-                            show: row.show,
-                            title: Some(row.title),
-                            link: row.link,
-                            rating: Some(row.rating),
-                            ..ImdbRatings::default()
-                        })
+                    Ok(ImdbRatings {
+                        index: row.index,
+                        show: row.show,
+                        title: Some(row.title),
+                        link: row.link,
+                        rating: Some(row.rating),
+                        ..ImdbRatings::default()
                     })
-                    .collect();
-                results
-            });
+                })
+                .collect();
+            results
+        });
         let results: Result<Vec<_>, Error> = try_join_all(futures).await;
         let results: Vec<_> = results?.into_iter().flatten().collect();
         Ok(results)
@@ -395,51 +393,49 @@ impl MovieCollection {
             })
             .collect();
 
-        let futures = results?
-            .into_iter()
-            .map(|mut result| async {
-                let file_stem = Path::new(&result.path)
-                    .file_stem()
-                    .unwrap()
-                    .to_string_lossy();
-                let (show, season, episode) = parse_file_stem(&file_stem);
+        let futures = results?.into_iter().map(|mut result| async {
+            let file_stem = Path::new(&result.path)
+                .file_stem()
+                .unwrap()
+                .to_string_lossy();
+            let (show, season, episode) = parse_file_stem(&file_stem);
 
-                if season != -1 && episode != -1 && show == result.show {
-                    #[derive(FromSqlRow)]
-                    struct TempImdbEpisodes {
-                        eprating: Option<f64>,
-                        eptitle: Option<String>,
-                        epurl: Option<String>,
-                    }
+            if season != -1 && episode != -1 && show == result.show {
+                #[derive(FromSqlRow)]
+                struct TempImdbEpisodes {
+                    eprating: Option<f64>,
+                    eptitle: Option<String>,
+                    epurl: Option<String>,
+                }
 
-                    let query = postgres_query::query!(
-                        r#"
+                let query = postgres_query::query!(
+                    r#"
                             SELECT cast(rating as double precision) as eprating, eptitle, epurl
                             FROM imdb_episodes
                             WHERE show = $show AND season = $season AND episode = $episode
                         "#,
-                        show = show,
-                        season = season,
-                        episode = episode
-                    );
+                    show = show,
+                    season = season,
+                    episode = episode
+                );
 
-                    for row in &self
-                        .get_pool()
-                        .get()
-                        .await?
-                        .query(query.sql(), query.parameters())
-                        .await?
-                    {
-                        let row = TempImdbEpisodes::from_row(row)?;
-                        result.season = Some(season);
-                        result.episode = Some(episode);
-                        result.eprating = row.eprating;
-                        result.eptitle = row.eptitle;
-                        result.epurl = row.epurl;
-                    }
+                for row in &self
+                    .get_pool()
+                    .get()
+                    .await?
+                    .query(query.sql(), query.parameters())
+                    .await?
+                {
+                    let row = TempImdbEpisodes::from_row(row)?;
+                    result.season = Some(season);
+                    result.episode = Some(episode);
+                    result.eprating = row.eprating;
+                    result.eptitle = row.eptitle;
+                    result.epurl = row.epurl;
                 }
-                Ok(result)
-            });
+            }
+            Ok(result)
+        });
         let results: Result<Vec<_>, Error> = try_join_all(futures).await;
         let mut results = results?;
         results.sort_by_key(|r| (r.season, r.episode));
@@ -664,18 +660,18 @@ impl MovieCollection {
         let futures = file_list.iter().map(|f| {
             let collection_map = collection_map.clone();
             async move {
-            if collection_map.get(f).is_none() {
-                let ext = Path::new(f)
-                    .extension()
-                    .map(OsStr::to_string_lossy)
-                    .ok_or_else(|| format_err!("extension fail"))?
-                    .to_string();
-                if self.get_config().suffixes.contains(&ext) {
-                    writeln!(stdout(), "not in collection {}", f)?;
-                    self.insert_into_collection(f).await?;
+                if collection_map.get(f).is_none() {
+                    let ext = Path::new(f)
+                        .extension()
+                        .map(OsStr::to_string_lossy)
+                        .ok_or_else(|| format_err!("extension fail"))?
+                        .to_string();
+                    if self.get_config().suffixes.contains(&ext) {
+                        writeln!(stdout(), "not in collection {}", f)?;
+                        self.insert_into_collection(f).await?;
+                    }
                 }
-            }
-            Ok(())
+                Ok(())
             }
         });
         let results: Result<Vec<_>, Error> = try_join_all(futures).await;
@@ -685,17 +681,18 @@ impl MovieCollection {
             let file_list = file_list.clone();
             let movie_queue = movie_queue.clone();
             async move {
-            if !file_list.contains(key) {
-                if let Some(v) = movie_queue.get(key) {
-                    writeln!(stdout(), "in queue but not disk {} {}", key, v)?;
-                    let mq = MovieQueueDB::with_pool(self.get_pool());
-                    mq.remove_from_queue_by_path(key).await?;
-                } else {
-                    writeln!(stdout(), "not on disk {} {}", key, val)?;
+                if !file_list.contains(key) {
+                    if let Some(v) = movie_queue.get(key) {
+                        writeln!(stdout(), "in queue but not disk {} {}", key, v)?;
+                        let mq = MovieQueueDB::with_pool(self.get_pool());
+                        mq.remove_from_queue_by_path(key).await?;
+                    } else {
+                        writeln!(stdout(), "not on disk {} {}", key, val)?;
+                    }
+                    self.remove_from_collection(key).await?;
                 }
-                self.remove_from_collection(key).await?;
+                Ok(())
             }
-            Ok(())}
         });
         let results: Result<Vec<_>, Error> = try_join_all(futures).await;
         results?;
@@ -704,25 +701,30 @@ impl MovieCollection {
             let file_list = file_list.clone();
             let movie_queue = movie_queue.clone();
             async move {
-            if !file_list.contains(key) {
-                if movie_queue.contains_key(key) {
-                    writeln!(stdout(), "in queue but not disk {}", key)?;
-                } else {
-                    writeln!(stdout(), "not on disk {} {}", key, val)?;
+                if !file_list.contains(key) {
+                    if movie_queue.contains_key(key) {
+                        writeln!(stdout(), "in queue but not disk {}", key)?;
+                    } else {
+                        writeln!(stdout(), "not on disk {} {}", key, val)?;
+                    }
                 }
-            }
-            Ok(())
+                Ok(())
             }
         });
         let results: Result<Vec<_>, Error> = try_join_all(futures).await;
         results?;
 
-        let shows_not_in_db: HashSet<_> = episode_list.into_par_iter().filter_map(|(show, season, episode, _)| {
-            let key = (show.to_string(), season, episode);
-            if !episodes_set.contains(&key) {
-                Some(show)
-            } else {None}
-        }).collect();
+        let shows_not_in_db: HashSet<_> = episode_list
+            .into_par_iter()
+            .filter_map(|(show, season, episode, _)| {
+                let key = (show.to_string(), season, episode);
+                if !episodes_set.contains(&key) {
+                    Some(show)
+                } else {
+                    None
+                }
+            })
+            .collect();
 
         for show in shows_not_in_db {
             writeln!(stdout(), "show has episode not in db {} ", show)?;
