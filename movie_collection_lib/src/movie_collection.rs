@@ -677,25 +677,18 @@ impl MovieCollection {
         let results: Result<Vec<_>, Error> = try_join_all(futures).await;
         results?;
 
-        let futures = collection_map.iter().map(|(key, val)| {
-            let file_list = file_list.clone();
-            let movie_queue = movie_queue.clone();
-            async move {
-                if !file_list.contains(key) {
-                    if let Some(v) = movie_queue.get(key) {
-                        writeln!(stdout(), "in queue but not disk {} {}", key, v)?;
-                        let mq = MovieQueueDB::with_pool(self.get_pool());
-                        mq.remove_from_queue_by_path(key).await?;
-                    } else {
-                        writeln!(stdout(), "not on disk {} {}", key, val)?;
-                    }
-                    self.remove_from_collection(key).await?;
+        for (key, val) in collection_map.iter() {
+            if !file_list.contains(key) {
+                if let Some(v) = movie_queue.get(key) {
+                    writeln!(stdout(), "in queue but not disk {} {}", key, v)?;
+                    let mq = MovieQueueDB::with_pool(self.get_pool());
+                    mq.remove_from_queue_by_path(key).await?;
+                } else {
+                    writeln!(stdout(), "not on disk {} {}", key, val)?;
                 }
-                Ok(())
+                self.remove_from_collection(key).await?;
             }
-        });
-        let results: Result<Vec<_>, Error> = try_join_all(futures).await;
-        results?;
+        }
 
         let futures = collection_map.iter().map(|(key, val)| {
             let file_list = file_list.clone();
