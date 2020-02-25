@@ -5,6 +5,7 @@ use std::env::var;
 use movie_collection_lib::pgpool::PgPool;
 
 pub async fn fill_from_db(pool: &PgPool) -> Result<(), Error> {
+    debug!("{:?}", *TRIGGER_DB_UPDATE);
     if TRIGGER_DB_UPDATE.check() {
         let query = "SELECT email FROM authorized_users";
         let results: Result<Vec<_>, Error> = pool
@@ -27,8 +28,8 @@ pub async fn fill_from_db(pool: &PgPool) -> Result<(), Error> {
             AUTHORIZED_USERS.merge_users(&[user])?;
         }
 
-        AUTHORIZED_USERS.merge_users(&users)
-    } else {
-        Ok(())
+        AUTHORIZED_USERS.merge_users(&users)?;
     }
+    debug!("{:?}", *AUTHORIZED_USERS);
+    Ok(())
 }

@@ -8,7 +8,7 @@ use std::time;
 use subprocess::Exec;
 use tokio::time::interval;
 
-use super::logged_user::fill_from_db;
+use super::logged_user::{fill_from_db, TRIGGER_DB_UPDATE};
 use super::movie_queue_routes::{
     find_new_episodes, frontpage, imdb_episodes_route, imdb_episodes_update, imdb_ratings_route,
     imdb_ratings_update, imdb_show, last_modified_route, movie_collection_route,
@@ -33,6 +33,7 @@ pub async fn start_app(config: Config) {
             fill_from_db(&p).await.unwrap_or(());
         }
     }
+    TRIGGER_DB_UPDATE.set();
 
     let command = "rm -f /var/www/html/videos/partial/*";
     block(move || Exec::shell(command).join()).await.unwrap();
