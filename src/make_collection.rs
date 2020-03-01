@@ -1,12 +1,10 @@
 use anyhow::Error;
 use futures::future::try_join_all;
-use std::io;
-use std::io::Write;
+use std::{io, io::Write};
 use structopt::StructOpt;
 use tokio::task::spawn_blocking;
 
-use movie_collection_lib::movie_collection::MovieCollection;
-use movie_collection_lib::utils::get_video_runtime;
+use movie_collection_lib::{movie_collection::MovieCollection, utils::get_video_runtime};
 
 #[derive(StructOpt)]
 /// Collection Query/Parser

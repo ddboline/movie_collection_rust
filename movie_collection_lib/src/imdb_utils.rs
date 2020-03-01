@@ -2,8 +2,10 @@ use anyhow::Error;
 use chrono::NaiveDate;
 use futures::future::try_join_all;
 use reqwest::{Client, Url};
-use select::document::Document;
-use select::predicate::{Class, Name};
+use select::{
+    document::Document,
+    predicate::{Class, Name},
+};
 use std::fmt;
 
 use crate::utils::{option_string_wrapper, ExponentialRetry};

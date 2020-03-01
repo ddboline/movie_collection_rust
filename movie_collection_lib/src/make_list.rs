@@ -1,11 +1,15 @@
 use anyhow::Error;
 use rayon::iter::{IntoParallelRefIterator, ParallelIterator};
-use std::collections::HashMap;
-use std::io::{stdout, Write};
-use std::path::Path;
+use std::{
+    collections::HashMap,
+    io::{stdout, Write},
+    path::Path,
+};
 
-use crate::config::Config;
-use crate::utils::{get_video_runtime, walk_directory};
+use crate::{
+    config::Config,
+    utils::{get_video_runtime, walk_directory},
+};
 
 pub fn make_list() -> Result<(), Error> {
     let config = Config::with_config()?;

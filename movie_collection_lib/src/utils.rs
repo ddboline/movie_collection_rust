@@ -1,21 +1,20 @@
-use amqp::protocol::basic::BasicProperties;
-use amqp::{Basic, Channel, Options, Session, Table};
+use amqp::{protocol::basic::BasicProperties, Basic, Channel, Options, Session, Table};
 use anyhow::{format_err, Error};
 use async_trait::async_trait;
 use log::error;
-use rand::distributions::{Distribution, Uniform};
-use rand::thread_rng;
-use reqwest::Url;
-use reqwest::{Client, Response};
+use rand::{
+    distributions::{Distribution, Uniform},
+    thread_rng,
+};
+use reqwest::{Client, Response, Url};
 use serde::{Deserialize, Serialize};
-use std::env::var;
-use std::fs::create_dir_all;
-use std::fs::rename;
-use std::fs::{File, OpenOptions};
-use std::io::{stdout, Write};
-use std::io::{BufRead, BufReader};
-use std::path::Path;
-use std::string::ToString;
+use std::{
+    env::var,
+    fs::{create_dir_all, rename, File, OpenOptions},
+    io::{stdout, BufRead, BufReader, Write},
+    path::Path,
+    string::ToString,
+};
 use subprocess::{Exec, Redirection};
 use tokio::time::{delay_for, Duration};
 

@@ -2,8 +2,10 @@ use anyhow::Error;
 use std::io::{stdout, Write};
 use structopt::StructOpt;
 
-use movie_collection_lib::movie_collection::MovieCollection;
-use movie_collection_lib::parse_imdb::{ParseImdb, ParseImdbOptions};
+use movie_collection_lib::{
+    movie_collection::MovieCollection,
+    parse_imdb::{ParseImdb, ParseImdbOptions},
+};
 
 async fn parse_imdb_parser() -> Result<(), Error> {
     let opts = ParseImdbOptions::from_args();

@@ -1,10 +1,8 @@
 use anyhow::Error;
-use std::io;
-use std::io::Write;
+use std::{io, io::Write};
 use structopt::StructOpt;
 
-use movie_collection_lib::movie_collection::MovieCollection;
-use movie_collection_lib::tv_show_source::TvShowSource;
+use movie_collection_lib::{movie_collection::MovieCollection, tv_show_source::TvShowSource};
 
 #[derive(StructOpt)]
 /// Query and Parse Video Collection

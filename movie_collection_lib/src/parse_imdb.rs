@@ -3,12 +3,10 @@ use chrono::NaiveDate;
 use std::collections::HashMap;
 use structopt::StructOpt;
 
-use crate::imdb_episodes::ImdbEpisodes;
-use crate::imdb_ratings::ImdbRatings;
-use crate::imdb_utils::ImdbConnection;
-use crate::movie_collection::MovieCollection;
-use crate::pgpool::PgPool;
-use crate::trakt_utils::WatchListMap;
+use crate::{
+    imdb_episodes::ImdbEpisodes, imdb_ratings::ImdbRatings, imdb_utils::ImdbConnection,
+    movie_collection::MovieCollection, pgpool::PgPool, trakt_utils::WatchListMap,
+};
 
 #[derive(StructOpt, Default, Debug)]
 /// Parse IMDB.com

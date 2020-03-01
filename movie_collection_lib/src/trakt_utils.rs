@@ -1,26 +1,24 @@
 use anyhow::{format_err, Error};
 use chrono::NaiveDate;
-use futures::future::join_all;
-use futures::future::try_join_all;
+use futures::future::{join_all, try_join_all};
 use log::debug;
 use postgres_query::FromSqlRow;
 use serde::{Deserialize, Serialize};
-use std::collections::{HashMap, HashSet};
-use std::fmt;
-use std::io::{stdout, Write};
-use std::str::FromStr;
-use std::sync::Arc;
+use std::{
+    collections::{HashMap, HashSet},
+    fmt,
+    io::{stdout, Write},
+    str::FromStr,
+    sync::Arc,
+};
 use tokio::task::spawn_blocking;
 
-use crate::imdb_episodes::ImdbEpisodes;
-use crate::imdb_ratings::ImdbRatings;
-use crate::movie_collection::MovieCollection;
-use crate::movie_queue::MovieQueueDB;
-use crate::pgpool::PgPool;
+use crate::{
+    imdb_episodes::ImdbEpisodes, imdb_ratings::ImdbRatings, movie_collection::MovieCollection,
+    movie_queue::MovieQueueDB, pgpool::PgPool,
+};
 
-use crate::trakt_instance;
-use crate::tv_show_source::TvShowSource;
-use crate::utils::option_string_wrapper;
+use crate::{trakt_instance, tv_show_source::TvShowSource, utils::option_string_wrapper};
 
 #[derive(Clone, Copy)]
 pub enum TraktActions {

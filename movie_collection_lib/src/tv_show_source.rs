@@ -1,9 +1,7 @@
 use anyhow::{format_err, Error};
 use bytes::BytesMut;
 use serde::{Deserialize, Serialize};
-use std::cmp::Ordering;
-use std::fmt;
-use std::str::FromStr;
+use std::{cmp::Ordering, fmt, str::FromStr};
 use tokio_postgres::types::{FromSql, IsNull, ToSql, Type};
 
 #[derive(Serialize, Deserialize, Clone, Debug, Eq, Copy)]

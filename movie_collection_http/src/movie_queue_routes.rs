@@ -1,35 +1,42 @@
 #![allow(clippy::needless_pass_by_value)]
 
-use actix_web::web::{Data, Json, Path, Query};
-use actix_web::HttpResponse;
+use actix_web::{
+    web::{Data, Json, Path, Query},
+    HttpResponse,
+};
 use anyhow::format_err;
 use serde::Serialize;
-use std::collections::{HashMap, HashSet};
-use std::path;
+use std::{
+    collections::{HashMap, HashSet},
+    path,
+};
 use subprocess::Exec;
 
-use movie_collection_lib::make_queue::movie_queue_http;
-use movie_collection_lib::movie_collection::ImdbSeason;
-use movie_collection_lib::movie_collection::TvShowsResult;
-use movie_collection_lib::movie_queue::MovieQueueResult;
-use movie_collection_lib::trakt_instance;
-use movie_collection_lib::trakt_utils::TraktActions;
-use movie_collection_lib::trakt_utils::WatchListShow;
-use movie_collection_lib::tv_show_source::TvShowSource;
-use movie_collection_lib::utils::remcom_single_file;
-
-use super::errors::ServiceError as Error;
-use super::logged_user::LoggedUser;
-use super::movie_queue_app::AppState;
-use super::movie_queue_requests::{
-    FindNewEpisodeRequest, ImdbEpisodesSyncRequest, ImdbEpisodesUpdateRequest, ImdbRatingsRequest,
-    ImdbRatingsSyncRequest, ImdbRatingsUpdateRequest, ImdbSeasonsRequest, ImdbShowRequest,
-    LastModifiedRequest, MovieCollectionSyncRequest, MovieCollectionUpdateRequest,
-    MoviePathRequest, MovieQueueRequest, MovieQueueSyncRequest, MovieQueueUpdateRequest,
-    ParseImdbRequest, QueueDeleteRequest, TraktCalRequest, TvShowsRequest, WatchedActionRequest,
-    WatchedListRequest, WatchlistActionRequest, WatchlistShowsRequest,
+use movie_collection_lib::{
+    make_queue::movie_queue_http,
+    movie_collection::{ImdbSeason, TvShowsResult},
+    movie_queue::MovieQueueResult,
+    trakt_instance,
+    trakt_utils::{TraktActions, WatchListShow},
+    tv_show_source::TvShowSource,
+    utils::remcom_single_file,
 };
-use super::HandleRequest;
+
+use super::{
+    errors::ServiceError as Error,
+    logged_user::LoggedUser,
+    movie_queue_app::AppState,
+    movie_queue_requests::{
+        FindNewEpisodeRequest, ImdbEpisodesSyncRequest, ImdbEpisodesUpdateRequest,
+        ImdbRatingsRequest, ImdbRatingsSyncRequest, ImdbRatingsUpdateRequest, ImdbSeasonsRequest,
+        ImdbShowRequest, LastModifiedRequest, MovieCollectionSyncRequest,
+        MovieCollectionUpdateRequest, MoviePathRequest, MovieQueueRequest, MovieQueueSyncRequest,
+        MovieQueueUpdateRequest, ParseImdbRequest, QueueDeleteRequest, TraktCalRequest,
+        TvShowsRequest, WatchedActionRequest, WatchedListRequest, WatchlistActionRequest,
+        WatchlistShowsRequest,
+    },
+    HandleRequest,
+};
 
 fn form_http_response(body: String) -> Result<HttpResponse, Error> {
     Ok(HttpResponse::Ok()

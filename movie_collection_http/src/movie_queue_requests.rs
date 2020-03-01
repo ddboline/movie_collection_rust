@@ -6,21 +6,24 @@ use serde::{Deserialize, Serialize};
 use std::path;
 
 use super::HandleRequest;
-use movie_collection_lib::imdb_episodes::ImdbEpisodes;
-use movie_collection_lib::imdb_ratings::ImdbRatings;
-use movie_collection_lib::movie_collection::{
-    find_new_episodes_http_worker, ImdbSeason, MovieCollection, MovieCollectionRow, TvShowsResult,
+use movie_collection_lib::{
+    imdb_episodes::ImdbEpisodes,
+    imdb_ratings::ImdbRatings,
+    movie_collection::{
+        find_new_episodes_http_worker, ImdbSeason, MovieCollection, MovieCollectionRow,
+        TvShowsResult,
+    },
+    movie_queue::{MovieQueueDB, MovieQueueResult, MovieQueueRow},
+    parse_imdb::{ParseImdb, ParseImdbOptions},
+    pgpool::PgPool,
+    trakt_instance,
+    trakt_utils::{
+        get_watched_shows_db, get_watchlist_shows_db_map, trakt_cal_http_worker,
+        watch_list_http_worker, watched_action_http_worker, TraktActions, WatchListMap,
+        WatchListShow, WatchedEpisode,
+    },
+    tv_show_source::TvShowSource,
 };
-use movie_collection_lib::movie_queue::{MovieQueueDB, MovieQueueResult, MovieQueueRow};
-use movie_collection_lib::parse_imdb::{ParseImdb, ParseImdbOptions};
-use movie_collection_lib::pgpool::PgPool;
-use movie_collection_lib::trakt_instance;
-use movie_collection_lib::trakt_utils::{
-    get_watched_shows_db, get_watchlist_shows_db_map, trakt_cal_http_worker,
-    watch_list_http_worker, watched_action_http_worker, TraktActions, WatchListMap, WatchListShow,
-    WatchedEpisode,
-};
-use movie_collection_lib::tv_show_source::TvShowSource;
 
 pub struct TvShowsRequest {}
 

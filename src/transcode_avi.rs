@@ -1,10 +1,14 @@
 use anyhow::Error;
-use std::io::{stdout, Write};
-use std::path::{Path, PathBuf};
+use std::{
+    io::{stdout, Write},
+    path::{Path, PathBuf},
+};
 use structopt::StructOpt;
 
-use movie_collection_lib::config::Config;
-use movie_collection_lib::utils::{create_transcode_script, publish_transcode_job_to_queue};
+use movie_collection_lib::{
+    config::Config,
+    utils::{create_transcode_script, publish_transcode_job_to_queue},
+};
 
 #[derive(StructOpt)]
 struct TranscodeAviOpts {

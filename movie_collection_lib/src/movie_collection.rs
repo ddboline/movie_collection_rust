@@ -2,24 +2,26 @@ use anyhow::{format_err, Error};
 use chrono::{DateTime, Duration, Local, NaiveDate, Utc};
 use futures::future::try_join_all;
 use postgres_query::FromSqlRow;
-use rayon::iter::IntoParallelIterator;
-use rayon::iter::{IntoParallelRefIterator, ParallelIterator};
+use rayon::iter::{IntoParallelIterator, IntoParallelRefIterator, ParallelIterator};
 use serde::{Deserialize, Serialize};
-use std::collections::{HashMap, HashSet};
-use std::ffi::OsStr;
-use std::fmt;
-use std::io::{stdout, Write};
-use std::path::Path;
-use std::sync::Arc;
+use std::{
+    collections::{HashMap, HashSet},
+    ffi::OsStr,
+    fmt,
+    io::{stdout, Write},
+    path::Path,
+    sync::Arc,
+};
 
-use crate::config::Config;
-use crate::imdb_episodes::ImdbEpisodes;
-use crate::imdb_ratings::ImdbRatings;
-use crate::movie_queue::MovieQueueDB;
-use crate::pgpool::PgPool;
+use crate::{
+    config::Config, imdb_episodes::ImdbEpisodes, imdb_ratings::ImdbRatings,
+    movie_queue::MovieQueueDB, pgpool::PgPool,
+};
 
-use crate::tv_show_source::TvShowSource;
-use crate::utils::{option_string_wrapper, parse_file_stem, walk_directory};
+use crate::{
+    tv_show_source::TvShowSource,
+    utils::{option_string_wrapper, parse_file_stem, walk_directory},
+};
 
 #[derive(FromSqlRow)]
 pub struct NewEpisodesResult {

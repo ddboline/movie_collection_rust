@@ -4,12 +4,9 @@ use futures::future::try_join_all;
 use log::debug;
 use postgres_query::FromSqlRow;
 use serde::{Deserialize, Serialize};
-use std::fmt;
-use std::path::Path;
+use std::{fmt, path::Path};
 
-use crate::config::Config;
-use crate::movie_collection::MovieCollection;
-use crate::pgpool::PgPool;
+use crate::{config::Config, movie_collection::MovieCollection, pgpool::PgPool};
 
 use crate::utils::{option_string_wrapper, parse_file_stem};
 
