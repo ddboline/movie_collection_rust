@@ -1,7 +1,7 @@
 use anyhow::{format_err, Error};
 use deadpool::managed::Object;
 use deadpool_postgres::{ClientWrapper, Config, Pool};
-use std::{env::set_var, fmt};
+use std::{fmt};
 use tokio_postgres::{error::Error as PgError, Config as PgConfig, NoTls};
 
 #[derive(Clone, Default)]
@@ -26,16 +26,23 @@ impl PgPool {
     pub fn new(pgurl: &str) -> Self {
         let pgconf: PgConfig = pgurl.parse().expect("Failed to parse Url");
 
-        if let tokio_postgres::config::Host::Tcp(s) = &pgconf.get_hosts()[0] {
-            set_var("PG_HOST", s);
-        }
-        pgconf.get_user().map(|u| set_var("PG_USER", u));
-        pgconf
-            .get_password()
-            .map(|u| set_var("PG_PASSWORD", String::from_utf8_lossy(u).to_string()));
-        pgconf.get_dbname().map(|u| set_var("PG_DBNAME", u));
+        let mut config = Config::default();
 
-        let config = Config::from_env("PG").expect("Failed to create config");
+        if let tokio_postgres::config::Host::Tcp(s) = &pgconf.get_hosts()[0] {
+            config.host.replace(s.to_string());
+        }
+        if let Some(u) = pgconf.get_user() {
+            config.user.replace(u.to_string());
+        }
+        if let Some(p) = pgconf.get_password() {
+            config
+                .password
+                .replace(String::from_utf8_lossy(p).to_string());
+        }
+        if let Some(db) = pgconf.get_dbname() {
+            config.dbname.replace(db.to_string());
+        }
+
         Self {
             pgurl: pgurl.to_string(),
             pool: Some(
