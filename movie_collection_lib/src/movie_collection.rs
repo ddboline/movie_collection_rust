@@ -713,10 +713,10 @@ impl MovieCollection {
             .into_par_iter()
             .filter_map(|(show, season, episode, _)| {
                 let key = (show.to_string(), season, episode);
-                if !episodes_set.contains(&key) {
-                    Some(show)
-                } else {
+                if episodes_set.contains(&key) {
                     None
+                } else {
+                    Some(show)
                 }
             })
             .collect();
@@ -798,7 +798,7 @@ impl MovieCollection {
         &self,
         mindate: NaiveDate,
         maxdate: NaiveDate,
-        source: &Option<TvShowSource>,
+        source: Option<TvShowSource>,
     ) -> Result<Vec<NewEpisodesResult>, Error> {
         let query = postgres_query::query_dyn!(
             &format!(
@@ -855,7 +855,7 @@ impl MovieCollection {
 
     pub async fn find_new_episodes(
         &self,
-        source: &Option<TvShowSource>,
+        source: Option<TvShowSource>,
         shows: &[String],
     ) -> Result<Vec<NewEpisodesResult>, Error> {
         let mindate = Local::today() + Duration::days(-14);
@@ -918,7 +918,7 @@ impl MovieCollection {
 pub async fn find_new_episodes_http_worker(
     pool: &PgPool,
     shows: Option<String>,
-    source: &Option<TvShowSource>,
+    source: Option<TvShowSource>,
 ) -> Result<Vec<String>, Error> {
     let button_add = format!(
         "{}{}",
@@ -943,7 +943,7 @@ pub async fn find_new_episodes_http_worker(
 
     let mq = MovieQueueDB::with_pool(&pool);
 
-    let episodes = mc.get_new_episodes(mindate, maxdate, &source).await?;
+    let episodes = mc.get_new_episodes(mindate, maxdate, source).await?;
 
     let shows: HashSet<String> = episodes
         .iter()

@@ -1,7 +1,7 @@
 use anyhow::{format_err, Error};
 use deadpool::managed::Object;
 use deadpool_postgres::{ClientWrapper, Config, Pool};
-use std::{fmt};
+use std::fmt;
 use tokio_postgres::{error::Error as PgError, Config as PgConfig, NoTls};
 
 #[derive(Clone, Default)]
@@ -48,7 +48,7 @@ impl PgPool {
             pool: Some(
                 config
                     .create_pool(NoTls)
-                    .expect(&format!("Failed to create pool {}", pgurl)),
+                    .unwrap_or_else(|_| panic!("Failed to create pool {}", pgurl)),
             ),
         }
     }

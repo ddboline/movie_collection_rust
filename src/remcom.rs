@@ -23,7 +23,7 @@ fn remcom() -> Result<(), Error> {
     for file in opts.files {
         remcom_single_file(
             &file,
-            opts.directory.as_ref().map(|d| d.as_path()),
+            opts.directory.as_ref().map(PathBuf::as_path),
             opts.unwatched,
         )?;
     }

@@ -549,7 +549,7 @@ pub async fn sync_trakt_with_db() -> Result<(), Error> {
     let mc = Arc::new(MovieCollection::new());
 
     let watchlist_shows_db = Arc::new(get_watchlist_shows_db(&mc.pool).await?);
-    let watchlist_shows = spawn_blocking(move || trakt_instance::get_watchlist_shows()).await??;
+    let watchlist_shows = spawn_blocking(trakt_instance::get_watchlist_shows).await??;
     if watchlist_shows.is_empty() {
         return Ok(());
     }
@@ -574,7 +574,7 @@ pub async fn sync_trakt_with_db() -> Result<(), Error> {
         .map(|s| ((s.imdb_url.to_string(), s.season, s.episode), s))
         .collect();
     let watched_shows_db = Arc::new(watched_shows_db);
-    let watched_shows = spawn_blocking(move || trakt_instance::get_watched_shows()).await??;
+    let watched_shows = spawn_blocking(trakt_instance::get_watched_shows).await??;
     if watched_shows.is_empty() {
         return Ok(());
     }
@@ -598,7 +598,7 @@ pub async fn sync_trakt_with_db() -> Result<(), Error> {
         .map(|s| (s.imdb_url.to_string(), s))
         .collect();
     let watched_movies_db = Arc::new(watched_movies_db);
-    let watched_movies = spawn_blocking(move || trakt_instance::get_watched_movies()).await??;
+    let watched_movies = spawn_blocking(trakt_instance::get_watched_movies).await??;
     let watched_movies = Arc::new(watched_movies);
     if watched_movies.is_empty() {
         return Ok(());
@@ -655,7 +655,7 @@ async fn get_imdb_url_from_show(
 }
 
 async fn trakt_cal_list(mc: &MovieCollection) -> Result<(), Error> {
-    let cal_entries = spawn_blocking(move || trakt_instance::get_calendar()).await??;
+    let cal_entries = spawn_blocking(trakt_instance::get_calendar).await??;
     for cal in cal_entries {
         let show = match ImdbRatings::get_show_by_link(&cal.link, &mc.pool).await? {
             Some(s) => s.show,
@@ -690,7 +690,7 @@ async fn watchlist_add(mc: &MovieCollection, show: Option<&str>) -> Result<(), E
             spawn_blocking(move || trakt_instance::add_watchlist_show(&imdb_url_)).await??
         )?;
         debug!("GOT HERE");
-        if let Some(show) = spawn_blocking(move || trakt_instance::get_watchlist_shows())
+        if let Some(show) = spawn_blocking(trakt_instance::get_watchlist_shows)
             .await??
             .get(&imdb_url)
         {
@@ -1054,7 +1054,7 @@ pub async fn trakt_cal_http_worker(pool: &PgPool) -> Result<Vec<String>, Error> 
         r#"onclick="imdb_update('SHOW', 'LINK', SEASON, '/list/trakt/cal');"
             >update database</button></td>"#
     );
-    let cal_list = spawn_blocking(|| trakt_instance::get_calendar()).await??;
+    let cal_list = spawn_blocking(trakt_instance::get_calendar).await??;
     let results: Vec<_> = cal_list
         .into_iter()
         .map(|cal| async {
@@ -1087,18 +1087,18 @@ pub async fn trakt_cal_http_worker(pool: &PgPool) -> Result<Vec<String>, Error> 
                     r#"<a href="https://www.imdb.com/title/{}">imdb</a>"#,
                     cal.link
                 ),
-                match cal.ep_link {
-                    Some(link) => format!(
+                if let Some(link) = cal.ep_link {
+                    format!(
                         r#"<a href="https://www.imdb.com/title/{}">{} {}</a>"#,
                         link, cal.season, cal.episode,
-                    ),
-                    None => match exists.as_ref() {
-                        Some(link) => format!(
-                            r#"<a href="https://www.imdb.com/title/{}">{} {}</a>"#,
-                            link, cal.season, cal.episode,
-                        ),
-                        None => format!("{} {}", cal.season, cal.episode,),
-                    },
+                    )
+                } else if let Some(link) = exists.as_ref() {
+                    format!(
+                        r#"<a href="https://www.imdb.com/title/{}">{} {}</a>"#,
+                        link, cal.season, cal.episode,
+                    )
+                } else {
+                    format!("{} {}", cal.season, cal.episode,)
                 },
                 cal.airdate,
                 if exists.is_some() {"".to_string()} else {

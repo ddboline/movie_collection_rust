@@ -26,7 +26,7 @@ async fn find_new_episodes() -> Result<(), Error> {
 
     let mc = MovieCollection::new();
 
-    let output = mc.find_new_episodes(&source, &opts.shows).await?;
+    let output = mc.find_new_episodes(source, &opts.shows).await?;
 
     let stdout = io::stdout();
 

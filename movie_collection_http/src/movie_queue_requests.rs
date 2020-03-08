@@ -289,7 +289,7 @@ impl HandleRequest<FindNewEpisodeRequest> for PgPool {
     type Result = Result<Vec<String>, Error>;
 
     async fn handle(&self, msg: FindNewEpisodeRequest) -> Self::Result {
-        find_new_episodes_http_worker(&self, msg.shows, &msg.source).await
+        find_new_episodes_http_worker(&self, msg.shows, msg.source).await
     }
 }
 

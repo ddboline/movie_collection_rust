@@ -33,6 +33,7 @@ impl From<&OsStr> for PathOrIndex {
     }
 }
 
+#[allow(clippy::cognitive_complexity)]
 pub async fn make_queue_worker(
     add_files: &[PathOrIndex],
     del_files: &[PathOrIndex],
@@ -60,46 +61,7 @@ pub async fn make_queue_worker(
                 }
             };
         }
-    } else if !add_files.is_empty() {
-        if add_files.len() == 1 {
-            let max_idx = mq.get_max_queue_index().await?;
-            if let PathOrIndex::Path(path) = &add_files[0] {
-                mq.insert_into_queue(max_idx + 1, &path.to_string_lossy())
-                    .await?;
-            } else {
-                panic!("No file specified");
-            }
-        } else if add_files.len() == 2 {
-            if let PathOrIndex::Index(idx) = &add_files[0] {
-                writeln!(stdout.lock(), "inserting into {}", idx)?;
-                if let PathOrIndex::Path(path) = &add_files[1] {
-                    mq.insert_into_queue(*idx, &path.to_string_lossy()).await?;
-                } else {
-                    panic!("{} is not a path", add_files[1]);
-                }
-            } else {
-                for file in add_files {
-                    let max_idx = mq.get_max_queue_index().await?;
-                    if let PathOrIndex::Path(path) = file {
-                        mq.insert_into_queue(max_idx + 1, &path.to_string_lossy())
-                            .await?;
-                    } else {
-                        panic!("{} is not a path", file);
-                    }
-                }
-            }
-        } else {
-            for file in add_files {
-                let max_idx = mq.get_max_queue_index().await?;
-                if let PathOrIndex::Path(path) = file {
-                    mq.insert_into_queue(max_idx + 1, &path.to_string_lossy())
-                        .await?;
-                } else {
-                    panic!("{} is not a path", file);
-                }
-            }
-        }
-    } else {
+    } else if add_files.is_empty() {
         let movie_queue = mq.print_movie_queue(&patterns).await?;
         if do_time {
             let results: Result<Vec<_>, Error> = movie_queue
@@ -118,7 +80,45 @@ pub async fn make_queue_worker(
                 writeln!(stdout.lock(), "{}", result)?;
             }
         }
+    } else if add_files.len() == 1 {
+        let max_idx = mq.get_max_queue_index().await?;
+        if let PathOrIndex::Path(path) = &add_files[0] {
+            mq.insert_into_queue(max_idx + 1, &path.to_string_lossy())
+                .await?;
+        } else {
+            panic!("No file specified");
+        }
+    } else if add_files.len() == 2 {
+        if let PathOrIndex::Index(idx) = &add_files[0] {
+            writeln!(stdout.lock(), "inserting into {}", idx)?;
+            if let PathOrIndex::Path(path) = &add_files[1] {
+                mq.insert_into_queue(*idx, &path.to_string_lossy()).await?;
+            } else {
+                panic!("{} is not a path", add_files[1]);
+            }
+        } else {
+            for file in add_files {
+                let max_idx = mq.get_max_queue_index().await?;
+                if let PathOrIndex::Path(path) = file {
+                    mq.insert_into_queue(max_idx + 1, &path.to_string_lossy())
+                        .await?;
+                } else {
+                    panic!("{} is not a path", file);
+                }
+            }
+        }
+    } else {
+        for file in add_files {
+            let max_idx = mq.get_max_queue_index().await?;
+            if let PathOrIndex::Path(path) = file {
+                mq.insert_into_queue(max_idx + 1, &path.to_string_lossy())
+                    .await?;
+            } else {
+                panic!("{} is not a path", file);
+            }
+        }
     }
+
     Ok(())
 }
 
@@ -127,7 +127,7 @@ pub async fn movie_queue_http(queue: &[MovieQueueResult]) -> Result<Vec<String>,
 
     let button = r#"<td><button type="submit" id="ID" onclick="delete_show('SHOW');"> remove </button></td>"#;
 
-    let futures = queue.into_iter().map(|row| {
+    let futures = queue.iter().map(|row| {
         let mc = mc.clone();
         async move {
         let path = Path::new(&row.path);
@@ -157,14 +157,16 @@ pub async fn movie_queue_http(queue: &[MovieQueueResult]) -> Result<Vec<String>,
             file_name.to_string()
         };
 
-        let entry = match row.link.as_ref() {
-            Some(link) => format!(
+        let entry = if let Some(link) = row.link.as_ref() {
+            format!(
                 "<tr>\n<td>{}</td>\n<td><a href={}>imdb</a></td>",
                 entry,
                 &format!("https://www.imdb.com/title/{}", link)
-            ),
-            None => format!("<tr>\n<td>{}</td>\n", entry),
+            )
+        } else {
+            format!("<tr>\n<td>{}</td>\n", entry)
         };
+
         let entry = format!(
             "{}\n{}",
             entry,
