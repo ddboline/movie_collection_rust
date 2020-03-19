@@ -37,7 +37,7 @@ async fn trakt_app() -> Result<(), Error> {
 
     let trakt_command = opts.trakt_command.unwrap_or(TraktCommands::None);
     let trakt_action = opts.trakt_action.unwrap_or(TraktActions::None);
-    let show = opts.show.as_ref().map(String::as_str);
+    let show = opts.show.as_deref();
     let season = opts.season.unwrap_or(-1);
 
     if do_parse {

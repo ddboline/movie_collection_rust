@@ -470,7 +470,7 @@ impl MovieCollection {
             .await?
             .iter()
             .map(|row| row.try_get("idx"))
-            .nth(0)
+            .next()
             .transpose()
             .map_err(Into::into)
     }
@@ -504,7 +504,7 @@ impl MovieCollection {
             .await?
             .iter()
             .map(|row| row.try_get("idx"))
-            .nth(0)
+            .next()
             .transpose()
             .map_err(Into::into)
     }
