@@ -16,7 +16,7 @@ use super::{
         movie_queue_play, movie_queue_route, movie_queue_show, movie_queue_transcode,
         movie_queue_transcode_directory, movie_queue_update, trakt_cal, trakt_watched_action,
         trakt_watched_list, trakt_watched_seasons, trakt_watchlist, trakt_watchlist_action,
-        tvshows,
+        tvshows, user,
     },
 };
 use movie_collection_lib::{config::Config, pgpool::PgPool};
@@ -111,6 +111,7 @@ pub async fn start_app(config: Config) {
             .service(web::resource("/list/last_modified").route(web::get().to(last_modified_route)))
             .service(web::resource("/list/{show}").route(web::get().to(movie_queue_show)))
             .service(web::resource("/list/").route(web::get().to(movie_queue)))
+            .service(web::resource("/list/user").route(web::get().to(user)))
             .service(web::resource("/list").route(web::get().to(movie_queue)))
     })
     .bind(&format!("127.0.0.1:{}", port))

@@ -44,11 +44,11 @@ fn form_http_response(body: String) -> Result<HttpResponse, Error> {
         .body(body))
 }
 
-fn to_json<T>(js: &T) -> Result<HttpResponse, Error>
+fn to_json<T>(js: T) -> Result<HttpResponse, Error>
 where
     T: Serialize,
 {
-    Ok(HttpResponse::Ok().json2(js))
+    Ok(HttpResponse::Ok().json(js))
 }
 
 fn movie_queue_body(patterns: &[String], entries: &[String]) -> String {
@@ -255,7 +255,7 @@ pub async fn imdb_episodes_route(
 ) -> Result<HttpResponse, Error> {
     let req = query.into_inner();
     let x = state.db.handle(req).await?;
-    to_json(&x)
+    to_json(x)
 }
 
 pub async fn imdb_episodes_update(
@@ -277,7 +277,7 @@ pub async fn imdb_ratings_route(
 ) -> Result<HttpResponse, Error> {
     let req = query.into_inner();
     let x = state.db.handle(req).await?;
-    to_json(&x)
+    to_json(x)
 }
 
 pub async fn imdb_ratings_update(
@@ -299,7 +299,7 @@ pub async fn movie_queue_route(
 ) -> Result<HttpResponse, Error> {
     let req = query.into_inner();
     let x = state.db.handle(req).await?;
-    to_json(&x)
+    to_json(x)
 }
 
 pub async fn movie_queue_update(
@@ -321,7 +321,7 @@ pub async fn movie_collection_route(
 ) -> Result<HttpResponse, Error> {
     let req = query.into_inner();
     let x = state.db.handle(req).await?;
-    to_json(&x)
+    to_json(x)
 }
 
 pub async fn movie_collection_update(
@@ -342,7 +342,7 @@ pub async fn last_modified_route(
 ) -> Result<HttpResponse, Error> {
     let req = LastModifiedRequest {};
     let x = state.db.handle(req).await?;
-    to_json(&x)
+    to_json(x)
 }
 
 pub async fn frontpage(_: LoggedUser, _: Data<AppState>) -> Result<HttpResponse, Error> {
@@ -664,4 +664,8 @@ pub async fn trakt_cal(_: LoggedUser, state: Data<AppState>) -> Result<HttpRespo
     let req = TraktCalRequest {};
     let entries = state.db.handle(req).await?;
     trakt_cal_worker(&entries)
+}
+
+pub async fn user(user: LoggedUser) -> Result<HttpResponse, Error> {
+    to_json(user)
 }
