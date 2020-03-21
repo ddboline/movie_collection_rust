@@ -21,11 +21,7 @@ fn remcom() -> Result<(), Error> {
     let opts = RemcomOpts::from_args();
 
     for file in opts.files {
-        remcom_single_file(
-            &file,
-            opts.directory.as_deref(),
-            opts.unwatched,
-        )?;
+        remcom_single_file(&file, opts.directory.as_deref(), opts.unwatched)?;
     }
 
     Ok(())
