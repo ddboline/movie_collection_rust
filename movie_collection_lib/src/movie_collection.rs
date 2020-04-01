@@ -153,7 +153,7 @@ impl ImdbSeason {
     }
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct MovieCollection {
     pub config: Config,
     pub pool: PgPool,

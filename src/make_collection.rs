@@ -29,8 +29,7 @@ async fn make_collection() -> Result<(), Error> {
     let do_time = opts.time;
 
     let mc = MovieCollection::new();
-    let stdout = mc.stdout.clone();
-    let task = stdout.spawn_stdout_task();
+    let task = mc.stdout.spawn_stdout_task();
     if do_parse {
         mc.make_collection().await?;
         mc.fix_collection_show_id().await?;

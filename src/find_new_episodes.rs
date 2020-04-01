@@ -24,8 +24,7 @@ async fn find_new_episodes() -> Result<(), Error> {
     };
 
     let mc = MovieCollection::new();
-    let stdout = mc.stdout.clone();
-    let stdout = stdout.spawn_stdout_task();
+    let task = mc.stdout.spawn_stdout_task();
 
     let output = mc.find_new_episodes(source, &opts.shows).await?;
 
@@ -33,7 +32,7 @@ async fn find_new_episodes() -> Result<(), Error> {
         mc.stdout.send(epi.to_string())?;
     }
     mc.stdout.close().await;
-    stdout.await?
+    task.await?
 }
 
 #[tokio::main]

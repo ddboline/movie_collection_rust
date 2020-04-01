@@ -68,7 +68,7 @@ pub fn make_list(stdout: &StdoutChannel) -> Result<(), Error> {
         .collect();
 
     for e in result {
-        stdout.send(format!("{}", e))?;
+        stdout.send(e.to_string())?;
     }
 
     let result: Vec<_> = file_list

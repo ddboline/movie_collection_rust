@@ -42,12 +42,16 @@ async fn trakt_app() -> Result<(), Error> {
     let season = opts.season.unwrap_or(-1);
 
     let mc = MovieCollection::new();
+    let task = mc.stdout.spawn_stdout_task();
 
-    if do_parse {
+    let result = if do_parse {
         sync_trakt_with_db(&mc).await
     } else {
         trakt_app_parse(&trakt_command, trakt_action, show, season, &opts.episode).await
-    }
+    };
+    mc.stdout.close().await;
+    task.await??;
+    result
 }
 
 #[tokio::main]

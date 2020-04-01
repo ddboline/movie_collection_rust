@@ -7,7 +7,7 @@ use movie_collection_lib::stdout_channel::StdoutChannel;
 async fn main() -> Result<(), Error> {
     env_logger::init();
     let stdout = StdoutChannel::new();
-    let task = stdout.clone().spawn_stdout_task();
+    let task = stdout.spawn_stdout_task();
 
     match make_list(&stdout) {
         Ok(_) => {}

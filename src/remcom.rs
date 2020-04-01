@@ -21,7 +21,7 @@ struct RemcomOpts {
 async fn remcom() -> Result<(), Error> {
     let opts = RemcomOpts::from_args();
     let stdout = StdoutChannel::new();
-    let task = stdout.clone().spawn_stdout_task();
+    let task = stdout.spawn_stdout_task();
 
     for file in opts.files {
         remcom_single_file(&file, opts.directory.as_deref(), opts.unwatched, &stdout)?;

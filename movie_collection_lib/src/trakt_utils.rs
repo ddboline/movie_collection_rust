@@ -553,7 +553,6 @@ pub async fn sync_trakt_with_db(mc: &MovieCollection) -> Result<(), Error> {
 
     let futures = watchlist_shows.into_iter().map(|(link, show)| {
         let watchlist_shows_db = watchlist_shows_db.clone();
-        let mc = mc.clone();
         async move {
             if !watchlist_shows_db.contains_key(&link) {
                 show.insert_show(&mc.pool).await?;
@@ -577,7 +576,6 @@ pub async fn sync_trakt_with_db(mc: &MovieCollection) -> Result<(), Error> {
     }
     let futures = watched_shows.into_iter().map(|(key, episode)| {
         let watched_shows_db = watched_shows_db.clone();
-        let mc = mc.clone();
         async move {
             if !watched_shows_db.contains_key(&key) {
                 episode.insert_episode(&mc.pool).await?;
@@ -603,7 +601,6 @@ pub async fn sync_trakt_with_db(mc: &MovieCollection) -> Result<(), Error> {
 
     let futures = watched_movies.iter().map(|(key, movie)| {
         let watched_movies_db = watched_movies_db.clone();
-        let mc = mc.clone();
         async move {
             if !watched_movies_db.contains_key(key) {
                 movie.insert_movie(&mc.pool).await?;
@@ -617,7 +614,6 @@ pub async fn sync_trakt_with_db(mc: &MovieCollection) -> Result<(), Error> {
 
     let futures = watched_movies_db.iter().map(|(key, movie)| {
         let watched_movies = watched_movies.clone();
-        let mc = mc.clone();
         async move {
             if !watched_movies.contains_key(key) {
                 movie.delete_movie(&mc.pool).await?;
@@ -824,7 +820,7 @@ pub async fn trakt_app_parse(
     episode: &[i32],
 ) -> Result<(), Error> {
     let mc = MovieCollection::new();
-    let task = mc.stdout.clone().spawn_stdout_task();
+    let task = mc.stdout.spawn_stdout_task();
     match trakt_command {
         TraktCommands::Calendar => trakt_cal_list(&mc).await?,
         TraktCommands::WatchList => match trakt_action {

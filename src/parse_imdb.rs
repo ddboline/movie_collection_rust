@@ -4,23 +4,21 @@ use structopt::StructOpt;
 use movie_collection_lib::{
     movie_collection::MovieCollection,
     parse_imdb::{ParseImdb, ParseImdbOptions},
-    stdout_channel::StdoutChannel,
 };
 
 async fn parse_imdb_parser() -> Result<(), Error> {
-    let stdout = StdoutChannel::new();
-    let task = stdout.clone().spawn_stdout_task();
     let opts = ParseImdbOptions::from_args();
 
     let mc = MovieCollection::new();
+    let task = mc.stdout.spawn_stdout_task();
     let pi = ParseImdb::with_pool(&mc.pool)?;
 
     let output = pi.parse_imdb_worker(&opts).await?;
 
     for line in output {
-        stdout.send(line.join(" "))?;
+        mc.stdout.send(line.join(" "))?;
     }
-    stdout.close().await;
+    mc.stdout.close().await;
     task.await?
 }
 

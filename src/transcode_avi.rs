@@ -18,7 +18,7 @@ struct TranscodeAviOpts {
 async fn transcode_avi() -> Result<(), Error> {
     let stdout = StdoutChannel::new();
     let config = Config::with_config()?;
-    let task = stdout.clone().spawn_stdout_task();
+    let task = stdout.spawn_stdout_task();
 
     let opts = TranscodeAviOpts::from_args();
 

@@ -30,9 +30,12 @@ struct MakeQueueOpts {
 async fn make_queue() -> Result<(), Error> {
     let opts = MakeQueueOpts::from_args();
     let stdout = StdoutChannel::new();
+    let task = stdout.spawn_stdout_task();
     let patterns: Vec<_> = opts.patterns.iter().map(String::as_str).collect();
 
-    make_queue_worker(&opts.add, &opts.remove, opts.time, &patterns, opts.shows, &stdout).await
+    make_queue_worker(&opts.add, &opts.remove, opts.time, &patterns, opts.shows, &stdout).await?;
+    stdout.close().await;
+    task.await?
 }
 
 #[tokio::main]
