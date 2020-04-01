@@ -1,6 +1,5 @@
 use anyhow::Error;
 use futures::future::try_join_all;
-use std::{io, io::Write};
 use structopt::StructOpt;
 use tokio::task::spawn_blocking;
 
@@ -29,9 +28,9 @@ async fn make_collection() -> Result<(), Error> {
     let do_parse = opts.parse;
     let do_time = opts.time;
 
-    let stdout = io::stdout();
-
     let mc = MovieCollection::new();
+    let stdout = mc.stdout.clone();
+    let task = stdout.spawn_stdout_task();
     if do_parse {
         mc.make_collection().await?;
         mc.fix_collection_show_id().await?;
@@ -45,15 +44,16 @@ async fn make_collection() -> Result<(), Error> {
             });
             let shows: Result<Vec<_>, Error> = try_join_all(futures).await;
             for (timeval, show) in shows? {
-                writeln!(stdout.lock(), "{} {}", timeval, show)?;
+                mc.stdout.send(format!("{} {}", timeval, show))?;
             }
         } else {
             for show in shows {
-                writeln!(stdout.lock(), "{}", show)?;
+                mc.stdout.send(show.to_string())?;
             }
         }
     }
-    Ok(())
+    mc.stdout.close().await;
+    task.await?
 }
 
 #[tokio::main]

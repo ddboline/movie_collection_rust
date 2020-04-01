@@ -8,7 +8,6 @@ use std::{
     collections::{HashMap, HashSet},
     ffi::OsStr,
     fmt,
-    io::{stdout, Write},
     path::Path,
     sync::Arc,
 };
@@ -16,9 +15,7 @@ use std::{
 use crate::{
     config::Config, imdb_episodes::ImdbEpisodes, imdb_ratings::ImdbRatings,
     movie_queue::MovieQueueDB, pgpool::PgPool,
-};
-
-use crate::{
+    stdout_channel::StdoutChannel,
     tv_show_source::TvShowSource,
     utils::{option_string_wrapper, parse_file_stem, walk_directory},
 };
@@ -160,6 +157,7 @@ impl ImdbSeason {
 pub struct MovieCollection {
     pub config: Config,
     pub pool: PgPool,
+    pub stdout: StdoutChannel,
 }
 
 impl Default for MovieCollection {
@@ -171,18 +169,22 @@ impl Default for MovieCollection {
 impl MovieCollection {
     pub fn new() -> Self {
         let config = Config::with_config().expect("Init config failed");
-        let pgurl = &config.pgurl;
+        let pool = PgPool::new(&config.pgurl);
+        let stdout = StdoutChannel::new();
         Self {
-            pool: PgPool::new(&pgurl),
+            pool,
             config,
+            stdout,
         }
     }
 
     pub fn with_pool(pool: &PgPool) -> Result<Self, Error> {
         let config = Config::with_config()?;
+        let stdout = StdoutChannel::new();
         let mc = Self {
             config,
             pool: pool.clone(),
+            stdout,
         };
         Ok(mc)
     }
@@ -669,7 +671,7 @@ impl MovieCollection {
                         .ok_or_else(|| format_err!("extension fail"))?
                         .to_string();
                     if self.get_config().suffixes.contains(&ext) {
-                        writeln!(stdout(), "not in collection {}", f)?;
+                        self.stdout.send(format!("not in collection {}", f))?;
                         self.insert_into_collection(f).await?;
                     }
                 }
@@ -682,11 +684,11 @@ impl MovieCollection {
         for (key, val) in collection_map.iter() {
             if !file_list.contains(key) {
                 if let Some(v) = movie_queue.get(key) {
-                    writeln!(stdout(), "in queue but not disk {} {}", key, v)?;
+                    self.stdout.send(format!("in queue but not disk {} {}", key, v))?;
                     let mq = MovieQueueDB::with_pool(self.get_pool());
                     mq.remove_from_queue_by_path(key).await?;
                 } else {
-                    writeln!(stdout(), "not on disk {} {}", key, val)?;
+                    self.stdout.send(format!("not on disk {} {}", key, val))?;
                 }
                 self.remove_from_collection(key).await?;
             }
@@ -698,9 +700,9 @@ impl MovieCollection {
             async move {
                 if !file_list.contains(key) {
                     if movie_queue.contains_key(key) {
-                        writeln!(stdout(), "in queue but not disk {}", key)?;
+                        self.stdout.send(format!("in queue but not disk {}", key))?;
                     } else {
-                        writeln!(stdout(), "not on disk {} {}", key, val)?;
+                        self.stdout.send(format!("not on disk {} {}", key, val))?;
                     }
                 }
                 Ok(())
@@ -722,7 +724,7 @@ impl MovieCollection {
             .collect();
 
         for show in shows_not_in_db {
-            writeln!(stdout(), "show has episode not in db {} ", show)?;
+            self.stdout.send(format!("show has episode not in db {} ", show))?;
         }
         Ok(())
     }

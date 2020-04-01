@@ -2,6 +2,7 @@ use anyhow::Error;
 use structopt::StructOpt;
 
 use movie_collection_lib::make_queue::{make_queue_worker, PathOrIndex};
+use movie_collection_lib::stdout_channel::StdoutChannel;
 
 #[derive(StructOpt)]
 /// Manage Video Queue
@@ -28,10 +29,10 @@ struct MakeQueueOpts {
 
 async fn make_queue() -> Result<(), Error> {
     let opts = MakeQueueOpts::from_args();
-
+    let stdout = StdoutChannel::new();
     let patterns: Vec<_> = opts.patterns.iter().map(String::as_str).collect();
 
-    make_queue_worker(&opts.add, &opts.remove, opts.time, &patterns, opts.shows).await
+    make_queue_worker(&opts.add, &opts.remove, opts.time, &patterns, opts.shows, &stdout).await
 }
 
 #[tokio::main]

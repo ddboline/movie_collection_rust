@@ -4,8 +4,6 @@ use futures::future::try_join_all;
 use rayon::iter::{IntoParallelIterator, ParallelIterator};
 use std::{
     ffi::OsStr,
-    io,
-    io::Write,
     path::{Path, PathBuf},
     sync::Arc,
 };
@@ -14,6 +12,7 @@ use crate::{
     movie_collection::MovieCollection,
     movie_queue::{MovieQueueDB, MovieQueueResult},
     utils::{get_video_runtime, parse_file_stem},
+    stdout_channel::StdoutChannel,
 };
 
 #[derive(Debug, Display)]
@@ -40,16 +39,15 @@ pub async fn make_queue_worker(
     do_time: bool,
     patterns: &[&str],
     do_shows: bool,
+    stdout: &StdoutChannel,
 ) -> Result<(), Error> {
     let mc = MovieCollection::new();
     let mq = MovieQueueDB::with_pool(&mc.pool);
 
-    let stdout = io::stdout();
-
     if do_shows {
         let shows = mc.print_tv_shows().await?;
         for show in shows {
-            writeln!(stdout.lock(), "{}", show)?;
+            stdout.send(show.to_string())?;
         }
     } else if !del_files.is_empty() {
         for file in del_files {
@@ -73,11 +71,11 @@ pub async fn make_queue_worker(
                 .collect();
 
             for (timeval, result) in results? {
-                writeln!(stdout.lock(), "{} {}", result, timeval)?;
+                stdout.send(format!("{} {}", result, timeval))?;
             }
         } else {
             for result in movie_queue {
-                writeln!(stdout.lock(), "{}", result)?;
+                stdout.send(result.to_string())?;
             }
         }
     } else if add_files.len() == 1 {
@@ -90,7 +88,7 @@ pub async fn make_queue_worker(
         }
     } else if add_files.len() == 2 {
         if let PathOrIndex::Index(idx) = &add_files[0] {
-            writeln!(stdout.lock(), "inserting into {}", idx)?;
+            stdout.send(format!("inserting into {}", idx))?;
             if let PathOrIndex::Path(path) = &add_files[1] {
                 mq.insert_into_queue(*idx, &path.to_string_lossy()).await?;
             } else {

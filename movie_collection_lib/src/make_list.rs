@@ -2,20 +2,18 @@ use anyhow::Error;
 use rayon::iter::{IntoParallelRefIterator, ParallelIterator};
 use std::{
     collections::HashMap,
-    io::{stdout, Write},
     path::Path,
 };
 
 use crate::{
     config::Config,
     utils::{get_video_runtime, walk_directory},
+    stdout_channel::StdoutChannel,
 };
 
-pub fn make_list() -> Result<(), Error> {
+pub fn make_list(stdout: &StdoutChannel) -> Result<(), Error> {
     let config = Config::with_config()?;
-
     let movies_dir = format!("{}/Documents/movies", config.home_dir);
-
     let path = Path::new(&movies_dir);
 
     let mut local_file_list: Vec<_> = path
@@ -69,10 +67,8 @@ pub fn make_list() -> Result<(), Error> {
         })
         .collect();
 
-    let stdout = stdout();
-
     for e in result {
-        writeln!(stdout.lock(), "{}", e)?;
+        stdout.send(format!("{}", e))?;
     }
 
     let result: Vec<_> = file_list
@@ -85,7 +81,7 @@ pub fn make_list() -> Result<(), Error> {
         .collect();
 
     for e in result {
-        writeln!(stdout.lock(), "{}", e)?;
+        stdout.send(e.to_string())?;
     }
 
     Ok(())

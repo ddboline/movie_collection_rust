@@ -1,6 +1,5 @@
 use anyhow::Error;
 use std::{
-    io::{stdout, Write},
     path::{Path, PathBuf},
 };
 use structopt::StructOpt;
@@ -8,6 +7,7 @@ use structopt::StructOpt;
 use movie_collection_lib::{
     config::Config,
     utils::{create_transcode_script, publish_transcode_job_to_queue},
+    stdout_channel::StdoutChannel,
 };
 
 #[derive(StructOpt)]
@@ -15,9 +15,10 @@ struct TranscodeAviOpts {
     files: Vec<PathBuf>,
 }
 
-fn transcode_avi() -> Result<(), Error> {
-    let stdout = stdout();
+async fn transcode_avi() -> Result<(), Error> {
+    let stdout = StdoutChannel::new();
     let config = Config::with_config()?;
+    let task = stdout.clone().spawn_stdout_task();
 
     let opts = TranscodeAviOpts::from_args();
 
@@ -34,17 +35,19 @@ fn transcode_avi() -> Result<(), Error> {
             panic!("file doesn't exist {}", path.to_string_lossy());
         }
         create_transcode_script(&config, &path).and_then(|s| {
-            writeln!(stdout.lock(), "script {}", s)?;
+            stdout.send(format!("script {}", s))?;
             publish_transcode_job_to_queue(&s, &config.transcode_queue, &config.transcode_queue)
         })?;
     }
-    Ok(())
+    stdout.close().await;
+    task.await?
 }
 
-fn main() {
+#[tokio::main]
+async fn main() {
     env_logger::init();
 
-    match transcode_avi() {
+    match transcode_avi().await {
         Ok(_) => (),
         Err(e) => {
             if e.to_string().contains("Broken pipe") {

@@ -1,13 +1,15 @@
 use anyhow::Error;
-use std::io::{stdout, Write};
 use structopt::StructOpt;
 
 use movie_collection_lib::{
     movie_collection::MovieCollection,
     parse_imdb::{ParseImdb, ParseImdbOptions},
+    stdout_channel::StdoutChannel,
 };
 
 async fn parse_imdb_parser() -> Result<(), Error> {
+    let stdout = StdoutChannel::new();
+    let task = stdout.clone().spawn_stdout_task();
     let opts = ParseImdbOptions::from_args();
 
     let mc = MovieCollection::new();
@@ -15,13 +17,11 @@ async fn parse_imdb_parser() -> Result<(), Error> {
 
     let output = pi.parse_imdb_worker(&opts).await?;
 
-    let stdout = stdout();
-
     for line in output {
-        writeln!(stdout.lock(), "{}", line.join(" "))?;
+        stdout.send(line.join(" "))?;
     }
-
-    Ok(())
+    stdout.close().await;
+    task.await?
 }
 
 #[tokio::main]

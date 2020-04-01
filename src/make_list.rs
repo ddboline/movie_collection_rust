@@ -1,9 +1,15 @@
+use anyhow::Error;
+
 use movie_collection_lib::make_list::make_list;
+use movie_collection_lib::stdout_channel::StdoutChannel;
 
-fn main() {
+#[tokio::main]
+async fn main() -> Result<(), Error> {
     env_logger::init();
+    let stdout = StdoutChannel::new();
+    let task = stdout.clone().spawn_stdout_task();
 
-    match make_list() {
+    match make_list(&stdout) {
         Ok(_) => {}
         Err(e) => {
             if e.to_string().contains("Broken pipe") {
@@ -12,4 +18,6 @@ fn main() {
             }
         }
     }
+    stdout.close().await;
+    task.await?
 }

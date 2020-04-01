@@ -1,6 +1,7 @@
 use anyhow::Error;
 use structopt::StructOpt;
 
+use movie_collection_lib::movie_collection::MovieCollection;
 use movie_collection_lib::trakt_utils::{
     sync_trakt_with_db, trakt_app_parse, TraktActions, TraktCommands,
 };
@@ -40,8 +41,10 @@ async fn trakt_app() -> Result<(), Error> {
     let show = opts.show.as_deref();
     let season = opts.season.unwrap_or(-1);
 
+    let mc = MovieCollection::new();
+
     if do_parse {
-        sync_trakt_with_db().await
+        sync_trakt_with_db(&mc).await
     } else {
         trakt_app_parse(&trakt_command, trakt_action, show, season, &opts.episode).await
     }

@@ -1,5 +1,4 @@
 use anyhow::Error;
-use std::{io, io::Write};
 use structopt::StructOpt;
 
 use movie_collection_lib::{movie_collection::MovieCollection, tv_show_source::TvShowSource};
@@ -25,16 +24,16 @@ async fn find_new_episodes() -> Result<(), Error> {
     };
 
     let mc = MovieCollection::new();
+    let stdout = mc.stdout.clone();
+    let stdout = stdout.spawn_stdout_task();
 
     let output = mc.find_new_episodes(source, &opts.shows).await?;
 
-    let stdout = io::stdout();
-
     for epi in output {
-        writeln!(stdout.lock(), "{}", epi)?;
+        mc.stdout.send(epi.to_string())?;
     }
-
-    Ok(())
+    mc.stdout.close().await;
+    stdout.await?
 }
 
 #[tokio::main]

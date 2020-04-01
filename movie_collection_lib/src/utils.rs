@@ -1,7 +1,7 @@
 use amqp::{protocol::basic::BasicProperties, Basic, Channel, Options, Session, Table};
 use anyhow::{format_err, Error};
 use async_trait::async_trait;
-use log::error;
+use log::{error, debug};
 use rand::{
     distributions::{Distribution, Uniform},
     thread_rng,
@@ -11,7 +11,7 @@ use serde::{Deserialize, Serialize};
 use std::{
     env::var,
     fs::{create_dir_all, rename, File, OpenOptions},
-    io::{stdout, BufRead, BufReader, Write},
+    io::{BufRead, BufReader, Write},
     path::Path,
     string::ToString,
 };
@@ -19,6 +19,7 @@ use subprocess::{Exec, Redirection};
 use tokio::time::{delay_for, Duration};
 
 use crate::config::Config;
+use crate::stdout_channel::StdoutChannel;
 
 #[inline]
 pub fn option_string_wrapper(s: &Option<String>) -> &str {
@@ -155,7 +156,7 @@ pub fn read_transcode_jobs_from_queue(queue: &str) -> Result<(), Error> {
         Table::new(),
     )?;
 
-    writeln!(stdout().lock(), "Starting consumer {}", consumer_name)?;
+    debug!("Starting consumer {}", consumer_name);
 
     channel.start_consuming();
 
@@ -251,7 +252,7 @@ pub fn create_move_script(
     let mut f = File::create(&mp4_script)?;
     f.write_all(&script_str.into_bytes())?;
 
-    writeln!(stdout().lock(), "dir {} file {}", output_dir, file)?;
+    debug!("dir {} file {}", output_dir, file);
     Ok(mp4_script.to_string_lossy().to_string())
 }
 
@@ -328,6 +329,7 @@ pub fn remcom_single_file(
     path: &Path,
     directory: Option<&Path>,
     unwatched: bool,
+    stdout: &StdoutChannel,
 ) -> Result<(), Error> {
     let config = Config::with_config()?;
     let ext = path
@@ -335,21 +337,19 @@ pub fn remcom_single_file(
         .ok_or_else(|| format_err!("no extension"))?
         .to_string_lossy();
 
-    let stdout = stdout();
-
     if ext != "mp4" {
         match create_transcode_script(&config, &path) {
             Ok(s) => {
-                writeln!(stdout.lock(), "script {}", s)?;
+                stdout.send(format!("script {}", s))?;
                 publish_transcode_job_to_queue(&s, &config.remcom_queue, &config.remcom_queue)?;
             }
-            Err(e) => writeln!(stdout.lock(), "error {}", e)?,
+            Err(e) => error!("error {}", e),
         }
     }
 
     create_move_script(&config, directory, unwatched, &path)
         .and_then(|s| {
-            writeln!(stdout.lock(), "script {}", s)?;
+            stdout.send(format!("script {}", s))?;
             publish_transcode_job_to_queue(&s, &config.remcom_queue, &config.remcom_queue)
         })
         .map_err(|e| {

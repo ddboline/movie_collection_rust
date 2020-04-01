@@ -7,7 +7,6 @@ use serde::{Deserialize, Serialize};
 use std::{
     collections::{HashMap, HashSet},
     fmt,
-    io::{stdout, Write},
     str::FromStr,
     sync::Arc,
 };
@@ -545,9 +544,7 @@ pub async fn get_watched_movies_db(pool: &PgPool) -> Result<Vec<WatchedMovie>, E
         .collect()
 }
 
-pub async fn sync_trakt_with_db() -> Result<(), Error> {
-    let mc = Arc::new(MovieCollection::new());
-
+pub async fn sync_trakt_with_db(mc: &MovieCollection) -> Result<(), Error> {
     let watchlist_shows_db = Arc::new(get_watchlist_shows_db(&mc.pool).await?);
     let watchlist_shows = spawn_blocking(trakt_instance::get_watchlist_shows).await??;
     if watchlist_shows.is_empty() {
@@ -560,7 +557,7 @@ pub async fn sync_trakt_with_db() -> Result<(), Error> {
         async move {
             if !watchlist_shows_db.contains_key(&link) {
                 show.insert_show(&mc.pool).await?;
-                writeln!(stdout(), "insert watchlist {}", show)?;
+                mc.stdout.send(format!("insert watchlist {}", show))?;
             }
             Ok(())
         }
@@ -584,7 +581,7 @@ pub async fn sync_trakt_with_db() -> Result<(), Error> {
         async move {
             if !watched_shows_db.contains_key(&key) {
                 episode.insert_episode(&mc.pool).await?;
-                writeln!(stdout(), "insert watched {}", episode)?;
+                mc.stdout.send(format!("insert watched {}", episode))?;
             }
             Ok(())
         }
@@ -610,7 +607,7 @@ pub async fn sync_trakt_with_db() -> Result<(), Error> {
         async move {
             if !watched_movies_db.contains_key(key) {
                 movie.insert_movie(&mc.pool).await?;
-                writeln!(stdout(), "insert watched {}", movie)?;
+                mc.stdout.send(format!("insert watched {}", movie))?;
             }
             Ok(())
         }
@@ -624,7 +621,7 @@ pub async fn sync_trakt_with_db() -> Result<(), Error> {
         async move {
             if !watched_movies.contains_key(key) {
                 movie.delete_movie(&mc.pool).await?;
-                writeln!(stdout(), "delete watched {}", movie)?;
+                mc.stdout.send(format!("delete watched {}", movie))?;
             }
             Ok(())
         }
@@ -642,7 +639,7 @@ async fn get_imdb_url_from_show(
         let imdb_shows = mc.print_imdb_shows(show, false).await?;
         if imdb_shows.len() > 1 {
             for show in imdb_shows {
-                writeln!(stdout(), "{}", show)?;
+                debug!("{}", show);
             }
             None
         } else {
@@ -675,7 +672,7 @@ async fn trakt_cal_list(mc: &MovieCollection) -> Result<(), Error> {
             .is_some()
         };
         if !exists {
-            writeln!(stdout().lock(), "{} {}", show, cal)?;
+            mc.stdout.send(format!("{} {}", show, cal))?;
         }
     }
     Ok(())
@@ -684,11 +681,9 @@ async fn trakt_cal_list(mc: &MovieCollection) -> Result<(), Error> {
 async fn watchlist_add(mc: &MovieCollection, show: Option<&str>) -> Result<(), Error> {
     if let Some(imdb_url) = get_imdb_url_from_show(&mc, show).await? {
         let imdb_url_ = imdb_url.clone();
-        writeln!(
-            stdout().lock(),
-            "result: {}",
+        mc.stdout.send(format!("result: {}",
             spawn_blocking(move || trakt_instance::add_watchlist_show(&imdb_url_)).await??
-        )?;
+        ))?;
         debug!("GOT HERE");
         if let Some(show) = spawn_blocking(trakt_instance::get_watchlist_shows)
             .await??
@@ -704,11 +699,9 @@ async fn watchlist_add(mc: &MovieCollection, show: Option<&str>) -> Result<(), E
 async fn watchlist_rm(mc: &MovieCollection, show: Option<&str>) -> Result<(), Error> {
     if let Some(imdb_url) = get_imdb_url_from_show(&mc, show).await? {
         let imdb_url_ = imdb_url.clone();
-        writeln!(
-            stdout().lock(),
-            "result: {}",
+        mc.stdout.send(format!("result: {}",
             spawn_blocking(move || trakt_instance::remove_watchlist_show(&imdb_url_)).await??
-        )?;
+        ))?;
         if let Some(show) = WatchListShow::get_show_by_link(&imdb_url, &mc.pool).await? {
             show.delete_show(&mc.pool).await?;
         }
@@ -719,7 +712,7 @@ async fn watchlist_rm(mc: &MovieCollection, show: Option<&str>) -> Result<(), Er
 async fn watchlist_list(mc: &MovieCollection) -> Result<(), Error> {
     let show_map = get_watchlist_shows_db(&mc.pool).await?;
     for (_, show) in show_map {
-        writeln!(stdout().lock(), "{}", show)?;
+        mc.stdout.send(format!("{}", show))?;
     }
     Ok(())
 }
@@ -804,20 +797,20 @@ async fn watched_list(mc: &MovieCollection, show: Option<&str>, season: i32) -> 
                 continue;
             }
             if show.imdb_url == imdb_url {
-                writeln!(stdout().lock(), "{}", show)?;
+                mc.stdout.send(show.to_string())?;
             }
         }
         for show in &watched_movies {
             if show.imdb_url == imdb_url {
-                writeln!(stdout().lock(), "{}", show)?;
+                mc.stdout.send(show.to_string())?;
             }
         }
     } else {
         for show in &watched_shows {
-            writeln!(stdout().lock(), "{}", show)?;
+            mc.stdout.send(show.to_string())?;
         }
         for show in &watched_movies {
-            writeln!(stdout().lock(), "{}", show)?;
+            mc.stdout.send(show.to_string())?;
         }
     }
     Ok(())
@@ -831,6 +824,7 @@ pub async fn trakt_app_parse(
     episode: &[i32],
 ) -> Result<(), Error> {
     let mc = MovieCollection::new();
+    let task = mc.stdout.clone().spawn_stdout_task();
     match trakt_command {
         TraktCommands::Calendar => trakt_cal_list(&mc).await?,
         TraktCommands::WatchList => match trakt_action {
@@ -847,7 +841,8 @@ pub async fn trakt_app_parse(
         },
         _ => {}
     }
-    Ok(())
+    mc.stdout.close().await;
+    task.await?
 }
 
 pub async fn watch_list_http_worker(

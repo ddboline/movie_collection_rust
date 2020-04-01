@@ -3,6 +3,7 @@ use std::path::PathBuf;
 use structopt::StructOpt;
 
 use movie_collection_lib::utils::remcom_single_file;
+use movie_collection_lib::stdout_channel::StdoutChannel;
 
 #[derive(StructOpt)]
 /// Create script to copy files, push job to queue
@@ -17,20 +18,23 @@ struct RemcomOpts {
     files: Vec<PathBuf>,
 }
 
-fn remcom() -> Result<(), Error> {
+async fn remcom() -> Result<(), Error> {
     let opts = RemcomOpts::from_args();
+    let stdout = StdoutChannel::new();
+    let task = stdout.clone().spawn_stdout_task();
 
     for file in opts.files {
-        remcom_single_file(&file, opts.directory.as_deref(), opts.unwatched)?;
+        remcom_single_file(&file, opts.directory.as_deref(), opts.unwatched, &stdout)?;
     }
-
-    Ok(())
+    stdout.close().await;
+    task.await?
 }
 
-fn main() {
+#[tokio::main]
+async fn main() {
     env_logger::init();
 
-    match remcom() {
+    match remcom().await {
         Ok(_) => (),
         Err(e) => {
             if e.to_string().contains("Broken pipe") {

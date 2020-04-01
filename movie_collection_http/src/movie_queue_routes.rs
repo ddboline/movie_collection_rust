@@ -20,6 +20,7 @@ use movie_collection_lib::{
     trakt_utils::{TraktActions, WatchListShow},
     tv_show_source::TvShowSource,
     utils::remcom_single_file,
+    stdout_channel::StdoutChannel,
 };
 
 use super::{
@@ -118,11 +119,13 @@ pub async fn movie_queue_delete(
 fn transcode_worker(
     directory: Option<&path::Path>,
     entries: &[MovieQueueResult],
+    stdout: &StdoutChannel,
 ) -> Result<HttpResponse, Error> {
+
     let entries: Result<Vec<_>, Error> = entries
         .iter()
         .map(|entry| {
-            remcom_single_file(&path::Path::new(&entry.path), directory, false)?;
+            remcom_single_file(&path::Path::new(&entry.path), directory, false, &stdout)?;
             Ok(format!("{}", entry))
         })
         .collect();
@@ -142,7 +145,8 @@ pub async fn movie_queue_transcode(
 
     let req = MovieQueueRequest { patterns };
     let (entries, _) = state.db.handle(req).await?;
-    transcode_worker(None, &entries)
+    let stdout = StdoutChannel::new();
+    transcode_worker(None, &entries, &stdout)
 }
 
 pub async fn movie_queue_transcode_directory(
@@ -155,7 +159,8 @@ pub async fn movie_queue_transcode_directory(
 
     let req = MovieQueueRequest { patterns };
     let (entries, _) = state.db.handle(req).await?;
-    transcode_worker(Some(&path::Path::new(&directory)), &entries)
+    let stdout = StdoutChannel::new();
+    transcode_worker(Some(&path::Path::new(&directory)), &entries, &stdout)
 }
 
 fn play_worker(full_path: String) -> Result<HttpResponse, Error> {
