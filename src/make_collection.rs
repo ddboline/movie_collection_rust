@@ -51,7 +51,7 @@ async fn make_collection() -> Result<(), Error> {
             }
         }
     }
-    mc.stdout.close().await;
+    mc.stdout.close().await?;
     task.await?
 }
 

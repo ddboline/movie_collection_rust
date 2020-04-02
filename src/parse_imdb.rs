@@ -18,7 +18,7 @@ async fn parse_imdb_parser() -> Result<(), Error> {
     for line in output {
         mc.stdout.send(line.join(" "))?;
     }
-    mc.stdout.close().await;
+    mc.stdout.close().await?;
     task.await?
 }
 

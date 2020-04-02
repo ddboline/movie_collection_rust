@@ -31,7 +31,7 @@ async fn find_new_episodes() -> Result<(), Error> {
     for epi in output {
         mc.stdout.send(epi.to_string())?;
     }
-    mc.stdout.close().await;
+    mc.stdout.close().await?;
     task.await?
 }
 

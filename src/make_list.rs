@@ -18,6 +18,6 @@ async fn main() -> Result<(), Error> {
             }
         }
     }
-    stdout.close().await;
+    stdout.close().await?;
     task.await?
 }

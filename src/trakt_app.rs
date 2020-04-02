@@ -49,7 +49,7 @@ async fn trakt_app() -> Result<(), Error> {
     } else {
         trakt_app_parse(&trakt_command, trakt_action, show, season, &opts.episode).await
     };
-    mc.stdout.close().await;
+    mc.stdout.close().await?;
     task.await??;
     result
 }

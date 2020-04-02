@@ -39,7 +39,7 @@ async fn transcode_avi() -> Result<(), Error> {
             publish_transcode_job_to_queue(&s, &config.transcode_queue, &config.transcode_queue)
         })?;
     }
-    stdout.close().await;
+    stdout.close().await?;
     task.await?
 }
 

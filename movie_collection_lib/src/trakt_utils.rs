@@ -837,7 +837,7 @@ pub async fn trakt_app_parse(
         },
         _ => {}
     }
-    mc.stdout.close().await;
+    mc.stdout.close().await?;
     task.await?
 }
 

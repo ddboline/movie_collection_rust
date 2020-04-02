@@ -34,7 +34,7 @@ async fn make_queue() -> Result<(), Error> {
     let patterns: Vec<_> = opts.patterns.iter().map(String::as_str).collect();
 
     make_queue_worker(&opts.add, &opts.remove, opts.time, &patterns, opts.shows, &stdout).await?;
-    stdout.close().await;
+    stdout.close().await?;
     task.await?
 }
 

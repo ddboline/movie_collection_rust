@@ -26,7 +26,7 @@ async fn remcom() -> Result<(), Error> {
     for file in opts.files {
         remcom_single_file(&file, opts.directory.as_deref(), opts.unwatched, &stdout)?;
     }
-    stdout.close().await;
+    stdout.close().await?;
     task.await?
 }
 
