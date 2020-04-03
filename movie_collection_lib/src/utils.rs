@@ -140,10 +140,15 @@ pub fn read_transcode_jobs_from_queue(queue: &str) -> Result<(), Error> {
                     .stderr(Redirection::Merge)
                     .stream_stdout()
                     .unwrap();
-
-                for line in BufReader::new(stream).lines() {
-                    write!(output_file, "{}", line.unwrap()).unwrap();
+                let mut reader = BufReader::new(stream);
+                let mut line = String::new();
+                loop {
+                    if reader.read_line(&mut line).unwrap() == 0 {
+                        break;
+                    }
+                    write!(output_file, "{}", line).unwrap();
                 }
+
                 rename(&script, &format!("{}/tmp_avi/{}", home_dir, file_name)).unwrap();
             }
         },
