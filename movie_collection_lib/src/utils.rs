@@ -143,6 +143,7 @@ pub fn read_transcode_jobs_from_queue(queue: &str) -> Result<(), Error> {
                 let mut reader = BufReader::new(stream);
                 let mut line = String::new();
                 loop {
+                    line.clear();
                     if reader.read_line(&mut line).unwrap() == 0 {
                         break;
                     }
