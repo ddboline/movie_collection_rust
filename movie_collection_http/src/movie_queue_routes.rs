@@ -444,7 +444,7 @@ fn process_shows(
         .map(|(_, v)| v)
         .chain(watchlist_shows.into_iter())
         .collect();
-    shows.sort_by_key(|item| item.show.clone());
+    shows.sort_by(|x, y| x.show.cmp(&y.show));
 
     let button_add = r#"<td><button type="submit" id="ID" onclick="watchlist_add('SHOW');">add to watchlist</button></td>"#;
     let button_rm = r#"<td><button type="submit" id="ID" onclick="watchlist_rm('SHOW');">remove from watchlist</button></td>"#;
