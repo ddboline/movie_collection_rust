@@ -2,6 +2,7 @@ use anyhow::Error;
 use structopt::StructOpt;
 
 use movie_collection_lib::{movie_collection::MovieCollection, tv_show_source::TvShowSource};
+use movie_collection_lib::stack_string::StackString;
 
 #[derive(StructOpt)]
 /// Query and Parse Video Collection
@@ -11,7 +12,7 @@ struct FindNewEpisodesOpt {
     source: Option<TvShowSource>,
 
     /// Only Show Some Shows
-    shows: Vec<String>,
+    shows: Vec<StackString>,
 }
 
 async fn find_new_episodes() -> Result<(), Error> {
@@ -29,7 +30,7 @@ async fn find_new_episodes() -> Result<(), Error> {
     let output = mc.find_new_episodes(source, &opts.shows).await?;
 
     for epi in output {
-        mc.stdout.send(epi.to_string())?;
+        mc.stdout.send(epi.to_string().into())?;
     }
     mc.stdout.close().await?;
     task.await?

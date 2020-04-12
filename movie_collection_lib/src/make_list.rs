@@ -1,14 +1,12 @@
 use anyhow::Error;
 use rayon::iter::{IntoParallelRefIterator, ParallelIterator};
-use std::{
-    collections::HashMap,
-    path::Path,
-};
+use std::{collections::HashMap, path::Path};
 
 use crate::{
     config::Config,
-    utils::{get_video_runtime, walk_directory},
     stdout_channel::StdoutChannel,
+    utils::{get_video_runtime, walk_directory},
+    stack_string::StackString,
 };
 
 pub fn make_list(stdout: &StdoutChannel) -> Result<(), Error> {
@@ -22,7 +20,7 @@ pub fn make_list(stdout: &StdoutChannel) -> Result<(), Error> {
             Ok(fname) => {
                 let file_name = fname.file_name().into_string().unwrap();
                 for suffix in &config.suffixes {
-                    if file_name.ends_with(suffix) {
+                    if file_name.ends_with(suffix.as_str()) {
                         return Some(file_name);
                     }
                 }
@@ -41,17 +39,17 @@ pub fn make_list(stdout: &StdoutChannel) -> Result<(), Error> {
     let file_list: Result<Vec<_>, Error> = config
         .movie_dirs
         .par_iter()
-        .map(|d| walk_directory(&d, &local_file_list))
+        .map(|d| walk_directory(d.as_str(), &local_file_list))
         .collect();
 
     let mut file_list: Vec<_> = file_list?.into_iter().flatten().collect();
 
     file_list.sort();
 
-    let file_map: HashMap<String, _> = file_list
+    let file_map: HashMap<StackString, _> = file_list
         .iter()
         .map(|f| {
-            let file_name = f.split('/').last().unwrap().to_string();
+            let file_name = f.split('/').last().unwrap().into();
             (file_name, f)
         })
         .collect();
@@ -59,7 +57,7 @@ pub fn make_list(stdout: &StdoutChannel) -> Result<(), Error> {
     let result: Vec<_> = local_file_list
         .iter()
         .map(|f| {
-            let full_path = match file_map.get(f) {
+            let full_path = match file_map.get(f.as_str()) {
                 Some(s) => s,
                 None => "",
             };
@@ -68,7 +66,7 @@ pub fn make_list(stdout: &StdoutChannel) -> Result<(), Error> {
         .collect();
 
     for e in result {
-        stdout.send(e.to_string())?;
+        stdout.send(e.into())?;
     }
 
     let result: Vec<_> = file_list
@@ -81,7 +79,7 @@ pub fn make_list(stdout: &StdoutChannel) -> Result<(), Error> {
         .collect();
 
     for e in result {
-        stdout.send(e.to_string())?;
+        stdout.send(e.into())?;
     }
 
     Ok(())

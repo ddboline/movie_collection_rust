@@ -1,7 +1,7 @@
 use amqp::{protocol::basic::BasicProperties, Basic, Channel, Options, Session, Table};
 use anyhow::{format_err, Error};
 use async_trait::async_trait;
-use log::{error, debug};
+use log::{debug, error};
 use rand::{
     distributions::{Distribution, Uniform},
     thread_rng,
@@ -20,13 +20,14 @@ use tokio::time::{delay_for, Duration};
 
 use crate::config::Config;
 use crate::stdout_channel::StdoutChannel;
+use crate::stack_string::StackString;
 
 #[inline]
-pub fn option_string_wrapper(s: &Option<String>) -> &str {
-    s.as_ref().map_or("", String::as_str)
+pub fn option_string_wrapper<T: AsRef<str>>(s: &Option<T>) -> &str {
+    s.as_ref().map_or("", AsRef::as_ref)
 }
 
-pub fn walk_directory(path: &str, match_strs: &[String]) -> Result<Vec<String>, Error> {
+pub fn walk_directory<T: AsRef<str>>(path: &str, match_strs: &[T]) -> Result<Vec<String>, Error> {
     let results = Path::new(path)
         .read_dir()?
         .filter_map(|f| match f {
@@ -45,7 +46,7 @@ pub fn walk_directory(path: &str, match_strs: &[String]) -> Result<Vec<String>, 
                         let path_names: Vec<_> = match_strs
                             .iter()
                             .filter_map(|m| {
-                                if path_name.contains(m) {
+                                if path_name.contains(m.as_ref()) {
                                     Some(path_name.to_string())
                                 } else {
                                     None
@@ -88,7 +89,7 @@ pub fn open_transcode_channel(queue: &str) -> Result<Channel, Error> {
 
 #[derive(Serialize, Deserialize)]
 struct ScriptStruct {
-    script: String,
+    script: StackString,
 }
 
 pub fn publish_transcode_job_to_queue(
@@ -108,7 +109,7 @@ pub fn publish_transcode_job_to_queue(
                 ..BasicProperties::default()
             },
             serde_json::to_string(&ScriptStruct {
-                script: script.to_string(),
+                script: script.into(),
             })?
             .into_bytes(),
         )
@@ -130,7 +131,7 @@ pub fn read_transcode_jobs_from_queue(queue: &str) -> Result<(), Error> {
                 .open("/tmp/temp_encoding.out")
                 .unwrap();
 
-            let path = Path::new(&script);
+            let path = Path::new(script.as_str());
             let file_name = path.file_name().unwrap().to_string_lossy();
             let home_dir = var("HOME").unwrap_or_else(|_| "/tmp".to_string());
             if path.exists() {
@@ -150,7 +151,7 @@ pub fn read_transcode_jobs_from_queue(queue: &str) -> Result<(), Error> {
                     write!(output_file, "{}", line).unwrap();
                 }
 
-                rename(&script, &format!("{}/tmp_avi/{}", home_dir, file_name)).unwrap();
+                rename(script.as_str(), &format!("{}/tmp_avi/{}", home_dir, file_name)).unwrap();
             }
         },
         queue,
@@ -200,7 +201,7 @@ pub fn create_move_script(
     let file_name = path.file_name().unwrap().to_string_lossy();
     let prefix = path.file_stem().unwrap().to_string_lossy().to_string();
     let output_dir = if let Some(d) = directory {
-        let d = Path::new(&config.preferred_dir)
+        let d = Path::new(config.preferred_dir.as_str())
             .join("Documents")
             .join("movies")
             .join(d);
@@ -212,7 +213,7 @@ pub fn create_move_script(
         }
         d
     } else if unwatched {
-        let d = Path::new(&config.preferred_dir)
+        let d = Path::new(config.preferred_dir.as_str())
             .join("television")
             .join("unwatched");
         if !d.exists() {
@@ -231,7 +232,7 @@ pub fn create_move_script(
             panic!("Failed to parse show season {} episode {}", season, episode);
         }
 
-        let d = Path::new(&config.preferred_dir)
+        let d = Path::new(config.preferred_dir.as_str())
             .join("Documents")
             .join("television")
             .join(show)
@@ -241,7 +242,7 @@ pub fn create_move_script(
         }
         d
     };
-    let mp4_script = Path::new(&config.home_dir)
+    let mp4_script = Path::new(config.home_dir.as_str())
         .join("dvdrip")
         .join("jobs")
         .join(format!("{}_copy.sh", prefix));
@@ -346,8 +347,12 @@ pub fn remcom_single_file(
     if ext != "mp4" {
         match create_transcode_script(&config, &path) {
             Ok(s) => {
-                stdout.send(format!("script {}", s))?;
-                publish_transcode_job_to_queue(&s, &config.remcom_queue, &config.remcom_queue)?;
+                stdout.send(format!("script {}", s).into())?;
+                publish_transcode_job_to_queue(
+                    &s,
+                    config.remcom_queue.as_str(),
+                    config.remcom_queue.as_str(),
+                )?;
             }
             Err(e) => error!("error {}", e),
         }
@@ -355,8 +360,12 @@ pub fn remcom_single_file(
 
     create_move_script(&config, directory, unwatched, &path)
         .and_then(|s| {
-            stdout.send(format!("script {}", s))?;
-            publish_transcode_job_to_queue(&s, &config.remcom_queue, &config.remcom_queue)
+            stdout.send(format!("script {}", s).into())?;
+            publish_transcode_job_to_queue(
+                &s,
+                config.remcom_queue.as_str(),
+                config.remcom_queue.as_str(),
+            )
         })
         .map_err(|e| {
             error!("{:?}", e);

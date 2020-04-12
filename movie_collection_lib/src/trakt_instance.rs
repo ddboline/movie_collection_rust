@@ -5,6 +5,7 @@ use std::collections::HashMap;
 use crate::trakt_utils::{
     TraktCalEntryList, TraktResult, WatchListShow, WatchedEpisode, WatchedMovie,
 };
+use crate::stack_string::StackString;
 
 pub fn trakt_instance_call_noargs(py: Python, method: &str) -> PyResult<String> {
     let trakt_instance = py.import("trakt_instance.trakt_instance")?;
@@ -18,7 +19,7 @@ pub fn trakt_instance_call_tuple(py: Python, method: &str, tup: PyTuple) -> PyRe
     String::extract(py, &result)
 }
 
-pub fn get_watchlist_shows() -> Result<HashMap<String, WatchListShow>, Error> {
+pub fn get_watchlist_shows() -> Result<HashMap<StackString, WatchListShow>, Error> {
     let gil = Python::acquire_gil();
     let py = gil.python();
     let result =
@@ -26,7 +27,7 @@ pub fn get_watchlist_shows() -> Result<HashMap<String, WatchListShow>, Error> {
     let watchlist_shows: Vec<WatchListShow> = serde_json::from_str(&result)?;
     let watchlist_shows = watchlist_shows
         .into_iter()
-        .map(|s| (s.link.to_string(), s))
+        .map(|s| (s.link.clone(), s))
         .collect();
     Ok(watchlist_shows)
 }
@@ -51,28 +52,28 @@ pub fn remove_watchlist_show(imdb_id: &str) -> Result<TraktResult, Error> {
     Ok(result)
 }
 
-pub fn get_watched_shows() -> Result<HashMap<(String, i32, i32), WatchedEpisode>, Error> {
+pub fn get_watched_shows() -> Result<HashMap<(StackString, i32, i32), WatchedEpisode>, Error> {
     let gil = Python::acquire_gil();
     let py = gil.python();
     let result =
         trakt_instance_call_noargs(py, "get_watched_shows").map_err(|e| format_err!("{:?}", e))?;
     let watched_shows: Vec<WatchedEpisode> = serde_json::from_str(&result)?;
-    let watched_shows: HashMap<(String, i32, i32), WatchedEpisode> = watched_shows
+    let watched_shows: HashMap<(StackString, i32, i32), WatchedEpisode> = watched_shows
         .into_iter()
-        .map(|s| ((s.imdb_url.to_string(), s.season, s.episode), s))
+        .map(|s| ((s.imdb_url.clone(), s.season, s.episode), s))
         .collect();
     Ok(watched_shows)
 }
 
-pub fn get_watched_movies() -> Result<HashMap<String, WatchedMovie>, Error> {
+pub fn get_watched_movies() -> Result<HashMap<StackString, WatchedMovie>, Error> {
     let gil = Python::acquire_gil();
     let py = gil.python();
     let result =
         trakt_instance_call_noargs(py, "get_watched_movies").map_err(|e| format_err!("{:?}", e))?;
     let watched_movies: Vec<WatchedMovie> = serde_json::from_str(&result)?;
-    let watched_movies: HashMap<String, WatchedMovie> = watched_movies
+    let watched_movies: HashMap<StackString, WatchedMovie> = watched_movies
         .into_iter()
-        .map(|s| (s.imdb_url.to_string(), s))
+        .map(|s| (s.imdb_url.clone(), s))
         .collect();
     Ok(watched_movies)
 }

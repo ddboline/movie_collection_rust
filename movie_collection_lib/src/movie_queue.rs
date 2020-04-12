@@ -8,16 +8,17 @@ use std::{fmt, path::Path};
 
 use crate::{config::Config, movie_collection::MovieCollection, pgpool::PgPool};
 
+use crate::stack_string::StackString;
 use crate::utils::{option_string_wrapper, parse_file_stem};
 
 #[derive(Default, Serialize)]
 pub struct MovieQueueResult {
     pub idx: i32,
-    pub path: String,
-    pub link: Option<String>,
+    pub path: StackString,
+    pub link: Option<StackString>,
     pub istv: bool,
-    pub show: Option<String>,
-    pub eplink: Option<String>,
+    pub show: Option<StackString>,
+    pub eplink: Option<StackString>,
     pub season: Option<i32>,
     pub episode: Option<i32>,
 }
@@ -48,7 +49,7 @@ impl MovieQueueDB {
     pub fn new() -> Self {
         let config = Config::with_config().expect("Init config failed");
         Self {
-            pool: PgPool::new(&config.pgurl),
+            pool: PgPool::new(config.pgurl.as_str()),
         }
     }
 
@@ -237,8 +238,8 @@ impl MovieQueueDB {
         #[derive(FromSqlRow)]
         struct PrintMovieQueue {
             idx: i32,
-            path: String,
-            link: Option<String>,
+            path: StackString,
+            link: Option<StackString>,
             istv: Option<bool>,
         }
 
@@ -282,7 +283,7 @@ impl MovieQueueDB {
 
         let futures = results?.into_iter().map(|mut result| async {
             if result.istv {
-                let file_stem = Path::new(&result.path)
+                let file_stem = Path::new(result.path.as_str())
                     .file_stem()
                     .unwrap()
                     .to_string_lossy();
@@ -306,8 +307,8 @@ impl MovieQueueDB {
                     .get(0)
                 {
                     let epurl: String = row.try_get("epurl")?;
-                    result.eplink = Some(epurl);
-                    result.show = Some(show.to_string());
+                    result.eplink = Some(epurl.into());
+                    result.show = Some(show.to_string().into());
                     result.season = Some(season);
                     result.episode = Some(episode);
                 }
@@ -349,6 +350,6 @@ impl MovieQueueDB {
 pub struct MovieQueueRow {
     pub idx: i32,
     pub collection_idx: i32,
-    pub path: String,
-    pub show: String,
+    pub path: StackString,
+    pub show: StackString,
 }

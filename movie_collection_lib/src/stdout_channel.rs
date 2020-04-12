@@ -9,10 +9,12 @@ use tokio::{
     task::{spawn, JoinHandle},
 };
 
+use crate::stack_string::StackString;
+
 #[derive(Clone, Debug)]
 pub struct StdoutChannel {
-    receiver: Arc<Mutex<UnboundedReceiver<Option<String>>>>,
-    sender: Arc<UnboundedSender<Option<String>>>,
+    receiver: Arc<Mutex<UnboundedReceiver<Option<StackString>>>>,
+    sender: Arc<UnboundedSender<Option<StackString>>>,
 }
 
 impl Default for StdoutChannel {
@@ -29,11 +31,11 @@ impl StdoutChannel {
         Self { receiver, sender }
     }
 
-    pub fn send(&self, item: String) -> Result<(), Error> {
+    pub fn send(&self, item: StackString) -> Result<(), Error> {
         self.sender.send(Some(item)).map_err(Into::into)
     }
 
-    async fn recv(&self) -> Option<Option<String>> {
+    async fn recv(&self) -> Option<Option<StackString>> {
         self.receiver.lock().await.recv().await
     }
 

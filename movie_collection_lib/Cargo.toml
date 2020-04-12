@@ -35,3 +35,4 @@ tokio = {version="0.2", features=["full"]}
 async-trait = "0.1"
 derive_more = "0.99"
 structopt = "0.3"
+inlinable_string = "0.1"

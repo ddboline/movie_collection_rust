@@ -8,12 +8,13 @@ use select::{
 };
 use std::fmt;
 
+use crate::stack_string::StackString;
 use crate::utils::{option_string_wrapper, ExponentialRetry};
 
 #[derive(Default)]
 pub struct ImdbTuple {
-    pub title: String,
-    pub link: String,
+    pub title: StackString,
+    pub link: StackString,
     pub rating: f64,
 }
 
@@ -33,8 +34,8 @@ pub struct RatingOutput {
 pub struct ImdbEpisodeResult {
     pub season: i32,
     pub episode: i32,
-    pub epurl: Option<String>,
-    pub eptitle: Option<String>,
+    pub epurl: Option<StackString>,
+    pub eptitle: Option<StackString>,
     pub airdate: Option<NaiveDate>,
     pub rating: Option<f64>,
     pub nrating: Option<u64>,
@@ -112,8 +113,8 @@ impl ImdbConnection {
         let futures = tl_vec.into_iter().map(|(t, l)| async move {
             let r = self.parse_imdb_rating(&l).await?;
             Ok(ImdbTuple {
-                title: t,
-                link: l.to_string(),
+                title: t.into(),
+                link: l.into(),
                 rating: r.rating.unwrap_or(-1.0),
             })
         });
@@ -231,8 +232,8 @@ impl ImdbConnection {
                         };
                         if let Some(epi_url) = a_.attr("href") {
                             if let Some(link) = epi_url.split('/').nth(2) {
-                                result.epurl = Some(link.to_string());
-                                result.eptitle = Some(a_.text().trim().to_string());
+                                result.epurl = Some(link.into());
+                                result.eptitle = Some(a_.text().trim().into());
                             }
                         }
                     }
@@ -244,7 +245,7 @@ impl ImdbConnection {
 
         let futures = results.into_iter().map(|mut result| async {
             if let Some(link) = result.epurl.as_ref() {
-                let r = self.parse_imdb_rating(&link).await?;
+                let r = self.parse_imdb_rating(link.as_str()).await?;
                 result.rating = r.rating;
                 result.nrating = r.count;
             }

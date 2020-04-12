@@ -14,7 +14,7 @@ use tokio::task::spawn_blocking;
 
 use crate::{
     imdb_episodes::ImdbEpisodes, imdb_ratings::ImdbRatings, movie_collection::MovieCollection,
-    movie_queue::MovieQueueDB, pgpool::PgPool,
+    movie_queue::MovieQueueDB, pgpool::PgPool, stack_string::StackString,
 };
 
 use crate::{trakt_instance, tv_show_source::TvShowSource, utils::option_string_wrapper};
@@ -72,11 +72,11 @@ impl FromStr for TraktCommands {
 
 #[derive(Serialize, Deserialize, Debug)]
 pub struct TraktCalEntry {
-    pub ep_link: Option<String>,
+    pub ep_link: Option<StackString>,
     pub episode: i32,
-    pub link: String,
+    pub link: StackString,
     pub season: i32,
-    pub show: String,
+    pub show: StackString,
     pub airdate: NaiveDate,
 }
 
@@ -99,7 +99,7 @@ pub type TraktCalEntryList = Vec<TraktCalEntry>;
 
 #[derive(Serialize, Deserialize, Debug, Default)]
 pub struct TraktResult {
-    pub status: String,
+    pub status: StackString,
 }
 
 impl fmt::Display for TraktResult {
@@ -110,8 +110,8 @@ impl fmt::Display for TraktResult {
 
 #[derive(Serialize, Deserialize, Debug, Default, FromSqlRow)]
 pub struct WatchListShow {
-    pub link: String,
-    pub title: String,
+    pub link: StackString,
+    pub title: StackString,
     pub year: i32,
 }
 
@@ -137,8 +137,8 @@ impl WatchListShow {
             let title: String = row.try_get("title")?;
             let year: i32 = row.try_get("year")?;
             Ok(Some(Self {
-                link: link.to_string(),
-                title,
+                link: link.into(),
+                title: title.into(),
                 year,
             }))
         } else {
@@ -196,7 +196,7 @@ impl WatchListShow {
 
 pub async fn get_watchlist_shows_db(
     pool: &PgPool,
-) -> Result<HashMap<String, WatchListShow>, Error> {
+) -> Result<HashMap<StackString, WatchListShow>, Error> {
     let query = r#"
         SELECT a.link, a.title, a.year
         FROM trakt_watchlist a
@@ -208,21 +208,21 @@ pub async fn get_watchlist_shows_db(
         .iter()
         .map(|row| {
             let val = WatchListShow::from_row(row)?;
-            Ok((val.link.to_string(), val))
+            Ok((val.link.clone(), val))
         })
         .collect()
 }
 
-pub type WatchListMap = HashMap<String, (String, WatchListShow, Option<TvShowSource>)>;
+pub type WatchListMap = HashMap<StackString, (StackString, WatchListShow, Option<TvShowSource>)>;
 
 pub async fn get_watchlist_shows_db_map(pool: &PgPool) -> Result<WatchListMap, Error> {
     #[derive(FromSqlRow)]
     struct WatchlistShowDbMap {
-        show: String,
-        link: String,
-        title: String,
+        show: StackString,
+        link: StackString,
+        title: StackString,
         year: i32,
-        source: Option<String>,
+        source: Option<StackString>,
     }
 
     let query = r#"
@@ -240,14 +240,14 @@ pub async fn get_watchlist_shows_db_map(pool: &PgPool) -> Result<WatchListMap, E
             let row = WatchlistShowDbMap::from_row(row)?;
 
             let source: Option<TvShowSource> = match row.source {
-                Some(s) => s.parse().ok(),
+                Some(s) => s.as_str().parse().ok(),
                 None => None,
             };
 
             Ok((
-                row.link.to_string(),
+                row.link.clone(),
                 (
-                    row.show,
+                    row.show.clone(),
                     WatchListShow {
                         link: row.link,
                         title: row.title,
@@ -262,8 +262,8 @@ pub async fn get_watchlist_shows_db_map(pool: &PgPool) -> Result<WatchListMap, E
 
 #[derive(Serialize, Deserialize, Debug, Default, PartialEq, Eq, Hash)]
 pub struct WatchedEpisode {
-    pub title: String,
-    pub imdb_url: String,
+    pub title: StackString,
+    pub imdb_url: StackString,
     pub episode: i32,
     pub season: i32,
 }
@@ -328,8 +328,8 @@ impl WatchedEpisode {
             .await?
             .get(0)
         {
-            let imdb_url: String = row.try_get("link")?;
-            let title: String = row.try_get("title")?;
+            let imdb_url: StackString = row.try_get("link")?;
+            let title: StackString = row.try_get("title")?;
             Ok(Some(Self {
                 title,
                 imdb_url,
@@ -414,8 +414,8 @@ pub async fn get_watched_shows_db(
         .await?
         .iter()
         .map(|row| {
-            let imdb_url: String = row.try_get("link")?;
-            let title: String = row.try_get("title")?;
+            let imdb_url: StackString = row.try_get("link")?;
+            let title: StackString = row.try_get("title")?;
             let season: i32 = row.try_get("season")?;
             let episode: i32 = row.try_get("episode")?;
             Ok(WatchedEpisode {
@@ -430,8 +430,8 @@ pub async fn get_watched_shows_db(
 
 #[derive(Serialize, Deserialize, Debug, Default, PartialEq, Eq, Hash)]
 pub struct WatchedMovie {
-    pub title: String,
-    pub imdb_url: String,
+    pub title: StackString,
+    pub imdb_url: StackString,
 }
 
 impl fmt::Display for WatchedMovie {
@@ -481,8 +481,8 @@ impl WatchedMovie {
             .await?
             .get(0)
         {
-            let imdb_url: String = row.try_get("link")?;
-            let title: String = row.try_get("title")?;
+            let imdb_url: StackString = row.try_get("link")?;
+            let title: StackString = row.try_get("title")?;
             Ok(Some(Self { title, imdb_url }))
         } else {
             Ok(None)
@@ -537,8 +537,8 @@ pub async fn get_watched_movies_db(pool: &PgPool) -> Result<Vec<WatchedMovie>, E
         .await?
         .iter()
         .map(|row| {
-            let imdb_url: String = row.try_get("link")?;
-            let title: String = row.try_get("title")?;
+            let imdb_url: StackString = row.try_get("link")?;
+            let title: StackString = row.try_get("title")?;
             Ok(WatchedMovie { title, imdb_url })
         })
         .collect()
@@ -556,7 +556,8 @@ pub async fn sync_trakt_with_db(mc: &MovieCollection) -> Result<(), Error> {
         async move {
             if !watchlist_shows_db.contains_key(&link) {
                 show.insert_show(&mc.pool).await?;
-                mc.stdout.send(format!("insert watchlist {}", show))?;
+                mc.stdout
+                    .send(format!("insert watchlist {}", show).into())?;
             }
             Ok(())
         }
@@ -564,10 +565,10 @@ pub async fn sync_trakt_with_db(mc: &MovieCollection) -> Result<(), Error> {
     let results: Result<Vec<_>, Error> = try_join_all(futures).await;
     results?;
 
-    let watched_shows_db: HashMap<(String, i32, i32), _> = get_watched_shows_db(&mc.pool, "", None)
+    let watched_shows_db: HashMap<(StackString, i32, i32), _> = get_watched_shows_db(&mc.pool, "", None)
         .await?
         .into_iter()
-        .map(|s| ((s.imdb_url.to_string(), s.season, s.episode), s))
+        .map(|s| ((s.imdb_url.clone(), s.season, s.episode), s))
         .collect();
     let watched_shows_db = Arc::new(watched_shows_db);
     let watched_shows = spawn_blocking(trakt_instance::get_watched_shows).await??;
@@ -579,7 +580,8 @@ pub async fn sync_trakt_with_db(mc: &MovieCollection) -> Result<(), Error> {
         async move {
             if !watched_shows_db.contains_key(&key) {
                 episode.insert_episode(&mc.pool).await?;
-                mc.stdout.send(format!("insert watched {}", episode))?;
+                mc.stdout
+                    .send(format!("insert watched {}", episode).into())?;
             }
             Ok(())
         }
@@ -587,10 +589,10 @@ pub async fn sync_trakt_with_db(mc: &MovieCollection) -> Result<(), Error> {
     let results: Result<Vec<_>, Error> = try_join_all(futures).await;
     results?;
 
-    let watched_movies_db: HashMap<String, _> = get_watched_movies_db(&mc.pool)
+    let watched_movies_db: HashMap<StackString, _> = get_watched_movies_db(&mc.pool)
         .await?
         .into_iter()
-        .map(|s| (s.imdb_url.to_string(), s))
+        .map(|s| (s.imdb_url.clone(), s))
         .collect();
     let watched_movies_db = Arc::new(watched_movies_db);
     let watched_movies = spawn_blocking(trakt_instance::get_watched_movies).await??;
@@ -604,7 +606,7 @@ pub async fn sync_trakt_with_db(mc: &MovieCollection) -> Result<(), Error> {
         async move {
             if !watched_movies_db.contains_key(key) {
                 movie.insert_movie(&mc.pool).await?;
-                mc.stdout.send(format!("insert watched {}", movie))?;
+                mc.stdout.send(format!("insert watched {}", movie).into())?;
             }
             Ok(())
         }
@@ -617,7 +619,7 @@ pub async fn sync_trakt_with_db(mc: &MovieCollection) -> Result<(), Error> {
         async move {
             if !watched_movies.contains_key(key) {
                 movie.delete_movie(&mc.pool).await?;
-                mc.stdout.send(format!("delete watched {}", movie))?;
+                mc.stdout.send(format!("delete watched {}", movie).into())?;
             }
             Ok(())
         }
@@ -650,15 +652,15 @@ async fn get_imdb_url_from_show(
 async fn trakt_cal_list(mc: &MovieCollection) -> Result<(), Error> {
     let cal_entries = spawn_blocking(trakt_instance::get_calendar).await??;
     for cal in cal_entries {
-        let show = match ImdbRatings::get_show_by_link(&cal.link, &mc.pool).await? {
+        let show = match ImdbRatings::get_show_by_link(cal.link.as_str(), &mc.pool).await? {
             Some(s) => s.show,
-            None => "".to_string(),
+            None => "".into(),
         };
         let exists = if show.is_empty() {
             false
         } else {
             ImdbEpisodes {
-                show: show.to_string(),
+                show: show.clone().into(),
                 season: cal.season,
                 episode: cal.episode,
                 ..ImdbEpisodes::default()
@@ -668,7 +670,7 @@ async fn trakt_cal_list(mc: &MovieCollection) -> Result<(), Error> {
             .is_some()
         };
         if !exists {
-            mc.stdout.send(format!("{} {}", show, cal))?;
+            mc.stdout.send(format!("{} {}", show, cal).into())?;
         }
     }
     Ok(())
@@ -677,13 +679,17 @@ async fn trakt_cal_list(mc: &MovieCollection) -> Result<(), Error> {
 async fn watchlist_add(mc: &MovieCollection, show: Option<&str>) -> Result<(), Error> {
     if let Some(imdb_url) = get_imdb_url_from_show(&mc, show).await? {
         let imdb_url_ = imdb_url.clone();
-        mc.stdout.send(format!("result: {}",
-            spawn_blocking(move || trakt_instance::add_watchlist_show(&imdb_url_)).await??
-        ))?;
+        mc.stdout.send(
+            format!(
+                "result: {}",
+                spawn_blocking(move || trakt_instance::add_watchlist_show(&imdb_url_)).await??
+            )
+            .into(),
+        )?;
         debug!("GOT HERE");
         if let Some(show) = spawn_blocking(trakt_instance::get_watchlist_shows)
             .await??
-            .get(&imdb_url)
+            .get(imdb_url.as_str())
         {
             debug!("INSERT SHOW {}", show);
             show.insert_show(&mc.pool).await?;
@@ -695,9 +701,13 @@ async fn watchlist_add(mc: &MovieCollection, show: Option<&str>) -> Result<(), E
 async fn watchlist_rm(mc: &MovieCollection, show: Option<&str>) -> Result<(), Error> {
     if let Some(imdb_url) = get_imdb_url_from_show(&mc, show).await? {
         let imdb_url_ = imdb_url.clone();
-        mc.stdout.send(format!("result: {}",
-            spawn_blocking(move || trakt_instance::remove_watchlist_show(&imdb_url_)).await??
-        ))?;
+        mc.stdout.send(
+            format!(
+                "result: {}",
+                spawn_blocking(move || trakt_instance::remove_watchlist_show(&imdb_url_)).await??
+            )
+            .into(),
+        )?;
         if let Some(show) = WatchListShow::get_show_by_link(&imdb_url, &mc.pool).await? {
             show.delete_show(&mc.pool).await?;
         }
@@ -708,7 +718,7 @@ async fn watchlist_rm(mc: &MovieCollection, show: Option<&str>) -> Result<(), Er
 async fn watchlist_list(mc: &MovieCollection) -> Result<(), Error> {
     let show_map = get_watchlist_shows_db(&mc.pool).await?;
     for (_, show) in show_map {
-        mc.stdout.send(format!("{}", show))?;
+        mc.stdout.send(format!("{}", show).into())?;
     }
     Ok(())
 }
@@ -729,7 +739,7 @@ async fn watched_add(
                 })
                 .await??;
                 WatchedEpisode {
-                    imdb_url: imdb_url.to_string(),
+                    imdb_url: imdb_url.clone().into(),
                     season,
                     episode: *epi,
                     ..WatchedEpisode::default()
@@ -739,10 +749,11 @@ async fn watched_add(
             }
         } else {
             let imdb_url_ = imdb_url.clone();
-            spawn_blocking(move || trakt_instance::add_movie_to_watched(&imdb_url_)).await??;
+            spawn_blocking(move || trakt_instance::add_movie_to_watched(imdb_url_.as_str()))
+                .await??;
             WatchedMovie {
-                imdb_url,
-                title: "".to_string(),
+                imdb_url: imdb_url.into(),
+                title: "".into(),
             }
             .insert_movie(&mc.pool)
             .await?;
@@ -792,21 +803,21 @@ async fn watched_list(mc: &MovieCollection, show: Option<&str>, season: i32) -> 
             if season != -1 && show.season != season {
                 continue;
             }
-            if show.imdb_url == imdb_url {
-                mc.stdout.send(show.to_string())?;
+            if show.imdb_url.as_str() == imdb_url.as_str() {
+                mc.stdout.send(show.to_string().into())?;
             }
         }
         for show in &watched_movies {
-            if show.imdb_url == imdb_url {
-                mc.stdout.send(show.to_string())?;
+            if show.imdb_url.as_str() == imdb_url.as_str() {
+                mc.stdout.send(show.to_string().into())?;
             }
         }
     } else {
         for show in &watched_shows {
-            mc.stdout.send(show.to_string())?;
+            mc.stdout.send(show.to_string().into())?;
         }
         for show in &watched_movies {
-            mc.stdout.send(show.to_string())?;
+            mc.stdout.send(show.to_string().into())?;
         }
     }
     Ok(())
@@ -864,20 +875,21 @@ pub async fn watch_list_http_worker(
         .await?
         .ok_or_else(|| format_err!("Show Doesn't exist"))?;
 
-    let watched_episodes_db: HashSet<i32> = get_watched_shows_db(&pool, &show.show, Some(season))
-        .await?
-        .into_iter()
-        .map(|s| s.episode)
-        .collect();
+    let watched_episodes_db: HashSet<i32> =
+        get_watched_shows_db(&pool, show.show.as_str(), Some(season))
+            .await?
+            .into_iter()
+            .map(|s| s.episode)
+            .collect();
 
-    let queue: HashMap<(String, i32, i32), _> = mq
-        .print_movie_queue(&[&show.show])
+    let queue: HashMap<(StackString, i32, i32), _> = mq
+        .print_movie_queue(&[show.show.as_str()])
         .await?
         .into_iter()
         .filter_map(|s| match &s.show {
             Some(show) => match s.season {
                 Some(season) => match s.episode {
-                    Some(episode) => Some(((show.to_string(), season, episode), s)),
+                    Some(episode) => Some(((show.clone(), season, episode), s)),
                     None => None,
                 },
                 None => None,
@@ -886,12 +898,14 @@ pub async fn watch_list_http_worker(
         })
         .collect();
 
-    let entries: Vec<_> = mc.print_imdb_episodes(&show.show, Some(season)).await?;
+    let entries: Vec<_> = mc
+        .print_imdb_episodes(show.show.as_str(), Some(season))
+        .await?;
 
     let mut collection_idx_map = HashMap::new();
     for r in &entries {
-        if let Some(row) = queue.get(&(show.show.to_string(), season, r.episode)) {
-            if let Some(index) = mc.get_collection_index(&row.path).await? {
+        if let Some(row) = queue.get(&(show.show.clone(), season, r.episode)) {
+            if let Some(index) = mc.get_collection_index(row.path.as_str()).await? {
                 collection_idx_map.insert(r.episode, index);
             }
         }
@@ -926,12 +940,12 @@ pub async fn watch_list_http_worker(
                 s.airdate,
                 if watched_episodes_db.contains(&s.episode) {
                     button_rm
-                        .replace("SHOW", &show.link)
+                        .replace("SHOW", show.link.as_str())
                         .replace("SEASON", &season.to_string())
                         .replace("EPISODE", &s.episode.to_string())
                 } else {
                     button_add
-                        .replace("SHOW", &show.link)
+                        .replace("SHOW", show.link.as_str())
                         .replace("SEASON", &season.to_string())
                         .replace("EPISODE", &s.episode.to_string())
                 }
@@ -989,7 +1003,7 @@ pub async fn watched_action_http_worker(
             };
             if season != -1 && episode != -1 {
                 WatchedEpisode {
-                    imdb_url: imdb_url.to_string(),
+                    imdb_url: imdb_url.to_string().into(),
                     season,
                     episode,
                     ..WatchedEpisode::default()
@@ -998,8 +1012,8 @@ pub async fn watched_action_http_worker(
                 .await?;
             } else {
                 WatchedMovie {
-                    imdb_url: imdb_url.to_string(),
-                    title: "".to_string(),
+                    imdb_url: imdb_url.to_string().into(),
+                    title: "".into(),
                 }
                 .insert_movie(&mc.pool)
                 .await?;
@@ -1049,13 +1063,13 @@ pub async fn trakt_cal_http_worker(pool: &PgPool) -> Result<Vec<String>, Error> 
     let results: Vec<_> = cal_list
         .into_iter()
         .map(|cal| async {
-            let show = match ImdbRatings::get_show_by_link(&cal.link, &pool).await? {
+            let show = match ImdbRatings::get_show_by_link(cal.link.as_str(), &pool).await? {
                 Some(s) => s.show,
-                None => "".to_string(),
+                None => "".into(),
             };
             let exists = if show.is_empty() {None} else {
                 let idx_opt = ImdbEpisodes {
-                    show: show.to_string(),
+                    show: show.clone().into(),
                     season: cal.season,
                     episode: cal.episode,
                     ..ImdbEpisodes::default()
@@ -1094,8 +1108,8 @@ pub async fn trakt_cal_http_worker(pool: &PgPool) -> Result<Vec<String>, Error> 
                 cal.airdate,
                 if exists.is_some() {"".to_string()} else {
                     button_add
-                        .replace("SHOW", &show)
-                        .replace("LINK", &cal.link)
+                        .replace("SHOW", show.as_str())
+                        .replace("LINK", cal.link.as_str())
                         .replace("SEASON", &cal.season.to_string())
                 },
             );

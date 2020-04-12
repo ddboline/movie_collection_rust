@@ -1,13 +1,11 @@
 use anyhow::Error;
-use std::{
-    path::{Path, PathBuf},
-};
+use std::path::{Path, PathBuf};
 use structopt::StructOpt;
 
 use movie_collection_lib::{
     config::Config,
-    utils::{create_transcode_script, publish_transcode_job_to_queue},
     stdout_channel::StdoutChannel,
+    utils::{create_transcode_script, publish_transcode_job_to_queue},
 };
 
 #[derive(StructOpt)]
@@ -23,7 +21,9 @@ async fn transcode_avi() -> Result<(), Error> {
     let opts = TranscodeAviOpts::from_args();
 
     for path in opts.files {
-        let movie_path = Path::new(&config.home_dir).join("Documents").join("movies");
+        let movie_path = Path::new(config.home_dir.as_str())
+            .join("Documents")
+            .join("movies");
         let path = if path.exists() {
             path
         } else {
@@ -35,8 +35,12 @@ async fn transcode_avi() -> Result<(), Error> {
             panic!("file doesn't exist {}", path.to_string_lossy());
         }
         create_transcode_script(&config, &path).and_then(|s| {
-            stdout.send(format!("script {}", s))?;
-            publish_transcode_job_to_queue(&s, &config.transcode_queue, &config.transcode_queue)
+            stdout.send(format!("script {}", s).into())?;
+            publish_transcode_job_to_queue(
+                &s,
+                config.transcode_queue.as_str(),
+                config.transcode_queue.as_str(),
+            )
         })?;
     }
     stdout.close().await?;

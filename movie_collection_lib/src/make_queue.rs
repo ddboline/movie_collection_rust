@@ -11,8 +11,8 @@ use std::{
 use crate::{
     movie_collection::MovieCollection,
     movie_queue::{MovieQueueDB, MovieQueueResult},
-    utils::{get_video_runtime, parse_file_stem},
     stdout_channel::StdoutChannel,
+    utils::{get_video_runtime, parse_file_stem},
 };
 
 #[derive(Debug, Display)]
@@ -47,7 +47,7 @@ pub async fn make_queue_worker(
     if do_shows {
         let shows = mc.print_tv_shows().await?;
         for show in shows {
-            stdout.send(show.to_string())?;
+            stdout.send(show.to_string().into())?;
         }
     } else if !del_files.is_empty() {
         for file in del_files {
@@ -65,17 +65,17 @@ pub async fn make_queue_worker(
             let results: Result<Vec<_>, Error> = movie_queue
                 .into_par_iter()
                 .map(|result| {
-                    let timeval = get_video_runtime(&result.path)?;
+                    let timeval = get_video_runtime(result.path.as_str())?;
                     Ok((timeval, result))
                 })
                 .collect();
 
             for (timeval, result) in results? {
-                stdout.send(format!("{} {}", result, timeval))?;
+                stdout.send(format!("{} {}", result, timeval).into())?;
             }
         } else {
             for result in movie_queue {
-                stdout.send(result.to_string())?;
+                stdout.send(result.to_string().into())?;
             }
         }
     } else if add_files.len() == 1 {
@@ -88,7 +88,7 @@ pub async fn make_queue_worker(
         }
     } else if add_files.len() == 2 {
         if let PathOrIndex::Index(idx) = &add_files[0] {
-            stdout.send(format!("inserting into {}", idx))?;
+            stdout.send(format!("inserting into {}", idx).into())?;
             if let PathOrIndex::Path(path) = &add_files[1] {
                 mq.insert_into_queue(*idx, &path.to_string_lossy()).await?;
             } else {
@@ -128,7 +128,7 @@ pub async fn movie_queue_http(queue: &[MovieQueueResult]) -> Result<Vec<String>,
     let futures = queue.iter().map(|row| {
         let mc = mc.clone();
         async move {
-        let path = Path::new(&row.path);
+        let path = Path::new(row.path.as_str());
         let ext = path
             .extension()
             .ok_or_else(|| format_err!("Cannot determine extension"))?
@@ -145,7 +145,7 @@ pub async fn movie_queue_http(queue: &[MovieQueueResult]) -> Result<Vec<String>,
         let (_, season, episode) = parse_file_stem(&file_stem);
 
         let entry = if ext == "mp4" {
-            let collection_idx = mc.get_collection_index(&row.path).await?.unwrap_or(-1);
+            let collection_idx = mc.get_collection_index(row.path.as_str()).await?.unwrap_or(-1);
             format!(
                 r#"<a href="javascript:updateMainArticle('{}');">{}</a>"#,
                 &format!("{}/{}", "/list/play", collection_idx),
@@ -179,7 +179,7 @@ pub async fn movie_queue_http(queue: &[MovieQueueResult]) -> Result<Vec<String>,
                 entry, file_name, file_name
             )
         } else {
-            let entries: Vec<_> = row.path.split('/').collect();
+            let entries: Vec<_> = row.path.as_str().split('/').collect();
             let len_entries = entries.len();
             let directory = entries[len_entries - 2];
             format!(

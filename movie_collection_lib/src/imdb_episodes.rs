@@ -5,17 +5,18 @@ use serde::{Deserialize, Serialize};
 use std::fmt;
 
 use crate::pgpool::PgPool;
+use crate::stack_string::StackString;
 
 #[derive(Clone, Serialize, Deserialize, FromSqlRow)]
 pub struct ImdbEpisodes {
-    pub show: String,
-    pub title: String,
+    pub show: StackString,
+    pub title: StackString,
     pub season: i32,
     pub episode: i32,
     pub airdate: NaiveDate,
     pub rating: f64,
-    pub eptitle: String,
-    pub epurl: String,
+    pub eptitle: StackString,
+    pub epurl: StackString,
 }
 
 impl fmt::Display for ImdbEpisodes {
@@ -44,14 +45,14 @@ impl Default for ImdbEpisodes {
 impl ImdbEpisodes {
     pub fn new() -> Self {
         Self {
-            show: "".to_string(),
-            title: "".to_string(),
+            show: "".into(),
+            title: "".into(),
             season: -1,
             episode: -1,
             airdate: NaiveDate::from_ymd(1970, 1, 1),
             rating: -1.0,
-            eptitle: "".to_string(),
-            epurl: "".to_string(),
+            eptitle: "".into(),
+            epurl: "".into(),
         }
     }
 

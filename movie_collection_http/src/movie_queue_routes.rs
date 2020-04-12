@@ -16,11 +16,12 @@ use movie_collection_lib::{
     make_queue::movie_queue_http,
     movie_collection::{ImdbSeason, TvShowsResult},
     movie_queue::MovieQueueResult,
+    stack_string::StackString,
+    stdout_channel::StdoutChannel,
     trakt_instance,
     trakt_utils::{TraktActions, WatchListShow},
     tv_show_source::TvShowSource,
     utils::remcom_single_file,
-    stdout_channel::StdoutChannel,
 };
 
 use super::{
@@ -52,7 +53,7 @@ where
     Ok(HttpResponse::Ok().json(js))
 }
 
-fn movie_queue_body(patterns: &[String], entries: &[String]) -> String {
+fn movie_queue_body(patterns: &[StackString], entries: &[String]) -> String {
     let previous = r#"<a href="javascript:updateMainArticle('/list/tvshows')">Go Back</a><br>"#;
 
     let watchlist_url = if patterns.is_empty() {
@@ -72,7 +73,7 @@ fn movie_queue_body(patterns: &[String], entries: &[String]) -> String {
 }
 
 async fn queue_body_resp(
-    patterns: Vec<String>,
+    patterns: Vec<StackString>,
     queue: Vec<MovieQueueResult>,
 ) -> Result<HttpResponse, Error> {
     let entries = movie_queue_http(&queue).await?;
@@ -92,7 +93,7 @@ pub async fn movie_queue(_: LoggedUser, state: Data<AppState>) -> Result<HttpRes
 }
 
 pub async fn movie_queue_show(
-    path: Path<String>,
+    path: Path<StackString>,
     _: LoggedUser,
     state: Data<AppState>,
 ) -> Result<HttpResponse, Error> {
@@ -105,7 +106,7 @@ pub async fn movie_queue_show(
 }
 
 pub async fn movie_queue_delete(
-    path: Path<String>,
+    path: Path<StackString>,
     _: LoggedUser,
     state: Data<AppState>,
 ) -> Result<HttpResponse, Error> {
@@ -113,7 +114,7 @@ pub async fn movie_queue_delete(
 
     let req = QueueDeleteRequest { path };
     let body = state.db.handle(req).await?;
-    form_http_response(body)
+    form_http_response(body.into())
 }
 
 fn transcode_worker(
@@ -121,11 +122,10 @@ fn transcode_worker(
     entries: &[MovieQueueResult],
     stdout: &StdoutChannel,
 ) -> Result<HttpResponse, Error> {
-
     let entries: Result<Vec<_>, Error> = entries
         .iter()
         .map(|entry| {
-            remcom_single_file(&path::Path::new(&entry.path), directory, false, &stdout)?;
+            remcom_single_file(&path::Path::new(entry.path.as_str()), directory, false, &stdout)?;
             Ok(format!("{}", entry))
         })
         .collect();
@@ -136,7 +136,7 @@ fn transcode_worker(
 }
 
 pub async fn movie_queue_transcode(
-    path: Path<String>,
+    path: Path<StackString>,
     _: LoggedUser,
     state: Data<AppState>,
 ) -> Result<HttpResponse, Error> {
@@ -150,7 +150,7 @@ pub async fn movie_queue_transcode(
 }
 
 pub async fn movie_queue_transcode_directory(
-    path: Path<(String, String)>,
+    path: Path<(StackString, StackString)>,
     _: LoggedUser,
     state: Data<AppState>,
 ) -> Result<HttpResponse, Error> {
@@ -160,7 +160,11 @@ pub async fn movie_queue_transcode_directory(
     let req = MovieQueueRequest { patterns };
     let (entries, _) = state.db.handle(req).await?;
     let stdout = StdoutChannel::new();
-    transcode_worker(Some(&path::Path::new(&directory)), &entries, &stdout)
+    transcode_worker(
+        Some(&path::Path::new(directory.as_str())),
+        &entries,
+        &stdout,
+    )
 }
 
 fn play_worker(full_path: String) -> Result<HttpResponse, Error> {
@@ -210,7 +214,7 @@ pub async fn movie_queue_play(
 }
 
 pub async fn imdb_show(
-    path: Path<String>,
+    path: Path<StackString>,
     query: Query<ParseImdbRequest>,
     _: LoggedUser,
     state: Data<AppState>,
@@ -354,13 +358,13 @@ pub async fn frontpage(_: LoggedUser, _: Data<AppState>) -> Result<HttpResponse,
     form_http_response(include_str!("../../templates/index.html").replace("BODY", ""))
 }
 
-type TvShowsMap = HashMap<String, (String, WatchListShow, Option<TvShowSource>)>;
+type TvShowsMap = HashMap<StackString, (StackString, WatchListShow, Option<TvShowSource>)>;
 
 #[derive(Debug, Default)]
 struct ProcessShowItem {
-    show: String,
-    title: String,
-    link: String,
+    show: StackString,
+    title: StackString,
+    link: StackString,
     source: Option<TvShowSource>,
 }
 
@@ -376,14 +380,14 @@ impl From<TvShowsResult> for ProcessShowItem {
 }
 
 fn tvshows_worker(res1: TvShowsMap, tvshows: Vec<TvShowsResult>) -> Result<String, Error> {
-    let tvshows: HashMap<String, _> = tvshows
+    let tvshows: HashMap<StackString, _> = tvshows
         .into_iter()
         .map(|s| {
             let item: ProcessShowItem = s.into();
             (item.link.clone(), item)
         })
         .collect();
-    let watchlist: HashMap<String, _> = res1
+    let watchlist: HashMap<StackString, _> = res1
         .into_iter()
         .map(|(link, (show, s, source))| {
             let item = ProcessShowItem {
@@ -426,8 +430,8 @@ pub async fn tvshows(_: LoggedUser, state: Data<AppState>) -> Result<HttpRespons
 }
 
 fn process_shows(
-    tvshows: HashMap<String, ProcessShowItem>,
-    watchlist: HashMap<String, ProcessShowItem>,
+    tvshows: HashMap<StackString, ProcessShowItem>,
+    watchlist: HashMap<StackString, ProcessShowItem>,
 ) -> Result<Vec<String>, Error> {
     let watchlist_keys: HashSet<_> = watchlist.keys().cloned().collect();
     let watchlist_shows: Vec<_> = watchlist
@@ -477,9 +481,9 @@ fn process_shows(
                     "".to_string()
                 },
                 if has_watchlist {
-                    button_rm.replace("SHOW", &item.link)
+                    button_rm.replace("SHOW", item.link.as_str())
                 } else {
-                    button_add.replace("SHOW", &item.link)
+                    button_add.replace("SHOW", item.link.as_str())
                 },
             )
         })
@@ -488,7 +492,7 @@ fn process_shows(
 }
 
 fn watchlist_worker(
-    shows: HashMap<String, (String, WatchListShow, Option<TvShowSource>)>,
+    shows: HashMap<StackString, (StackString, WatchListShow, Option<TvShowSource>)>,
 ) -> Result<HttpResponse, Error> {
     let mut shows: Vec<_> = shows
         .into_iter()
@@ -552,16 +556,16 @@ fn watchlist_action_worker(action: TraktActions, imdb_url: &str) -> Result<HttpR
 }
 
 pub async fn trakt_watchlist_action(
-    path: Path<(String, String)>,
+    path: Path<(StackString, StackString)>,
     _: LoggedUser,
     state: Data<AppState>,
 ) -> Result<HttpResponse, Error> {
     let (action, imdb_url) = path.into_inner();
-    let action = action.parse().expect("impossible");
+    let action = action.as_str().parse().expect("impossible");
 
     let req = WatchlistActionRequest { action, imdb_url };
     let imdb_url = state.db.handle(req).await?;
-    watchlist_action_worker(action, &imdb_url)
+    watchlist_action_worker(action, imdb_url.as_str())
 }
 
 fn trakt_watched_seasons_worker(
@@ -587,7 +591,7 @@ fn trakt_watched_seasons_worker(
                 s.season,
                 s.nepisodes,
                 button_add
-                    .replace("SHOW", &s.show)
+                    .replace("SHOW", s.show.as_str())
                     .replace("LINK", &link)
                     .replace("SEASON", &s.season.to_string())
             )
@@ -605,18 +609,20 @@ fn trakt_watched_seasons_worker(
 }
 
 pub async fn trakt_watched_seasons(
-    path: Path<String>,
+    path: Path<StackString>,
     _: LoggedUser,
     state: Data<AppState>,
 ) -> Result<HttpResponse, Error> {
     let imdb_url = path.into_inner();
     let s = state.clone();
     let show_opt = s.db.handle(ImdbRatingsRequest { imdb_url }).await?;
-    let empty = || ("".to_string(), "".to_string(), "".to_string());
+    let empty = || ("".into(), "".into(), "".into());
     let (imdb_url, show, link) =
-        show_opt.map_or_else(empty, |(imdb_url, t)| (imdb_url, t.show, t.link));
+        show_opt.map_or_else(empty, |(imdb_url, t)| (imdb_url, t.show.into(), t.link));
     let entries = state.db.handle(ImdbSeasonsRequest { show }).await?;
-    let entries = trakt_watched_seasons_worker(&link, &imdb_url, &entries)?;
+    let imdb_url: StackString = imdb_url.into();
+    let link: StackString = link.into();
+    let entries = trakt_watched_seasons_worker(link.as_str(), imdb_url.as_str(), &entries)?;
     let resp = HttpResponse::Ok()
         .content_type("text/html; charset=utf-8")
         .body(entries);
@@ -624,7 +630,7 @@ pub async fn trakt_watched_seasons(
 }
 
 pub async fn trakt_watched_list(
-    path: Path<(String, i32)>,
+    path: Path<(StackString, i32)>,
     _: LoggedUser,
     state: Data<AppState>,
 ) -> Result<HttpResponse, Error> {
@@ -636,14 +642,14 @@ pub async fn trakt_watched_list(
 }
 
 pub async fn trakt_watched_action(
-    path: Path<(String, String, i32, i32)>,
+    path: Path<(StackString, StackString, i32, i32)>,
     _: LoggedUser,
     state: Data<AppState>,
 ) -> Result<HttpResponse, Error> {
     let (action, imdb_url, season, episode) = path.into_inner();
 
     let req = WatchedActionRequest {
-        action: action.parse().expect("impossible"),
+        action: action.as_str().parse().expect("impossible"),
         imdb_url,
         season,
         episode,

@@ -5,14 +5,15 @@ use postgres_query::FromSqlRow;
 use serde::{Deserialize, Serialize};
 use std::fmt;
 
+use crate::stack_string::StackString;
 use crate::{pgpool::PgPool, tv_show_source::TvShowSource, utils::option_string_wrapper};
 
 #[derive(Default, Clone, Debug, Serialize, Deserialize, FromSqlRow)]
 pub struct ImdbRatings {
     pub index: i32,
-    pub show: String,
-    pub title: Option<String>,
-    pub link: String,
+    pub show: StackString,
+    pub title: Option<StackString>,
+    pub link: StackString,
     pub rating: Option<f64>,
     pub istv: Option<bool>,
     pub source: Option<TvShowSource>,

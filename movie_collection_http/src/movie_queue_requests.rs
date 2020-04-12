@@ -16,6 +16,7 @@ use movie_collection_lib::{
     movie_queue::{MovieQueueDB, MovieQueueResult, MovieQueueRow},
     parse_imdb::{ParseImdb, ParseImdbOptions},
     pgpool::PgPool,
+    stack_string::StackString,
     trakt_instance,
     trakt_utils::{
         get_watched_shows_db, get_watchlist_shows_db_map, trakt_cal_http_worker,
@@ -48,16 +49,16 @@ impl HandleRequest<WatchlistShowsRequest> for PgPool {
 }
 
 pub struct QueueDeleteRequest {
-    pub path: String,
+    pub path: StackString,
 }
 
 #[async_trait]
 impl HandleRequest<QueueDeleteRequest> for PgPool {
-    type Result = Result<String, Error>;
+    type Result = Result<StackString, Error>;
     async fn handle(&self, msg: QueueDeleteRequest) -> Self::Result {
-        if path::Path::new(&msg.path).exists() {
+        if path::Path::new(msg.path.as_str()).exists() {
             MovieQueueDB::with_pool(&self)
-                .remove_from_queue_by_path(&msg.path)
+                .remove_from_queue_by_path(msg.path.as_str())
                 .await?;
         }
         Ok(msg.path)
@@ -65,15 +66,15 @@ impl HandleRequest<QueueDeleteRequest> for PgPool {
 }
 
 pub struct MovieQueueRequest {
-    pub patterns: Vec<String>,
+    pub patterns: Vec<StackString>,
 }
 
 #[async_trait]
 impl HandleRequest<MovieQueueRequest> for PgPool {
-    type Result = Result<(Vec<MovieQueueResult>, Vec<String>), Error>;
+    type Result = Result<(Vec<MovieQueueResult>, Vec<StackString>), Error>;
 
     async fn handle(&self, msg: MovieQueueRequest) -> Self::Result {
-        let patterns: Vec<_> = msg.patterns.iter().map(String::as_str).collect();
+        let patterns: Vec<_> = msg.patterns.iter().map(StackString::as_str).collect();
         let queue = MovieQueueDB::with_pool(&self)
             .print_movie_queue(&patterns)
             .await?;
@@ -97,22 +98,22 @@ impl HandleRequest<MoviePathRequest> for PgPool {
 }
 
 pub struct ImdbRatingsRequest {
-    pub imdb_url: String,
+    pub imdb_url: StackString,
 }
 
 #[async_trait]
 impl HandleRequest<ImdbRatingsRequest> for PgPool {
-    type Result = Result<Option<(String, ImdbRatings)>, Error>;
+    type Result = Result<Option<(StackString, ImdbRatings)>, Error>;
 
     async fn handle(&self, msg: ImdbRatingsRequest) -> Self::Result {
-        ImdbRatings::get_show_by_link(&msg.imdb_url, &self)
+        ImdbRatings::get_show_by_link(msg.imdb_url.as_str(), &self)
             .await
             .map(|s| s.map(|sh| (msg.imdb_url, sh)))
     }
 }
 
 pub struct ImdbSeasonsRequest {
-    pub show: String,
+    pub show: StackString,
 }
 
 #[async_trait]
@@ -124,7 +125,7 @@ impl HandleRequest<ImdbSeasonsRequest> for PgPool {
             Ok(Vec::new())
         } else {
             MovieCollection::with_pool(&self)?
-                .print_imdb_all_seasons(&msg.show)
+                .print_imdb_all_seasons(msg.show.as_str())
                 .await
         }
     }
@@ -132,22 +133,26 @@ impl HandleRequest<ImdbSeasonsRequest> for PgPool {
 
 pub struct WatchlistActionRequest {
     pub action: TraktActions,
-    pub imdb_url: String,
+    pub imdb_url: StackString,
 }
 
 #[async_trait]
 impl HandleRequest<WatchlistActionRequest> for PgPool {
-    type Result = Result<String, Error>;
+    type Result = Result<StackString, Error>;
 
     async fn handle(&self, msg: WatchlistActionRequest) -> Self::Result {
         match msg.action {
             TraktActions::Add => {
-                if let Some(show) = trakt_instance::get_watchlist_shows()?.get(&msg.imdb_url) {
+                if let Some(show) =
+                    trakt_instance::get_watchlist_shows()?.get(msg.imdb_url.as_str())
+                {
                     show.insert_show(&self).await?;
                 }
             }
             TraktActions::Remove => {
-                if let Some(show) = WatchListShow::get_show_by_link(&msg.imdb_url, &self).await? {
+                if let Some(show) =
+                    WatchListShow::get_show_by_link(msg.imdb_url.as_str(), &self).await?
+                {
                     show.delete_show(&self).await?;
                 }
             }
@@ -158,7 +163,7 @@ impl HandleRequest<WatchlistActionRequest> for PgPool {
 }
 
 pub struct WatchedShowsRequest {
-    pub show: String,
+    pub show: StackString,
     pub season: i32,
 }
 
@@ -167,12 +172,12 @@ impl HandleRequest<WatchedShowsRequest> for PgPool {
     type Result = Result<Vec<WatchedEpisode>, Error>;
 
     async fn handle(&self, msg: WatchedShowsRequest) -> Self::Result {
-        get_watched_shows_db(&self, &msg.show, Some(msg.season)).await
+        get_watched_shows_db(&self, msg.show.as_str(), Some(msg.season)).await
     }
 }
 
 pub struct ImdbEpisodesRequest {
-    pub show: String,
+    pub show: StackString,
     pub season: Option<i32>,
 }
 
@@ -182,13 +187,13 @@ impl HandleRequest<ImdbEpisodesRequest> for PgPool {
 
     async fn handle(&self, msg: ImdbEpisodesRequest) -> Self::Result {
         MovieCollection::with_pool(&self)?
-            .print_imdb_episodes(&msg.show, msg.season)
+            .print_imdb_episodes(msg.show.as_str(), msg.season)
             .await
     }
 }
 
 pub struct WatchedListRequest {
-    pub imdb_url: String,
+    pub imdb_url: StackString,
     pub season: i32,
 }
 
@@ -197,13 +202,13 @@ impl HandleRequest<WatchedListRequest> for PgPool {
     type Result = Result<String, Error>;
 
     async fn handle(&self, msg: WatchedListRequest) -> Self::Result {
-        watch_list_http_worker(&self, &msg.imdb_url, msg.season).await
+        watch_list_http_worker(&self, msg.imdb_url.as_str(), msg.season).await
     }
 }
 
 pub struct WatchedActionRequest {
     pub action: TraktActions,
-    pub imdb_url: String,
+    pub imdb_url: StackString,
     pub season: i32,
     pub episode: i32,
 }
@@ -213,7 +218,14 @@ impl HandleRequest<WatchedActionRequest> for PgPool {
     type Result = Result<String, Error>;
 
     async fn handle(&self, msg: WatchedActionRequest) -> Self::Result {
-        watched_action_http_worker(&self, msg.action, &msg.imdb_url, msg.season, msg.episode).await
+        watched_action_http_worker(
+            &self,
+            msg.action,
+            msg.imdb_url.as_str(),
+            msg.season,
+            msg.episode,
+        )
+        .await
     }
 }
 
@@ -223,14 +235,14 @@ pub struct ParseImdbRequest {
     pub database: Option<bool>,
     pub tv: Option<bool>,
     pub update: Option<bool>,
-    pub link: Option<String>,
+    pub link: Option<StackString>,
     pub season: Option<i32>,
 }
 
 impl From<ParseImdbRequest> for ParseImdbOptions {
     fn from(opts: ParseImdbRequest) -> Self {
         Self {
-            show: "".to_string(),
+            show: "".into(),
             tv: opts.tv.unwrap_or(false),
             imdb_link: opts.link,
             all_seasons: opts.all.unwrap_or(false),
@@ -242,7 +254,7 @@ impl From<ParseImdbRequest> for ParseImdbOptions {
 }
 
 pub struct ImdbShowRequest {
-    pub show: String,
+    pub show: StackString,
     pub query: ParseImdbRequest,
 }
 
@@ -281,7 +293,7 @@ impl HandleRequest<TraktCalRequest> for PgPool {
 #[derive(Serialize, Deserialize)]
 pub struct FindNewEpisodeRequest {
     pub source: Option<TvShowSource>,
-    pub shows: Option<String>,
+    pub shows: Option<StackString>,
 }
 
 #[async_trait]
@@ -382,7 +394,7 @@ impl HandleRequest<ImdbRatingsUpdateRequest> for PgPool {
 
     async fn handle(&self, msg: ImdbRatingsUpdateRequest) -> Self::Result {
         for show in msg.shows {
-            match ImdbRatings::get_show_by_link(&show.link, &self).await? {
+            match ImdbRatings::get_show_by_link(show.link.as_ref(), &self).await? {
                 Some(_) => show.update_show(&self).await?,
                 None => show.insert_show(&self).await?,
             }
@@ -404,10 +416,10 @@ impl HandleRequest<MovieQueueUpdateRequest> for PgPool {
         let mq = MovieQueueDB::with_pool(&self);
         let mc = MovieCollection::with_pool(&self)?;
         for entry in msg.queue {
-            let cidx = if let Some(i) = mc.get_collection_index(&entry.path).await? {
+            let cidx = if let Some(i) = mc.get_collection_index(entry.path.as_ref()).await? {
                 i
             } else {
-                mc.insert_into_collection_by_idx(entry.collection_idx, &entry.path)
+                mc.insert_into_collection_by_idx(entry.collection_idx, entry.path.as_ref())
                     .await?;
                 entry.collection_idx
             };
@@ -431,13 +443,13 @@ impl HandleRequest<MovieCollectionUpdateRequest> for PgPool {
     async fn handle(&self, msg: MovieCollectionUpdateRequest) -> Self::Result {
         let mc = MovieCollection::with_pool(&self)?;
         for entry in msg.collection {
-            if let Some(cidx) = mc.get_collection_index(&entry.path).await? {
+            if let Some(cidx) = mc.get_collection_index(entry.path.as_ref()).await? {
                 if cidx == entry.idx {
                     continue;
                 }
-                mc.remove_from_collection(&entry.path).await?;
+                mc.remove_from_collection(entry.path.as_ref()).await?;
             };
-            mc.insert_into_collection_by_idx(entry.idx, &entry.path)
+            mc.insert_into_collection_by_idx(entry.idx, entry.path.as_ref())
                 .await?;
         }
         Ok(())
@@ -446,7 +458,7 @@ impl HandleRequest<MovieCollectionUpdateRequest> for PgPool {
 
 #[derive(Serialize, Deserialize)]
 pub struct LastModifiedResponse {
-    pub table: String,
+    pub table: StackString,
     pub last_modified: DateTime<Utc>,
 }
 
@@ -469,7 +481,7 @@ impl HandleRequest<LastModifiedRequest> for PgPool {
             if let Some(row) = self.get().await?.query(query.as_str(), &[]).await?.get(0) {
                 let last_modified: DateTime<Utc> = row.try_get(0)?;
                 Ok(Some(LastModifiedResponse {
-                    table: (*table).to_string(),
+                    table: (*table).into(),
                     last_modified,
                 }))
             } else {

@@ -13,8 +13,12 @@ use std::{
 };
 
 use crate::{
-    config::Config, imdb_episodes::ImdbEpisodes, imdb_ratings::ImdbRatings,
-    movie_queue::MovieQueueDB, pgpool::PgPool,
+    config::Config,
+    imdb_episodes::ImdbEpisodes,
+    imdb_ratings::ImdbRatings,
+    movie_queue::MovieQueueDB,
+    pgpool::PgPool,
+    stack_string::StackString,
     stdout_channel::StdoutChannel,
     tv_show_source::TvShowSource,
     utils::{option_string_wrapper, parse_file_stem, walk_directory},
@@ -22,16 +26,16 @@ use crate::{
 
 #[derive(FromSqlRow)]
 pub struct NewEpisodesResult {
-    pub show: String,
-    pub link: String,
-    pub title: String,
+    pub show: StackString,
+    pub link: StackString,
+    pub title: StackString,
     pub season: i32,
     pub episode: i32,
-    pub epurl: String,
+    pub epurl: StackString,
     pub airdate: NaiveDate,
     pub rating: f64,
     pub eprating: f64,
-    pub eptitle: String,
+    pub eptitle: StackString,
 }
 
 impl fmt::Display for NewEpisodesResult {
@@ -55,10 +59,10 @@ impl fmt::Display for NewEpisodesResult {
 
 #[derive(Default, FromSqlRow)]
 pub struct TvShowsResult {
-    pub show: String,
-    pub link: String,
+    pub show: StackString,
+    pub link: StackString,
     pub count: i64,
-    pub title: String,
+    pub title: StackString,
     pub source: Option<TvShowSource>,
 }
 
@@ -80,22 +84,22 @@ impl fmt::Display for TvShowsResult {
 #[derive(Default, Serialize, Deserialize, FromSqlRow)]
 pub struct MovieCollectionRow {
     pub idx: i32,
-    pub path: String,
-    pub show: String,
+    pub path: StackString,
+    pub show: StackString,
 }
 
 #[derive(Default, FromSqlRow)]
 pub struct MovieCollectionResult {
-    pub path: String,
-    pub show: String,
+    pub path: StackString,
+    pub show: StackString,
     pub rating: f64,
-    pub title: String,
+    pub title: StackString,
     pub istv: bool,
     pub eprating: Option<f64>,
     pub season: Option<i32>,
     pub episode: Option<i32>,
-    pub eptitle: Option<String>,
-    pub epurl: Option<String>,
+    pub eptitle: Option<StackString>,
+    pub epurl: Option<StackString>,
 }
 
 impl fmt::Display for MovieCollectionResult {
@@ -126,8 +130,8 @@ impl fmt::Display for MovieCollectionResult {
 
 #[derive(Debug, Default, FromSqlRow)]
 pub struct ImdbSeason {
-    pub show: String,
-    pub title: String,
+    pub show: StackString,
+    pub title: StackString,
     pub season: i32,
     pub nepisodes: i64,
 }
@@ -169,7 +173,7 @@ impl Default for MovieCollection {
 impl MovieCollection {
     pub fn new() -> Self {
         let config = Config::with_config().expect("Init config failed");
-        let pool = PgPool::new(&config.pgurl);
+        let pool = PgPool::new(config.pgurl.as_str());
         let stdout = StdoutChannel::new();
         Self {
             pool,
@@ -228,9 +232,9 @@ impl MovieCollection {
             #[derive(FromSqlRow)]
             struct TempImdbRating {
                 index: i32,
-                show: String,
-                title: String,
-                link: String,
+                show: StackString,
+                title: StackString,
+                link: StackString,
                 rating: f64,
             }
 
@@ -342,16 +346,16 @@ impl MovieCollection {
             .collect()
     }
 
-    pub async fn search_movie_collection(
+    pub async fn search_movie_collection<T: AsRef<str>>(
         &self,
-        search_strs: &[String],
+        search_strs: &[T],
     ) -> Result<Vec<MovieCollectionResult>, Error> {
         #[derive(FromSqlRow)]
         struct SearchMovieCollection {
-            path: String,
-            show: String,
+            path: StackString,
+            show: StackString,
             rating: f64,
-            title: String,
+            title: StackString,
             istv: Option<bool>,
         }
 
@@ -370,7 +374,7 @@ impl MovieCollection {
             } else {
                 let search_strs: Vec<_> = search_strs
                     .iter()
-                    .map(|s| format!("a.path like '%{}%'", s))
+                    .map(|s| format!("a.path like '%{}%'", s.as_ref()))
                     .collect();
                 format!("WHERE {}", search_strs.join(" OR "))
             },
@@ -398,18 +402,18 @@ impl MovieCollection {
             .collect();
 
         let futures = results?.into_iter().map(|mut result| async {
-            let file_stem = Path::new(&result.path)
+            let file_stem = Path::new(result.path.as_str())
                 .file_stem()
                 .unwrap()
                 .to_string_lossy();
             let (show, season, episode) = parse_file_stem(&file_stem);
 
-            if season != -1 && episode != -1 && show == result.show {
+            if season != -1 && episode != -1 && show.as_str() == result.show.as_str() {
                 #[derive(FromSqlRow)]
                 struct TempImdbEpisodes {
                     eprating: Option<f64>,
-                    eptitle: Option<String>,
-                    epurl: Option<String>,
+                    eptitle: Option<StackString>,
+                    epurl: Option<StackString>,
                 }
 
                 let query = postgres_query::query!(
@@ -577,7 +581,7 @@ impl MovieCollection {
             .get_config()
             .movie_dirs
             .par_iter()
-            .map(|d| walk_directory(&d, &self.get_config().suffixes))
+            .map(|d| walk_directory(d.as_str(), &self.get_config().suffixes))
             .collect();
         let file_list = file_list?;
 
@@ -588,7 +592,7 @@ impl MovieCollection {
         let file_list: HashSet<_> = file_list.into_iter().flatten().collect();
         let file_list = Arc::new(file_list);
 
-        let episode_list: Result<HashSet<_>, Error> = file_list
+        let episode_list: Result<HashSet<(StackString, _, _, _)>, Error> = file_list
             .par_iter()
             .filter_map(|f| {
                 let res = || {
@@ -600,7 +604,7 @@ impl MovieCollection {
                     if season == -1 || episode == -1 {
                         Ok(None)
                     } else {
-                        Ok(Some((show, season, episode, f)))
+                        Ok(Some((show.into(), season, episode, f)))
                     }
                 };
                 res().transpose()
@@ -613,7 +617,7 @@ impl MovieCollection {
             FROM movie_queue a
             JOIN movie_collection b ON a.collection_idx=b.idx
         "#;
-        let movie_queue: Result<HashMap<String, i32>, Error> = self
+        let movie_queue: Result<HashMap<StackString, i32>, Error> = self
             .get_pool()
             .get()
             .await?
@@ -621,7 +625,7 @@ impl MovieCollection {
             .await?
             .iter()
             .map(|row| {
-                let path: String = row.try_get("path")?;
+                let path: StackString = row.try_get("path")?;
                 let idx: i32 = row.try_get("idx")?;
                 Ok((path, idx))
             })
@@ -629,7 +633,7 @@ impl MovieCollection {
         let movie_queue = Arc::new(movie_queue?);
 
         let query = "SELECT path, show FROM movie_collection";
-        let collection_map: Result<HashMap<String, String>, Error> = self
+        let collection_map: Result<HashMap<StackString, StackString>, Error> = self
             .get_pool()
             .get()
             .await?
@@ -637,15 +641,15 @@ impl MovieCollection {
             .await?
             .iter()
             .map(|row| {
-                let path: String = row.try_get("path")?;
-                let show: String = row.try_get("show")?;
+                let path: StackString = row.try_get("path")?;
+                let show: StackString = row.try_get("show")?;
                 Ok((path, show))
             })
             .collect();
         let collection_map = Arc::new(collection_map?);
 
         let query = "SELECT show, season, episode from imdb_episodes";
-        let episodes_set: Result<HashSet<(String, i32, i32)>, Error> = self
+        let episodes_set: Result<HashSet<(StackString, i32, i32)>, Error> = self
             .get_pool()
             .get()
             .await?
@@ -653,7 +657,7 @@ impl MovieCollection {
             .await?
             .iter()
             .map(|row| {
-                let show: String = row.try_get("show")?;
+                let show: StackString = row.try_get("show")?;
                 let season: i32 = row.try_get("season")?;
                 let episode: i32 = row.try_get("episode")?;
                 Ok((show, season, episode))
@@ -664,14 +668,16 @@ impl MovieCollection {
         let futures = file_list.iter().map(|f| {
             let collection_map = collection_map.clone();
             async move {
-                if collection_map.get(f).is_none() {
+                if collection_map.get(f.as_str()).is_none() {
                     let ext = Path::new(f)
                         .extension()
                         .map(OsStr::to_string_lossy)
                         .ok_or_else(|| format_err!("extension fail"))?
-                        .to_string();
+                        .to_string()
+                        .into();
                     if self.get_config().suffixes.contains(&ext) {
-                        self.stdout.send(format!("not in collection {}", f))?;
+                        self.stdout
+                            .send(format!("not in collection {}", f).into())?;
                         self.insert_into_collection(f).await?;
                     }
                 }
@@ -682,15 +688,17 @@ impl MovieCollection {
         results?;
 
         for (key, val) in collection_map.iter() {
-            if !file_list.contains(key) {
+            if !file_list.contains(key.as_str()) {
                 if let Some(v) = movie_queue.get(key) {
-                    self.stdout.send(format!("in queue but not disk {} {}", key, v))?;
+                    self.stdout
+                        .send(format!("in queue but not disk {} {}", key, v).into())?;
                     let mq = MovieQueueDB::with_pool(self.get_pool());
-                    mq.remove_from_queue_by_path(key).await?;
+                    mq.remove_from_queue_by_path(key.as_str()).await?;
                 } else {
-                    self.stdout.send(format!("not on disk {} {}", key, val))?;
+                    self.stdout
+                        .send(format!("not on disk {} {}", key, val).into())?;
                 }
-                self.remove_from_collection(key).await?;
+                self.remove_from_collection(key.as_str()).await?;
             }
         }
 
@@ -698,11 +706,13 @@ impl MovieCollection {
             let file_list = file_list.clone();
             let movie_queue = movie_queue.clone();
             async move {
-                if !file_list.contains(key) {
-                    if movie_queue.contains_key(key) {
-                        self.stdout.send(format!("in queue but not disk {}", key))?;
+                if !file_list.contains(key.as_str()) {
+                    if movie_queue.contains_key(key.as_str()) {
+                        self.stdout
+                            .send(format!("in queue but not disk {}", key).into())?;
                     } else {
-                        self.stdout.send(format!("not on disk {} {}", key, val))?;
+                        self.stdout
+                            .send(format!("not on disk {} {}", key, val).into())?;
                     }
                 }
                 Ok(())
@@ -711,10 +721,10 @@ impl MovieCollection {
         let results: Result<Vec<_>, Error> = try_join_all(futures).await;
         results?;
 
-        let shows_not_in_db: HashSet<_> = episode_list
+        let shows_not_in_db: HashSet<StackString> = episode_list
             .into_par_iter()
             .filter_map(|(show, season, episode, _)| {
-                let key = (show.to_string(), season, episode);
+                let key = (show.clone(), season, episode);
                 if episodes_set.contains(&key) {
                     None
                 } else {
@@ -724,20 +734,21 @@ impl MovieCollection {
             .collect();
 
         for show in shows_not_in_db {
-            self.stdout.send(format!("show has episode not in db {} ", show))?;
+            self.stdout
+                .send(format!("show has episode not in db {} ", show).into())?;
         }
         Ok(())
     }
 
-    pub async fn get_imdb_show_map(&self) -> Result<HashMap<String, ImdbRatings>, Error> {
+    pub async fn get_imdb_show_map(&self) -> Result<HashMap<StackString, ImdbRatings>, Error> {
         #[derive(FromSqlRow)]
         struct ImdbShowMap {
-            link: String,
-            show: String,
-            title: String,
+            link: StackString,
+            show: StackString,
+            title: StackString,
             rating: f64,
             istv: bool,
-            source: Option<String>,
+            source: Option<StackString>,
         }
 
         let query = r#"
@@ -756,12 +767,12 @@ impl MovieCollection {
                 let row = ImdbShowMap::from_row(row)?;
 
                 let source: Option<TvShowSource> = match row.source {
-                    Some(s) => s.parse().ok(),
+                    Some(s) => s.as_str().parse().ok(),
                     None => None,
                 };
 
                 Ok((
-                    row.link.to_string(),
+                    row.link.clone(),
                     ImdbRatings {
                         show: row.show,
                         title: Some(row.title),
@@ -855,10 +866,10 @@ impl MovieCollection {
             .collect()
     }
 
-    pub async fn find_new_episodes(
+    pub async fn find_new_episodes<T: AsRef<str>>(
         &self,
         source: Option<TvShowSource>,
-        shows: &[String],
+        shows: &[T],
     ) -> Result<Vec<NewEpisodesResult>, Error> {
         let mindate = Local::today() + Duration::days(-14);
         let maxdate = Local::today() + Duration::days(7);
@@ -871,7 +882,7 @@ impl MovieCollection {
             .get_new_episodes(mindate.naive_local(), maxdate.naive_local(), source)
             .await?;
         'outer: for epi in episodes {
-            let movie_queue = mq.print_movie_queue(&[&epi.show]).await?;
+            let movie_queue = mq.print_movie_queue(&[epi.show.as_str()]).await?;
             for s in movie_queue {
                 if let Some(show) = &s.show {
                     if let Some(season) = &s.season {
@@ -886,7 +897,7 @@ impl MovieCollection {
                     }
                 }
             }
-            if !shows.is_empty() && shows.iter().any(|s| &epi.show != s) {
+            if !shows.is_empty() && shows.iter().any(|s| epi.show.as_str() != s.as_ref()) {
                 continue;
             }
             output.push(epi);
@@ -917,9 +928,9 @@ impl MovieCollection {
     }
 }
 
-pub async fn find_new_episodes_http_worker(
+pub async fn find_new_episodes_http_worker<T: AsRef<str>>(
     pool: &PgPool,
-    shows: Option<String>,
+    shows: Option<T>,
     source: Option<TvShowSource>,
 ) -> Result<Vec<String>, Error> {
     let button_add = format!(
@@ -938,7 +949,7 @@ pub async fn find_new_episodes_http_worker(
 
     let mc = MovieCollection::with_pool(&pool)?;
     let shows_filter: Option<HashSet<String>> =
-        shows.map(|s| s.split(',').map(ToString::to_string).collect());
+        shows.map(|s| s.as_ref().split(',').map(ToString::to_string).collect());
 
     let mindate = (Local::today() + Duration::days(-14)).naive_local();
     let maxdate = (Local::today() + Duration::days(7)).naive_local();
@@ -969,12 +980,12 @@ pub async fn find_new_episodes_http_worker(
     for show in shows {
         let movie_queue = mq.print_movie_queue(&[&show]).await?;
         for s in movie_queue {
-            if let Some(u) = mc.get_collection_index(&s.path).await? {
+            if let Some(u) = mc.get_collection_index(s.path.as_str()).await? {
                 queue.push((
                     (
                         s.show
-                            .as_ref()
-                            .map_or_else(|| "".to_string(), ToString::to_string),
+                            .clone()
+                            .unwrap_or_else(|| "".into()),
                         s.season.unwrap_or(-1),
                         s.episode.unwrap_or(-1),
                     ),
@@ -984,12 +995,12 @@ pub async fn find_new_episodes_http_worker(
         }
     }
 
-    let queue: HashMap<(String, i32, i32), i32> = queue.into_iter().collect();
+    let queue: HashMap<(StackString, i32, i32), i32> = queue.into_iter().collect();
 
     let output = episodes
         .into_iter()
         .map(|epi| {
-            let key = (epi.show.to_string(), epi.season, epi.episode);
+            let key = (epi.show.clone(), epi.season, epi.episode);
             format!(
                 "<tr><td>{}</td><td>{}</td><td>{}</td><td>{}</td><td>{}</td>{}</tr>",
                 format!(
@@ -1011,8 +1022,8 @@ pub async fn find_new_episodes_http_worker(
                 format!("rating: {:0.1} / {:0.1}", epi.eprating, epi.rating,),
                 epi.airdate,
                 button_add
-                    .replace("SHOW", &epi.show)
-                    .replace("LINK", &epi.link)
+                    .replace("SHOW", epi.show.as_str())
+                    .replace("LINK", epi.link.as_str())
                     .replace("SEASON", &epi.season.to_string()),
             )
         })

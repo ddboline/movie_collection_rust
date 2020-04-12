@@ -16,7 +16,7 @@ async fn parse_imdb_parser() -> Result<(), Error> {
     let output = pi.parse_imdb_worker(&opts).await?;
 
     for line in output {
-        mc.stdout.send(line.join(" "))?;
+        mc.stdout.send(line.join(" ").into())?;
     }
     mc.stdout.close().await?;
     task.await?

@@ -4,6 +4,7 @@ use structopt::StructOpt;
 use tokio::task::spawn_blocking;
 
 use movie_collection_lib::{movie_collection::MovieCollection, utils::get_video_runtime};
+use movie_collection_lib::stack_string::StackString;
 
 #[derive(StructOpt)]
 /// Collection Query/Parser
@@ -19,7 +20,7 @@ struct MakeCollectionOpts {
     time: bool,
 
     /// Shows to display
-    shows: Vec<String>,
+    shows: Vec<StackString>,
 }
 
 async fn make_collection() -> Result<(), Error> {
@@ -38,16 +39,16 @@ async fn make_collection() -> Result<(), Error> {
         if do_time {
             let futures = shows.into_iter().map(|result| async move {
                 let path = result.path.clone();
-                let timeval = spawn_blocking(move || get_video_runtime(&path)).await??;
+                let timeval = spawn_blocking(move || get_video_runtime(path.as_str())).await??;
                 Ok((timeval, result))
             });
             let shows: Result<Vec<_>, Error> = try_join_all(futures).await;
             for (timeval, show) in shows? {
-                mc.stdout.send(format!("{} {}", timeval, show))?;
+                mc.stdout.send(format!("{} {}", timeval, show).into())?;
             }
         } else {
             for show in shows {
-                mc.stdout.send(show.to_string())?;
+                mc.stdout.send(show.to_string().into())?;
             }
         }
     }

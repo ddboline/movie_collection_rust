@@ -5,6 +5,7 @@ use movie_collection_lib::movie_collection::MovieCollection;
 use movie_collection_lib::trakt_utils::{
     sync_trakt_with_db, trakt_app_parse, TraktActions, TraktCommands,
 };
+use  movie_collection_lib::stack_string::StackString;
 
 #[derive(StructOpt)]
 /// Query and Parse Trakt.tv
@@ -22,7 +23,7 @@ struct TraktAppOpts {
     trakt_action: Option<TraktActions>,
 
     /// show
-    show: Option<String>,
+    show: Option<StackString>,
 
     /// season
     season: Option<i32>,
@@ -38,7 +39,7 @@ async fn trakt_app() -> Result<(), Error> {
 
     let trakt_command = opts.trakt_command.unwrap_or(TraktCommands::None);
     let trakt_action = opts.trakt_action.unwrap_or(TraktActions::None);
-    let show = opts.show.as_deref();
+    let show = opts.show.as_ref().map(StackString::as_str);
     let season = opts.season.unwrap_or(-1);
 
     let mc = MovieCollection::new();
