@@ -660,7 +660,7 @@ async fn trakt_cal_list(mc: &MovieCollection) -> Result<(), Error> {
             false
         } else {
             ImdbEpisodes {
-                show: show.clone().into(),
+                show: show.clone(),
                 season: cal.season,
                 episode: cal.episode,
                 ..ImdbEpisodes::default()
@@ -1069,7 +1069,7 @@ pub async fn trakt_cal_http_worker(pool: &PgPool) -> Result<Vec<String>, Error> 
             };
             let exists = if show.is_empty() {None} else {
                 let idx_opt = ImdbEpisodes {
-                    show: show.clone().into(),
+                    show: show.clone(),
                     season: cal.season,
                     episode: cal.episode,
                     ..ImdbEpisodes::default()

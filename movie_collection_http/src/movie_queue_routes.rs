@@ -618,10 +618,8 @@ pub async fn trakt_watched_seasons(
     let show_opt = s.db.handle(ImdbRatingsRequest { imdb_url }).await?;
     let empty = || ("".into(), "".into(), "".into());
     let (imdb_url, show, link) =
-        show_opt.map_or_else(empty, |(imdb_url, t)| (imdb_url, t.show.into(), t.link));
+        show_opt.map_or_else(empty, |(imdb_url, t)| (imdb_url, t.show, t.link));
     let entries = state.db.handle(ImdbSeasonsRequest { show }).await?;
-    let imdb_url: StackString = imdb_url.into();
-    let link: StackString = link.into();
     let entries = trakt_watched_seasons_worker(link.as_str(), imdb_url.as_str(), &entries)?;
     let resp = HttpResponse::Ok()
         .content_type("text/html; charset=utf-8")
