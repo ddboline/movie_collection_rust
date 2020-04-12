@@ -1,9 +1,11 @@
 use anyhow::Error;
 use structopt::StructOpt;
 
-use movie_collection_lib::make_queue::{make_queue_worker, PathOrIndex};
-use movie_collection_lib::stdout_channel::StdoutChannel;
-use movie_collection_lib::stack_string::StackString;
+use movie_collection_lib::{
+    make_queue::{make_queue_worker, PathOrIndex},
+    stack_string::StackString,
+    stdout_channel::StdoutChannel,
+};
 
 #[derive(StructOpt)]
 /// Manage Video Queue

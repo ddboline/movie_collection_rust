@@ -1,7 +1,6 @@
 use anyhow::Error;
 
-use movie_collection_lib::make_list::make_list;
-use movie_collection_lib::stdout_channel::StdoutChannel;
+use movie_collection_lib::{make_list::make_list, stdout_channel::StdoutChannel};
 
 #[tokio::main]
 async fn main() -> Result<(), Error> {

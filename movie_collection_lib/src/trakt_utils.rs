@@ -565,11 +565,12 @@ pub async fn sync_trakt_with_db(mc: &MovieCollection) -> Result<(), Error> {
     let results: Result<Vec<_>, Error> = try_join_all(futures).await;
     results?;
 
-    let watched_shows_db: HashMap<(StackString, i32, i32), _> = get_watched_shows_db(&mc.pool, "", None)
-        .await?
-        .into_iter()
-        .map(|s| ((s.imdb_url.clone(), s.season, s.episode), s))
-        .collect();
+    let watched_shows_db: HashMap<(StackString, i32, i32), _> =
+        get_watched_shows_db(&mc.pool, "", None)
+            .await?
+            .into_iter()
+            .map(|s| ((s.imdb_url.clone(), s.season, s.episode), s))
+            .collect();
     let watched_shows_db = Arc::new(watched_shows_db);
     let watched_shows = spawn_blocking(trakt_instance::get_watched_shows).await??;
     if watched_shows.is_empty() {

@@ -3,8 +3,9 @@ use futures::future::try_join_all;
 use structopt::StructOpt;
 use tokio::task::spawn_blocking;
 
-use movie_collection_lib::{movie_collection::MovieCollection, utils::get_video_runtime};
-use movie_collection_lib::stack_string::StackString;
+use movie_collection_lib::{
+    movie_collection::MovieCollection, stack_string::StackString, utils::get_video_runtime,
+};
 
 #[derive(StructOpt)]
 /// Collection Query/Parser

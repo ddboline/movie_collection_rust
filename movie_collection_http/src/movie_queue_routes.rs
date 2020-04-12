@@ -125,7 +125,12 @@ fn transcode_worker(
     let entries: Result<Vec<_>, Error> = entries
         .iter()
         .map(|entry| {
-            remcom_single_file(&path::Path::new(entry.path.as_str()), directory, false, &stdout)?;
+            remcom_single_file(
+                &path::Path::new(entry.path.as_str()),
+                directory,
+                false,
+                &stdout,
+            )?;
             Ok(format!("{}", entry))
         })
         .collect();

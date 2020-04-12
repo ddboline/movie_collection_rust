@@ -5,8 +5,10 @@ use postgres_query::FromSqlRow;
 use serde::{Deserialize, Serialize};
 use std::fmt;
 
-use crate::stack_string::StackString;
-use crate::{pgpool::PgPool, tv_show_source::TvShowSource, utils::option_string_wrapper};
+use crate::{
+    pgpool::PgPool, stack_string::StackString, tv_show_source::TvShowSource,
+    utils::option_string_wrapper,
+};
 
 #[derive(Default, Clone, Debug, Serialize, Deserialize, FromSqlRow)]
 pub struct ImdbRatings {

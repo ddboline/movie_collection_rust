@@ -2,8 +2,7 @@ use anyhow::Error;
 use std::path::PathBuf;
 use structopt::StructOpt;
 
-use movie_collection_lib::stdout_channel::StdoutChannel;
-use movie_collection_lib::utils::remcom_single_file;
+use movie_collection_lib::{stdout_channel::StdoutChannel, utils::remcom_single_file};
 
 #[derive(StructOpt)]
 /// Create script to copy files, push job to queue

@@ -18,9 +18,7 @@ use std::{
 use subprocess::{Exec, Redirection};
 use tokio::time::{delay_for, Duration};
 
-use crate::config::Config;
-use crate::stdout_channel::StdoutChannel;
-use crate::stack_string::StackString;
+use crate::{config::Config, stack_string::StackString, stdout_channel::StdoutChannel};
 
 #[inline]
 pub fn option_string_wrapper<T: AsRef<str>>(s: &Option<T>) -> &str {
@@ -151,7 +149,11 @@ pub fn read_transcode_jobs_from_queue(queue: &str) -> Result<(), Error> {
                     write!(output_file, "{}", line).unwrap();
                 }
 
-                rename(script.as_str(), &format!("{}/tmp_avi/{}", home_dir, file_name)).unwrap();
+                rename(
+                    script.as_str(),
+                    &format!("{}/tmp_avi/{}", home_dir, file_name),
+                )
+                .unwrap();
             }
         },
         queue,

@@ -983,9 +983,7 @@ pub async fn find_new_episodes_http_worker<T: AsRef<str>>(
             if let Some(u) = mc.get_collection_index(s.path.as_str()).await? {
                 queue.push((
                     (
-                        s.show
-                            .clone()
-                            .unwrap_or_else(|| "".into()),
+                        s.show.clone().unwrap_or_else(|| "".into()),
                         s.season.unwrap_or(-1),
                         s.episode.unwrap_or(-1),
                     ),

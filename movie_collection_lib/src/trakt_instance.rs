@@ -2,10 +2,10 @@ use anyhow::{format_err, Error};
 use cpython::{FromPyObject, PyResult, PyTuple, Python, PythonObject, ToPyObject};
 use std::collections::HashMap;
 
-use crate::trakt_utils::{
-    TraktCalEntryList, TraktResult, WatchListShow, WatchedEpisode, WatchedMovie,
+use crate::{
+    stack_string::StackString,
+    trakt_utils::{TraktCalEntryList, TraktResult, WatchListShow, WatchedEpisode, WatchedMovie},
 };
-use crate::stack_string::StackString;
 
 pub fn trakt_instance_call_noargs(py: Python, method: &str) -> PyResult<String> {
     let trakt_instance = py.import("trakt_instance.trakt_instance")?;

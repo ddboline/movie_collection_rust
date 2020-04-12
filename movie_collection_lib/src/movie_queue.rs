@@ -8,8 +8,10 @@ use std::{fmt, path::Path};
 
 use crate::{config::Config, movie_collection::MovieCollection, pgpool::PgPool};
 
-use crate::stack_string::StackString;
-use crate::utils::{option_string_wrapper, parse_file_stem};
+use crate::{
+    stack_string::StackString,
+    utils::{option_string_wrapper, parse_file_stem},
+};
 
 #[derive(Default, Serialize)]
 pub struct MovieQueueResult {

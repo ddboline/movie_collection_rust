@@ -1,11 +1,11 @@
 use anyhow::Error;
 use structopt::StructOpt;
 
-use movie_collection_lib::movie_collection::MovieCollection;
-use movie_collection_lib::trakt_utils::{
-    sync_trakt_with_db, trakt_app_parse, TraktActions, TraktCommands,
+use movie_collection_lib::{
+    movie_collection::MovieCollection,
+    stack_string::StackString,
+    trakt_utils::{sync_trakt_with_db, trakt_app_parse, TraktActions, TraktCommands},
 };
-use  movie_collection_lib::stack_string::StackString;
 
 #[derive(StructOpt)]
 /// Query and Parse Trakt.tv

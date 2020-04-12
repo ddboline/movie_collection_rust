@@ -4,9 +4,9 @@ use std::{collections::HashMap, path::Path};
 
 use crate::{
     config::Config,
+    stack_string::StackString,
     stdout_channel::StdoutChannel,
     utils::{get_video_runtime, walk_directory},
-    stack_string::StackString,
 };
 
 pub fn make_list(stdout: &StdoutChannel) -> Result<(), Error> {

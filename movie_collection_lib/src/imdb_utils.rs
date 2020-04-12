@@ -8,8 +8,10 @@ use select::{
 };
 use std::fmt;
 
-use crate::stack_string::StackString;
-use crate::utils::{option_string_wrapper, ExponentialRetry};
+use crate::{
+    stack_string::StackString,
+    utils::{option_string_wrapper, ExponentialRetry},
+};
 
 #[derive(Default)]
 pub struct ImdbTuple {

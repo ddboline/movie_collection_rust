@@ -4,8 +4,7 @@ use postgres_query::FromSqlRow;
 use serde::{Deserialize, Serialize};
 use std::fmt;
 
-use crate::pgpool::PgPool;
-use crate::stack_string::StackString;
+use crate::{pgpool::PgPool, stack_string::StackString};
 
 #[derive(Clone, Serialize, Deserialize, FromSqlRow)]
 pub struct ImdbEpisodes {

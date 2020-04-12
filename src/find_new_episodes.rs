@@ -1,8 +1,9 @@
 use anyhow::Error;
 use structopt::StructOpt;
 
-use movie_collection_lib::{movie_collection::MovieCollection, tv_show_source::TvShowSource};
-use movie_collection_lib::stack_string::StackString;
+use movie_collection_lib::{
+    movie_collection::MovieCollection, stack_string::StackString, tv_show_source::TvShowSource,
+};
 
 #[derive(StructOpt)]
 /// Query and Parse Video Collection
