@@ -40,7 +40,7 @@ async fn make_collection() -> Result<(), Error> {
         if do_time {
             let futures = shows.into_iter().map(|result| async move {
                 let path = result.path.clone();
-                let timeval = spawn_blocking(move || get_video_runtime(path.as_str())).await??;
+                let timeval = spawn_blocking(move || get_video_runtime(&path)).await??;
                 Ok((timeval, result))
             });
             let shows: Result<Vec<_>, Error> = try_join_all(futures).await;

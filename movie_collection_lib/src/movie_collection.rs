@@ -173,7 +173,7 @@ impl Default for MovieCollection {
 impl MovieCollection {
     pub fn new() -> Self {
         let config = Config::with_config().expect("Init config failed");
-        let pool = PgPool::new(config.pgurl.as_str());
+        let pool = PgPool::new(&config.pgurl);
         let stdout = StdoutChannel::new();
         Self {
             pool,
@@ -581,7 +581,7 @@ impl MovieCollection {
             .get_config()
             .movie_dirs
             .par_iter()
-            .map(|d| walk_directory(d.as_str(), &self.get_config().suffixes))
+            .map(|d| walk_directory(&d, &self.get_config().suffixes))
             .collect();
         let file_list = file_list?;
 
@@ -693,12 +693,12 @@ impl MovieCollection {
                     self.stdout
                         .send(format!("in queue but not disk {} {}", key, v).into())?;
                     let mq = MovieQueueDB::with_pool(self.get_pool());
-                    mq.remove_from_queue_by_path(key.as_str()).await?;
+                    mq.remove_from_queue_by_path(&key).await?;
                 } else {
                     self.stdout
                         .send(format!("not on disk {} {}", key, val).into())?;
                 }
-                self.remove_from_collection(key.as_str()).await?;
+                self.remove_from_collection(&key).await?;
             }
         }
 
@@ -767,7 +767,7 @@ impl MovieCollection {
                 let row = ImdbShowMap::from_row(row)?;
 
                 let source: Option<TvShowSource> = match row.source {
-                    Some(s) => s.as_str().parse().ok(),
+                    Some(s) => s.parse().ok(),
                     None => None,
                 };
 
@@ -980,7 +980,7 @@ pub async fn find_new_episodes_http_worker<T: AsRef<str>>(
     for show in shows {
         let movie_queue = mq.print_movie_queue(&[&show]).await?;
         for s in movie_queue {
-            if let Some(u) = mc.get_collection_index(s.path.as_str()).await? {
+            if let Some(u) = mc.get_collection_index(&s.path).await? {
                 queue.push((
                     (
                         s.show.clone().unwrap_or_else(|| "".into()),
@@ -1020,8 +1020,8 @@ pub async fn find_new_episodes_http_worker<T: AsRef<str>>(
                 format!("rating: {:0.1} / {:0.1}", epi.eprating, epi.rating,),
                 epi.airdate,
                 button_add
-                    .replace("SHOW", epi.show.as_str())
-                    .replace("LINK", epi.link.as_str())
+                    .replace("SHOW", &epi.show)
+                    .replace("LINK", &epi.link)
                     .replace("SEASON", &epi.season.to_string()),
             )
         })

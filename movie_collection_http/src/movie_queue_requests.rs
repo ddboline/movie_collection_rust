@@ -58,7 +58,7 @@ impl HandleRequest<QueueDeleteRequest> for PgPool {
     async fn handle(&self, msg: QueueDeleteRequest) -> Self::Result {
         if path::Path::new(msg.path.as_str()).exists() {
             MovieQueueDB::with_pool(&self)
-                .remove_from_queue_by_path(msg.path.as_str())
+                .remove_from_queue_by_path(&msg.path)
                 .await?;
         }
         Ok(msg.path)
@@ -106,7 +106,7 @@ impl HandleRequest<ImdbRatingsRequest> for PgPool {
     type Result = Result<Option<(StackString, ImdbRatings)>, Error>;
 
     async fn handle(&self, msg: ImdbRatingsRequest) -> Self::Result {
-        ImdbRatings::get_show_by_link(msg.imdb_url.as_str(), &self)
+        ImdbRatings::get_show_by_link(&msg.imdb_url, &self)
             .await
             .map(|s| s.map(|sh| (msg.imdb_url, sh)))
     }
@@ -121,11 +121,11 @@ impl HandleRequest<ImdbSeasonsRequest> for PgPool {
     type Result = Result<Vec<ImdbSeason>, Error>;
 
     async fn handle(&self, msg: ImdbSeasonsRequest) -> Self::Result {
-        if msg.show.as_str() == "" {
+        if &msg.show == "" {
             Ok(Vec::new())
         } else {
             MovieCollection::with_pool(&self)?
-                .print_imdb_all_seasons(msg.show.as_str())
+                .print_imdb_all_seasons(&msg.show)
                 .await
         }
     }
@@ -143,16 +143,12 @@ impl HandleRequest<WatchlistActionRequest> for PgPool {
     async fn handle(&self, msg: WatchlistActionRequest) -> Self::Result {
         match msg.action {
             TraktActions::Add => {
-                if let Some(show) =
-                    trakt_instance::get_watchlist_shows()?.get(msg.imdb_url.as_str())
-                {
+                if let Some(show) = trakt_instance::get_watchlist_shows()?.get(&msg.imdb_url) {
                     show.insert_show(&self).await?;
                 }
             }
             TraktActions::Remove => {
-                if let Some(show) =
-                    WatchListShow::get_show_by_link(msg.imdb_url.as_str(), &self).await?
-                {
+                if let Some(show) = WatchListShow::get_show_by_link(&msg.imdb_url, &self).await? {
                     show.delete_show(&self).await?;
                 }
             }
@@ -172,7 +168,7 @@ impl HandleRequest<WatchedShowsRequest> for PgPool {
     type Result = Result<Vec<WatchedEpisode>, Error>;
 
     async fn handle(&self, msg: WatchedShowsRequest) -> Self::Result {
-        get_watched_shows_db(&self, msg.show.as_str(), Some(msg.season)).await
+        get_watched_shows_db(&self, &msg.show, Some(msg.season)).await
     }
 }
 
@@ -187,7 +183,7 @@ impl HandleRequest<ImdbEpisodesRequest> for PgPool {
 
     async fn handle(&self, msg: ImdbEpisodesRequest) -> Self::Result {
         MovieCollection::with_pool(&self)?
-            .print_imdb_episodes(msg.show.as_str(), msg.season)
+            .print_imdb_episodes(&msg.show, msg.season)
             .await
     }
 }
@@ -202,7 +198,7 @@ impl HandleRequest<WatchedListRequest> for PgPool {
     type Result = Result<String, Error>;
 
     async fn handle(&self, msg: WatchedListRequest) -> Self::Result {
-        watch_list_http_worker(&self, msg.imdb_url.as_str(), msg.season).await
+        watch_list_http_worker(&self, &msg.imdb_url, msg.season).await
     }
 }
 
@@ -218,14 +214,7 @@ impl HandleRequest<WatchedActionRequest> for PgPool {
     type Result = Result<String, Error>;
 
     async fn handle(&self, msg: WatchedActionRequest) -> Self::Result {
-        watched_action_http_worker(
-            &self,
-            msg.action,
-            msg.imdb_url.as_str(),
-            msg.season,
-            msg.episode,
-        )
-        .await
+        watched_action_http_worker(&self, msg.action, &msg.imdb_url, msg.season, msg.episode).await
     }
 }
 

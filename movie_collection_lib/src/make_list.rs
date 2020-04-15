@@ -39,7 +39,7 @@ pub fn make_list(stdout: &StdoutChannel) -> Result<(), Error> {
     let file_list: Result<Vec<_>, Error> = config
         .movie_dirs
         .par_iter()
-        .map(|d| walk_directory(d.as_str(), &local_file_list))
+        .map(|d| walk_directory(&d, &local_file_list))
         .collect();
 
     let mut file_list: Vec<_> = file_list?.into_iter().flatten().collect();

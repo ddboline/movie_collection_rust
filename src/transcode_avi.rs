@@ -36,11 +36,7 @@ async fn transcode_avi() -> Result<(), Error> {
         }
         create_transcode_script(&config, &path).and_then(|s| {
             stdout.send(format!("script {}", s).into())?;
-            publish_transcode_job_to_queue(
-                &s,
-                config.transcode_queue.as_str(),
-                config.transcode_queue.as_str(),
-            )
+            publish_transcode_job_to_queue(&s, &config.transcode_queue, &config.transcode_queue)
         })?;
     }
     stdout.close().await?;

@@ -65,7 +65,7 @@ pub async fn make_queue_worker(
             let results: Result<Vec<_>, Error> = movie_queue
                 .into_par_iter()
                 .map(|result| {
-                    let timeval = get_video_runtime(result.path.as_str())?;
+                    let timeval = get_video_runtime(&result.path)?;
                     Ok((timeval, result))
                 })
                 .collect();
@@ -145,7 +145,7 @@ pub async fn movie_queue_http(queue: &[MovieQueueResult]) -> Result<Vec<String>,
         let (_, season, episode) = parse_file_stem(&file_stem);
 
         let entry = if ext == "mp4" {
-            let collection_idx = mc.get_collection_index(row.path.as_str()).await?.unwrap_or(-1);
+            let collection_idx = mc.get_collection_index(&row.path).await?.unwrap_or(-1);
             format!(
                 r#"<a href="javascript:updateMainArticle('{}');">{}</a>"#,
                 &format!("{}/{}", "/list/play", collection_idx),
@@ -179,7 +179,7 @@ pub async fn movie_queue_http(queue: &[MovieQueueResult]) -> Result<Vec<String>,
                 entry, file_name, file_name
             )
         } else {
-            let entries: Vec<_> = row.path.as_str().split('/').collect();
+            let entries: Vec<_> = row.path.split('/').collect();
             let len_entries = entries.len();
             let directory = entries[len_entries - 2];
             format!(

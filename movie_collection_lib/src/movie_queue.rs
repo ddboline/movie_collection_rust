@@ -51,7 +51,7 @@ impl MovieQueueDB {
     pub fn new() -> Self {
         let config = Config::with_config().expect("Init config failed");
         Self {
-            pool: PgPool::new(config.pgurl.as_str()),
+            pool: PgPool::new(&config.pgurl),
         }
     }
 

@@ -247,7 +247,7 @@ impl ImdbConnection {
 
         let futures = results.into_iter().map(|mut result| async {
             if let Some(link) = result.epurl.as_ref() {
-                let r = self.parse_imdb_rating(link.as_str()).await?;
+                let r = self.parse_imdb_rating(&link).await?;
                 result.rating = r.rating;
                 result.nrating = r.count;
             }

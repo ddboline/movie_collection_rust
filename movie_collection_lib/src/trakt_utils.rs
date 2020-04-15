@@ -240,7 +240,7 @@ pub async fn get_watchlist_shows_db_map(pool: &PgPool) -> Result<WatchListMap, E
             let row = WatchlistShowDbMap::from_row(row)?;
 
             let source: Option<TvShowSource> = match row.source {
-                Some(s) => s.as_str().parse().ok(),
+                Some(s) => s.parse().ok(),
                 None => None,
             };
 
@@ -653,7 +653,7 @@ async fn get_imdb_url_from_show(
 async fn trakt_cal_list(mc: &MovieCollection) -> Result<(), Error> {
     let cal_entries = spawn_blocking(trakt_instance::get_calendar).await??;
     for cal in cal_entries {
-        let show = match ImdbRatings::get_show_by_link(cal.link.as_str(), &mc.pool).await? {
+        let show = match ImdbRatings::get_show_by_link(&cal.link, &mc.pool).await? {
             Some(s) => s.show,
             None => "".into(),
         };
@@ -750,8 +750,7 @@ async fn watched_add(
             }
         } else {
             let imdb_url_ = imdb_url.clone();
-            spawn_blocking(move || trakt_instance::add_movie_to_watched(imdb_url_.as_str()))
-                .await??;
+            spawn_blocking(move || trakt_instance::add_movie_to_watched(&imdb_url_)).await??;
             WatchedMovie {
                 imdb_url: imdb_url.into(),
                 title: "".into(),
@@ -876,12 +875,11 @@ pub async fn watch_list_http_worker(
         .await?
         .ok_or_else(|| format_err!("Show Doesn't exist"))?;
 
-    let watched_episodes_db: HashSet<i32> =
-        get_watched_shows_db(&pool, show.show.as_str(), Some(season))
-            .await?
-            .into_iter()
-            .map(|s| s.episode)
-            .collect();
+    let watched_episodes_db: HashSet<i32> = get_watched_shows_db(&pool, &show.show, Some(season))
+        .await?
+        .into_iter()
+        .map(|s| s.episode)
+        .collect();
 
     let queue: HashMap<(StackString, i32, i32), _> = mq
         .print_movie_queue(&[show.show.as_str()])
@@ -899,14 +897,12 @@ pub async fn watch_list_http_worker(
         })
         .collect();
 
-    let entries: Vec<_> = mc
-        .print_imdb_episodes(show.show.as_str(), Some(season))
-        .await?;
+    let entries: Vec<_> = mc.print_imdb_episodes(&show.show, Some(season)).await?;
 
     let mut collection_idx_map = HashMap::new();
     for r in &entries {
         if let Some(row) = queue.get(&(show.show.clone(), season, r.episode)) {
-            if let Some(index) = mc.get_collection_index(row.path.as_str()).await? {
+            if let Some(index) = mc.get_collection_index(&row.path).await? {
                 collection_idx_map.insert(r.episode, index);
             }
         }
@@ -941,12 +937,12 @@ pub async fn watch_list_http_worker(
                 s.airdate,
                 if watched_episodes_db.contains(&s.episode) {
                     button_rm
-                        .replace("SHOW", show.link.as_str())
+                        .replace("SHOW", &show.link)
                         .replace("SEASON", &season.to_string())
                         .replace("EPISODE", &s.episode.to_string())
                 } else {
                     button_add
-                        .replace("SHOW", show.link.as_str())
+                        .replace("SHOW", &show.link)
                         .replace("SEASON", &season.to_string())
                         .replace("EPISODE", &s.episode.to_string())
                 }
@@ -1064,7 +1060,7 @@ pub async fn trakt_cal_http_worker(pool: &PgPool) -> Result<Vec<String>, Error> 
     let results: Vec<_> = cal_list
         .into_iter()
         .map(|cal| async {
-            let show = match ImdbRatings::get_show_by_link(cal.link.as_str(), &pool).await? {
+            let show = match ImdbRatings::get_show_by_link(&cal.link, &pool).await? {
                 Some(s) => s.show,
                 None => "".into(),
             };
@@ -1109,8 +1105,8 @@ pub async fn trakt_cal_http_worker(pool: &PgPool) -> Result<Vec<String>, Error> 
                 cal.airdate,
                 if exists.is_some() {"".to_string()} else {
                     button_add
-                        .replace("SHOW", show.as_str())
-                        .replace("LINK", cal.link.as_str())
+                        .replace("SHOW", &show)
+                        .replace("LINK", &cal.link)
                         .replace("SEASON", &cal.season.to_string())
                 },
             );

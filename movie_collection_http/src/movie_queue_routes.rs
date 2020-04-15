@@ -486,9 +486,9 @@ fn process_shows(
                     "".to_string()
                 },
                 if has_watchlist {
-                    button_rm.replace("SHOW", item.link.as_str())
+                    button_rm.replace("SHOW", &item.link)
                 } else {
-                    button_add.replace("SHOW", item.link.as_str())
+                    button_add.replace("SHOW", &item.link)
                 },
             )
         })
@@ -566,11 +566,11 @@ pub async fn trakt_watchlist_action(
     state: Data<AppState>,
 ) -> Result<HttpResponse, Error> {
     let (action, imdb_url) = path.into_inner();
-    let action = action.as_str().parse().expect("impossible");
+    let action = action.parse().expect("impossible");
 
     let req = WatchlistActionRequest { action, imdb_url };
     let imdb_url = state.db.handle(req).await?;
-    watchlist_action_worker(action, imdb_url.as_str())
+    watchlist_action_worker(action, &imdb_url)
 }
 
 fn trakt_watched_seasons_worker(
@@ -596,7 +596,7 @@ fn trakt_watched_seasons_worker(
                 s.season,
                 s.nepisodes,
                 button_add
-                    .replace("SHOW", s.show.as_str())
+                    .replace("SHOW", &s.show)
                     .replace("LINK", &link)
                     .replace("SEASON", &s.season.to_string())
             )
@@ -625,7 +625,7 @@ pub async fn trakt_watched_seasons(
     let (imdb_url, show, link) =
         show_opt.map_or_else(empty, |(imdb_url, t)| (imdb_url, t.show, t.link));
     let entries = state.db.handle(ImdbSeasonsRequest { show }).await?;
-    let entries = trakt_watched_seasons_worker(link.as_str(), imdb_url.as_str(), &entries)?;
+    let entries = trakt_watched_seasons_worker(&link, &imdb_url, &entries)?;
     let resp = HttpResponse::Ok()
         .content_type("text/html; charset=utf-8")
         .body(entries);
@@ -652,7 +652,7 @@ pub async fn trakt_watched_action(
     let (action, imdb_url, season, episode) = path.into_inner();
 
     let req = WatchedActionRequest {
-        action: action.as_str().parse().expect("impossible"),
+        action: action.parse().expect("impossible"),
         imdb_url,
         season,
         episode,

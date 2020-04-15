@@ -59,7 +59,7 @@ impl ParseImdb {
     ) -> Result<Vec<Vec<String>>, Error> {
         let shows: Vec<_> = if let Some(ilink) = &opts.imdb_link {
             self.mc
-                .print_imdb_shows(opts.show.as_str(), opts.tv)
+                .print_imdb_shows(&opts.show, opts.tv)
                 .await?
                 .into_iter()
                 .filter_map(|s| {
@@ -72,7 +72,7 @@ impl ParseImdb {
                 .collect()
         } else {
             self.mc
-                .print_imdb_shows(opts.show.as_str(), opts.tv)
+                .print_imdb_shows(&opts.show, opts.tv)
                 .await?
                 .into_iter()
                 .map(|s| (s.link.clone(), s))
@@ -92,7 +92,7 @@ impl ParseImdb {
         let episodes: Option<Vec<_>> = if opts.tv {
             if opts.all_seasons {
                 if !opts.do_update {
-                    let seasons = self.mc.print_imdb_all_seasons(opts.show.as_str()).await?;
+                    let seasons = self.mc.print_imdb_all_seasons(&opts.show).await?;
                     for s in seasons {
                         output.push(s.get_string_vec());
                     }
@@ -101,7 +101,7 @@ impl ParseImdb {
             } else {
                 let r = self
                     .mc
-                    .print_imdb_episodes(opts.show.as_str(), opts.season)
+                    .print_imdb_episodes(&opts.show, opts.season)
                     .await?
                     .into_iter()
                     .map(|e| ((e.season, e.episode), e))
@@ -137,9 +137,7 @@ impl ParseImdb {
         output: &mut Vec<Vec<String>>,
     ) -> Result<(), Error> {
         let imdb_conn = ImdbConnection::new();
-        let results = imdb_conn
-            .parse_imdb(&opts.show.as_str().replace("_", " "))
-            .await?;
+        let results = imdb_conn.parse_imdb(&opts.show.replace("_", " ")).await?;
         let results = if let Some(ilink) = &opts.imdb_link {
             results
                 .into_iter()
@@ -173,8 +171,8 @@ impl ParseImdb {
                         }
                     } else {
                         output.push(vec![format!("not exists {} {}", opts.show, result)]);
-                        let istv = result.title.as_str().contains("TV Series")
-                            || result.title.as_str().contains("TV Mini-Series");
+                        let istv = result.title.contains("TV Series")
+                            || result.title.contains("TV Mini-Series");
 
                         ImdbRatings {
                             show: opts.show.clone(),
@@ -196,7 +194,7 @@ impl ParseImdb {
             output.push(vec![format!("Using {}", link)]);
             if let Some(result) = shows.get(&link) {
                 let episode_list = imdb_conn
-                    .parse_imdb_episode_list(link.as_str(), opts.season)
+                    .parse_imdb_episode_list(&link, opts.season)
                     .await?;
                 for episode in episode_list {
                     output.push(vec![format!("{} {}", result, episode)]);
@@ -284,9 +282,9 @@ impl ParseImdb {
                     "<tr><td>{}</td><td>{}</td></tr>",
                     tmp.join("</td><td>"),
                     if watchlist.contains_key(&imdb_url) {
-                        button_rm.replace("SHOW", imdb_url.as_str())
+                        button_rm.replace("SHOW", &imdb_url)
                     } else {
-                        button_add.replace("SHOW", imdb_url.as_str())
+                        button_add.replace("SHOW", &imdb_url)
                     }
                 )
             })
