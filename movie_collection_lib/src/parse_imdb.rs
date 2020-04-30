@@ -270,7 +270,7 @@ impl ParseImdb {
                         if i.starts_with("tt") {
                             imdb_url = i.into();
                             format!(
-                                r#"<a href="https://www.imdb.com/title/{}">{}</a>"#,
+                                r#"<a href="https://www.imdb.com/title/{}" target="_blank">{}</a>"#,
                                 imdb_url, imdb_url
                             )
                         } else {

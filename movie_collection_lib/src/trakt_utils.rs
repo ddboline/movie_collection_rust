@@ -926,7 +926,7 @@ pub async fn watch_list_http_worker(
                 show.show,
                 entry,
                 format!(
-                    r#"<a href="https://www.imdb.com/title/{}">s{} ep{}</a>"#,
+                    r#"<a href="https://www.imdb.com/title/{}" target="_blank">s{} ep{}</a>"#,
                     s.epurl, season, s.episode,
                 ),
                 format!(
@@ -1086,17 +1086,17 @@ pub async fn trakt_cal_http_worker(pool: &PgPool) -> Result<Vec<String>, Error> 
                     cal.link, cal.season, cal.show,
                 ),
                 format!(
-                    r#"<a href="https://www.imdb.com/title/{}">imdb</a>"#,
+                    r#"<a href="https://www.imdb.com/title/{}" target="_blank">imdb</a>"#,
                     cal.link
                 ),
                 if let Some(link) = cal.ep_link {
                     format!(
-                        r#"<a href="https://www.imdb.com/title/{}">{} {}</a>"#,
+                        r#"<a href="https://www.imdb.com/title/{}" target="_blank">{} {}</a>"#,
                         link, cal.season, cal.episode,
                     )
                 } else if let Some(link) = exists.as_ref() {
                     format!(
-                        r#"<a href="https://www.imdb.com/title/{}">{} {}</a>"#,
+                        r#"<a href="https://www.imdb.com/title/{}" target="_blank">{} {}</a>"#,
                         link, cal.season, cal.episode,
                     )
                 } else {

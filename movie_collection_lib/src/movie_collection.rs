@@ -1014,7 +1014,7 @@ pub async fn find_new_episodes_http_worker<T: AsRef<str>>(
                     None => epi.eptitle.to_string(),
                 },
                 format!(
-                    r#"<a href="https://www.imdb.com/title/{}">s{} ep{}</a>"#,
+                    r#"<a href="https://www.imdb.com/title/{}" target="_blank">s{} ep{}</a>"#,
                     epi.epurl, epi.season, epi.episode
                 ),
                 format!("rating: {:0.1} / {:0.1}", epi.eprating, epi.rating,),

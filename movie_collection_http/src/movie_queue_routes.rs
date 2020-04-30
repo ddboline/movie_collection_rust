@@ -464,7 +464,7 @@ fn process_shows(
             let has_watchlist = watchlist_keys.contains(&item.link);
             format!(
                 r#"<tr><td>{}</td>
-                <td><a href="https://www.imdb.com/title/{}">imdb</a></td><td>{}</td><td>{}</td><td>{}</td></tr>"#,
+                <td><a href="https://www.imdb.com/title/{}" target="_blank">imdb</a></td><td>{}</td><td>{}</td><td>{}</td></tr>"#,
                 if tvshow_keys.contains(&item.link) {
                     format!(r#"<a href="javascript:updateMainArticle('/list/{}')">{}</a>"#, item.show, item.title)
                 } else {
@@ -475,9 +475,9 @@ fn process_shows(
                 },
                 item.link,
                 match item.source {
-                    Some(TvShowSource::Netflix) => r#"<a href="https://netflix.com">netflix</a>"#,
-                    Some(TvShowSource::Hulu) => r#"<a href="https://hulu.com">hulu</a>"#,
-                    Some(TvShowSource::Amazon) => r#"<a href="https://amazon.com">amazon</a>"#,
+                    Some(TvShowSource::Netflix) => r#"<a href="https://netflix.com" target="_blank">netflix</a>"#,
+                    Some(TvShowSource::Hulu) => r#"<a href="https://hulu.com" target="_blank">hulu</a>"#,
+                    Some(TvShowSource::Amazon) => r#"<a href="https://amazon.com" target="_blank">amazon</a>"#,
                     _ => "",
                 },
                 if has_watchlist {
@@ -511,7 +511,7 @@ fn watchlist_worker(
         .map(|(title, link, source)| {
             format!(
                 r#"<tr><td>{}</td>
-            <td><a href="https://www.imdb.com/title/{}">imdb</a> {} </tr>"#,
+            <td><a href="https://www.imdb.com/title/{}" target="_blank">imdb</a> {} </tr>"#,
                 format!(
                     r#"<a href="javascript:updateMainArticle('/list/trakt/watched/list/{}')">{}</a>"#,
                     link, title
@@ -519,10 +519,10 @@ fn watchlist_worker(
                 link,
                 match source {
                     Some(TvShowSource::Netflix) => {
-                        r#"<td><a href="https://netflix.com">netflix</a>"#
+                        r#"<td><a href="https://netflix.com" target="_blank">netflix</a>"#
                     }
-                    Some(TvShowSource::Hulu) => r#"<td><a href="https://hulu.com">netflix</a>"#,
-                    Some(TvShowSource::Amazon) => r#"<td><a href="https://amazon.com">netflix</a>"#,
+                    Some(TvShowSource::Hulu) => r#"<td><a href="https://hulu.com" target="_blank">netflix</a>"#,
+                    Some(TvShowSource::Amazon) => r#"<td><a href="https://amazon.com" target="_blank">netflix</a>"#,
                     _ => "",
                 },
             )
