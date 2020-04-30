@@ -66,7 +66,7 @@ fn movie_queue_body(patterns: &[StackString], entries: &[String]) -> String {
         r#"{}<a href="javascript:updateMainArticle('{}')">Watch List</a><table border="0">{}</table>"#,
         previous,
         watchlist_url,
-        entries.join("\n")
+        entries.join("")
     );
 
     entries
@@ -416,7 +416,7 @@ fn tvshows_worker(res1: TvShowsMap, tvshows: Vec<TvShowsResult>) -> Result<Strin
     let entries = format!(
         r#"{}<table border="0">{}</table>"#,
         previous,
-        shows.join("\n")
+        shows.join("")
     );
 
     Ok(entries)
