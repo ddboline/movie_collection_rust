@@ -157,7 +157,7 @@ pub async fn movie_queue_http(queue: &[MovieQueueResult]) -> Result<Vec<String>,
 
         let entry = if let Some(link) = row.link.as_ref() {
             format!(
-                r#"<tr>\n<td>{}</td>\n<td><a href={} target="_blank">imdb</a></td>"#,
+                r#"<tr><td>{}</td><td><a href={} target="_blank">imdb</a></td>"#,
                 entry,
                 &format!("https://www.imdb.com/title/{}", link)
             )

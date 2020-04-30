@@ -136,7 +136,7 @@ fn transcode_worker(
         .collect();
     let resp = HttpResponse::Ok()
         .content_type("text/html; charset=utf-8")
-        .body(entries?.join("\n"));
+        .body(entries?.join(""));
     Ok(resp)
 }
 
@@ -244,7 +244,7 @@ fn new_episode_worker(entries: &[String]) -> Result<HttpResponse, Error> {
     let entries = format!(
         r#"{}<table border="0">{}</table>"#,
         previous,
-        entries.join("\n")
+        entries.join("")
     );
     let resp = HttpResponse::Ok()
         .content_type("text/html; charset=utf-8")
@@ -533,7 +533,7 @@ fn watchlist_worker(
     let entries = format!(
         r#"{}<table border="0">{}</table>"#,
         previous,
-        shows.join("\n")
+        shows.join("")
     );
 
     let resp = HttpResponse::Ok()
@@ -608,7 +608,7 @@ fn trakt_watched_seasons_worker(
     let entries = format!(
         r#"{}<table border="0">{}</table>"#,
         previous,
-        entries.join("\n")
+        entries.join("")
     );
     Ok(entries)
 }
@@ -666,7 +666,7 @@ fn trakt_cal_worker(entries: &[String]) -> Result<HttpResponse, Error> {
     let entries = format!(
         r#"{}<table border="0">{}</table>"#,
         previous,
-        entries.join("\n")
+        entries.join("")
     );
     let resp = HttpResponse::Ok()
         .content_type("text/html; charset=utf-8")
