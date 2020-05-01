@@ -252,6 +252,7 @@ impl MovieQueueDB {
                 JOIN movie_collection b ON a.collection_idx = b.idx
                 LEFT JOIN imdb_ratings c ON b.show_id = c.index
                 {}
+                ORDER BY a.idx
             "#,
             if patterns.is_empty() {
                 "".to_string()
