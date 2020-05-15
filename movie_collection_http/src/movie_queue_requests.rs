@@ -4,6 +4,7 @@ use chrono::{DateTime, Utc};
 use futures::future::try_join_all;
 use serde::{Deserialize, Serialize};
 use std::path;
+use lazy_static::lazy_static;
 
 use super::HandleRequest;
 use movie_collection_lib::{
@@ -17,13 +18,14 @@ use movie_collection_lib::{
     parse_imdb::{ParseImdb, ParseImdbOptions},
     pgpool::PgPool,
     stack_string::StackString,
-    trakt_instance,
     trakt_utils::{
         get_watched_shows_db, get_watchlist_shows_db_map, trakt_cal_http_worker,
         watch_list_http_worker, watched_action_http_worker, TraktActions, WatchListMap,
-        WatchListShow, WatchedEpisode,
+        WatchListShow, WatchedEpisode, TRAKT_CONN,
     },
     tv_show_source::TvShowSource,
+    config::Config,
+    trakt_connection::TraktConnection,
 };
 
 pub struct TvShowsRequest {}
@@ -143,7 +145,8 @@ impl HandleRequest<WatchlistActionRequest> for PgPool {
     async fn handle(&self, msg: WatchlistActionRequest) -> Self::Result {
         match msg.action {
             TraktActions::Add => {
-                if let Some(show) = trakt_instance::get_watchlist_shows()?.get(&msg.imdb_url) {
+                TRAKT_CONN.init().await;
+                if let Some(show) = TRAKT_CONN.get_watchlist_shows().await?.get(&msg.imdb_url) {
                     show.insert_show(&self).await?;
                 }
             }

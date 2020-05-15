@@ -24,7 +24,6 @@ pub mod pgpool;
 pub mod stack_string;
 pub mod stdout_channel;
 pub mod trakt_connection;
-pub mod trakt_instance;
 pub mod trakt_utils;
 pub mod tv_show_source;
 pub mod utils;

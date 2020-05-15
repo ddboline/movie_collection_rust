@@ -21,8 +21,7 @@ use movie_collection_lib::{
     stack_string::StackString,
     stdout_channel::StdoutChannel,
     trakt_connection::TraktConnection,
-    trakt_instance,
-    trakt_utils::{TraktActions, WatchListShow},
+    trakt_utils::{TraktActions, WatchListShow, TRAKT_CONN},
     tv_show_source::TvShowSource,
     utils::remcom_single_file,
 };
@@ -38,15 +37,10 @@ use super::{
         MovieCollectionUpdateRequest, MoviePathRequest, MovieQueueRequest, MovieQueueSyncRequest,
         MovieQueueUpdateRequest, ParseImdbRequest, QueueDeleteRequest, TraktCalRequest,
         TvShowsRequest, WatchedActionRequest, WatchedListRequest, WatchlistActionRequest,
-        WatchlistShowsRequest,
+        WatchlistShowsRequest
     },
     HandleRequest,
 };
-
-lazy_static! {
-    static ref CONFIG: Config = Config::with_config().unwrap();
-    static ref TRAKT_CONN: TraktConnection = TraktConnection::new(CONFIG.clone());
-}
 
 fn form_http_response(body: String) -> Result<HttpResponse, Error> {
     Ok(HttpResponse::Ok()
@@ -556,10 +550,11 @@ pub async fn trakt_watchlist(_: LoggedUser, state: Data<AppState>) -> Result<Htt
     watchlist_worker(x)
 }
 
-fn watchlist_action_worker(action: TraktActions, imdb_url: &str) -> Result<HttpResponse, Error> {
+async fn watchlist_action_worker(action: TraktActions, imdb_url: &str) -> Result<HttpResponse, Error> {
+    TRAKT_CONN.init().await;
     let body = match action {
-        TraktActions::Add => trakt_instance::add_watchlist_show(&imdb_url)?.to_string(),
-        TraktActions::Remove => trakt_instance::remove_watchlist_show(&imdb_url)?.to_string(),
+        TraktActions::Add => TRAKT_CONN.add_watchlist_show(&imdb_url).await?.to_string(),
+        TraktActions::Remove => TRAKT_CONN.remove_watchlist_show(&imdb_url).await?.to_string(),
         _ => "".to_string(),
     };
     let resp = HttpResponse::Ok()
@@ -581,7 +576,7 @@ pub async fn trakt_watchlist_action(
         imdb_url: imdb_url.into(),
     };
     let imdb_url = state.db.handle(req).await?;
-    watchlist_action_worker(action, &imdb_url)
+    watchlist_action_worker(action, &imdb_url).await
 }
 
 fn trakt_watched_seasons_worker(
@@ -699,6 +694,7 @@ pub async fn user(user: LoggedUser) -> Result<HttpResponse, Error> {
 }
 
 pub async fn trakt_auth_url(_: LoggedUser, _: Data<AppState>) -> Result<HttpResponse, Error> {
+    TRAKT_CONN.init().await;
     let url = TRAKT_CONN.get_auth_url().await?;
     form_http_response(url.to_string())
 }
@@ -714,6 +710,7 @@ pub async fn trakt_callback(
     _: LoggedUser,
     _: Data<AppState>,
 ) -> Result<HttpResponse, Error> {
+    TRAKT_CONN.init().await;
     TRAKT_CONN
         .exchange_code_for_auth_token(query.code.as_str(), query.state.as_str())
         .await?;

@@ -12,7 +12,7 @@ use std::sync::Arc;
 use tokio::fs::{read, write};
 use tokio::sync::{Mutex, RwLock};
 
-use crate::iso_8601_datetime::{self, convert_datetime_to_str};
+use crate::iso_8601_datetime;
 use crate::stack_string::StackString;
 use crate::trakt_utils::{
     TraktCalEntry, TraktCalEntryList, TraktResult, WatchListShow, WatchedEpisode, WatchedMovie,
@@ -664,6 +664,7 @@ mod tests {
     use anyhow::Error;
 
     #[test]
+    #[ignore]
     fn test_get_auth_url() -> Result<(), Error> {
         let config = Config::with_config()?;
         let conn = TraktConnection::new(config);
@@ -671,10 +672,12 @@ mod tests {
         let url = conn._get_auth_url(test_state.as_str())?;
         println!("url {}", url);
         let expected = format!(
-            "https://trakt.tv/?{}{}%2Flist%2Ftrakt%2Fcallback&state={}",
-            "response_type=code&client_id=&redirect_uri=https%3A%2F%2F",
-            conn.config.domain,
-            test_state,
+            "https://trakt.tv/oauth/authorize?{a}{client_id}{b}{domain}%2Flist%2Ftrakt%2Fcallback&state={state}",
+            a="response_type=code&client_id=",
+            client_id=conn.config.trakt_client_id,
+            b="&redirect_uri=https%3A%2F%2F",
+            domain=conn.config.domain,
+            state=test_state,
         );
         assert_eq!(url.as_str(), &expected);
         Ok(())
@@ -731,7 +734,8 @@ mod tests {
         let conn = TraktConnection::new(config);
         conn.init().await;
         let result = conn.get_watched_movies().await?;
-        assert!(result.len() > 10);
+        println!("{}", result.len());
+        assert!(result.len() > 5);
         Ok(())
     }
 
@@ -742,8 +746,8 @@ mod tests {
         let conn = TraktConnection::new(config);
         conn.init().await;
         let result = conn.get_calendar().await?;
-        println!("{:#?}", result);
-        assert!(false);
+        println!("{}", result.len());
+        assert!(result.len() > 5);
         Ok(())
     }
 }
