@@ -12,7 +12,7 @@ use std::sync::Arc;
 use tokio::fs::{read, write};
 use tokio::sync::{Mutex, RwLock};
 
-use crate::iso_8601_datetime;
+use crate::iso_8601_datetime::{self, convert_datetime_to_str};
 use crate::stack_string::StackString;
 use crate::trakt_utils::{
     TraktCalEntry, TraktCalEntryList, TraktResult, WatchListShow, WatchedEpisode, WatchedMovie,
@@ -240,6 +240,51 @@ impl TraktConnection {
             .map_err(Into::into)
     }
 
+    pub async fn get_movie_by_imdb_id(
+        &self,
+        imdb_id: &str,
+    ) -> Result<Vec<TraktMovieSearchResponse>, Error> {
+        let headers = self.get_ro_headers()?;
+        let url = format!(
+            "{}/search/imdb/{}?type=movie",
+            self.config.trakt_endpoint, imdb_id
+        );
+        self.client
+            .get(url.as_str())
+            .headers(headers)
+            .send()
+            .await?
+            .error_for_status()?
+            .json()
+            .await
+            .map_err(Into::into)
+    }
+
+    pub async fn get_episode(
+        &self,
+        imdb_id: &str,
+        season: i32,
+        episode: i32,
+    ) -> Result<TraktEpisodeObject, Error> {
+        let headers = self.get_ro_headers()?;
+        let url = format!(
+            "{}/shows/{imdb}/seasons/{season}/episodes/{episode}",
+            self.config.trakt_endpoint,
+            imdb = imdb_id,
+            season = season,
+            episode = episode,
+        );
+        self.client
+            .get(url.as_str())
+            .headers(headers)
+            .send()
+            .await?
+            .error_for_status()?
+            .json()
+            .await
+            .map_err(Into::into)
+    }
+
     pub async fn add_watchlist_show(&self, imdb_id: &str) -> Result<TraktResult, Error> {
         let show_obj = self
             .get_show_by_imdb_id(imdb_id)
@@ -304,7 +349,12 @@ impl TraktConnection {
             .into_iter()
             .flat_map(|show_entry| {
                 let title = show_entry.show.title.clone();
-                let imdb_url: StackString = show_entry.show.ids.imdb.as_ref().map_or_else(|| "".into(), Clone::clone);
+                let imdb_url: StackString = show_entry
+                    .show
+                    .ids
+                    .imdb
+                    .as_ref()
+                    .map_or_else(|| "".into(), Clone::clone);
                 show_entry
                     .seasons
                     .into_iter()
@@ -343,7 +393,12 @@ impl TraktConnection {
         let movie_map = watched_movies
             .into_iter()
             .map(|entry| {
-                let imdb: StackString = entry.movie.ids.imdb.as_ref().map_or_else(|| "".into(), Clone::clone);
+                let imdb: StackString = entry
+                    .movie
+                    .ids
+                    .imdb
+                    .as_ref()
+                    .map_or_else(|| "".into(), Clone::clone);
                 let movie = WatchedMovie {
                     title: entry.movie.title.into(),
                     imdb_url: imdb.clone(),
@@ -369,18 +424,158 @@ impl TraktConnection {
         let cal_entries: Vec<_> = new_episodes
             .into_iter()
             .map(|entry| {
-                let imdb: StackString = entry.show.ids.imdb.as_ref().map_or_else(|| "".into(), Clone::clone);
+                let imdb: StackString = entry
+                    .show
+                    .ids
+                    .imdb
+                    .as_ref()
+                    .map_or_else(|| "".into(), Clone::clone);
                 TraktCalEntry {
-                ep_link: entry.episode.ids.imdb.as_ref().map(Clone::clone),
-                episode: entry.episode.number,
-                link: imdb,
-                season: entry.episode.season,
-                show: entry.show.title.into(),
-                airdate: entry.first_aired.naive_local().date(),
-            }})
+                    ep_link: entry.episode.ids.imdb.as_ref().map(Clone::clone),
+                    episode: entry.episode.number,
+                    link: imdb,
+                    season: entry.episode.season,
+                    show: entry.show.title.into(),
+                    airdate: entry.first_aired.naive_local().date(),
+                }
+            })
             .collect();
         Ok(cal_entries)
     }
+
+    pub async fn add_episode_to_watched(
+        &self,
+        imdb_id: &str,
+        season: i32,
+        episode: i32,
+    ) -> Result<TraktResult, Error> {
+        let episode_obj = self.get_episode(imdb_id, season, episode).await?;
+        let headers = self.get_rw_headers().await?;
+        let url = format!("{}/sync/history", self.config.trakt_endpoint);
+        let data = hashmap! {
+            "episodes" => vec![
+                WatchedEpisodeRequest {
+                    watched_at: Utc::now(),
+                    ids: episode_obj.ids,
+                }
+            ]
+        };
+        self.client
+            .post(url.as_str())
+            .headers(headers)
+            .json(&data)
+            .send()
+            .await?
+            .error_for_status()?;
+        Ok(TraktResult {
+            status: "success".into(),
+        })
+    }
+
+    pub async fn add_movie_to_watched(&self, imdb_id: &str) -> Result<TraktResult, Error> {
+        let movie_obj = self
+            .get_movie_by_imdb_id(imdb_id)
+            .await?
+            .pop()
+            .ok_or_else(|| format_err!("No show returned"))?;
+        let headers = self.get_rw_headers().await?;
+        let url = format!("{}/sync/history", self.config.trakt_endpoint);
+        let data = hashmap! {
+            "movies" => vec![
+                WatchedMovieRequest {
+                    watched_at: Utc::now(),
+                    title: movie_obj.movie.title.clone(),
+                    year: movie_obj.movie.year,
+                    ids: movie_obj.movie.ids,
+                }
+            ]
+        };
+        self.client
+            .post(url.as_str())
+            .headers(headers)
+            .json(&data)
+            .send()
+            .await?
+            .error_for_status()?;
+        Ok(TraktResult {
+            status: "success".into(),
+        })
+    }
+
+    pub async fn remove_episode_to_watched(
+        &self,
+        imdb_id: &str,
+        season: i32,
+        episode: i32,
+    ) -> Result<TraktResult, Error> {
+        let episode_obj = self.get_episode(imdb_id, season, episode).await?;
+        let headers = self.get_rw_headers().await?;
+        let url = format!("{}/sync/history/remove", self.config.trakt_endpoint);
+        let data = hashmap! {
+            "episodes" => vec![
+                WatchedEpisodeRequest {
+                    watched_at: Utc::now(),
+                    ids: episode_obj.ids,
+                }
+            ]
+        };
+        self.client
+            .post(url.as_str())
+            .headers(headers)
+            .json(&data)
+            .send()
+            .await?
+            .error_for_status()?;
+        Ok(TraktResult {
+            status: "success".into(),
+        })
+    }
+
+    pub async fn remove_movie_to_watched(&self, imdb_id: &str) -> Result<TraktResult, Error> {
+        let movie_obj = self
+            .get_movie_by_imdb_id(imdb_id)
+            .await?
+            .pop()
+            .ok_or_else(|| format_err!("No show returned"))?;
+        let headers = self.get_rw_headers().await?;
+        let url = format!("{}/sync/history/remove", self.config.trakt_endpoint);
+        let data = hashmap! {
+            "movies" => vec![
+                WatchedMovieRequest {
+                    watched_at: Utc::now(),
+                    title: movie_obj.movie.title.clone(),
+                    year: movie_obj.movie.year,
+                    ids: movie_obj.movie.ids,
+                }
+            ]
+        };
+        self.client
+            .post(url.as_str())
+            .headers(headers)
+            .json(&data)
+            .send()
+            .await?
+            .error_for_status()?;
+        Ok(TraktResult {
+            status: "success".into(),
+        })
+    }
+}
+
+#[derive(Serialize, Deserialize, Debug)]
+struct WatchedMovieRequest {
+    #[serde(with = "iso_8601_datetime")]
+    pub watched_at: DateTime<Utc>,
+    pub title: StackString,
+    pub year: i32,
+    pub ids: TraktIdObject,
+}
+
+#[derive(Serialize, Deserialize, Debug)]
+struct WatchedEpisodeRequest {
+    #[serde(with = "iso_8601_datetime")]
+    pub watched_at: DateTime<Utc>,
+    pub ids: TraktIdObject,
 }
 
 #[derive(Serialize, Deserialize, Debug)]
@@ -424,8 +619,12 @@ pub struct WatchListShowsResponse {
 
 #[derive(Serialize, Deserialize, Debug)]
 pub struct TraktShowSearchResponse {
-    pub score: Option<f64>,
     pub show: TraktShowObject,
+}
+
+#[derive(Serialize, Deserialize, Debug)]
+pub struct TraktMovieSearchResponse {
+    pub movie: TraktShowObject,
 }
 
 #[derive(Serialize, Deserialize, Debug)]
