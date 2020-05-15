@@ -31,7 +31,7 @@ pub struct TraktConnection {
 
 impl Default for TraktConnection {
     fn default() -> Self {
-        let config = Config::with_config().unwrap();
+        let config = Config::with_config().expect("Failed to create config");
         Self::new(config)
     }
 }

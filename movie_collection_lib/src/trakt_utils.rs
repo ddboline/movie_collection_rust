@@ -10,7 +10,6 @@ use std::{
     str::FromStr,
     sync::Arc,
 };
-use tokio::task::spawn_blocking;
 use lazy_static::lazy_static;
 
 use crate::{

@@ -4,7 +4,6 @@ use chrono::{DateTime, Utc};
 use futures::future::try_join_all;
 use serde::{Deserialize, Serialize};
 use std::path;
-use lazy_static::lazy_static;
 
 use super::HandleRequest;
 use movie_collection_lib::{

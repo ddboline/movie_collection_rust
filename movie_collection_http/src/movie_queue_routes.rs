@@ -714,5 +714,15 @@ pub async fn trakt_callback(
     TRAKT_CONN
         .exchange_code_for_auth_token(query.code.as_str(), query.state.as_str())
         .await?;
-    form_http_response("".to_string())
+    let body = r#"
+        <title>Trakt auth code received!</title>
+        This window can be closed.
+        <script language="JavaScript" type="text/javascript">window.close()</script>"#;
+    form_http_response(body.to_string())
+}
+
+pub async fn refresh_auth(_: LoggedUser, _: Data<AppState>) -> Result<HttpResponse, Error> {
+    TRAKT_CONN.init().await;
+    TRAKT_CONN.exchange_refresh_token().await?;
+    form_http_response("finished".to_string())
 }

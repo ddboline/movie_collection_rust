@@ -16,7 +16,7 @@ use super::{
         movie_queue_play, movie_queue_route, movie_queue_show, movie_queue_transcode,
         movie_queue_transcode_directory, movie_queue_update, trakt_auth_url, trakt_cal,
         trakt_callback, trakt_watched_action, trakt_watched_list, trakt_watched_seasons,
-        trakt_watchlist, trakt_watchlist_action, tvshows, user,
+        trakt_watchlist, trakt_watchlist_action, tvshows, user, refresh_auth
     },
 };
 use movie_collection_lib::{config::Config, pgpool::PgPool};
@@ -71,6 +71,7 @@ pub async fn start_app(config: Config) {
             .service(web::resource("/list/play/{index}").route(web::get().to(movie_queue_play)))
             .service(web::resource("/list/trakt/auth_url").route(web::get().to(trakt_auth_url)))
             .service(web::resource("/list/trakt/callback").route(web::get().to(trakt_callback)))
+            .service(web::resource("/list/trakt/refresh_auth").route(web::get().to(refresh_auth)))
             .service(web::resource("/list/trakt/cal").route(web::get().to(trakt_cal)))
             .service(web::resource("/list/trakt/watchlist").route(web::get().to(trakt_watchlist)))
             .service(
