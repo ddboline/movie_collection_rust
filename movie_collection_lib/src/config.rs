@@ -19,6 +19,9 @@ pub struct ConfigInner {
     pub n_db_workers: usize,
     pub transcode_queue: StackString,
     pub remcom_queue: StackString,
+    pub trakt_endpoint: StackString,
+    pub trakt_client_id: StackString,
+    pub trakt_client_secret: StackString,
 }
 
 #[derive(Debug, Default, Clone)]
@@ -94,6 +97,9 @@ impl Config {
         set_config_parse!(config, n_db_workers, 2);
         set_config_default!(config, transcode_queue, "transcode_work_queue".into());
         set_config_default!(config, remcom_queue, "remcom_worker_queue".into());
+        set_config_parse!(config, trakt_endpoint, "https://api.trakt.tv".into());
+        set_config_default!(config, trakt_client_id, "".into());
+        set_config_default!(config, trakt_client_secret, "".into());
 
         config.home_dir = dirs::home_dir()
             .ok_or_else(|| format_err!("No HOME directory..."))?

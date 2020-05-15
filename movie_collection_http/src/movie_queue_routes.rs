@@ -5,7 +5,8 @@ use actix_web::{
     HttpResponse,
 };
 use anyhow::format_err;
-use serde::Serialize;
+use lazy_static::lazy_static;
+use serde::{Deserialize, Serialize};
 use std::{
     collections::{HashMap, HashSet},
     path,
@@ -13,11 +14,13 @@ use std::{
 use subprocess::Exec;
 
 use movie_collection_lib::{
+    config::Config,
     make_queue::movie_queue_http,
     movie_collection::{ImdbSeason, TvShowsResult},
     movie_queue::MovieQueueResult,
     stack_string::StackString,
     stdout_channel::StdoutChannel,
+    trakt_connection::TraktConnection,
     trakt_instance,
     trakt_utils::{TraktActions, WatchListShow},
     tv_show_source::TvShowSource,
@@ -39,6 +42,11 @@ use super::{
     },
     HandleRequest,
 };
+
+lazy_static! {
+    static ref CONFIG: Config = Config::with_config().unwrap();
+    static ref TRAKT_CONN: TraktConnection = TraktConnection::new(CONFIG.clone());
+}
 
 fn form_http_response(body: String) -> Result<HttpResponse, Error> {
     Ok(HttpResponse::Ok()
@@ -568,7 +576,10 @@ pub async fn trakt_watchlist_action(
     let (action, imdb_url) = path.into_inner();
     let action = action.parse().expect("impossible");
 
-    let req = WatchlistActionRequest { action, imdb_url: imdb_url.into() };
+    let req = WatchlistActionRequest {
+        action,
+        imdb_url: imdb_url.into(),
+    };
     let imdb_url = state.db.handle(req).await?;
     watchlist_action_worker(action, &imdb_url)
 }
@@ -639,7 +650,10 @@ pub async fn trakt_watched_list(
 ) -> Result<HttpResponse, Error> {
     let (imdb_url, season) = path.into_inner();
 
-    let req = WatchedListRequest { imdb_url: imdb_url.into(), season };
+    let req = WatchedListRequest {
+        imdb_url: imdb_url.into(),
+        season,
+    };
     let x = state.db.handle(req).await?;
     form_http_response(x)
 }
@@ -682,4 +696,26 @@ pub async fn trakt_cal(_: LoggedUser, state: Data<AppState>) -> Result<HttpRespo
 
 pub async fn user(user: LoggedUser) -> Result<HttpResponse, Error> {
     to_json(user)
+}
+
+pub async fn trakt_auth_url(_: LoggedUser, _: Data<AppState>) -> Result<HttpResponse, Error> {
+    let url = TRAKT_CONN.get_auth_url().await?;
+    form_http_response(url.to_string())
+}
+
+#[derive(Serialize, Deserialize)]
+pub struct TraktCallbackRequest {
+    pub code: String,
+    pub state: String,
+}
+
+pub async fn trakt_callback(
+    query: Query<TraktCallbackRequest>,
+    _: LoggedUser,
+    _: Data<AppState>,
+) -> Result<HttpResponse, Error> {
+    TRAKT_CONN
+        .exchange_code_for_auth_token(query.code.as_str(), query.state.as_str())
+        .await?;
+    form_http_response("".to_string())
 }
