@@ -1,6 +1,6 @@
 [package]
 name = "movie_collection_lib"
-version = "0.5.18"
+version = "0.5.19"
 authors = ["Daniel Boline <ddboline@gmail.com>"]
 edition = "2018"
 
@@ -24,7 +24,6 @@ log = "0.4"
 env_logger = "0.7"
 simple_logger = "1.5"
 actix = "0.9"
-cpython = "0.4"
 retry = "1.0"
 postgres_query = "0.3"
 bytes = "0.5"
@@ -36,3 +35,6 @@ async-trait = "0.1"
 derive_more = "0.99"
 structopt = "0.3"
 inlinable_string = "0.1"
+lazy_static = "1.4"
+base64 = "0.12"
+maplit = "1.0"

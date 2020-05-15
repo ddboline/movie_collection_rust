@@ -61,6 +61,8 @@ footer {
 <input type="button" name="watchlist" value="WatchList" onclick="updateMainArticle('/list/trakt/watchlist');"/>
 <input type="button" name="trakt_cal" value="TraktCalendar" onclick="updateMainArticle('/list/trakt/cal');"/>
 <input type="button" name="list" value="FullQueue" onclick="updateMainArticle('/list');"/>
+<input type="button" name="refresh" value="RefreshAuth" onclick="refreshAuth();"/>
+<input type="button" name="auth" value="Auth" onclick="traktAuth();"/>
 </H3>
 
 <H3>
@@ -167,7 +169,25 @@ BODY
         let out = "requested " + link
         document.getElementById("remcomoutput").innerHTML = out;
     }
+    function refreshAuth() {
+        let url = "/list/trakt/refresh_auth";
+        let xmlhttp = new XMLHttpRequest();
+        xmlhttp.onload = function() {
+            document.getElementById("main_article").innerHTML = xmlhttp.responseText;
+        }
+        xmlhttp.open("GET", url, true);
+        xmlhttp.send(null);
+    }
+    function traktAuth() {
+        let url = "/list/trakt/auth_url";
+        let xmlhttp = new XMLHttpRequest();
+        xmlhttp.onload = function() {
+            let win = window.open(xmlhttp.responseText, '_blank');
+            win.focus()
+        }
+        xmlhttp.open("GET", url, true);
+        xmlhttp.send(null);
+    }
     </script>
-
 </body>
 </html>

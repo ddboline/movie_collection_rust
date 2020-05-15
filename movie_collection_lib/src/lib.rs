@@ -8,11 +8,13 @@
 #![allow(clippy::similar_names)]
 #![allow(clippy::shadow_unrelated)]
 #![allow(clippy::missing_errors_doc)]
+#![allow(clippy::struct_excessive_bools)]
 
 pub mod config;
 pub mod imdb_episodes;
 pub mod imdb_ratings;
 pub mod imdb_utils;
+pub mod iso_8601_datetime;
 pub mod make_list;
 pub mod make_queue;
 pub mod movie_collection;
@@ -21,7 +23,7 @@ pub mod parse_imdb;
 pub mod pgpool;
 pub mod stack_string;
 pub mod stdout_channel;
-pub mod trakt_instance;
+pub mod trakt_connection;
 pub mod trakt_utils;
 pub mod tv_show_source;
 pub mod utils;

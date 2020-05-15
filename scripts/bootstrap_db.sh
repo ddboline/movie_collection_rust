@@ -31,6 +31,7 @@ SENDING_EMAIL_ADDRESS=$SENDING_EMAIL_ADDRESS
 CALLBACK_URL=https://${DOMAIN}/auth/register.html
 EOL
 
+psql movie_queue < ./scripts/authorized_users.sql
 psql movie_queue < ./scripts/imdb_ratings.sql
 psql movie_queue < ./scripts/imdb_episodes.sql
 psql movie_queue < ./scripts/movie_collection_on_dvd.sql
