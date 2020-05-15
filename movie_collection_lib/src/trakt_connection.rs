@@ -1,5 +1,5 @@
 use anyhow::{format_err, Error};
-use base64;
+use base64::{encode_config, URL_SAFE_NO_PAD};
 use chrono::{DateTime, Utc};
 use lazy_static::lazy_static;
 use maplit::hashmap;
@@ -31,7 +31,7 @@ pub struct TraktConnection {
 
 impl Default for TraktConnection {
     fn default() -> Self {
-        let config = Config::with_config().expect("Failed to create config");
+        let config = Config::with_config().expect("Failed to create");
         Self::new(config)
     }
 }
@@ -58,24 +58,24 @@ impl TraktConnection {
         }
     }
 
-    fn token_path(&self) -> Result<PathBuf, Error> {
+    fn token_path() -> Result<PathBuf, Error> {
         let home_dir = dirs::home_dir().ok_or_else(|| format_err!("No home dir"))?;
         Ok(home_dir.join(".trakt").join("auth_token_web.json"))
     }
 
     async fn read_auth_token(&self) -> Result<AccessTokenResponse, Error> {
-        serde_json::from_slice(&read(self.token_path()?).await?).map_err(Into::into)
+        serde_json::from_slice(&read(Self::token_path()?).await?).map_err(Into::into)
     }
 
     async fn write_auth_token(&self, token: &AccessTokenResponse) -> Result<(), Error> {
-        write(&self.token_path()?, &serde_json::to_string(token)?)
+        write(&Self::token_path()?, &serde_json::to_string(token)?)
             .await
             .map_err(Into::into)
     }
 
     fn get_random_string() -> String {
         let random_bytes: Vec<u8> = (0..16).map(|_| thread_rng().gen::<u8>()).collect();
-        base64::encode_config(&random_bytes, base64::URL_SAFE_NO_PAD)
+        encode_config(&random_bytes, URL_SAFE_NO_PAD)
     }
 
     fn _get_auth_url(&self, state: &str) -> Result<Url, Error> {
@@ -206,12 +206,12 @@ impl TraktConnection {
         let watchlist = resp
             .into_iter()
             .map(|r| {
-                let imdb: StackString = r.show.ids.imdb.unwrap_or_else(|| "".into()).into();
+                let imdb: StackString = r.show.ids.imdb.unwrap_or_else(|| "".into());
                 (
                     imdb.clone(),
                     WatchListShow {
                         link: imdb,
-                        title: r.show.title.into(),
+                        title: r.show.title,
                         year: r.show.year,
                     },
                 )
@@ -365,7 +365,7 @@ impl TraktConnection {
                         season_entry.episodes.into_iter().map(move |episode_entry| {
                             let episode = episode_entry.number;
                             let epi = WatchedEpisode {
-                                title: title.clone().into(),
+                                title: title.clone(),
                                 imdb_url: imdb_url.clone(),
                                 episode,
                                 season,
@@ -400,7 +400,7 @@ impl TraktConnection {
                     .as_ref()
                     .map_or_else(|| "".into(), Clone::clone);
                 let movie = WatchedMovie {
-                    title: entry.movie.title.into(),
+                    title: entry.movie.title,
                     imdb_url: imdb.clone(),
                 };
                 (imdb, movie)
@@ -428,14 +428,13 @@ impl TraktConnection {
                     .show
                     .ids
                     .imdb
-                    .as_ref()
-                    .map_or_else(|| "".into(), Clone::clone);
+                    .unwrap_or_else(|| "".into());
                 TraktCalEntry {
                     ep_link: entry.episode.ids.imdb.as_ref().map(Clone::clone),
                     episode: entry.episode.number,
                     link: imdb,
                     season: entry.episode.season,
-                    show: entry.show.title.into(),
+                    show: entry.show.title,
                     airdate: entry.first_aired.naive_local().date(),
                 }
             })

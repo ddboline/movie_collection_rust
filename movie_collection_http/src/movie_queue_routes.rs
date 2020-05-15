@@ -5,7 +5,6 @@ use actix_web::{
     HttpResponse,
 };
 use anyhow::format_err;
-use lazy_static::lazy_static;
 use serde::{Deserialize, Serialize};
 use std::{
     collections::{HashMap, HashSet},
@@ -14,13 +13,11 @@ use std::{
 use subprocess::Exec;
 
 use movie_collection_lib::{
-    config::Config,
     make_queue::movie_queue_http,
     movie_collection::{ImdbSeason, TvShowsResult},
     movie_queue::MovieQueueResult,
     stack_string::StackString,
     stdout_channel::StdoutChannel,
-    trakt_connection::TraktConnection,
     trakt_utils::{TraktActions, WatchListShow, TRAKT_CONN},
     tv_show_source::TvShowSource,
     utils::remcom_single_file,

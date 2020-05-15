@@ -23,8 +23,6 @@ use movie_collection_lib::{
         WatchListShow, WatchedEpisode, TRAKT_CONN,
     },
     tv_show_source::TvShowSource,
-    config::Config,
-    trakt_connection::TraktConnection,
 };
 
 pub struct TvShowsRequest {}
