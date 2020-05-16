@@ -138,7 +138,7 @@ impl TraktConnection {
                 "client_id" => self.config.trakt_client_id.as_str(),
                 "client_secret" => self.config.trakt_client_secret.as_str(),
                 "redirect_uri" => redirect_uri.as_str(),
-                "grant_type" => "authorization_code",
+                "grant_type" => "refresh_token",
             };
             let mut headers = HeaderMap::new();
             headers.insert("Content-Type", "application/json".parse()?);
