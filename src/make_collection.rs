@@ -41,12 +41,10 @@ async fn make_collection() -> Result<(), Error> {
             let futures = shows.into_iter().map(|result| async move {
                 let path = result.path.clone();
                 let timeval = spawn_blocking(move || get_video_runtime(&path)).await??;
-                Ok((timeval, result))
+                Ok(format!("{} {}", timeval, result))
             });
             let shows: Result<Vec<_>, Error> = try_join_all(futures).await;
-            for (timeval, show) in shows? {
-                mc.stdout.send(format!("{} {}", timeval, show).into())?;
-            }
+            mc.stdout.send(shows?.join("\n").into())?;
         } else {
             for show in shows {
                 mc.stdout.send(show.to_string().into())?;

@@ -34,7 +34,7 @@ use super::{
         MovieCollectionUpdateRequest, MoviePathRequest, MovieQueueRequest, MovieQueueSyncRequest,
         MovieQueueUpdateRequest, ParseImdbRequest, QueueDeleteRequest, TraktCalRequest,
         TvShowsRequest, WatchedActionRequest, WatchedListRequest, WatchlistActionRequest,
-        WatchlistShowsRequest
+        WatchlistShowsRequest,
     },
     HandleRequest,
 };
@@ -547,11 +547,17 @@ pub async fn trakt_watchlist(_: LoggedUser, state: Data<AppState>) -> Result<Htt
     watchlist_worker(x)
 }
 
-async fn watchlist_action_worker(action: TraktActions, imdb_url: &str) -> Result<HttpResponse, Error> {
+async fn watchlist_action_worker(
+    action: TraktActions,
+    imdb_url: &str,
+) -> Result<HttpResponse, Error> {
     TRAKT_CONN.init().await;
     let body = match action {
         TraktActions::Add => TRAKT_CONN.add_watchlist_show(&imdb_url).await?.to_string(),
-        TraktActions::Remove => TRAKT_CONN.remove_watchlist_show(&imdb_url).await?.to_string(),
+        TraktActions::Remove => TRAKT_CONN
+            .remove_watchlist_show(&imdb_url)
+            .await?
+            .to_string(),
         _ => "".to_string(),
     };
     let resp = HttpResponse::Ok()

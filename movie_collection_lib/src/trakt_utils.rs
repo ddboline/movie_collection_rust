@@ -1,6 +1,7 @@
 use anyhow::{format_err, Error};
 use chrono::NaiveDate;
 use futures::future::{join_all, try_join_all};
+use lazy_static::lazy_static;
 use log::debug;
 use postgres_query::FromSqlRow;
 use serde::{Deserialize, Serialize};
@@ -10,12 +11,11 @@ use std::{
     str::FromStr,
     sync::Arc,
 };
-use lazy_static::lazy_static;
 
 use crate::{
-    imdb_episodes::ImdbEpisodes, imdb_ratings::ImdbRatings, movie_collection::MovieCollection,
-    movie_queue::MovieQueueDB, pgpool::PgPool, stack_string::StackString,
-    config::Config, trakt_connection::TraktConnection,
+    config::Config, imdb_episodes::ImdbEpisodes, imdb_ratings::ImdbRatings,
+    movie_collection::MovieCollection, movie_queue::MovieQueueDB, pgpool::PgPool,
+    stack_string::StackString, trakt_connection::TraktConnection,
 };
 
 use crate::{tv_show_source::TvShowSource, utils::option_string_wrapper};
@@ -697,7 +697,9 @@ async fn watchlist_add(mc: &MovieCollection, show: Option<&str>) -> Result<(), E
             .into(),
         )?;
         debug!("GOT HERE");
-        if let Some(show) = TRAKT_CONN.get_watchlist_shows().await?
+        if let Some(show) = TRAKT_CONN
+            .get_watchlist_shows()
+            .await?
             .get(imdb_url.as_str())
         {
             debug!("INSERT SHOW {}", show);
@@ -745,7 +747,9 @@ async fn watched_add(
             for epi in episode {
                 let epi_ = *epi;
                 let imdb_url_ = imdb_url.clone();
-                TRAKT_CONN.add_episode_to_watched(&imdb_url_, season, epi_).await?;
+                TRAKT_CONN
+                    .add_episode_to_watched(&imdb_url_, season, epi_)
+                    .await?;
                 WatchedEpisode {
                     imdb_url: imdb_url.clone().into(),
                     season,
@@ -781,7 +785,9 @@ async fn watched_rm(
             for epi in episode {
                 let epi_ = *epi;
                 let imdb_url_ = imdb_url.clone();
-                TRAKT_CONN.remove_episode_to_watched(&imdb_url_, season, epi_).await?;
+                TRAKT_CONN
+                    .remove_episode_to_watched(&imdb_url_, season, epi_)
+                    .await?;
                 if let Some(epi_) =
                     WatchedEpisode::get_watched_episode(&mc.pool, &imdb_url, season, *epi).await?
                 {
@@ -995,7 +1001,9 @@ pub async fn watched_action_http_worker(
         TraktActions::Add => {
             let result = if season != -1 && episode != -1 {
                 let imdb_url_ = Arc::clone(&imdb_url);
-                TRAKT_CONN.add_episode_to_watched(&imdb_url_, season, episode).await?
+                TRAKT_CONN
+                    .add_episode_to_watched(&imdb_url_, season, episode)
+                    .await?
             } else {
                 let imdb_url_ = Arc::clone(&imdb_url);
                 TRAKT_CONN.add_movie_to_watched(&imdb_url_).await?
@@ -1023,7 +1031,9 @@ pub async fn watched_action_http_worker(
         TraktActions::Remove => {
             let imdb_url_ = Arc::clone(&imdb_url);
             let result = if season != -1 && episode != -1 {
-                TRAKT_CONN.remove_episode_to_watched(&imdb_url_, season, episode).await?
+                TRAKT_CONN
+                    .remove_episode_to_watched(&imdb_url_, season, episode)
+                    .await?
             } else {
                 TRAKT_CONN.remove_movie_to_watched(&imdb_url_).await?
             };

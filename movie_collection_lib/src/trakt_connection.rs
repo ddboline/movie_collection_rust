@@ -6,18 +6,21 @@ use maplit::hashmap;
 use rand::{thread_rng, Rng};
 use reqwest::{header::HeaderMap, Client, Url};
 use serde::{Deserialize, Serialize};
-use std::collections::HashMap;
-use std::path::PathBuf;
-use std::sync::Arc;
-use tokio::fs::{read, write};
-use tokio::sync::{Mutex, RwLock};
-
-use crate::iso_8601_datetime;
-use crate::stack_string::StackString;
-use crate::trakt_utils::{
-    TraktCalEntry, TraktCalEntryList, TraktResult, WatchListShow, WatchedEpisode, WatchedMovie,
+use std::{collections::HashMap, path::PathBuf, sync::Arc};
+use tokio::{
+    fs::{read, write},
+    sync::{Mutex, RwLock},
 };
-use crate::{config::Config, utils::ExponentialRetry};
+
+use crate::{
+    config::Config,
+    iso_8601_datetime,
+    stack_string::StackString,
+    trakt_utils::{
+        TraktCalEntry, TraktCalEntryList, TraktResult, WatchListShow, WatchedEpisode, WatchedMovie,
+    },
+    utils::ExponentialRetry,
+};
 
 lazy_static! {
     static ref CSRF_TOKEN: Mutex<Option<StackString>> = Mutex::new(None);
@@ -424,11 +427,7 @@ impl TraktConnection {
         let cal_entries: Vec<_> = new_episodes
             .into_iter()
             .map(|entry| {
-                let imdb: StackString = entry
-                    .show
-                    .ids
-                    .imdb
-                    .unwrap_or_else(|| "".into());
+                let imdb: StackString = entry.show.ids.imdb.unwrap_or_else(|| "".into());
                 TraktCalEntry {
                     ep_link: entry.episode.ids.imdb.as_ref().map(Clone::clone),
                     episode: entry.episode.number,
@@ -658,8 +657,7 @@ pub struct TraktCalendarResponse {
 
 #[cfg(test)]
 mod tests {
-    use crate::config::Config;
-    use crate::trakt_connection::TraktConnection;
+    use crate::{config::Config, trakt_connection::TraktConnection};
     use anyhow::Error;
 
     #[test]

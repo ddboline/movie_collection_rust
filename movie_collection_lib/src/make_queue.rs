@@ -45,10 +45,13 @@ pub async fn make_queue_worker(
     let mq = MovieQueueDB::with_pool(&mc.pool);
 
     if do_shows {
-        let shows = mc.print_tv_shows().await?;
-        for show in shows {
-            stdout.send(show.to_string().into())?;
-        }
+        let shows: Vec<_> = mc
+            .print_tv_shows()
+            .await?
+            .into_par_iter()
+            .map(|s| s.to_string())
+            .collect();
+        stdout.send(shows.join("\n").into())?;
     } else if !del_files.is_empty() {
         for file in del_files {
             match file {
@@ -66,13 +69,10 @@ pub async fn make_queue_worker(
                 .into_par_iter()
                 .map(|result| {
                     let timeval = get_video_runtime(&result.path)?;
-                    Ok((timeval, result))
+                    Ok(format!("{} {}", result, timeval))
                 })
                 .collect();
-
-            for (timeval, result) in results? {
-                stdout.send(format!("{} {}", result, timeval).into())?;
-            }
+            stdout.send(results?.join("\n").into())?;
         } else {
             for result in movie_queue {
                 stdout.send(result.to_string().into())?;
