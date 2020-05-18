@@ -9,6 +9,7 @@ use thiserror::Error;
 use crate::logged_user::TRIGGER_DB_UPDATE;
 
 #[derive(Error, Debug)]
+#[allow(clippy::used_underscore_binding)]
 pub enum ServiceError {
     #[error("Internal Server Error")]
     InternalServerError,
