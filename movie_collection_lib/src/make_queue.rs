@@ -13,6 +13,7 @@ use crate::{
     movie_queue::{MovieQueueDB, MovieQueueResult},
     stdout_channel::StdoutChannel,
     utils::{get_video_runtime, parse_file_stem},
+    pgpool::PgPool,
 };
 
 #[derive(Debug, Display)]
@@ -120,8 +121,8 @@ pub async fn make_queue_worker(
     Ok(())
 }
 
-pub async fn movie_queue_http(queue: &[MovieQueueResult]) -> Result<Vec<String>, Error> {
-    let mc = Arc::new(MovieCollection::new());
+pub async fn movie_queue_http(queue: &[MovieQueueResult], pool: &PgPool) -> Result<Vec<String>, Error> {
+    let mc = Arc::new(MovieCollection::with_pool(pool)?);
 
     let button = r#"<td><button type="submit" id="ID" onclick="delete_show('SHOW');"> remove </button></td>"#;
 

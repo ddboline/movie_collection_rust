@@ -21,6 +21,7 @@ use movie_collection_lib::{
     trakt_utils::{TraktActions, WatchListShow, TRAKT_CONN},
     tv_show_source::TvShowSource,
     utils::remcom_single_file,
+    pgpool::PgPool,
 };
 
 use super::{
@@ -74,8 +75,9 @@ fn movie_queue_body(patterns: &[StackString], entries: &[String]) -> String {
 async fn queue_body_resp(
     patterns: Vec<StackString>,
     queue: Vec<MovieQueueResult>,
+    pool: &PgPool,
 ) -> Result<HttpResponse, Error> {
-    let entries = movie_queue_http(&queue).await?;
+    let entries = movie_queue_http(&queue, pool).await?;
     let body = movie_queue_body(&patterns, &entries);
     let resp = HttpResponse::Ok()
         .content_type("text/html; charset=utf-8")
@@ -88,7 +90,7 @@ pub async fn movie_queue(_: LoggedUser, state: Data<AppState>) -> Result<HttpRes
         patterns: Vec::new(),
     };
     let (queue, _) = state.db.handle(req).await?;
-    queue_body_resp(Vec::new(), queue).await
+    queue_body_resp(Vec::new(), queue, &state.db).await
 }
 
 pub async fn movie_queue_show(
@@ -101,7 +103,7 @@ pub async fn movie_queue_show(
 
     let req = MovieQueueRequest { patterns };
     let (queue, patterns) = state.db.handle(req).await?;
-    queue_body_resp(patterns, queue).await
+    queue_body_resp(patterns, queue, &state.db).await
 }
 
 pub async fn movie_queue_delete(
