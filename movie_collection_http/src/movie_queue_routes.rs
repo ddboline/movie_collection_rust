@@ -16,12 +16,12 @@ use movie_collection_lib::{
     make_queue::movie_queue_http,
     movie_collection::{ImdbSeason, TvShowsResult},
     movie_queue::MovieQueueResult,
+    pgpool::PgPool,
     stack_string::StackString,
     stdout_channel::StdoutChannel,
     trakt_utils::{TraktActions, WatchListShow, TRAKT_CONN},
     tv_show_source::TvShowSource,
     utils::remcom_single_file,
-    pgpool::PgPool,
 };
 
 use super::{
