@@ -75,9 +75,8 @@ pub async fn make_queue_worker(
                 .collect();
             stdout.send(results?.join("\n").into())?;
         } else {
-            for result in movie_queue {
-                stdout.send(result.to_string().into())?;
-            }
+            let results: Vec<_> = movie_queue.into_iter().map(|x| x.to_string()).collect();
+            stdout.send(results.join("\n").into())?;
         }
     } else if add_files.len() == 1 {
         let max_idx = mq.get_max_queue_index().await?;
