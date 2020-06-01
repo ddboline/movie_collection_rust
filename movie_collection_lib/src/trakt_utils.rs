@@ -836,9 +836,9 @@ async fn watched_list(mc: &MovieCollection, show: Option<&str>, season: i32) -> 
             .collect();
         mc.stdout.send(lines.join("\n").into())?;
     } else {
-        let lines: Vec<_> = watched_shows.iter().map(|show| show.to_string()).collect();
+        let lines: Vec<_> = watched_shows.iter().map(ToString::to_string).collect();
         mc.stdout.send(lines.join("\n").into())?;
-        let lines: Vec<_> = watched_movies.iter().map(|show| show.to_string()).collect();
+        let lines: Vec<_> = watched_movies.iter().map(ToString::to_string).collect();
         mc.stdout.send(lines.join("\n").into())?;
     }
     Ok(())
