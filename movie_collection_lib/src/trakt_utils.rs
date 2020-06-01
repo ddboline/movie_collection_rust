@@ -810,25 +810,35 @@ async fn watched_list(mc: &MovieCollection, show: Option<&str>, season: i32) -> 
     let watched_movies = get_watched_movies_db(&mc.pool).await?;
 
     if let Some(imdb_url) = get_imdb_url_from_show(&mc, show).await? {
-        let lines: Vec<_> = watched_shows.iter().filter_map(|show| {
-            if season != -1 && show.season != season {
-                return None;
-            }
-            if show.imdb_url.as_str() == imdb_url.as_str() {
-                Some(show.to_string())
-            } else {None}
-        }).collect();
+        let lines: Vec<_> = watched_shows
+            .iter()
+            .filter_map(|show| {
+                if season != -1 && show.season != season {
+                    return None;
+                }
+                if show.imdb_url.as_str() == imdb_url.as_str() {
+                    Some(show.to_string())
+                } else {
+                    None
+                }
+            })
+            .collect();
         mc.stdout.send(lines.join("\n").into())?;
-        let lines: Vec<_> = watched_movies.iter().filter_map(|show| {
-            if show.imdb_url.as_str() == imdb_url.as_str() {
-                Some(show.to_string())
-            } else {None}
-        }).collect();
+        let lines: Vec<_> = watched_movies
+            .iter()
+            .filter_map(|show| {
+                if show.imdb_url.as_str() == imdb_url.as_str() {
+                    Some(show.to_string())
+                } else {
+                    None
+                }
+            })
+            .collect();
         mc.stdout.send(lines.join("\n").into())?;
     } else {
-        let lines: Vec<_> = watched_shows.iter().map(|show| {show.to_string()}).collect();
+        let lines: Vec<_> = watched_shows.iter().map(|show| show.to_string()).collect();
         mc.stdout.send(lines.join("\n").into())?;
-        let lines: Vec<_> = watched_movies.iter().map(|show| {show.to_string()}).collect();
+        let lines: Vec<_> = watched_movies.iter().map(|show| show.to_string()).collect();
         mc.stdout.send(lines.join("\n").into())?;
     }
     Ok(())
