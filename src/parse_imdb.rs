@@ -13,11 +13,10 @@ async fn parse_imdb_parser() -> Result<(), Error> {
     let task = mc.stdout.spawn_stdout_task();
     let pi = ParseImdb::with_pool(&mc.pool)?;
 
-    let output = pi.parse_imdb_worker(&opts).await?;
+    let output: Vec<_> = pi.parse_imdb_worker(&opts).await?.into_iter().map(|x| x.join(" ")).collect();
 
-    for line in output {
-        mc.stdout.send(line.join(" ").into())?;
-    }
+    mc.stdout.send(output.join("\n").into())?;
+
     mc.stdout.close().await?;
     task.await?
 }
