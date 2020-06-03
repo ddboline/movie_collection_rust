@@ -227,7 +227,7 @@ impl TraktConnection {
         loop {
             let page = self.get_watchlist_shows_page(current_page, 20).await?;
             current_page += 1;
-            if page.len() == 0 {
+            if page.is_empty() {
                 break;
             }
             results.extend_from_slice(&page);
