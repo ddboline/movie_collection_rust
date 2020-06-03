@@ -2,6 +2,7 @@ use anyhow::{format_err, Error};
 use base64::{encode_config, URL_SAFE_NO_PAD};
 use chrono::{DateTime, Utc};
 use lazy_static::lazy_static;
+use log::debug;
 use maplit::hashmap;
 use rand::{thread_rng, Rng};
 use reqwest::{header::HeaderMap, Client, Url};
@@ -194,19 +195,44 @@ impl TraktConnection {
         Ok(headers)
     }
 
-    pub async fn get_watchlist_shows(&self) -> Result<HashMap<StackString, WatchListShow>, Error> {
+    async fn get_watchlist_shows_page(
+        &self,
+        page: usize,
+        limit: usize,
+    ) -> Result<Vec<WatchListShowsResponse>, Error> {
         let headers = self.get_rw_headers().await?;
         let url = format!("{}/sync/watchlist/shows", self.config.trakt_endpoint);
-        let resp: Vec<WatchListShowsResponse> = self
+        let url = Url::parse_with_params(
+            &url,
+            &[("page", &page.to_string()), ("limit", &limit.to_string())],
+        )?;
+        let resp = self
             .client
-            .get(url.as_str())
+            .get(url)
             .headers(headers)
             .send()
             .await?
-            .error_for_status()?
-            .json()
-            .await?;
-        let watchlist = resp
+            .error_for_status()?;
+        let headers = resp.headers();
+        if let Some(current_page) = headers.get("X-Pagination-Page") {
+            let current_page: usize = current_page.to_str()?.parse()?;
+            assert_eq!(current_page, page);
+        }
+        resp.json().await.map_err(Into::into)
+    }
+
+    pub async fn get_watchlist_shows(&self) -> Result<HashMap<StackString, WatchListShow>, Error> {
+        let mut current_page = 1;
+        let mut results = Vec::new();
+        loop {
+            let page = self.get_watchlist_shows_page(current_page, 20).await?;
+            current_page += 1;
+            if page.len() == 0 {
+                break;
+            }
+            results.extend_from_slice(&page);
+        }
+        let watchlist = results
             .into_iter()
             .map(|r| {
                 let imdb: StackString = r.show.ids.imdb.unwrap_or_else(|| "".into());
@@ -297,17 +323,21 @@ impl TraktConnection {
         let headers = self.get_rw_headers().await?;
         let url = format!("{}/sync/watchlist", self.config.trakt_endpoint);
         let data = hashmap! {
-            "shows" => vec![show_obj],
+            "shows" => vec![show_obj.show],
         };
-        self.client
+        debug!("shows: {}", serde_json::to_string_pretty(&data)?);
+        let text = self
+            .client
             .post(url.as_str())
             .headers(headers)
             .json(&data)
             .send()
             .await?
-            .error_for_status()?;
+            .error_for_status()?
+            .text()
+            .await?;
         Ok(TraktResult {
-            status: "success".into(),
+            status: text.into(),
         })
     }
 
@@ -320,17 +350,20 @@ impl TraktConnection {
         let headers = self.get_rw_headers().await?;
         let url = format!("{}/sync/watchlist/remove", self.config.trakt_endpoint);
         let data = hashmap! {
-            "shows" => vec![show_obj],
+            "shows" => vec![show_obj.show],
         };
-        self.client
+        let text = self
+            .client
             .post(url.as_str())
             .headers(headers)
             .json(&data)
             .send()
             .await?
-            .error_for_status()?;
+            .error_for_status()?
+            .text()
+            .await?;
         Ok(TraktResult {
-            status: "success".into(),
+            status: text.into(),
         })
     }
 
@@ -586,7 +619,7 @@ struct AccessTokenResponse {
     created_at: u64,
 }
 
-#[derive(Serialize, Deserialize, Debug)]
+#[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct TraktIdObject {
     pub trakt: i32,
     pub imdb: Option<StackString>,
@@ -595,7 +628,7 @@ pub struct TraktIdObject {
     pub tmdb: Option<i32>,
 }
 
-#[derive(Serialize, Deserialize, Debug)]
+#[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct TraktShowObject {
     pub title: StackString,
     pub year: i32,
@@ -610,7 +643,7 @@ pub struct TraktEpisodeObject {
     pub ids: TraktIdObject,
 }
 
-#[derive(Serialize, Deserialize, Debug)]
+#[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct WatchListShowsResponse {
     pub show: TraktShowObject,
 }
