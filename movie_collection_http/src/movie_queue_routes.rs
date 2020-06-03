@@ -79,10 +79,7 @@ async fn queue_body_resp(
 ) -> Result<HttpResponse, Error> {
     let entries = movie_queue_http(&queue, pool).await?;
     let body = movie_queue_body(&patterns, &entries);
-    let resp = HttpResponse::Ok()
-        .content_type("text/html; charset=utf-8")
-        .body(body);
-    Ok(resp)
+    form_http_response(body)
 }
 
 pub async fn movie_queue(_: LoggedUser, state: Data<AppState>) -> Result<HttpResponse, Error> {
@@ -135,10 +132,7 @@ fn transcode_worker(
             Ok(format!("{}", entry))
         })
         .collect();
-    let resp = HttpResponse::Ok()
-        .content_type("text/html; charset=utf-8")
-        .body(entries?.join(""));
-    Ok(resp)
+    form_http_response(entries?.join(""))
 }
 
 pub async fn movie_queue_transcode(
@@ -200,11 +194,7 @@ fn play_worker(full_path: String) -> Result<HttpResponse, Error> {
         full_path, file_name
     );
     Exec::shell(&command).join()?;
-
-    let resp = HttpResponse::Ok()
-        .content_type("text/html; charset=utf-8")
-        .body(body);
-    Ok(resp)
+    form_http_response(body)
 }
 
 pub async fn movie_queue_play(
@@ -247,10 +237,7 @@ fn new_episode_worker(entries: &[String]) -> Result<HttpResponse, Error> {
         previous,
         entries.join("")
     );
-    let resp = HttpResponse::Ok()
-        .content_type("text/html; charset=utf-8")
-        .body(entries);
-    Ok(resp)
+    form_http_response(entries)
 }
 
 pub async fn find_new_episodes(
@@ -428,11 +415,7 @@ pub async fn tvshows(_: LoggedUser, state: Data<AppState>) -> Result<HttpRespons
     let shows = s.db.handle(TvShowsRequest {}).await?;
     let res1 = state.db.handle(WatchlistShowsRequest {}).await?;
     let entries = tvshows_worker(res1, shows)?;
-
-    let resp = HttpResponse::Ok()
-        .content_type("text/html; charset=utf-8")
-        .body(entries);
-    Ok(resp)
+    form_http_response(entries)
 }
 
 fn process_shows(
@@ -537,10 +520,7 @@ fn watchlist_worker(
         shows.join("")
     );
 
-    let resp = HttpResponse::Ok()
-        .content_type("text/html; charset=utf-8")
-        .body(entries);
-    Ok(resp)
+    form_http_response(entries)
 }
 
 pub async fn trakt_watchlist(_: LoggedUser, state: Data<AppState>) -> Result<HttpResponse, Error> {
@@ -562,10 +542,7 @@ async fn watchlist_action_worker(
             .to_string(),
         _ => "".to_string(),
     };
-    let resp = HttpResponse::Ok()
-        .content_type("text/html; charset=utf-8")
-        .body(body);
-    Ok(resp)
+    form_http_response(body)
 }
 
 pub async fn trakt_watchlist_action(
@@ -637,10 +614,7 @@ pub async fn trakt_watched_seasons(
         show_opt.map_or_else(empty, |(imdb_url, t)| (imdb_url, t.show, t.link));
     let entries = state.db.handle(ImdbSeasonsRequest { show }).await?;
     let entries = trakt_watched_seasons_worker(&link, &imdb_url, &entries)?;
-    let resp = HttpResponse::Ok()
-        .content_type("text/html; charset=utf-8")
-        .body(entries);
-    Ok(resp)
+    form_http_response(entries)
 }
 
 pub async fn trakt_watched_list(
@@ -682,10 +656,7 @@ fn trakt_cal_worker(entries: &[String]) -> Result<HttpResponse, Error> {
         previous,
         entries.join("")
     );
-    let resp = HttpResponse::Ok()
-        .content_type("text/html; charset=utf-8")
-        .body(entries);
-    Ok(resp)
+    form_http_response(entries)
 }
 
 pub async fn trakt_cal(_: LoggedUser, state: Data<AppState>) -> Result<HttpResponse, Error> {
