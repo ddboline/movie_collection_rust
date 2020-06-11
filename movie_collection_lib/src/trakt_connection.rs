@@ -7,7 +7,11 @@ use maplit::hashmap;
 use rand::{thread_rng, Rng};
 use reqwest::{header::HeaderMap, Client, Url};
 use serde::{Deserialize, Serialize};
-use std::{collections::HashMap, path::PathBuf, sync::Arc};
+use std::{
+    collections::{HashMap, HashSet},
+    path::PathBuf,
+    sync::Arc,
+};
 use tokio::{
     fs::{read, write},
     sync::{Mutex, RwLock},
@@ -414,7 +418,7 @@ impl TraktConnection {
         Ok(episode_map)
     }
 
-    pub async fn get_watched_movies(&self) -> Result<HashMap<StackString, WatchedMovie>, Error> {
+    pub async fn get_watched_movies(&self) -> Result<HashSet<WatchedMovie>, Error> {
         let headers = self.get_rw_headers().await?;
         let url = format!("{}/sync/watched/movies", self.config.trakt_endpoint);
         let watched_movies: Vec<TraktWatchedMovieResponse> = self
@@ -426,7 +430,7 @@ impl TraktConnection {
             .error_for_status()?
             .json()
             .await?;
-        let movie_map = watched_movies
+        let movie_map: HashSet<WatchedMovie> = watched_movies
             .into_iter()
             .map(|entry| {
                 let imdb: StackString = entry
@@ -435,11 +439,10 @@ impl TraktConnection {
                     .imdb
                     .as_ref()
                     .map_or_else(|| "".into(), Clone::clone);
-                let movie = WatchedMovie {
+                WatchedMovie {
                     title: entry.movie.title,
-                    imdb_url: imdb.clone(),
-                };
-                (imdb, movie)
+                    imdb_url: imdb,
+                }
             })
             .collect();
         Ok(movie_map)

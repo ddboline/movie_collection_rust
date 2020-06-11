@@ -6,6 +6,8 @@ use actix_web::{
 };
 use anyhow::format_err;
 use serde::{Deserialize, Serialize};
+use std::borrow::Borrow;
+use std::hash::{Hash, Hasher};
 use std::{
     collections::{HashMap, HashSet},
     path,
@@ -353,12 +355,33 @@ pub async fn frontpage(_: LoggedUser, _: Data<AppState>) -> Result<HttpResponse,
 
 type TvShowsMap = HashMap<StackString, (StackString, WatchListShow, Option<TvShowSource>)>;
 
-#[derive(Debug, Default)]
+#[derive(Debug, Default, Eq)]
 struct ProcessShowItem {
     show: StackString,
     title: StackString,
     link: StackString,
     source: Option<TvShowSource>,
+}
+
+impl PartialEq for ProcessShowItem {
+    fn eq(&self, other: &Self) -> bool {
+        self.link == other.link
+    }
+}
+
+impl Hash for ProcessShowItem {
+    fn hash<H>(&self, state: &mut H)
+    where
+        H: Hasher,
+    {
+        self.link.hash(state)
+    }
+}
+
+impl Borrow<str> for ProcessShowItem {
+    fn borrow(&self) -> &str {
+        self.link.as_str()
+    }
 }
 
 impl From<TvShowsResult> for ProcessShowItem {
@@ -373,14 +396,14 @@ impl From<TvShowsResult> for ProcessShowItem {
 }
 
 fn tvshows_worker(res1: TvShowsMap, tvshows: Vec<TvShowsResult>) -> Result<String, Error> {
-    let tvshows: HashMap<StackString, _> = tvshows
+    let tvshows: HashSet<_> = tvshows
         .into_iter()
         .map(|s| {
             let item: ProcessShowItem = s.into();
-            (item.link.clone(), item)
+            item
         })
         .collect();
-    let watchlist: HashMap<StackString, _> = res1
+    let watchlist: HashSet<_> = res1
         .into_iter()
         .map(|(link, (show, s, source))| {
             let item = ProcessShowItem {
@@ -389,7 +412,8 @@ fn tvshows_worker(res1: TvShowsMap, tvshows: Vec<TvShowsResult>) -> Result<Strin
                 link: s.link,
                 source,
             };
-            (link, item)
+            debug_assert!(link.as_str() == item.link.as_str());
+            item
         })
         .collect();
 
@@ -419,24 +443,18 @@ pub async fn tvshows(_: LoggedUser, state: Data<AppState>) -> Result<HttpRespons
 }
 
 fn process_shows(
-    tvshows: HashMap<StackString, ProcessShowItem>,
-    watchlist: HashMap<StackString, ProcessShowItem>,
+    tvshows: HashSet<ProcessShowItem>,
+    watchlist: HashSet<ProcessShowItem>,
 ) -> Result<Vec<String>, Error> {
-    let watchlist_keys: HashSet<_> = watchlist.keys().cloned().collect();
     let watchlist_shows: Vec<_> = watchlist
-        .into_iter()
-        .filter_map(|(_, item)| match tvshows.get(&item.link) {
+        .iter()
+        .filter_map(|item| match tvshows.get(item.link.as_str()) {
             None => Some(item),
             Some(_) => None,
         })
         .collect();
 
-    let tvshow_keys: HashSet<_> = tvshows.keys().cloned().collect();
-    let mut shows: Vec<_> = tvshows
-        .into_iter()
-        .map(|(_, v)| v)
-        .chain(watchlist_shows.into_iter())
-        .collect();
+    let mut shows: Vec<_> = tvshows.iter().chain(watchlist_shows.into_iter()).collect();
     shows.sort_by(|x, y| x.show.cmp(&y.show));
 
     let button_add = r#"<td><button type="submit" id="ID" onclick="watchlist_add('SHOW');">add to watchlist</button></td>"#;
@@ -445,11 +463,11 @@ fn process_shows(
     let shows: Vec<_> = shows
         .into_iter()
         .map(|item| {
-            let has_watchlist = watchlist_keys.contains(&item.link);
+            let has_watchlist = watchlist.contains(item.link.as_str());
             format!(
                 r#"<tr><td>{}</td>
                 <td><a href="https://www.imdb.com/title/{}" target="_blank">imdb</a></td><td>{}</td><td>{}</td><td>{}</td></tr>"#,
-                if tvshow_keys.contains(&item.link) {
+                if tvshows.contains(item.link.as_str()) {
                     format!(r#"<a href="javascript:updateMainArticle('/list/{}')">{}</a>"#, item.show, item.title)
                 } else {
                     format!(

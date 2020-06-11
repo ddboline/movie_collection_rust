@@ -5,6 +5,8 @@ use lazy_static::lazy_static;
 use log::debug;
 use postgres_query::FromSqlRow;
 use serde::{Deserialize, Serialize};
+use std::borrow::Borrow;
+use std::hash::{Hash, Hasher};
 use std::{
     collections::{HashMap, HashSet},
     fmt,
@@ -114,11 +116,32 @@ impl fmt::Display for TraktResult {
     }
 }
 
-#[derive(Serialize, Deserialize, Debug, Default, FromSqlRow)]
+#[derive(Serialize, Deserialize, Debug, Default, FromSqlRow, Eq)]
 pub struct WatchListShow {
     pub link: StackString,
     pub title: StackString,
     pub year: i32,
+}
+
+impl PartialEq for WatchListShow {
+    fn eq(&self, other: &Self) -> bool {
+        self.link == other.link
+    }
+}
+
+impl Hash for WatchListShow {
+    fn hash<H>(&self, state: &mut H)
+    where
+        H: Hasher,
+    {
+        self.link.hash(state)
+    }
+}
+
+impl Borrow<str> for WatchListShow {
+    fn borrow(&self) -> &str {
+        self.link.as_str()
+    }
 }
 
 impl fmt::Display for WatchListShow {
@@ -200,9 +223,7 @@ impl WatchListShow {
     }
 }
 
-pub async fn get_watchlist_shows_db(
-    pool: &PgPool,
-) -> Result<HashMap<StackString, WatchListShow>, Error> {
+pub async fn get_watchlist_shows_db(pool: &PgPool) -> Result<HashSet<WatchListShow>, Error> {
     let query = r#"
         SELECT a.link, a.title, a.year
         FROM trakt_watchlist a
@@ -214,7 +235,7 @@ pub async fn get_watchlist_shows_db(
         .iter()
         .map(|row| {
             let val = WatchListShow::from_row(row)?;
-            Ok((val.link.clone(), val))
+            Ok(val)
         })
         .collect()
 }
@@ -434,10 +455,31 @@ pub async fn get_watched_shows_db(
         .collect()
 }
 
-#[derive(Serialize, Deserialize, Debug, Default, PartialEq, Eq, Hash)]
+#[derive(Serialize, Deserialize, Debug, Default, Eq)]
 pub struct WatchedMovie {
     pub title: StackString,
     pub imdb_url: StackString,
+}
+
+impl PartialEq for WatchedMovie {
+    fn eq(&self, other: &Self) -> bool {
+        self.imdb_url == other.imdb_url
+    }
+}
+
+impl Hash for WatchedMovie {
+    fn hash<H>(&self, state: &mut H)
+    where
+        H: Hasher,
+    {
+        self.imdb_url.hash(state)
+    }
+}
+
+impl Borrow<str> for WatchedMovie {
+    fn borrow(&self) -> &str {
+        self.imdb_url.as_str()
+    }
 }
 
 impl fmt::Display for WatchedMovie {
@@ -561,7 +603,7 @@ pub async fn sync_trakt_with_db(mc: &MovieCollection) -> Result<(), Error> {
     let futures = watchlist_shows.into_iter().map(|(link, show)| {
         let watchlist_shows_db = watchlist_shows_db.clone();
         async move {
-            if !watchlist_shows_db.contains_key(&link) {
+            if !watchlist_shows_db.contains(link.as_str()) {
                 show.insert_show(&mc.pool).await?;
                 mc.stdout
                     .send(format!("insert watchlist {}", show).into())?;
@@ -597,11 +639,8 @@ pub async fn sync_trakt_with_db(mc: &MovieCollection) -> Result<(), Error> {
     let results: Result<Vec<_>, Error> = try_join_all(futures).await;
     results?;
 
-    let watched_movies_db: HashMap<StackString, _> = get_watched_movies_db(&mc.pool)
-        .await?
-        .into_iter()
-        .map(|s| (s.imdb_url.clone(), s))
-        .collect();
+    let watched_movies_db: HashSet<_> =
+        get_watched_movies_db(&mc.pool).await?.into_iter().collect();
     let watched_movies_db = Arc::new(watched_movies_db);
     let watched_movies = TRAKT_CONN.get_watched_movies().await?;
     let watched_movies = Arc::new(watched_movies);
@@ -609,10 +648,10 @@ pub async fn sync_trakt_with_db(mc: &MovieCollection) -> Result<(), Error> {
         return Ok(());
     }
 
-    let futures = watched_movies.iter().map(|(key, movie)| {
+    let futures = watched_movies.iter().map(|movie: &WatchedMovie| {
         let watched_movies_db = watched_movies_db.clone();
         async move {
-            if !watched_movies_db.contains_key(key) {
+            if !watched_movies_db.contains(movie.imdb_url.as_str()) {
                 movie.insert_movie(&mc.pool).await?;
                 mc.stdout.send(format!("insert watched {}", movie).into())?;
             }
@@ -622,10 +661,10 @@ pub async fn sync_trakt_with_db(mc: &MovieCollection) -> Result<(), Error> {
     let results: Result<Vec<_>, Error> = try_join_all(futures).await;
     results?;
 
-    let futures = watched_movies_db.iter().map(|(key, movie)| {
+    let futures = watched_movies_db.iter().map(|movie| {
         let watched_movies = watched_movies.clone();
         async move {
-            if !watched_movies.contains_key(key) {
+            if !watched_movies.contains(movie.imdb_url.as_str()) {
                 movie.delete_movie(&mc.pool).await?;
                 mc.stdout.send(format!("delete watched {}", movie).into())?;
             }
@@ -729,9 +768,8 @@ async fn watchlist_rm(mc: &MovieCollection, show: Option<&str>) -> Result<(), Er
 
 async fn watchlist_list(mc: &MovieCollection) -> Result<(), Error> {
     let show_map = get_watchlist_shows_db(&mc.pool).await?;
-    for (_, show) in show_map {
-        mc.stdout.send(format!("{}", show).into())?;
-    }
+    let results: Vec<_> = show_map.iter().map(ToString::to_string).collect();
+    mc.stdout.send(results.join("\n").into())?;
     Ok(())
 }
 
