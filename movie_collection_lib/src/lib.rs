@@ -9,6 +9,7 @@
 #![allow(clippy::shadow_unrelated)]
 #![allow(clippy::missing_errors_doc)]
 #![allow(clippy::struct_excessive_bools)]
+#![allow(clippy::used_underscore_binding)]
 
 pub mod config;
 pub mod imdb_episodes;
