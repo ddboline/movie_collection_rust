@@ -448,10 +448,7 @@ fn process_shows(
 ) -> Result<Vec<String>, Error> {
     let watchlist_shows: Vec<_> = watchlist
         .iter()
-        .filter_map(|item| match tvshows.get(item.link.as_str()) {
-            None => Some(item),
-            Some(_) => None,
-        })
+        .filter(|item| tvshows.get(item.link.as_str()).is_none())
         .collect();
 
     let mut shows: Vec<_> = tvshows.iter().chain(watchlist_shows.into_iter()).collect();

@@ -1,3 +1,5 @@
+#![allow(clippy::used_underscore_binding)]
+
 use crossbeam_utils::thread;
 
 use movie_collection_lib::{config::Config, utils::read_transcode_jobs_from_queue};

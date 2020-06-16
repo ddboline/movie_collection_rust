@@ -1,3 +1,5 @@
+#![allow(clippy::used_underscore_binding)]
+
 use anyhow::Error;
 
 use movie_collection_lib::{make_list::make_list, stdout_channel::StdoutChannel};

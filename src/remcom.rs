@@ -1,3 +1,5 @@
+#![allow(clippy::used_underscore_binding)]
+
 use anyhow::Error;
 use std::path::PathBuf;
 use structopt::StructOpt;
