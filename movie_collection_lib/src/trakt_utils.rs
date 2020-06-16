@@ -5,11 +5,11 @@ use lazy_static::lazy_static;
 use log::debug;
 use postgres_query::FromSqlRow;
 use serde::{Deserialize, Serialize};
-use std::borrow::Borrow;
-use std::hash::{Hash, Hasher};
 use std::{
+    borrow::Borrow,
     collections::{HashMap, HashSet},
     fmt,
+    hash::{Hash, Hasher},
     str::FromStr,
     sync::Arc,
 };

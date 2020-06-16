@@ -1,71 +1,103 @@
 use anyhow::{format_err, Error};
-use std::{env::var, ops::Deref, path::Path, sync::Arc};
+use serde::Deserialize;
+use std::{
+    ops::Deref,
+    path::{Path, PathBuf},
+    sync::Arc,
+};
 
 use crate::stack_string::StackString;
 
-#[derive(Debug, Default)]
+#[derive(Debug, Default, Deserialize)]
 pub struct ConfigInner {
-    pub home_dir: StackString,
+    #[serde(default = "default_home_dir")]
+    pub home_dir: PathBuf,
     pub pgurl: StackString,
     pub movie_dirs: Vec<StackString>,
+    #[serde(default = "default_suffixes")]
     pub suffixes: Vec<StackString>,
-    pub preferred_dir: StackString,
+    #[serde(default = "default_preferred_dir")]
+    pub preferred_dir: PathBuf,
+    #[serde(default = "default_queue_table")]
     pub queue_table: StackString,
+    #[serde(default = "default_collection_table")]
     pub collection_table: StackString,
+    #[serde(default = "default_ratings_table")]
     pub ratings_table: StackString,
+    #[serde(default = "default_episode_table")]
     pub episode_table: StackString,
+    #[serde(default = "default_port")]
     pub port: u32,
+    #[serde(default = "default_domain")]
     pub domain: StackString,
+    #[serde(default = "default_n_db_workers")]
     pub n_db_workers: usize,
+    #[serde(default = "default_transcode_queue")]
     pub transcode_queue: StackString,
+    #[serde(default = "default_remcom_queue")]
     pub remcom_queue: StackString,
+    #[serde(default = "default_trakt_endpoint")]
     pub trakt_endpoint: StackString,
     pub trakt_client_id: StackString,
     pub trakt_client_secret: StackString,
+    #[serde(default = "default_secret_key")]
+    pub secret_key: StackString,
+}
+
+fn default_suffixes() -> Vec<StackString> {
+    vec!["avi".into(), "mp4".into(), "mkv".into()]
+}
+fn default_preferred_dir() -> PathBuf {
+    "/tmp".into()
+}
+fn default_home_dir() -> PathBuf {
+    dirs::home_dir().expect("No home directory")
+}
+fn default_port() -> u32 {
+    8042
+}
+fn default_secret_key() -> StackString {
+    "0123".repeat(8).into()
+}
+fn default_domain() -> StackString {
+    "localhost".into()
+}
+fn default_n_db_workers() -> usize {
+    2
+}
+fn default_queue_table() -> StackString {
+    "movie_queue".into()
+}
+fn default_collection_table() -> StackString {
+    "movie_collection".into()
+}
+fn default_ratings_table() -> StackString {
+    "imdb_ratings".into()
+}
+fn default_episode_table() -> StackString {
+    "imdb_episodes".into()
+}
+fn default_transcode_queue() -> StackString {
+    "transcode_work_queue".into()
+}
+fn default_remcom_queue() -> StackString {
+    "remcom_worker_queue".into()
+}
+fn default_trakt_endpoint() -> StackString {
+    "https://api.trakt.tv".into()
 }
 
 #[derive(Debug, Default, Clone)]
 pub struct Config(Arc<ConfigInner>);
 
-macro_rules! set_config {
-    ($s:ident, $id:ident) => {
-        if let Ok($id) = var(&stringify!($id).to_uppercase()) {
-            $s.$id = $id.into();
-        }
-    };
-}
-
-macro_rules! set_config_parse {
-    ($s:ident, $id:ident, $d:expr) => {
-        $s.$id = var(&stringify!($id).to_uppercase())
-            .ok()
-            .and_then(|x| x.parse().ok())
-            .unwrap_or_else(|| $d);
-    };
-}
-
-macro_rules! set_config_must {
-    ($s:ident, $id:ident) => {
-        $s.$id = var(&stringify!($id).to_uppercase())
-            .map(Into::into)
-            .map_err(|e| format_err!("{} must be set: {}", stringify!($id).to_uppercase(), e))?;
-    };
-}
-
-macro_rules! set_config_default {
-    ($s:ident, $id:ident, $d:expr) => {
-        $s.$id = var(&stringify!($id).to_uppercase()).map_or_else(|_| $d, Into::into);
-    };
-}
-
 impl ConfigInner {
     pub fn new() -> Self {
         Self {
-            home_dir: "/tmp".into(),
-            suffixes: vec!["avi".into(), "mp4".into(), "mkv".into()],
-            port: 8042,
-            domain: "localhost".into(),
-            n_db_workers: 2,
+            home_dir: default_home_dir(),
+            suffixes: default_suffixes(),
+            port: default_port(),
+            domain: default_domain(),
+            n_db_workers: default_n_db_workers(),
             ..Self::default()
         }
     }
@@ -84,40 +116,7 @@ impl Config {
             dotenv::from_path(&env_file).ok();
         }
 
-        let mut config = ConfigInner::new();
-
-        set_config_must!(config, pgurl);
-        set_config_default!(config, preferred_dir, "/tmp".into());
-        set_config_default!(config, queue_table, "movie_queue".into());
-        set_config_default!(config, collection_table, "movie_collection".into());
-        set_config_default!(config, ratings_table, "imdb_ratings".into());
-        set_config_default!(config, episode_table, "imdb_episodes".into());
-        set_config_parse!(config, port, 8042);
-        set_config!(config, domain);
-        set_config_parse!(config, n_db_workers, 2);
-        set_config_default!(config, transcode_queue, "transcode_work_queue".into());
-        set_config_default!(config, remcom_queue, "remcom_worker_queue".into());
-        set_config_parse!(config, trakt_endpoint, "https://api.trakt.tv".into());
-        set_config_default!(config, trakt_client_id, "".into());
-        set_config_default!(config, trakt_client_secret, "".into());
-
-        config.home_dir = dirs::home_dir()
-            .ok_or_else(|| format_err!("No HOME directory..."))?
-            .to_string_lossy()
-            .to_string()
-            .into();
-
-        config.movie_dirs = var("MOVIEDIRS")
-            .unwrap_or_else(|_| "".to_string())
-            .split(',')
-            .filter_map(|d| {
-                if Path::new(d).exists() {
-                    Some(d.into())
-                } else {
-                    None
-                }
-            })
-            .collect();
+        let config: ConfigInner = envy::from_env()?;
 
         Ok(Self(Arc::new(config)))
     }

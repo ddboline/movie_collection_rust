@@ -6,10 +6,10 @@ use actix_web::{
 };
 use anyhow::format_err;
 use serde::{Deserialize, Serialize};
-use std::borrow::Borrow;
-use std::hash::{Hash, Hasher};
 use std::{
+    borrow::Borrow,
     collections::{HashMap, HashSet},
+    hash::{Hash, Hasher},
     path,
 };
 use subprocess::Exec;

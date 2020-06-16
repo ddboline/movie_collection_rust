@@ -1,5 +1,5 @@
 use anyhow::Error;
-use std::path::{Path, PathBuf};
+use std::path::PathBuf;
 use structopt::StructOpt;
 
 use movie_collection_lib::{
@@ -21,9 +21,7 @@ async fn transcode_avi() -> Result<(), Error> {
     let opts = TranscodeAviOpts::from_args();
 
     for path in opts.files {
-        let movie_path = Path::new(config.home_dir.as_str())
-            .join("Documents")
-            .join("movies");
+        let movie_path = config.home_dir.join("Documents").join("movies");
         let path = if path.exists() {
             path
         } else {
@@ -35,7 +33,7 @@ async fn transcode_avi() -> Result<(), Error> {
             panic!("file doesn't exist {}", path.to_string_lossy());
         }
         create_transcode_script(&config, &path).and_then(|s| {
-            stdout.send(format!("script {}", s).into())?;
+            stdout.send(format!("script {:?}", s).into())?;
             publish_transcode_job_to_queue(&s, &config.transcode_queue, &config.transcode_queue)
         })?;
     }

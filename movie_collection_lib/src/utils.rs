@@ -9,16 +9,15 @@ use rand::{
 use reqwest::{Client, Response, Url};
 use serde::{Deserialize, Serialize};
 use std::{
-    env::var,
     fs::{create_dir_all, rename, File, OpenOptions},
     io::{BufRead, BufReader, Write},
-    path::Path,
+    path::{Path, PathBuf},
     string::ToString,
 };
 use subprocess::{Exec, Redirection};
 use tokio::time::{delay_for, Duration};
 
-use crate::{config::Config, stack_string::StackString, stdout_channel::StdoutChannel};
+use crate::{config::Config, stdout_channel::StdoutChannel};
 
 #[inline]
 pub fn option_string_wrapper<T: AsRef<str>>(s: &Option<T>) -> &str {
@@ -87,11 +86,11 @@ pub fn open_transcode_channel(queue: &str) -> Result<Channel, Error> {
 
 #[derive(Serialize, Deserialize)]
 struct ScriptStruct {
-    script: StackString,
+    script: PathBuf,
 }
 
 pub fn publish_transcode_job_to_queue(
-    script: &str,
+    script: &Path,
     queue: &str,
     routing_key: &str,
 ) -> Result<(), Error> {
@@ -129,11 +128,10 @@ pub fn read_transcode_jobs_from_queue(queue: &str) -> Result<(), Error> {
                 .open("/tmp/temp_encoding.out")
                 .unwrap();
 
-            let path = Path::new(script.as_str());
-            let file_name = path.file_name().unwrap().to_string_lossy();
-            let home_dir = var("HOME").unwrap_or_else(|_| "/tmp".to_string());
-            if path.exists() {
-                let command = format!("sh {}", script);
+            let file_name = script.file_name().unwrap().to_string_lossy();
+            let home_dir = dirs::home_dir().unwrap_or_else(|| "/tmp".into());
+            if script.exists() {
+                let command = format!("sh {}", script.to_string_lossy());
 
                 let stream = Exec::shell(&command)
                     .stderr(Redirection::Merge)
@@ -149,11 +147,7 @@ pub fn read_transcode_jobs_from_queue(queue: &str) -> Result<(), Error> {
                     write!(output_file, "{}", line).unwrap();
                 }
 
-                rename(
-                    script.as_str(),
-                    &format!("{}/tmp_avi/{}", home_dir, file_name),
-                )
-                .unwrap();
+                rename(&script, home_dir.join("tmp_avi").join(file_name.as_ref())).unwrap();
             }
         },
         queue,
@@ -172,21 +166,28 @@ pub fn read_transcode_jobs_from_queue(queue: &str) -> Result<(), Error> {
     Ok(())
 }
 
-pub fn create_transcode_script(config: &Config, path: &Path) -> Result<String, Error> {
+pub fn create_transcode_script(config: &Config, path: &Path) -> Result<PathBuf, Error> {
     let full_path = path.to_string_lossy().to_string();
-    let fstem = path
-        .file_stem()
-        .ok_or_else(|| format_err!("No stem"))?
-        .to_string_lossy();
-    let script_file = format!("{}/dvdrip/jobs/{}.sh", config.home_dir, fstem);
+    let fstem = path.file_stem().ok_or_else(|| format_err!("No stem"))?;
+    let script_file = config
+        .home_dir
+        .join("dvdrip")
+        .join("jobs")
+        .join(&fstem)
+        .with_extension("sh");
     if Path::new(&script_file).exists() {
         Err(format_err!("File exists"))
     } else {
-        let output_file = format!("{}/dvdrip/avi/{}.mp4", config.home_dir, fstem);
+        let output_file = config
+            .home_dir
+            .join("dvdrip")
+            .join("avi")
+            .join(&fstem)
+            .with_extension("mp4");
         let template_file = include_str!("../../templates/transcode_script.sh")
             .replace("INPUT_FILE", &full_path)
-            .replace("OUTPUT_FILE", &output_file)
-            .replace("PREFIX", &fstem);
+            .replace("OUTPUT_FILE", &output_file.to_string_lossy())
+            .replace("PREFIX", &fstem.to_string_lossy());
         let mut file = File::create(&script_file)?;
         file.write_all(&template_file.into_bytes())?;
         Ok(script_file)
@@ -198,12 +199,13 @@ pub fn create_move_script(
     directory: Option<&Path>,
     unwatched: bool,
     path: &Path,
-) -> Result<String, Error> {
+) -> Result<PathBuf, Error> {
     let file = path.to_string_lossy();
     let file_name = path.file_name().unwrap().to_string_lossy();
     let prefix = path.file_stem().unwrap().to_string_lossy().to_string();
     let output_dir = if let Some(d) = directory {
-        let d = Path::new(config.preferred_dir.as_str())
+        let d = config
+            .preferred_dir
             .join("Documents")
             .join("movies")
             .join(d);
@@ -215,9 +217,7 @@ pub fn create_move_script(
         }
         d
     } else if unwatched {
-        let d = Path::new(config.preferred_dir.as_str())
-            .join("television")
-            .join("unwatched");
+        let d = config.preferred_dir.join("television").join("unwatched");
         if !d.exists() {
             return Err(format_err!(
                 "Directory {} does not exist",
@@ -234,7 +234,8 @@ pub fn create_move_script(
             panic!("Failed to parse show season {} episode {}", season, episode);
         }
 
-        let d = Path::new(config.preferred_dir.as_str())
+        let d = config
+            .preferred_dir
             .join("Documents")
             .join("television")
             .join(show)
@@ -244,7 +245,8 @@ pub fn create_move_script(
         }
         d
     };
-    let mp4_script = Path::new(config.home_dir.as_str())
+    let mp4_script = config
+        .home_dir
         .join("dvdrip")
         .join("jobs")
         .join(format!("{}_copy.sh", prefix));
@@ -262,7 +264,7 @@ pub fn create_move_script(
     f.write_all(&script_str.into_bytes())?;
 
     debug!("dir {} file {}", output_dir, file);
-    Ok(mp4_script.to_string_lossy().to_string())
+    Ok(mp4_script)
 }
 
 pub fn parse_file_stem(file_stem: &str) -> (String, i32, i32) {
@@ -349,7 +351,7 @@ pub fn remcom_single_file(
     if ext != "mp4" {
         match create_transcode_script(&config, &path) {
             Ok(s) => {
-                stdout.send(format!("script {}", s).into())?;
+                stdout.send(format!("script {:?}", s).into())?;
                 publish_transcode_job_to_queue(&s, &config.remcom_queue, &config.remcom_queue)?;
             }
             Err(e) => error!("error {}", e),
@@ -358,7 +360,7 @@ pub fn remcom_single_file(
 
     create_move_script(&config, directory, unwatched, &path)
         .and_then(|s| {
-            stdout.send(format!("script {}", s).into())?;
+            stdout.send(format!("script {:?}", s).into())?;
             publish_transcode_job_to_queue(&s, &config.remcom_queue, &config.remcom_queue)
         })
         .map_err(|e| {

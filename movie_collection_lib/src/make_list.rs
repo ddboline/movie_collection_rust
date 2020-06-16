@@ -1,6 +1,6 @@
 use anyhow::Error;
 use rayon::iter::{IntoParallelRefIterator, ParallelIterator};
-use std::{collections::HashMap, path::Path};
+use std::collections::HashMap;
 
 use crate::{
     config::Config,
@@ -11,10 +11,9 @@ use crate::{
 
 pub fn make_list(stdout: &StdoutChannel) -> Result<(), Error> {
     let config = Config::with_config()?;
-    let movies_dir = format!("{}/Documents/movies", config.home_dir);
-    let path = Path::new(&movies_dir);
+    let movies_dir = config.home_dir.join("Documents").join("movies");
 
-    let mut local_file_list: Vec<_> = path
+    let mut local_file_list: Vec<_> = movies_dir
         .read_dir()?
         .filter_map(|f| match f {
             Ok(fname) => {
