@@ -55,10 +55,12 @@ pub fn make_list(stdout: &StdoutChannel) -> Result<(), Error> {
 
     let result: Vec<_> = local_file_list
         .iter()
-        .filter_map(|f| {
-            file_map
-                .get(f.as_str())
-                .map(|full_path| format!("{} {}", f, full_path.to_string_lossy()))
+        .map(|f| {
+            if let Some(full_path) = file_map.get(f.as_str()) {
+                format!("{} {}", f, full_path.to_string_lossy())
+            } else {
+                format!("{}", f)
+            }
         })
         .collect();
 
