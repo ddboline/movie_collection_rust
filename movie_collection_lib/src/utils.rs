@@ -40,10 +40,8 @@ pub fn walk_directory<T: AsRef<str>>(path: &Path, match_strs: &[T]) -> Result<Ve
                         path_stack.push(path);
                     } else if match_strs.is_empty() {
                         output_paths.push(path);
-                    } else {
-                        if match_strs.iter().any(|m| path_name.contains(m.as_ref())) {
-                            output_paths.push(path);
-                        }
+                    } else if match_strs.iter().any(|m| path_name.contains(m.as_ref())) {
+                        output_paths.push(path);
                     }
                 }
             }
