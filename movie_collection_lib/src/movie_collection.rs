@@ -589,7 +589,11 @@ impl MovieCollection {
             return Ok(());
         }
 
-        let file_list: HashSet<_> = file_list.into_iter().flatten().collect();
+        let file_list: HashSet<_> = file_list
+            .into_iter()
+            .flatten()
+            .map(|f| f.to_string_lossy().into_owned())
+            .collect();
         let file_list = Arc::new(file_list);
 
         let episode_list: Result<HashSet<(StackString, _, _, _)>, Error> = file_list

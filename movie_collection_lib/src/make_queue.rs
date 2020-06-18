@@ -69,7 +69,8 @@ pub async fn make_queue_worker(
             let results: Result<Vec<_>, Error> = movie_queue
                 .into_par_iter()
                 .map(|result| {
-                    let timeval = get_video_runtime(&result.path)?;
+                    let path = Path::new(result.path.as_str());
+                    let timeval = get_video_runtime(path)?;
                     Ok(format!("{} {}", result, timeval))
                 })
                 .collect();

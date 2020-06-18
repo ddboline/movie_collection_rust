@@ -13,7 +13,7 @@ pub struct ConfigInner {
     #[serde(default = "default_home_dir")]
     pub home_dir: PathBuf,
     pub pgurl: StackString,
-    pub movie_dirs: Vec<StackString>,
+    pub movie_dirs: Vec<PathBuf>,
     #[serde(default = "default_suffixes")]
     pub suffixes: Vec<StackString>,
     #[serde(default = "default_preferred_dir")]

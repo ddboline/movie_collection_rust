@@ -48,19 +48,17 @@ pub fn make_list(stdout: &StdoutChannel) -> Result<(), Error> {
     let file_map: HashMap<StackString, _> = file_list
         .iter()
         .map(|f| {
-            let file_name = f.split('/').last().unwrap().into();
+            let file_name = f.file_name().unwrap().to_string_lossy().to_string().into();
             (file_name, f)
         })
         .collect();
 
     let result: Vec<_> = local_file_list
         .iter()
-        .map(|f| {
-            let full_path = match file_map.get(f.as_str()) {
-                Some(s) => s,
-                None => "",
-            };
-            format!("{} {}", f, full_path)
+        .filter_map(|f| {
+            file_map
+                .get(f.as_str())
+                .map(|full_path| format!("{} {}", f, full_path.to_string_lossy()))
         })
         .collect();
 
@@ -72,8 +70,7 @@ pub fn make_list(stdout: &StdoutChannel) -> Result<(), Error> {
         .par_iter()
         .map(|f| {
             let timeval = get_video_runtime(f).unwrap_or_else(|_| "".to_string());
-
-            format!("{} {}", timeval, f)
+            format!("{} {}", timeval, f.to_string_lossy())
         })
         .collect();
 

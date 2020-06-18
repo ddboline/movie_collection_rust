@@ -2,6 +2,7 @@
 
 use anyhow::Error;
 use futures::future::try_join_all;
+use std::path::Path;
 use structopt::StructOpt;
 use tokio::task::spawn_blocking;
 
@@ -42,7 +43,11 @@ async fn make_collection() -> Result<(), Error> {
         if do_time {
             let futures = shows.into_iter().map(|result| async move {
                 let path = result.path.clone();
-                let timeval = spawn_blocking(move || get_video_runtime(&path)).await??;
+                let timeval = spawn_blocking(move || {
+                    let path = Path::new(path.as_str());
+                    get_video_runtime(&path)
+                })
+                .await??;
                 Ok(format!("{} {}", timeval, result))
             });
             let shows: Result<Vec<_>, Error> = try_join_all(futures).await;

@@ -24,46 +24,32 @@ pub fn option_string_wrapper<T: AsRef<str>>(s: &Option<T>) -> &str {
     s.as_ref().map_or("", AsRef::as_ref)
 }
 
-pub fn walk_directory<T: AsRef<str>>(path: &str, match_strs: &[T]) -> Result<Vec<String>, Error> {
-    let results = Path::new(path)
-        .read_dir()?
-        .filter_map(|f| match f {
-            Ok(fpath) => match fpath.file_type() {
-                Ok(ftype) => {
-                    let path_name = fpath.path().to_string_lossy().to_string();
-
+pub fn walk_directory<T: AsRef<str>>(path: &Path, match_strs: &[T]) -> Result<Vec<PathBuf>, Error> {
+    let mut path_stack = vec![path.to_path_buf()];
+    let mut output_paths = Vec::new();
+    while let Some(path) = path_stack.pop() {
+        if !path.exists() {
+            continue;
+        }
+        for f in path.read_dir()? {
+            if let Ok(fpath) = f {
+                if let Ok(ftype) = fpath.file_type() {
+                    let path = fpath.path();
+                    let path_name = path.to_string_lossy().into_owned();
                     if ftype.is_dir() {
-                        Some(match walk_directory(&path_name, match_strs) {
-                            Ok(v) => v,
-                            Err(e) => panic!("{} {}", path_name, e),
-                        })
+                        path_stack.push(path);
                     } else if match_strs.is_empty() {
-                        Some(vec![path_name])
+                        output_paths.push(path);
                     } else {
-                        let path_names: Vec<_> = match_strs
-                            .iter()
-                            .filter_map(|m| {
-                                if path_name.contains(m.as_ref()) {
-                                    Some(path_name.to_string())
-                                } else {
-                                    None
-                                }
-                            })
-                            .collect();
-                        if path_names.is_empty() {
-                            None
-                        } else {
-                            Some(path_names)
+                        if match_strs.iter().any(|m| path_name.contains(m.as_ref())) {
+                            output_paths.push(path);
                         }
                     }
                 }
-                Err(_) => None,
-            },
-            Err(_) => None,
-        })
-        .flatten()
-        .collect();
-    Ok(results)
+            }
+        }
+    }
+    Ok(output_paths)
 }
 
 pub fn get_version_number() -> String {
@@ -297,11 +283,16 @@ pub fn parse_file_stem(file_stem: &str) -> (String, i32, i32) {
     }
 }
 
-pub fn get_video_runtime(f: &str) -> Result<String, Error> {
-    let command = if f.ends_with(".avi") {
-        format!("aviindex -i {} -o /dev/null", f)
+pub fn get_video_runtime(f: &Path) -> Result<String, Error> {
+    let ext = f
+        .extension()
+        .ok_or_else(|| format_err!("No extension"))?
+        .to_string_lossy();
+    let fname = f.to_string_lossy();
+    let command = if ext == ".avi" {
+        format!("aviindex -i {} -o /dev/null", fname)
     } else {
-        format!("ffprobe {} 2>&1", f)
+        format!("ffprobe {} 2>&1", fname)
     };
 
     let mut timeval = "".to_string();
