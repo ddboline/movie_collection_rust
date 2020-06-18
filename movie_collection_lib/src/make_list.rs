@@ -59,7 +59,7 @@ pub fn make_list(stdout: &StdoutChannel) -> Result<(), Error> {
             if let Some(full_path) = file_map.get(f.as_str()) {
                 format!("{} {}", f, full_path.to_string_lossy())
             } else {
-                format!("{}", f)
+                f.to_string()
             }
         })
         .collect();
