@@ -16,6 +16,7 @@ use std::{
 };
 use subprocess::{Exec, Redirection};
 use tokio::time::{delay_for, Duration};
+use walkdir::WalkDir;
 
 use crate::{config::Config, stdout_channel::StdoutChannel};
 
@@ -25,29 +26,25 @@ pub fn option_string_wrapper<T: AsRef<str>>(s: &Option<T>) -> &str {
 }
 
 pub fn walk_directory<T: AsRef<str>>(path: &Path, match_strs: &[T]) -> Result<Vec<PathBuf>, Error> {
-    let mut path_stack = vec![path.to_path_buf()];
-    let mut output_paths = Vec::new();
-    while let Some(path) = path_stack.pop() {
-        if !path.exists() {
-            continue;
-        }
-        for f in path.read_dir()? {
-            if let Ok(fpath) = f {
-                if let Ok(ftype) = fpath.file_type() {
-                    let path = fpath.path();
-                    let path_name = path.to_string_lossy().into_owned();
-                    if ftype.is_dir() {
-                        path_stack.push(path);
-                    } else if match_strs.is_empty()
-                        || match_strs.iter().any(|m| path_name.contains(m.as_ref()))
-                    {
-                        output_paths.push(path);
-                    }
+    WalkDir::new(path)
+        .into_iter()
+        .filter_map(|f| match f {
+            Ok(fpath) => {
+                let ftype = fpath.file_type();
+                let path = fpath.path();
+                let path_name = path.to_string_lossy().into_owned();
+                if !ftype.is_dir()
+                    && (match_strs.is_empty()
+                        || match_strs.iter().any(|m| path_name.contains(m.as_ref())))
+                {
+                    Some(Ok(path.to_path_buf()))
+                } else {
+                    None
                 }
             }
-        }
-    }
-    Ok(output_paths)
+            Err(e) => Some(Err(e.into())),
+        })
+        .collect()
 }
 
 pub fn get_version_number() -> String {
