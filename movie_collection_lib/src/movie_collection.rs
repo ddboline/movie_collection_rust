@@ -581,6 +581,7 @@ impl MovieCollection {
             .get_config()
             .movie_dirs
             .par_iter()
+            .filter(|d| d.exists())
             .map(|d| walk_directory(&d, &self.get_config().suffixes))
             .collect();
         let file_list = file_list?;
