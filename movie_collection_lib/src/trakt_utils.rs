@@ -167,7 +167,7 @@ impl WatchListShow {
             let year: i32 = row.try_get("year")?;
             Ok(Some(Self {
                 link: link.into(),
-                title: title,
+                title,
                 year,
             }))
         } else {
