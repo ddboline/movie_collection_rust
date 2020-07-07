@@ -780,7 +780,7 @@ mod tests {
         conn.init().await;
         let result = conn.get_calendar().await?;
         println!("{}", result.len());
-        assert!(result.len() > 3);
+        assert!(result.len() > 1);
         Ok(())
     }
 }
