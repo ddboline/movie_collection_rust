@@ -98,7 +98,7 @@ pub async fn movie_queue_show(
     state: Data<AppState>,
 ) -> Result<HttpResponse, Error> {
     let path = path.into_inner();
-    let patterns = vec![path.into()];
+    let patterns = vec![path];
 
     let req = MovieQueueRequest { patterns };
     let (queue, patterns) = state.db.handle(req).await?;
@@ -110,7 +110,7 @@ pub async fn movie_queue_delete(
     _: LoggedUser,
     state: Data<AppState>,
 ) -> Result<HttpResponse, Error> {
-    let path = path.into_inner().into();
+    let path = path.into_inner();
 
     let req = QueueDeleteRequest { path };
     let body = state.db.handle(req).await?;
@@ -142,7 +142,7 @@ pub async fn movie_queue_transcode(
     _: LoggedUser,
     state: Data<AppState>,
 ) -> Result<HttpResponse, Error> {
-    let path = path.into_inner().into();
+    let path = path.into_inner();
     let patterns = vec![path];
 
     let req = MovieQueueRequest { patterns };
@@ -157,7 +157,7 @@ pub async fn movie_queue_transcode_directory(
     state: Data<AppState>,
 ) -> Result<HttpResponse, Error> {
     let (directory, file) = path.into_inner();
-    let patterns = vec![file.into()];
+    let patterns = vec![file];
 
     let req = MovieQueueRequest { patterns };
     let (entries, _) = state.db.handle(req).await?;
@@ -216,7 +216,7 @@ pub async fn imdb_show(
     _: LoggedUser,
     state: Data<AppState>,
 ) -> Result<HttpResponse, Error> {
-    let show = path.into_inner().into();
+    let show = path.into_inner();
     let query = query.into_inner();
 
     let req = ImdbShowRequest { show, query };
@@ -569,7 +569,7 @@ pub async fn trakt_watchlist_action(
 
     let req = WatchlistActionRequest {
         action,
-        imdb_url: imdb_url.into(),
+        imdb_url,
     };
     let imdb_url = state.db.handle(req).await?;
     watchlist_action_worker(action, &imdb_url).await
@@ -620,7 +620,7 @@ pub async fn trakt_watched_seasons(
     _: LoggedUser,
     state: Data<AppState>,
 ) -> Result<HttpResponse, Error> {
-    let imdb_url = path.into_inner().into();
+    let imdb_url = path.into_inner();
     let s = state.clone();
     let show_opt = s.db.handle(ImdbRatingsRequest { imdb_url }).await?;
     let empty = || ("".into(), "".into(), "".into());
@@ -639,7 +639,7 @@ pub async fn trakt_watched_list(
     let (imdb_url, season) = path.into_inner();
 
     let req = WatchedListRequest {
-        imdb_url: imdb_url.into(),
+        imdb_url,
         season,
     };
     let x = state.db.handle(req).await?;
@@ -655,7 +655,7 @@ pub async fn trakt_watched_action(
 
     let req = WatchedActionRequest {
         action: action.parse().expect("impossible"),
-        imdb_url: imdb_url.into(),
+        imdb_url,
         season,
         episode,
     };

@@ -167,7 +167,7 @@ impl WatchListShow {
             let year: i32 = row.try_get("year")?;
             Ok(Some(Self {
                 link: link.into(),
-                title: title.into(),
+                title: title,
                 year,
             }))
         } else {
@@ -789,7 +789,7 @@ async fn watched_add(
                     .add_episode_to_watched(&imdb_url_, season, epi_)
                     .await?;
                 WatchedEpisode {
-                    imdb_url: imdb_url.clone().into(),
+                    imdb_url: imdb_url.clone(),
                     season,
                     episode: *epi,
                     ..WatchedEpisode::default()
@@ -801,7 +801,7 @@ async fn watched_add(
             let imdb_url_ = imdb_url.clone();
             TRAKT_CONN.add_movie_to_watched(&imdb_url_).await?;
             WatchedMovie {
-                imdb_url: imdb_url.into(),
+                imdb_url,
                 title: "".into(),
             }
             .insert_movie(&mc.pool)

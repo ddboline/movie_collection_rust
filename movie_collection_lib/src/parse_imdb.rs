@@ -266,15 +266,15 @@ impl ParseImdb {
                 let mut imdb_url: StackString = "".into();
                 let tmp: Vec<_> = line
                     .into_iter()
-                    .map(|i| {
-                        if i.starts_with("tt") {
-                            imdb_url = i.into();
+                    .map(|imdb_url_| {
+                        if imdb_url_.starts_with("tt") {
+                            imdb_url = imdb_url_.clone();
                             format!(
                                 r#"<a href="https://www.imdb.com/title/{}" target="_blank">{}</a>"#,
                                 imdb_url, imdb_url
                             ).into()
                         } else {
-                            i
+                            imdb_url_
                         }
                     })
                     .collect();

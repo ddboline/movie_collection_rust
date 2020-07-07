@@ -610,7 +610,7 @@ impl MovieCollection {
                     if season == -1 || episode == -1 {
                         Ok(None)
                     } else {
-                        Ok(Some((show.into(), season, episode, f)))
+                        Ok(Some((show, season, episode, f)))
                     }
                 };
                 res().transpose()
