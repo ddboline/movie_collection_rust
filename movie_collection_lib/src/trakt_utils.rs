@@ -163,7 +163,7 @@ impl WatchListShow {
             .await?
             .get(0)
         {
-            let title: String = row.try_get("title")?;
+            let title: StackString = row.try_get("title")?;
             let year: i32 = row.try_get("year")?;
             Ok(Some(Self {
                 link: link.into(),
@@ -679,7 +679,7 @@ pub async fn sync_trakt_with_db(mc: &MovieCollection) -> Result<(), Error> {
 async fn get_imdb_url_from_show(
     mc: &MovieCollection,
     show: Option<&str>,
-) -> Result<Option<String>, Error> {
+) -> Result<Option<StackString>, Error> {
     let result = if let Some(show) = show {
         let imdb_shows = mc.print_imdb_shows(show, false).await?;
         if imdb_shows.len() > 1 {
@@ -688,7 +688,7 @@ async fn get_imdb_url_from_show(
             }
             None
         } else {
-            Some(imdb_shows[0].link.to_string())
+            Some(imdb_shows[0].link.clone())
         }
     } else {
         None
@@ -915,7 +915,7 @@ pub async fn watch_list_http_worker(
     pool: &PgPool,
     imdb_url: &str,
     season: i32,
-) -> Result<String, Error> {
+) -> Result<StackString, Error> {
     let button_add = format!(
         "{}{}",
         r#"<button type="submit" id="ID" "#,
@@ -1031,7 +1031,7 @@ pub async fn watch_list_http_worker(
         previous,
         buttons,
         entries.join("\n")
-    );
+    ).into();
     Ok(entries)
 }
 
@@ -1041,7 +1041,7 @@ pub async fn watched_action_http_worker(
     imdb_url: &str,
     season: i32,
     episode: i32,
-) -> Result<String, Error> {
+) -> Result<StackString, Error> {
     let mc = MovieCollection::with_pool(&pool)?;
     let imdb_url = Arc::new(imdb_url.to_owned());
     TRAKT_CONN.init().await;
@@ -1101,11 +1101,11 @@ pub async fn watched_action_http_worker(
             format!("{}", result)
         }
         _ => "".to_string(),
-    };
+    }.into();
     Ok(body)
 }
 
-pub async fn trakt_cal_http_worker(pool: &PgPool) -> Result<Vec<String>, Error> {
+pub async fn trakt_cal_http_worker(pool: &PgPool) -> Result<Vec<StackString>, Error> {
     let button_add = format!(
         "{}{}",
         r#"<td><button type="submit" id="ID" "#,
@@ -1166,7 +1166,7 @@ pub async fn trakt_cal_http_worker(pool: &PgPool) -> Result<Vec<String>, Error> 
                         .replace("LINK", &cal.link)
                         .replace("SEASON", &cal.season.to_string())
                 },
-            );
+            ).into();
             Ok(entry)
         })
         .collect();

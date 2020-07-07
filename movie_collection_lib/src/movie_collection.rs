@@ -11,6 +11,7 @@ use std::{
     path::Path,
     sync::Arc,
 };
+use itertools::Itertools;
 
 use crate::{
     config::Config,
@@ -147,12 +148,12 @@ impl fmt::Display for ImdbSeason {
 }
 
 impl ImdbSeason {
-    pub fn get_string_vec(&self) -> Vec<String> {
+    pub fn get_string_vec(&self) -> Vec<StackString> {
         vec![
-            self.show.to_string(),
-            self.title.to_string(),
-            self.season.to_string(),
-            self.nepisodes.to_string(),
+            self.show.clone(),
+            self.title.clone(),
+            self.season.to_string().into(),
+            self.nepisodes.to_string().into(),
         ]
     }
 }
@@ -212,7 +213,7 @@ impl MovieCollection {
         } else {
             query
         };
-        let shows: Vec<String> = self
+        let shows: HashSet<StackString> = self
             .get_pool()
             .get()
             .await?
@@ -222,10 +223,10 @@ impl MovieCollection {
             .map(|r| r.get(0))
             .collect();
 
-        let shows = if shows.contains(&show.to_string()) {
-            vec![show.to_string()]
+        let shows = if shows.contains(show) {
+            vec!{show.into()}
         } else {
-            shows
+            shows.into_iter().sorted().collect()
         };
 
         let futures = shows.into_iter().map(|show| async move {
@@ -481,12 +482,12 @@ impl MovieCollection {
             .map_err(Into::into)
     }
 
-    pub async fn get_collection_path(&self, idx: i32) -> Result<String, Error> {
+    pub async fn get_collection_path(&self, idx: i32) -> Result<StackString, Error> {
         let query = postgres_query::query!(
             "SELECT path FROM movie_collection WHERE idx = $idx",
             idx = idx
         );
-        let path: String = self
+        let path: StackString = self
             .get_pool()
             .get()
             .await?
@@ -937,7 +938,7 @@ pub async fn find_new_episodes_http_worker<T: AsRef<str>>(
     pool: &PgPool,
     shows: Option<T>,
     source: Option<TvShowSource>,
-) -> Result<Vec<String>, Error> {
+) -> Result<Vec<StackString>, Error> {
     let button_add = format!(
         "{}{}",
         r#"<td><button type="submit" id="ID" "#,
@@ -953,8 +954,8 @@ pub async fn find_new_episodes_http_worker<T: AsRef<str>>(
     );
 
     let mc = MovieCollection::with_pool(&pool)?;
-    let shows_filter: Option<HashSet<String>> =
-        shows.map(|s| s.as_ref().split(',').map(ToString::to_string).collect());
+    let shows_filter: Option<HashSet<StackString>> =
+        shows.map(|s| s.as_ref().split(',').map(Into::into).collect());
 
     let mindate = (Local::today() + Duration::days(-14)).naive_local();
     let maxdate = (Local::today() + Duration::days(7)).naive_local();
@@ -963,13 +964,13 @@ pub async fn find_new_episodes_http_worker<T: AsRef<str>>(
 
     let episodes = mc.get_new_episodes(mindate, maxdate, source).await?;
 
-    let shows: HashSet<String> = episodes
+    let shows: HashSet<StackString> = episodes
         .iter()
         .filter_map(|s| {
-            let show = s.show.to_string();
+            let show = s.show.clone();
             match shows_filter.as_ref() {
                 Some(f) => {
-                    if f.contains(&show) {
+                    if f.contains(show.as_str()) {
                         Some(show)
                     } else {
                         None
@@ -1028,7 +1029,7 @@ pub async fn find_new_episodes_http_worker<T: AsRef<str>>(
                     .replace("SHOW", &epi.show)
                     .replace("LINK", &epi.link)
                     .replace("SEASON", &epi.season.to_string()),
-            )
+            ).into()
         })
         .collect();
 

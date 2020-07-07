@@ -18,7 +18,7 @@ use subprocess::{Exec, Redirection};
 use tokio::time::{delay_for, Duration};
 use walkdir::WalkDir;
 
-use crate::{config::Config, stdout_channel::StdoutChannel};
+use crate::{config::Config, stdout_channel::StdoutChannel, stack_string::StackString};
 
 #[inline]
 pub fn option_string_wrapper<T: AsRef<str>>(s: &Option<T>) -> &str {
@@ -45,16 +45,6 @@ pub fn walk_directory<T: AsRef<str>>(path: &Path, match_strs: &[T]) -> Result<Ve
             Err(e) => Some(Err(e.into())),
         })
         .collect()
-}
-
-pub fn get_version_number() -> String {
-    format!(
-        "{}.{}.{}{}",
-        env!("CARGO_PKG_VERSION_MAJOR"),
-        env!("CARGO_PKG_VERSION_MINOR"),
-        env!("CARGO_PKG_VERSION_PATCH"),
-        option_env!("CARGO_PKG_VERSION_PRE").unwrap_or("")
-    )
 }
 
 pub fn open_transcode_channel(queue: &str) -> Result<Channel, Error> {
@@ -219,7 +209,7 @@ pub fn create_move_script(
             .preferred_dir
             .join("Documents")
             .join("television")
-            .join(show)
+            .join(show.as_str())
             .join(format!("season{}", season));
         if !d.exists() {
             create_dir_all(&d)?;
@@ -248,14 +238,14 @@ pub fn create_move_script(
     Ok(mp4_script)
 }
 
-pub fn parse_file_stem(file_stem: &str) -> (String, i32, i32) {
+pub fn parse_file_stem(file_stem: &str) -> (StackString, i32, i32) {
     let entries: Vec<_> = file_stem.split('_').collect();
 
     if entries.len() < 3 {
-        return (file_stem.to_string(), -1, -1);
+        return (file_stem.into(), -1, -1);
     }
 
-    let show = entries[..(entries.len() - 2)].join("_");
+    let show = entries[..(entries.len() - 2)].join("_").into();
 
     let season = entries[(entries.len() - 2)];
     let season: i32 = if season.starts_with('s') {
@@ -272,13 +262,13 @@ pub fn parse_file_stem(file_stem: &str) -> (String, i32, i32) {
     };
 
     if season == -1 || episode == -1 {
-        (file_stem.to_string(), -1, -1)
+        (file_stem.into(), -1, -1)
     } else {
         (show, season, episode)
     }
 }
 
-pub fn get_video_runtime(f: &Path) -> Result<String, Error> {
+pub fn get_video_runtime(f: &Path) -> Result<StackString, Error> {
     let ext = f
         .extension()
         .ok_or_else(|| format_err!("No extension"))?
@@ -290,7 +280,7 @@ pub fn get_video_runtime(f: &Path) -> Result<String, Error> {
         format!("ffprobe {} 2>&1", fname)
     };
 
-    let mut timeval = "".to_string();
+    let mut timeval = "".into();
 
     let stream = Exec::shell(command).stream_stdout()?;
     let results: Result<Vec<_>, Error> = BufReader::new(stream)
@@ -306,14 +296,14 @@ pub fn get_video_runtime(f: &Path) -> Result<String, Error> {
                 let nsecs: f64 = nframes as f64 / fps;
                 let nmin = (nsecs / 60.) as u64;
                 let nhour = (nmin as f64 / 60.) as u64;
-                timeval = format!("{:02}:{:02}:{:02}", nhour, nmin % 60, nsecs as u64 % 60);
+                timeval = format!("{:02}:{:02}:{:02}", nhour, nmin % 60, nsecs as u64 % 60).into();
             }
             if items.len() > 1 && items[0] == "Duration:" {
                 let its: Vec<_> = items[1].trim_matches(',').split(':').collect();
                 let nhour: u64 = its[0].parse()?;
                 let nmin: u64 = its[1].parse()?;
                 let nsecs: f64 = its[2].parse()?;
-                timeval = format!("{:02}:{:02}:{:02}", nhour, nmin, nsecs as u64);
+                timeval = format!("{:02}:{:02}:{:02}", nhour, nmin, nsecs as u64).into();
             }
             Ok(())
         })

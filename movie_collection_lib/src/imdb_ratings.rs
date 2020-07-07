@@ -126,16 +126,16 @@ impl ImdbRatings {
             .collect()
     }
 
-    pub fn get_string_vec(&self) -> Vec<String> {
+    pub fn get_string_vec(&self) -> Vec<StackString> {
         vec![
-            self.show.to_string(),
-            option_string_wrapper(&self.title).to_string(),
-            self.link.to_string(),
-            self.rating.unwrap_or(-1.0).to_string(),
-            self.istv.unwrap_or(false).to_string(),
+            self.show.clone(),
+            option_string_wrapper(&self.title).into(),
+            self.link.clone(),
+            self.rating.unwrap_or(-1.0).to_string().into(),
+            self.istv.unwrap_or(false).to_string().into(),
             self.source
                 .as_ref()
-                .map_or_else(|| "".to_string(), ToString::to_string),
+                .map_or_else(|| "".to_string(), ToString::to_string).into(),
         ]
     }
 }

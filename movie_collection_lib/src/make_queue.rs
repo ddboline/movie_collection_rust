@@ -14,6 +14,7 @@ use crate::{
     pgpool::PgPool,
     stdout_channel::StdoutChannel,
     utils::{get_video_runtime, parse_file_stem},
+    stack_string::StackString,
 };
 
 #[derive(Debug, Display)]
@@ -124,7 +125,7 @@ pub async fn make_queue_worker(
 pub async fn movie_queue_http(
     queue: &[MovieQueueResult],
     pool: &PgPool,
-) -> Result<Vec<String>, Error> {
+) -> Result<Vec<StackString>, Error> {
     let mc = Arc::new(MovieCollection::with_pool(pool)?);
 
     let button = r#"<td><button type="submit" id="ID" onclick="delete_show('SHOW');"> remove </button></td>"#;
@@ -156,7 +157,7 @@ pub async fn movie_queue_http(
                 file_name
             )
         } else {
-            file_name.to_string()
+            file_name.clone()
         };
 
         let entry = if let Some(link) = row.link.as_ref() {
@@ -173,7 +174,7 @@ pub async fn movie_queue_http(
             "{}\n{}",
             entry,
             button.replace("ID", &file_name).replace("SHOW", &file_name)
-        );
+        ).into();
 
         let entry = if ext == "mp4" {
             entry
@@ -181,7 +182,7 @@ pub async fn movie_queue_http(
             format!(
                 r#"{}<td><button type="submit" id="{}" onclick="transcode('{}');"> transcode </button></td>"#,
                 entry, file_name, file_name
-            )
+            ).into()
         } else {
             let entries: Vec<_> = row.path.split('/').collect();
             let len_entries = entries.len();
@@ -189,7 +190,7 @@ pub async fn movie_queue_http(
             format!(
                 r#"{}<td><button type="submit" id="{}" onclick="transcode_directory('{}', '{}');"> transcode </button></td>"#,
                 entry, file_name, file_name, directory
-            )
+            ).into()
         };
         Ok(entry)
         }

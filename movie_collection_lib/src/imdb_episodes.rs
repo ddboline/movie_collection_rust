@@ -175,16 +175,16 @@ impl ImdbEpisodes {
             .map_err(Into::into)
     }
 
-    pub fn get_string_vec(&self) -> Vec<String> {
+    pub fn get_string_vec(&self) -> Vec<StackString> {
         vec![
-            self.show.to_string(),
-            self.title.to_string(),
-            self.season.to_string(),
-            self.episode.to_string(),
-            self.airdate.to_string(),
-            self.rating.to_string(),
-            self.eptitle.to_string(),
-            self.epurl.to_string(),
+            self.show.clone(),
+            self.title.clone(),
+            self.season.to_string().into(),
+            self.episode.to_string().into(),
+            self.airdate.to_string().into(),
+            self.rating.to_string().into(),
+            self.eptitle.clone(),
+            self.epurl.clone(),
         ]
     }
 }

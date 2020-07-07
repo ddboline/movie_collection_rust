@@ -6,6 +6,8 @@ use std::fmt::Debug;
 use subprocess::PopenError;
 use thiserror::Error;
 
+use movie_collection_lib::stack_string::StackString;
+
 use crate::logged_user::TRIGGER_DB_UPDATE;
 
 #[derive(Error, Debug)]
@@ -14,13 +16,13 @@ pub enum ServiceError {
     #[error("Internal Server Error")]
     InternalServerError,
     #[error("BadRequest: {0}")]
-    BadRequest(String),
+    BadRequest(StackString),
     #[error("Unauthorized")]
     Unauthorized,
     #[error("Anyhow error {0}")]
     AnyhowError(#[from] AnyhowError),
     #[error("blocking error {0}")]
-    BlockingError(String),
+    BlockingError(StackString),
     #[error("Popen error {0}")]
     PopenError(#[from] PopenError),
 }
@@ -44,6 +46,6 @@ impl ResponseError for ServiceError {
 
 impl<T: Debug> From<BlockingError<T>> for ServiceError {
     fn from(item: BlockingError<T>) -> Self {
-        Self::BlockingError(format!("{:?}", item))
+        Self::BlockingError(format!("{:?}", item).into())
     }
 }

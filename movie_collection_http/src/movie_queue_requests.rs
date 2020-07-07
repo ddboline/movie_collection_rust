@@ -87,7 +87,7 @@ pub struct MoviePathRequest {
 
 #[async_trait]
 impl HandleRequest<MoviePathRequest> for PgPool {
-    type Result = Result<String, Error>;
+    type Result = Result<StackString, Error>;
 
     async fn handle(&self, msg: MoviePathRequest) -> Self::Result {
         MovieCollection::with_pool(&self)?
@@ -195,7 +195,7 @@ pub struct WatchedListRequest {
 
 #[async_trait]
 impl HandleRequest<WatchedListRequest> for PgPool {
-    type Result = Result<String, Error>;
+    type Result = Result<StackString, Error>;
 
     async fn handle(&self, msg: WatchedListRequest) -> Self::Result {
         watch_list_http_worker(&self, &msg.imdb_url, msg.season).await
@@ -211,7 +211,7 @@ pub struct WatchedActionRequest {
 
 #[async_trait]
 impl HandleRequest<WatchedActionRequest> for PgPool {
-    type Result = Result<String, Error>;
+    type Result = Result<StackString, Error>;
 
     async fn handle(&self, msg: WatchedActionRequest) -> Self::Result {
         watched_action_http_worker(&self, msg.action, &msg.imdb_url, msg.season, msg.episode).await
@@ -258,7 +258,7 @@ impl From<ImdbShowRequest> for ParseImdbOptions {
 
 #[async_trait]
 impl HandleRequest<ImdbShowRequest> for PgPool {
-    type Result = Result<String, Error>;
+    type Result = Result<StackString, Error>;
 
     async fn handle(&self, msg: ImdbShowRequest) -> Self::Result {
         let watchlist = get_watchlist_shows_db_map(&self).await?;
@@ -272,7 +272,7 @@ pub struct TraktCalRequest {}
 
 #[async_trait]
 impl HandleRequest<TraktCalRequest> for PgPool {
-    type Result = Result<Vec<String>, Error>;
+    type Result = Result<Vec<StackString>, Error>;
 
     async fn handle(&self, _: TraktCalRequest) -> Self::Result {
         trakt_cal_http_worker(&self).await
@@ -287,7 +287,7 @@ pub struct FindNewEpisodeRequest {
 
 #[async_trait]
 impl HandleRequest<FindNewEpisodeRequest> for PgPool {
-    type Result = Result<Vec<String>, Error>;
+    type Result = Result<Vec<StackString>, Error>;
 
     async fn handle(&self, msg: FindNewEpisodeRequest) -> Self::Result {
         find_new_episodes_http_worker(&self, msg.shows, msg.source).await

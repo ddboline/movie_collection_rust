@@ -55,7 +55,7 @@ where
     Ok(HttpResponse::Ok().json(js))
 }
 
-fn movie_queue_body(patterns: &[StackString], entries: &[String]) -> String {
+fn movie_queue_body(patterns: &[StackString], entries: &[StackString]) -> StackString {
     let previous = r#"<a href="javascript:updateMainArticle('/list/tvshows')">Go Back</a><br>"#;
 
     let watchlist_url = if patterns.is_empty() {
@@ -71,7 +71,7 @@ fn movie_queue_body(patterns: &[StackString], entries: &[String]) -> String {
         entries.join("")
     );
 
-    entries
+    entries.into()
 }
 
 async fn queue_body_resp(
@@ -81,7 +81,7 @@ async fn queue_body_resp(
 ) -> Result<HttpResponse, Error> {
     let entries = movie_queue_http(&queue, pool).await?;
     let body = movie_queue_body(&patterns, &entries);
-    form_http_response(body)
+    form_http_response(body.into())
 }
 
 pub async fn movie_queue(_: LoggedUser, state: Data<AppState>) -> Result<HttpResponse, Error> {
@@ -93,7 +93,7 @@ pub async fn movie_queue(_: LoggedUser, state: Data<AppState>) -> Result<HttpRes
 }
 
 pub async fn movie_queue_show(
-    path: Path<String>,
+    path: Path<StackString>,
     _: LoggedUser,
     state: Data<AppState>,
 ) -> Result<HttpResponse, Error> {
@@ -106,7 +106,7 @@ pub async fn movie_queue_show(
 }
 
 pub async fn movie_queue_delete(
-    path: Path<String>,
+    path: Path<StackString>,
     _: LoggedUser,
     state: Data<AppState>,
 ) -> Result<HttpResponse, Error> {
@@ -138,7 +138,7 @@ fn transcode_worker(
 }
 
 pub async fn movie_queue_transcode(
-    path: Path<String>,
+    path: Path<StackString>,
     _: LoggedUser,
     state: Data<AppState>,
 ) -> Result<HttpResponse, Error> {
@@ -152,7 +152,7 @@ pub async fn movie_queue_transcode(
 }
 
 pub async fn movie_queue_transcode_directory(
-    path: Path<(String, String)>,
+    path: Path<(StackString, StackString)>,
     _: LoggedUser,
     state: Data<AppState>,
 ) -> Result<HttpResponse, Error> {
@@ -169,10 +169,8 @@ pub async fn movie_queue_transcode_directory(
     )
 }
 
-fn play_worker(full_path: String) -> Result<HttpResponse, Error> {
-    let path = path::Path::new(&full_path);
-
-    let file_name = path
+fn play_worker(full_path: &path::Path) -> Result<HttpResponse, Error> {
+    let file_name = full_path
         .file_name()
         .ok_or_else(|| format_err!("Invalid path"))?
         .to_string_lossy();
@@ -193,7 +191,7 @@ fn play_worker(full_path: String) -> Result<HttpResponse, Error> {
     Exec::shell(&command).join()?;
     let command = format!(
         "ln -s {} /var/www/html/videos/partial/{}",
-        full_path, file_name
+        full_path.to_string_lossy(), file_name
     );
     Exec::shell(&command).join()?;
     form_http_response(body)
@@ -207,12 +205,13 @@ pub async fn movie_queue_play(
     let idx = idx.into_inner();
 
     let req = MoviePathRequest { idx };
-    let x = state.db.handle(req).await?;
-    play_worker(x)
+    let movie_path = state.db.handle(req).await?;
+    let movie_path = path::Path::new(movie_path.as_str());
+    play_worker(&movie_path)
 }
 
 pub async fn imdb_show(
-    path: Path<String>,
+    path: Path<StackString>,
     query: Query<ParseImdbRequest>,
     _: LoggedUser,
     state: Data<AppState>,
@@ -222,10 +221,10 @@ pub async fn imdb_show(
 
     let req = ImdbShowRequest { show, query };
     let x = state.db.handle(req).await?;
-    form_http_response(x)
+    form_http_response(x.into())
 }
 
-fn new_episode_worker(entries: &[String]) -> Result<HttpResponse, Error> {
+fn new_episode_worker(entries: &[StackString]) -> Result<HttpResponse, Error> {
     let previous = r#"
         <a href="javascript:updateMainArticle('/list/tvshows')">Go Back</a><br>
         <input type="button" name="list_cal" value="TVCalendar" onclick="updateMainArticle('/list/cal');"/>
@@ -395,7 +394,7 @@ impl From<TvShowsResult> for ProcessShowItem {
     }
 }
 
-fn tvshows_worker(res1: TvShowsMap, tvshows: Vec<TvShowsResult>) -> Result<String, Error> {
+fn tvshows_worker(res1: TvShowsMap, tvshows: Vec<TvShowsResult>) -> Result<StackString, Error> {
     let tvshows: HashSet<_> = tvshows
         .into_iter()
         .map(|s| {
@@ -429,7 +428,7 @@ fn tvshows_worker(res1: TvShowsMap, tvshows: Vec<TvShowsResult>) -> Result<Strin
         r#"{}<table border="0">{}</table>"#,
         previous,
         shows.join("")
-    );
+    ).into();
 
     Ok(entries)
 }
@@ -439,13 +438,13 @@ pub async fn tvshows(_: LoggedUser, state: Data<AppState>) -> Result<HttpRespons
     let shows = s.db.handle(TvShowsRequest {}).await?;
     let res1 = state.db.handle(WatchlistShowsRequest {}).await?;
     let entries = tvshows_worker(res1, shows)?;
-    form_http_response(entries)
+    form_http_response(entries.into())
 }
 
 fn process_shows(
     tvshows: HashSet<ProcessShowItem>,
     watchlist: HashSet<ProcessShowItem>,
-) -> Result<Vec<String>, Error> {
+) -> Result<Vec<StackString>, Error> {
     let watchlist_shows: Vec<_> = watchlist
         .iter()
         .filter(|item| tvshows.get(item.link.as_str()).is_none())
@@ -489,7 +488,7 @@ fn process_shows(
                 } else {
                     button_add.replace("SHOW", &item.link)
                 },
-            )
+            ).into()
         })
         .collect();
     Ok(shows)
@@ -561,7 +560,7 @@ async fn watchlist_action_worker(
 }
 
 pub async fn trakt_watchlist_action(
-    path: Path<(String, String)>,
+    path: Path<(StackString, StackString)>,
     _: LoggedUser,
     state: Data<AppState>,
 ) -> Result<HttpResponse, Error> {
@@ -580,7 +579,7 @@ fn trakt_watched_seasons_worker(
     link: &str,
     imdb_url: &str,
     entries: &[ImdbSeason],
-) -> Result<String, Error> {
+) -> Result<StackString, Error> {
     let button_add = r#"
         <td>
         <button type="submit" id="ID"
@@ -612,12 +611,12 @@ fn trakt_watched_seasons_worker(
         r#"{}<table border="0">{}</table>"#,
         previous,
         entries.join("")
-    );
+    ).into();
     Ok(entries)
 }
 
 pub async fn trakt_watched_seasons(
-    path: Path<String>,
+    path: Path<StackString>,
     _: LoggedUser,
     state: Data<AppState>,
 ) -> Result<HttpResponse, Error> {
@@ -629,11 +628,11 @@ pub async fn trakt_watched_seasons(
         show_opt.map_or_else(empty, |(imdb_url, t)| (imdb_url, t.show, t.link));
     let entries = state.db.handle(ImdbSeasonsRequest { show }).await?;
     let entries = trakt_watched_seasons_worker(&link, &imdb_url, &entries)?;
-    form_http_response(entries)
+    form_http_response(entries.into())
 }
 
 pub async fn trakt_watched_list(
-    path: Path<(String, i32)>,
+    path: Path<(StackString, i32)>,
     _: LoggedUser,
     state: Data<AppState>,
 ) -> Result<HttpResponse, Error> {
@@ -644,11 +643,11 @@ pub async fn trakt_watched_list(
         season,
     };
     let x = state.db.handle(req).await?;
-    form_http_response(x)
+    form_http_response(x.into())
 }
 
 pub async fn trakt_watched_action(
-    path: Path<(String, String, i32, i32)>,
+    path: Path<(StackString, StackString, i32, i32)>,
     _: LoggedUser,
     state: Data<AppState>,
 ) -> Result<HttpResponse, Error> {
@@ -661,10 +660,10 @@ pub async fn trakt_watched_action(
         episode,
     };
     let x = state.db.handle(req).await?;
-    form_http_response(x)
+    form_http_response(x.into())
 }
 
-fn trakt_cal_worker(entries: &[String]) -> Result<HttpResponse, Error> {
+fn trakt_cal_worker(entries: &[StackString]) -> Result<HttpResponse, Error> {
     let previous = r#"<a href="javascript:updateMainArticle('/list/tvshows')">Go Back</a><br>"#;
     let entries = format!(
         r#"{}<table border="0">{}</table>"#,
@@ -692,8 +691,8 @@ pub async fn trakt_auth_url(_: LoggedUser, _: Data<AppState>) -> Result<HttpResp
 
 #[derive(Serialize, Deserialize)]
 pub struct TraktCallbackRequest {
-    pub code: String,
-    pub state: String,
+    pub code: StackString,
+    pub state: StackString,
 }
 
 pub async fn trakt_callback(

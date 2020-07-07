@@ -1,25 +1,21 @@
 use anyhow::Error;
 use bytes::BytesMut;
-use derive_more::{Display, From, Into};
-use inlinable_string::InlinableString;
-pub use inlinable_string::StringExt;
-use serde::{Deserialize, Serialize};
+use derive_more::{From, Into};
+use smartstring::alias::String as SmartString;
+use serde::{Deserialize, Serialize, Deserializer, Serializer};
 use std::{
     borrow::{Borrow, Cow},
     ops::{Deref, DerefMut},
     str::FromStr,
-    string::{FromUtf16Error, FromUtf8Error},
+    fmt::{self, Formatter, Display},
 };
 use tokio_postgres::types::{FromSql, IsNull, ToSql, Type};
 
 #[derive(
-    Serialize,
-    Deserialize,
     Debug,
     Clone,
     Into,
     From,
-    Display,
     PartialEq,
     Eq,
     Hash,
@@ -27,8 +23,7 @@ use tokio_postgres::types::{FromSql, IsNull, ToSql, Type};
     PartialOrd,
     Ord,
 )]
-#[serde(into = "String", from = "String")]
-pub struct StackString(InlinableString);
+pub struct StackString(SmartString);
 
 impl StackString {
     pub fn as_str(&self) -> &str {
@@ -36,12 +31,57 @@ impl StackString {
     }
 }
 
+impl Serialize for StackString {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: Serializer,
+    {
+        serializer.serialize_str(self.0.as_str())
+    }
+}
+
+impl<'de> Deserialize<'de> for StackString {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: Deserializer<'de>,
+    {
+        use ::serde::de::{Error, Visitor};
+
+        struct SmartVisitor;
+
+        impl<'a> Visitor<'a> for SmartVisitor {
+            type Value = StackString;
+
+            fn expecting(&self, formatter: &mut Formatter) -> fmt::Result {
+                formatter.write_str("a string")
+            }
+
+            fn visit_str<E: Error>(self, v: &str) -> Result<Self::Value, E> {
+                Ok(v.into())
+            }
+
+            fn visit_borrowed_str<E: Error>(self, v: &'a str) -> Result<Self::Value, E> {
+                Ok(v.into())
+            }
+
+            fn visit_string<E: Error>(self, v: String) -> Result<Self::Value, E> {
+                Ok(v.into())
+            }
+        }
+
+        deserializer.deserialize_str(SmartVisitor)
+    }
+}
+
+impl Display for StackString {
+    fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
+        write!(f, "{}", self.as_str())
+    }
+}
+
 impl From<StackString> for String {
     fn from(item: StackString) -> Self {
-        match item.0 {
-            InlinableString::Heap(s) => s,
-            InlinableString::Inline(s) => s.to_string(),
-        }
+        item.0.into()
     }
 }
 
@@ -167,109 +207,3 @@ impl<'a> PartialEq<&'a str> for StackString {
     }
 }
 
-impl<'a> StringExt<'a> for StackString {
-    #[inline]
-    fn new() -> Self {
-        StackString(InlinableString::new())
-    }
-
-    #[inline]
-    fn with_capacity(capacity: usize) -> Self {
-        StackString(InlinableString::with_capacity(capacity))
-    }
-
-    #[inline]
-    fn from_utf8(vec: Vec<u8>) -> Result<Self, FromUtf8Error> {
-        InlinableString::from_utf8(vec).map(StackString)
-    }
-
-    #[inline]
-    fn from_utf16(v: &[u16]) -> Result<Self, FromUtf16Error> {
-        InlinableString::from_utf16(v).map(StackString)
-    }
-
-    #[inline]
-    fn from_utf16_lossy(v: &[u16]) -> Self {
-        StackString(InlinableString::from_utf16_lossy(v))
-    }
-
-    #[inline]
-    unsafe fn from_raw_parts(buf: *mut u8, length: usize, capacity: usize) -> Self {
-        StackString(InlinableString::from_raw_parts(buf, length, capacity))
-    }
-
-    #[inline]
-    unsafe fn from_utf8_unchecked(bytes: Vec<u8>) -> Self {
-        StackString(InlinableString::from_utf8_unchecked(bytes))
-    }
-
-    #[inline]
-    fn into_bytes(self) -> Vec<u8> {
-        InlinableString::into_bytes(self.0)
-    }
-
-    #[inline]
-    fn push_str(&mut self, string: &str) {
-        InlinableString::push_str(&mut self.0, string)
-    }
-
-    #[inline]
-    fn capacity(&self) -> usize {
-        InlinableString::capacity(&self.0)
-    }
-
-    #[inline]
-    fn reserve(&mut self, additional: usize) {
-        InlinableString::reserve(&mut self.0, additional)
-    }
-
-    #[inline]
-    fn reserve_exact(&mut self, additional: usize) {
-        InlinableString::reserve_exact(&mut self.0, additional)
-    }
-
-    #[inline]
-    fn shrink_to_fit(&mut self) {
-        InlinableString::shrink_to_fit(&mut self.0)
-    }
-
-    #[inline]
-    fn push(&mut self, ch: char) {
-        InlinableString::push(&mut self.0, ch)
-    }
-
-    #[inline]
-    fn as_bytes(&self) -> &[u8] {
-        InlinableString::as_bytes(&self.0)
-    }
-
-    #[inline]
-    fn truncate(&mut self, new_len: usize) {
-        InlinableString::truncate(&mut self.0, new_len)
-    }
-
-    #[inline]
-    fn pop(&mut self) -> Option<char> {
-        InlinableString::pop(&mut self.0)
-    }
-
-    #[inline]
-    fn remove(&mut self, idx: usize) -> char {
-        InlinableString::remove(&mut self.0, idx)
-    }
-
-    #[inline]
-    fn insert(&mut self, idx: usize, ch: char) {
-        InlinableString::insert(&mut self.0, idx, ch)
-    }
-
-    #[inline]
-    unsafe fn as_mut_slice(&mut self) -> &mut [u8] {
-        InlinableString::as_mut_slice(&mut self.0)
-    }
-
-    #[inline]
-    fn len(&self) -> usize {
-        InlinableString::len(&self.0)
-    }
-}

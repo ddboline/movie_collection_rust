@@ -56,7 +56,7 @@ impl ParseImdb {
     pub async fn parse_imdb_worker(
         &self,
         opts: &ParseImdbOptions,
-    ) -> Result<Vec<Vec<String>>, Error> {
+    ) -> Result<Vec<Vec<StackString>>, Error> {
         let shows: Vec<_> = if let Some(ilink) = &opts.imdb_link {
             self.mc
                 .print_imdb_shows(&opts.show, opts.tv)
@@ -134,7 +134,7 @@ impl ParseImdb {
         opts: &ParseImdbOptions,
         shows: &HashMap<StackString, ImdbRatings>,
         episodes: &Option<HashMap<(i32, i32), ImdbEpisodes>>,
-        output: &mut Vec<Vec<String>>,
+        output: &mut Vec<Vec<StackString>>,
     ) -> Result<(), Error> {
         let imdb_conn = ImdbConnection::new();
         let results = imdb_conn.parse_imdb(&opts.show.replace("_", " ")).await?;
@@ -167,10 +167,10 @@ impl ParseImdb {
                             output.push(vec![format!(
                                 "exists {} {} {}",
                                 opts.show, s, result.rating
-                            )]);
+                            ).into()]);
                         }
                     } else {
-                        output.push(vec![format!("not exists {} {}", opts.show, result)]);
+                        output.push(vec![format!("not exists {} {}", opts.show, result).into()]);
                         let istv = result.title.contains("TV Series")
                             || result.title.contains("TV Mini-Series");
 
@@ -188,16 +188,16 @@ impl ParseImdb {
                 }
             }
             for result in &results {
-                output.push(vec![format!("{}", result)]);
+                output.push(vec![result.to_string().into()]);
             }
         } else if let Some(link) = link {
-            output.push(vec![format!("Using {}", link)]);
+            output.push(vec![format!("Using {}", link).into()]);
             if let Some(result) = shows.get(&link) {
                 let episode_list = imdb_conn
                     .parse_imdb_episode_list(&link, opts.season)
                     .await?;
                 for episode in episode_list {
-                    output.push(vec![format!("{} {}", result, episode)]);
+                    output.push(vec![format!("{} {}", result, episode).into()]);
                     if opts.update_database {
                         let key = (episode.season, episode.episode);
                         if let Some(episodes) = &episodes {
@@ -212,7 +212,7 @@ impl ParseImdb {
                                     output.push(vec![format!(
                                         "exists {} {} {}",
                                         result, episode, e.rating
-                                    )]);
+                                    ).into()]);
                                     let mut new = e.clone();
                                     new.eptitle = episode.eptitle.unwrap_or_else(|| "".into());
                                     new.rating = episode.rating.unwrap_or(-1.0);
@@ -220,7 +220,7 @@ impl ParseImdb {
                                     new.update_episode(&self.mc.get_pool()).await?;
                                 }
                             } else {
-                                output.push(vec![format!("not exists {} {}", result, episode)]);
+                                output.push(vec![format!("not exists {} {}", result, episode).into()]);
                                 ImdbEpisodes {
                                     show: opts.show.clone(),
                                     title: result.title.clone().unwrap_or_else(|| "".into()),
@@ -246,7 +246,7 @@ impl ParseImdb {
         &self,
         opts: &ParseImdbOptions,
         watchlist: &WatchListMap,
-    ) -> Result<String, Error> {
+    ) -> Result<StackString, Error> {
         let button_add = format!(
             "{}{}",
             r#"<td><button type="submit" id="ID" "#,
@@ -272,7 +272,7 @@ impl ParseImdb {
                             format!(
                                 r#"<a href="https://www.imdb.com/title/{}" target="_blank">{}</a>"#,
                                 imdb_url, imdb_url
-                            )
+                            ).into()
                         } else {
                             i
                         }
@@ -290,6 +290,6 @@ impl ParseImdb {
             })
             .collect();
 
-        Ok(output.join("\n"))
+        Ok(output.join("\n").into())
     }
 }

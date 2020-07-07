@@ -72,7 +72,7 @@ pub fn make_list(stdout: &StdoutChannel) -> Result<(), Error> {
     let result: Vec<_> = file_list
         .par_iter()
         .map(|f| {
-            let timeval = get_video_runtime(f).unwrap_or_else(|_| "".to_string());
+            let timeval = get_video_runtime(f).unwrap_or_else(|_| "".into());
             format!("{} {}", timeval, f.to_string_lossy())
         })
         .collect();
