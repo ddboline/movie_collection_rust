@@ -25,4 +25,4 @@ actix-threadpool = "0.3"
 rust_auth_server = { git = "https://github.com/ddboline/rust-auth-server.git", tag="0.5.14" }
 async-trait = "0.1"
 log = "0.4"
-stack-string = { git = "https://github.com/ddboline/stack-string-rs.git", branch="master", features=["postgres_types"] }
+stack-string = { git = "https://github.com/ddboline/stack-string-rs.git", tag="0.1.1", features=["postgres_types"] }
