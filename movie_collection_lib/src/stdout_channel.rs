@@ -8,8 +8,7 @@ use tokio::{
     },
     task::{spawn, JoinHandle},
 };
-
-use crate::stack_string::StackString;
+use stack_string::StackString;
 
 #[derive(Clone, Debug)]
 pub struct StdoutChannel {

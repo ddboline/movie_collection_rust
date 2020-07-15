@@ -3,8 +3,9 @@ use chrono::{DateTime, NaiveDate, Utc};
 use postgres_query::FromSqlRow;
 use serde::{Deserialize, Serialize};
 use std::fmt;
+use stack_string::StackString;
 
-use crate::{pgpool::PgPool, stack_string::StackString};
+use crate::{pgpool::PgPool};
 
 #[derive(Clone, Serialize, Deserialize, FromSqlRow)]
 pub struct ImdbEpisodes {

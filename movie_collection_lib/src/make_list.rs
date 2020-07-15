@@ -1,10 +1,10 @@
 use anyhow::Error;
 use rayon::iter::{IntoParallelRefIterator, ParallelIterator};
 use std::collections::HashMap;
+use stack_string::StackString;
 
 use crate::{
     config::Config,
-    stack_string::StackString,
     stdout_channel::StdoutChannel,
     utils::{get_video_runtime, walk_directory},
 };

@@ -17,8 +17,9 @@ use std::{
 use subprocess::{Exec, Redirection};
 use tokio::time::{delay_for, Duration};
 use walkdir::WalkDir;
+use stack_string::StackString;
 
-use crate::{config::Config, stdout_channel::StdoutChannel, stack_string::StackString};
+use crate::{config::Config, stdout_channel::StdoutChannel};
 
 #[inline]
 pub fn option_string_wrapper<T: AsRef<str>>(s: &Option<T>) -> &str {

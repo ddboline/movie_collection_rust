@@ -4,6 +4,7 @@ use chrono::{DateTime, Utc};
 use futures::future::try_join_all;
 use serde::{Deserialize, Serialize};
 use std::path;
+use stack_string::StackString;
 
 use super::HandleRequest;
 use movie_collection_lib::{
@@ -16,7 +17,6 @@ use movie_collection_lib::{
     movie_queue::{MovieQueueDB, MovieQueueResult, MovieQueueRow},
     parse_imdb::{ParseImdb, ParseImdbOptions},
     pgpool::PgPool,
-    stack_string::StackString,
     trakt_utils::{
         get_watched_shows_db, get_watchlist_shows_db_map, trakt_cal_http_worker,
         watch_list_http_worker, watched_action_http_worker, TraktActions, WatchListMap,

@@ -5,11 +5,11 @@ use log::debug;
 use postgres_query::FromSqlRow;
 use serde::{Deserialize, Serialize};
 use std::{fmt, path::Path};
+use stack_string::StackString;
 
 use crate::{config::Config, movie_collection::MovieCollection, pgpool::PgPool};
 
 use crate::{
-    stack_string::StackString,
     utils::{option_string_wrapper, parse_file_stem},
 };
 

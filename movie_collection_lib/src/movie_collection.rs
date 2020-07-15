@@ -12,6 +12,7 @@ use std::{
     sync::Arc,
 };
 use itertools::Itertools;
+use stack_string::StackString;
 
 use crate::{
     config::Config,
@@ -19,7 +20,6 @@ use crate::{
     imdb_ratings::ImdbRatings,
     movie_queue::MovieQueueDB,
     pgpool::PgPool,
-    stack_string::StackString,
     stdout_channel::StdoutChannel,
     tv_show_source::TvShowSource,
     utils::{option_string_wrapper, parse_file_stem, walk_directory},

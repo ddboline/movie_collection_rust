@@ -7,9 +7,9 @@ use select::{
     predicate::{Class, Name},
 };
 use std::fmt;
+use stack_string::StackString;
 
 use crate::{
-    stack_string::StackString,
     utils::{option_string_wrapper, ExponentialRetry},
 };
 

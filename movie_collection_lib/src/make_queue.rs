@@ -7,6 +7,7 @@ use std::{
     path::{Path, PathBuf},
     sync::Arc,
 };
+use stack_string::StackString;
 
 use crate::{
     movie_collection::MovieCollection,
@@ -14,7 +15,6 @@ use crate::{
     pgpool::PgPool,
     stdout_channel::StdoutChannel,
     utils::{get_video_runtime, parse_file_stem},
-    stack_string::StackString,
 };
 
 #[derive(Debug, Display)]

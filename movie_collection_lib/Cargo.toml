@@ -41,3 +41,4 @@ maplit = "1.0"
 envy = "0.4"
 walkdir = "2.3"
 itertools = "0.9"
+stack-string = { git = "https://github.com/ddboline/stack-string-rs.git", branch="master", features=["postgres_types"] }

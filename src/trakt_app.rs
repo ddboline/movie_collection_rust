@@ -2,10 +2,10 @@
 
 use anyhow::Error;
 use structopt::StructOpt;
+use stack_string::StackString;
 
 use movie_collection_lib::{
     movie_collection::MovieCollection,
-    stack_string::StackString,
     trakt_utils::{sync_trakt_with_db, trakt_app_parse, TraktActions, TraktCommands},
 };
 

@@ -4,9 +4,10 @@ use log::debug;
 use postgres_query::FromSqlRow;
 use serde::{Deserialize, Serialize};
 use std::fmt;
+use stack_string::StackString;
 
 use crate::{
-    pgpool::PgPool, stack_string::StackString, tv_show_source::TvShowSource,
+    pgpool::PgPool, tv_show_source::TvShowSource,
     utils::option_string_wrapper,
 };
 

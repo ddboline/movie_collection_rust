@@ -5,9 +5,10 @@ use futures::future::try_join_all;
 use std::path::Path;
 use structopt::StructOpt;
 use tokio::task::spawn_blocking;
+use stack_string::StackString;
 
 use movie_collection_lib::{
-    movie_collection::MovieCollection, stack_string::StackString, utils::get_video_runtime,
+    movie_collection::MovieCollection, utils::get_video_runtime,
 };
 
 #[derive(StructOpt)]

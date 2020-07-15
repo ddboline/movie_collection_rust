@@ -13,11 +13,12 @@ use std::{
     str::FromStr,
     sync::Arc,
 };
+use stack_string::StackString;
 
 use crate::{
     config::Config, imdb_episodes::ImdbEpisodes, imdb_ratings::ImdbRatings,
     movie_collection::MovieCollection, movie_queue::MovieQueueDB, pgpool::PgPool,
-    stack_string::StackString, trakt_connection::TraktConnection,
+    trakt_connection::TraktConnection,
 };
 
 use crate::{tv_show_source::TvShowSource, utils::option_string_wrapper};

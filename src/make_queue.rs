@@ -2,10 +2,10 @@
 
 use anyhow::Error;
 use structopt::StructOpt;
+use stack_string::StackString;
 
 use movie_collection_lib::{
     make_queue::{make_queue_worker, PathOrIndex},
-    stack_string::StackString,
     stdout_channel::StdoutChannel,
 };
 

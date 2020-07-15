@@ -16,11 +16,11 @@ use tokio::{
     fs::{read, write},
     sync::{Mutex, RwLock},
 };
+use stack_string::StackString;
 
 use crate::{
     config::Config,
     iso_8601_datetime,
-    stack_string::StackString,
     trakt_utils::{
         TraktCalEntry, TraktCalEntryList, TraktResult, WatchListShow, WatchedEpisode, WatchedMovie,
     },

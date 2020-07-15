@@ -22,7 +22,6 @@ pub mod movie_collection;
 pub mod movie_queue;
 pub mod parse_imdb;
 pub mod pgpool;
-pub mod stack_string;
 pub mod stdout_channel;
 pub mod trakt_connection;
 pub mod trakt_utils;

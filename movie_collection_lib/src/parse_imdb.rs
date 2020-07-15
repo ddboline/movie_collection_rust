@@ -2,10 +2,11 @@ use anyhow::Error;
 use chrono::NaiveDate;
 use std::collections::HashMap;
 use structopt::StructOpt;
+use stack_string::StackString;
 
 use crate::{
     imdb_episodes::ImdbEpisodes, imdb_ratings::ImdbRatings, imdb_utils::ImdbConnection,
-    movie_collection::MovieCollection, pgpool::PgPool, stack_string::StackString,
+    movie_collection::MovieCollection, pgpool::PgPool,
     trakt_utils::WatchListMap,
 };
 

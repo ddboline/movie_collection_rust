@@ -2,9 +2,10 @@
 
 use anyhow::Error;
 use structopt::StructOpt;
+use stack_string::StackString;
 
 use movie_collection_lib::{
-    movie_collection::MovieCollection, stack_string::StackString, tv_show_source::TvShowSource,
+    movie_collection::MovieCollection, tv_show_source::TvShowSource,
 };
 
 #[derive(StructOpt)]

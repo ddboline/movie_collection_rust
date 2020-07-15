@@ -5,8 +5,7 @@ use rust_auth_server::static_files::login_html;
 use std::fmt::Debug;
 use subprocess::PopenError;
 use thiserror::Error;
-
-use movie_collection_lib::stack_string::StackString;
+use stack_string::StackString;
 
 use crate::logged_user::TRIGGER_DB_UPDATE;
 
