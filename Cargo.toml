@@ -1,6 +1,6 @@
 [package]
 name = "movie_collection_rust"
-version = "0.5.32"
+version = "0.5.33"
 authors = ["Daniel Boline <ddboline@gmail.com>"]
 edition = "2018"
 
@@ -20,7 +20,7 @@ thiserror = "1.0"
 tokio = {version="0.2", features=["full"]}
 structopt = "0.3"
 futures = "0.3"
-stack-string = { git = "https://github.com/ddboline/stack-string-rs.git", tag="0.1.1", features=["postgres_types"] }
+stack-string = { git = "https://github.com/ddboline/stack-string-rs.git", tag="0.1.2", features=["postgres_types"] }
 
 [workspace]
 members = [
