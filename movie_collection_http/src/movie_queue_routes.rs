@@ -42,13 +42,15 @@ use super::{
     HandleRequest,
 };
 
-fn form_http_response(body: String) -> Result<HttpResponse, Error> {
+pub type HttpResult = Result<HttpResponse, Error>;
+
+fn form_http_response(body: String) -> HttpResult {
     Ok(HttpResponse::Ok()
         .content_type("text/html; charset=utf-8")
         .body(body))
 }
 
-fn to_json<T>(js: T) -> Result<HttpResponse, Error>
+fn to_json<T>(js: T) -> HttpResult
 where
     T: Serialize,
 {
@@ -78,13 +80,13 @@ async fn queue_body_resp(
     patterns: Vec<StackString>,
     queue: Vec<MovieQueueResult>,
     pool: &PgPool,
-) -> Result<HttpResponse, Error> {
+) -> HttpResult {
     let entries = movie_queue_http(&queue, pool).await?;
     let body = movie_queue_body(&patterns, &entries);
     form_http_response(body.into())
 }
 
-pub async fn movie_queue(_: LoggedUser, state: Data<AppState>) -> Result<HttpResponse, Error> {
+pub async fn movie_queue(_: LoggedUser, state: Data<AppState>) -> HttpResult {
     let req = MovieQueueRequest {
         patterns: Vec::new(),
     };
@@ -96,7 +98,7 @@ pub async fn movie_queue_show(
     path: Path<StackString>,
     _: LoggedUser,
     state: Data<AppState>,
-) -> Result<HttpResponse, Error> {
+) -> HttpResult {
     let path = path.into_inner();
     let patterns = vec![path];
 
@@ -109,7 +111,7 @@ pub async fn movie_queue_delete(
     path: Path<StackString>,
     _: LoggedUser,
     state: Data<AppState>,
-) -> Result<HttpResponse, Error> {
+) -> HttpResult {
     let path = path.into_inner();
 
     let req = QueueDeleteRequest { path };
@@ -121,7 +123,7 @@ fn transcode_worker(
     directory: Option<&path::Path>,
     entries: &[MovieQueueResult],
     stdout: &StdoutChannel,
-) -> Result<HttpResponse, Error> {
+) -> HttpResult {
     let entries: Result<Vec<_>, Error> = entries
         .iter()
         .map(|entry| {
@@ -141,7 +143,7 @@ pub async fn movie_queue_transcode(
     path: Path<StackString>,
     _: LoggedUser,
     state: Data<AppState>,
-) -> Result<HttpResponse, Error> {
+) -> HttpResult {
     let path = path.into_inner();
     let patterns = vec![path];
 
@@ -155,7 +157,7 @@ pub async fn movie_queue_transcode_directory(
     path: Path<(StackString, StackString)>,
     _: LoggedUser,
     state: Data<AppState>,
-) -> Result<HttpResponse, Error> {
+) -> HttpResult {
     let (directory, file) = path.into_inner();
     let patterns = vec![file];
 
@@ -169,7 +171,7 @@ pub async fn movie_queue_transcode_directory(
     )
 }
 
-fn play_worker(full_path: &path::Path) -> Result<HttpResponse, Error> {
+fn play_worker(full_path: &path::Path) -> HttpResult {
     let file_name = full_path
         .file_name()
         .ok_or_else(|| format_err!("Invalid path"))?
@@ -201,7 +203,7 @@ pub async fn movie_queue_play(
     idx: Path<i32>,
     _: LoggedUser,
     state: Data<AppState>,
-) -> Result<HttpResponse, Error> {
+) -> HttpResult {
     let idx = idx.into_inner();
 
     let req = MoviePathRequest { idx };
@@ -215,7 +217,7 @@ pub async fn imdb_show(
     query: Query<ParseImdbRequest>,
     _: LoggedUser,
     state: Data<AppState>,
-) -> Result<HttpResponse, Error> {
+) -> HttpResult {
     let show = path.into_inner();
     let query = query.into_inner();
 
@@ -224,7 +226,7 @@ pub async fn imdb_show(
     form_http_response(x.into())
 }
 
-fn new_episode_worker(entries: &[StackString]) -> Result<HttpResponse, Error> {
+fn new_episode_worker(entries: &[StackString]) -> HttpResult {
     let previous = r#"
         <a href="javascript:updateMainArticle('/list/tvshows')">Go Back</a><br>
         <input type="button" name="list_cal" value="TVCalendar" onclick="updateMainArticle('/list/cal');"/>
@@ -245,7 +247,7 @@ pub async fn find_new_episodes(
     query: Query<FindNewEpisodeRequest>,
     _: LoggedUser,
     state: Data<AppState>,
-) -> Result<HttpResponse, Error> {
+) -> HttpResult {
     let req = query.into_inner();
     let entries = state.db.handle(req).await?;
     new_episode_worker(&entries)
@@ -255,7 +257,7 @@ pub async fn imdb_episodes_route(
     query: Query<ImdbEpisodesSyncRequest>,
     _: LoggedUser,
     state: Data<AppState>,
-) -> Result<HttpResponse, Error> {
+) -> HttpResult {
     let req = query.into_inner();
     let x = state.db.handle(req).await?;
     to_json(x)
@@ -265,7 +267,7 @@ pub async fn imdb_episodes_update(
     data: Json<ImdbEpisodesUpdateRequest>,
     _: LoggedUser,
     state: Data<AppState>,
-) -> Result<HttpResponse, Error> {
+) -> HttpResult {
     let episodes = data.into_inner();
 
     let req = episodes;
@@ -277,7 +279,7 @@ pub async fn imdb_ratings_route(
     query: Query<ImdbRatingsSyncRequest>,
     _: LoggedUser,
     state: Data<AppState>,
-) -> Result<HttpResponse, Error> {
+) -> HttpResult {
     let req = query.into_inner();
     let x = state.db.handle(req).await?;
     to_json(x)
@@ -287,7 +289,7 @@ pub async fn imdb_ratings_update(
     data: Json<ImdbRatingsUpdateRequest>,
     _: LoggedUser,
     state: Data<AppState>,
-) -> Result<HttpResponse, Error> {
+) -> HttpResult {
     let shows = data.into_inner();
 
     let req = shows;
@@ -299,7 +301,7 @@ pub async fn movie_queue_route(
     query: Query<MovieQueueSyncRequest>,
     _: LoggedUser,
     state: Data<AppState>,
-) -> Result<HttpResponse, Error> {
+) -> HttpResult {
     let req = query.into_inner();
     let x = state.db.handle(req).await?;
     to_json(x)
@@ -309,7 +311,7 @@ pub async fn movie_queue_update(
     data: Json<MovieQueueUpdateRequest>,
     _: LoggedUser,
     state: Data<AppState>,
-) -> Result<HttpResponse, Error> {
+) -> HttpResult {
     let queue = data.into_inner();
 
     let req = queue;
@@ -321,7 +323,7 @@ pub async fn movie_collection_route(
     query: Query<MovieCollectionSyncRequest>,
     _: LoggedUser,
     state: Data<AppState>,
-) -> Result<HttpResponse, Error> {
+) -> HttpResult {
     let req = query.into_inner();
     let x = state.db.handle(req).await?;
     to_json(x)
@@ -331,7 +333,7 @@ pub async fn movie_collection_update(
     data: Json<MovieCollectionUpdateRequest>,
     _: LoggedUser,
     state: Data<AppState>,
-) -> Result<HttpResponse, Error> {
+) -> HttpResult {
     let collection = data.into_inner();
 
     let req = collection;
@@ -342,13 +344,13 @@ pub async fn movie_collection_update(
 pub async fn last_modified_route(
     _: LoggedUser,
     state: Data<AppState>,
-) -> Result<HttpResponse, Error> {
+) -> HttpResult {
     let req = LastModifiedRequest {};
     let x = state.db.handle(req).await?;
     to_json(x)
 }
 
-pub async fn frontpage(_: LoggedUser, _: Data<AppState>) -> Result<HttpResponse, Error> {
+pub async fn frontpage(_: LoggedUser, _: Data<AppState>) -> HttpResult {
     form_http_response(include_str!("../../templates/index.html").replace("BODY", ""))
 }
 
@@ -433,7 +435,7 @@ fn tvshows_worker(res1: TvShowsMap, tvshows: Vec<TvShowsResult>) -> Result<Stack
     Ok(entries)
 }
 
-pub async fn tvshows(_: LoggedUser, state: Data<AppState>) -> Result<HttpResponse, Error> {
+pub async fn tvshows(_: LoggedUser, state: Data<AppState>) -> HttpResult {
     let s = state.clone();
     let shows = s.db.handle(TvShowsRequest {}).await?;
     let res1 = state.db.handle(WatchlistShowsRequest {}).await?;
@@ -496,7 +498,7 @@ fn process_shows(
 
 fn watchlist_worker(
     shows: HashMap<StackString, (StackString, WatchListShow, Option<TvShowSource>)>,
-) -> Result<HttpResponse, Error> {
+) -> HttpResult {
     let mut shows: Vec<_> = shows
         .into_iter()
         .map(|(_, (_, s, source))| (s.title, s.link, source))
@@ -537,7 +539,7 @@ fn watchlist_worker(
     form_http_response(entries)
 }
 
-pub async fn trakt_watchlist(_: LoggedUser, state: Data<AppState>) -> Result<HttpResponse, Error> {
+pub async fn trakt_watchlist(_: LoggedUser, state: Data<AppState>) -> HttpResult {
     let req = WatchlistShowsRequest {};
     let x = state.db.handle(req).await?;
     watchlist_worker(x)
@@ -546,7 +548,7 @@ pub async fn trakt_watchlist(_: LoggedUser, state: Data<AppState>) -> Result<Htt
 async fn watchlist_action_worker(
     action: TraktActions,
     imdb_url: &str,
-) -> Result<HttpResponse, Error> {
+) -> HttpResult {
     TRAKT_CONN.init().await;
     let body = match action {
         TraktActions::Add => TRAKT_CONN.add_watchlist_show(&imdb_url).await?.to_string(),
@@ -563,7 +565,7 @@ pub async fn trakt_watchlist_action(
     path: Path<(StackString, StackString)>,
     _: LoggedUser,
     state: Data<AppState>,
-) -> Result<HttpResponse, Error> {
+) -> HttpResult {
     let (action, imdb_url) = path.into_inner();
     let action = action.parse().expect("impossible");
 
@@ -619,7 +621,7 @@ pub async fn trakt_watched_seasons(
     path: Path<StackString>,
     _: LoggedUser,
     state: Data<AppState>,
-) -> Result<HttpResponse, Error> {
+) -> HttpResult {
     let imdb_url = path.into_inner();
     let s = state.clone();
     let show_opt = s.db.handle(ImdbRatingsRequest { imdb_url }).await?;
@@ -635,7 +637,7 @@ pub async fn trakt_watched_list(
     path: Path<(StackString, i32)>,
     _: LoggedUser,
     state: Data<AppState>,
-) -> Result<HttpResponse, Error> {
+) -> HttpResult {
     let (imdb_url, season) = path.into_inner();
 
     let req = WatchedListRequest {
@@ -650,7 +652,7 @@ pub async fn trakt_watched_action(
     path: Path<(StackString, StackString, i32, i32)>,
     _: LoggedUser,
     state: Data<AppState>,
-) -> Result<HttpResponse, Error> {
+) -> HttpResult {
     let (action, imdb_url, season, episode) = path.into_inner();
 
     let req = WatchedActionRequest {
@@ -663,7 +665,7 @@ pub async fn trakt_watched_action(
     form_http_response(x.into())
 }
 
-fn trakt_cal_worker(entries: &[StackString]) -> Result<HttpResponse, Error> {
+fn trakt_cal_worker(entries: &[StackString]) -> HttpResult {
     let previous = r#"<a href="javascript:updateMainArticle('/list/tvshows')">Go Back</a><br>"#;
     let entries = format!(
         r#"{}<table border="0">{}</table>"#,
@@ -673,17 +675,17 @@ fn trakt_cal_worker(entries: &[StackString]) -> Result<HttpResponse, Error> {
     form_http_response(entries)
 }
 
-pub async fn trakt_cal(_: LoggedUser, state: Data<AppState>) -> Result<HttpResponse, Error> {
+pub async fn trakt_cal(_: LoggedUser, state: Data<AppState>) -> HttpResult {
     let req = TraktCalRequest {};
     let entries = state.db.handle(req).await?;
     trakt_cal_worker(&entries)
 }
 
-pub async fn user(user: LoggedUser) -> Result<HttpResponse, Error> {
+pub async fn user(user: LoggedUser) -> HttpResult {
     to_json(user)
 }
 
-pub async fn trakt_auth_url(_: LoggedUser, _: Data<AppState>) -> Result<HttpResponse, Error> {
+pub async fn trakt_auth_url(_: LoggedUser, _: Data<AppState>) -> HttpResult {
     TRAKT_CONN.init().await;
     let url = TRAKT_CONN.get_auth_url().await?;
     form_http_response(url.to_string())
@@ -699,7 +701,7 @@ pub async fn trakt_callback(
     query: Query<TraktCallbackRequest>,
     _: LoggedUser,
     _: Data<AppState>,
-) -> Result<HttpResponse, Error> {
+) -> HttpResult {
     TRAKT_CONN.init().await;
     TRAKT_CONN
         .exchange_code_for_auth_token(query.code.as_str(), query.state.as_str())
@@ -711,7 +713,7 @@ pub async fn trakt_callback(
     form_http_response(body.to_string())
 }
 
-pub async fn refresh_auth(_: LoggedUser, _: Data<AppState>) -> Result<HttpResponse, Error> {
+pub async fn refresh_auth(_: LoggedUser, _: Data<AppState>) -> HttpResult {
     TRAKT_CONN.init().await;
     TRAKT_CONN.exchange_refresh_token().await?;
     form_http_response("finished".to_string())
