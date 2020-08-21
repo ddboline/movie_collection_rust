@@ -898,13 +898,13 @@ pub async fn trakt_app_parse(
             TraktActions::Add => watchlist_add(&mc, show).await?,
             TraktActions::Remove => watchlist_rm(&mc, show).await?,
             TraktActions::List => watchlist_list(&mc).await?,
-            _ => {}
+            TraktActions::None => {}
         },
         TraktCommands::Watched => match trakt_action {
             TraktActions::Add => watched_add(&mc, show, season, episode).await?,
             TraktActions::Remove => watched_rm(&mc, show, season, episode).await?,
             TraktActions::List => watched_list(&mc, show, season).await?,
-            _ => {}
+            TraktActions::None => {}
         },
         _ => {}
     }
