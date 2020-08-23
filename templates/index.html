@@ -73,6 +73,9 @@ BODY
 </center>
 
 <script language="JavaScript" type="text/javascript">
+    !function() {
+        updateMainArticle('/list/cal?source=all');
+    }();
     function updateMainArticle( url ) {
         let xmlhttp = new XMLHttpRequest();
         xmlhttp.onload = function f() {
