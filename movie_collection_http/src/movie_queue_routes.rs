@@ -5,7 +5,9 @@ use actix_web::{
     HttpResponse,
 };
 use anyhow::format_err;
+use maplit::hashmap;
 use serde::{Deserialize, Serialize};
+use stack_string::StackString;
 use std::{
     borrow::Borrow,
     collections::{HashMap, HashSet},
@@ -13,7 +15,6 @@ use std::{
     path,
 };
 use subprocess::Exec;
-use stack_string::StackString;
 
 use movie_collection_lib::{
     make_queue::movie_queue_http,
@@ -23,7 +24,7 @@ use movie_collection_lib::{
     stdout_channel::StdoutChannel,
     trakt_utils::{TraktActions, WatchListShow, TRAKT_CONN},
     tv_show_source::TvShowSource,
-    utils::remcom_single_file,
+    utils::{remcom_single_file, HBR},
 };
 
 use super::{
@@ -193,17 +194,14 @@ fn play_worker(full_path: &path::Path) -> HttpResult {
     Exec::shell(&command).join()?;
     let command = format!(
         "ln -s {} /var/www/html/videos/partial/{}",
-        full_path.to_string_lossy(), file_name
+        full_path.to_string_lossy(),
+        file_name
     );
     Exec::shell(&command).join()?;
     form_http_response(body)
 }
 
-pub async fn movie_queue_play(
-    idx: Path<i32>,
-    _: LoggedUser,
-    state: Data<AppState>,
-) -> HttpResult {
+pub async fn movie_queue_play(idx: Path<i32>, _: LoggedUser, state: Data<AppState>) -> HttpResult {
     let idx = idx.into_inner();
 
     let req = MoviePathRequest { idx };
@@ -341,17 +339,14 @@ pub async fn movie_collection_update(
     form_http_response("Success".to_string())
 }
 
-pub async fn last_modified_route(
-    _: LoggedUser,
-    state: Data<AppState>,
-) -> HttpResult {
+pub async fn last_modified_route(_: LoggedUser, state: Data<AppState>) -> HttpResult {
     let req = LastModifiedRequest {};
     let x = state.db.handle(req).await?;
     to_json(x)
 }
 
 pub async fn frontpage(_: LoggedUser, _: Data<AppState>) -> HttpResult {
-    form_http_response(include_str!("../../templates/index.html").replace("BODY", ""))
+    form_http_response(HBR.render("index.html", &hashmap! {"BODY" => ""})?)
 }
 
 type TvShowsMap = HashMap<StackString, (StackString, WatchListShow, Option<TvShowSource>)>;
@@ -430,7 +425,8 @@ fn tvshows_worker(res1: TvShowsMap, tvshows: Vec<TvShowsResult>) -> Result<Stack
         r#"{}<table border="0">{}</table>"#,
         previous,
         shows.join("")
-    ).into();
+    )
+    .into();
 
     Ok(entries)
 }
@@ -545,10 +541,7 @@ pub async fn trakt_watchlist(_: LoggedUser, state: Data<AppState>) -> HttpResult
     watchlist_worker(x)
 }
 
-async fn watchlist_action_worker(
-    action: TraktActions,
-    imdb_url: &str,
-) -> HttpResult {
+async fn watchlist_action_worker(action: TraktActions, imdb_url: &str) -> HttpResult {
     TRAKT_CONN.init().await;
     let body = match action {
         TraktActions::Add => TRAKT_CONN.add_watchlist_show(&imdb_url).await?.to_string(),
@@ -569,10 +562,7 @@ pub async fn trakt_watchlist_action(
     let (action, imdb_url) = path.into_inner();
     let action = action.parse().expect("impossible");
 
-    let req = WatchlistActionRequest {
-        action,
-        imdb_url,
-    };
+    let req = WatchlistActionRequest { action, imdb_url };
     let imdb_url = state.db.handle(req).await?;
     watchlist_action_worker(action, &imdb_url).await
 }
@@ -613,7 +603,8 @@ fn trakt_watched_seasons_worker(
         r#"{}<table border="0">{}</table>"#,
         previous,
         entries.join("")
-    ).into();
+    )
+    .into();
     Ok(entries)
 }
 
@@ -640,10 +631,7 @@ pub async fn trakt_watched_list(
 ) -> HttpResult {
     let (imdb_url, season) = path.into_inner();
 
-    let req = WatchedListRequest {
-        imdb_url,
-        season,
-    };
+    let req = WatchedListRequest { imdb_url, season };
     let x = state.db.handle(req).await?;
     form_http_response(x.into())
 }
