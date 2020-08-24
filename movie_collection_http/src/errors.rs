@@ -1,11 +1,12 @@
 use actix_threadpool::BlockingError;
 use actix_web::{error::ResponseError, HttpResponse};
 use anyhow::Error as AnyhowError;
+use handlebars::RenderError;
 use rust_auth_server::static_files::login_html;
+use stack_string::StackString;
 use std::fmt::Debug;
 use subprocess::PopenError;
 use thiserror::Error;
-use stack_string::StackString;
 
 use crate::logged_user::TRIGGER_DB_UPDATE;
 
@@ -24,6 +25,8 @@ pub enum ServiceError {
     BlockingError(StackString),
     #[error("Popen error {0}")]
     PopenError(#[from] PopenError),
+    #[error("Template Parse Error {0}")]
+    RenderError(#[from] RenderError),
 }
 
 // impl ResponseError trait allows to convert our errors into http responses
