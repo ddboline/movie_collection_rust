@@ -1,9 +1,9 @@
 use anyhow::{format_err, Error};
 use deadpool::managed::Object;
 use deadpool_postgres::{ClientWrapper, Config, Pool};
+use stack_string::StackString;
 use std::fmt;
 use tokio_postgres::{error::Error as PgError, Config as PgConfig, NoTls};
-use stack_string::StackString;
 
 #[derive(Clone, Default)]
 pub struct PgPool {

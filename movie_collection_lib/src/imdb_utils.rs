@@ -6,12 +6,10 @@ use select::{
     document::Document,
     predicate::{Class, Name},
 };
-use std::fmt;
 use stack_string::StackString;
+use std::fmt;
 
-use crate::{
-    utils::{option_string_wrapper, ExponentialRetry},
-};
+use crate::utils::{option_string_wrapper, ExponentialRetry};
 
 #[derive(Default)]
 pub struct ImdbTuple {

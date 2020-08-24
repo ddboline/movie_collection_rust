@@ -2,12 +2,12 @@ use anyhow::{format_err, Error};
 use derive_more::Display;
 use futures::future::try_join_all;
 use rayon::iter::{IntoParallelIterator, ParallelIterator};
+use stack_string::StackString;
 use std::{
     ffi::OsStr,
     path::{Path, PathBuf},
     sync::Arc,
 };
-use stack_string::StackString;
 
 use crate::{
     movie_collection::MovieCollection,

@@ -3,13 +3,10 @@ use chrono::{DateTime, Utc};
 use log::debug;
 use postgres_query::FromSqlRow;
 use serde::{Deserialize, Serialize};
-use std::fmt;
 use stack_string::StackString;
+use std::fmt;
 
-use crate::{
-    pgpool::PgPool, tv_show_source::TvShowSource,
-    utils::option_string_wrapper,
-};
+use crate::{pgpool::PgPool, tv_show_source::TvShowSource, utils::option_string_wrapper};
 
 #[derive(Default, Clone, Debug, Serialize, Deserialize, FromSqlRow)]
 pub struct ImdbRatings {
@@ -136,7 +133,8 @@ impl ImdbRatings {
             self.istv.unwrap_or(false).to_string().into(),
             self.source
                 .as_ref()
-                .map_or_else(|| "".to_string(), ToString::to_string).into(),
+                .map_or_else(|| "".to_string(), ToString::to_string)
+                .into(),
         ]
     }
 }

@@ -398,11 +398,15 @@ pub trait ExponentialRetry {
 #[cfg(test)]
 mod tests {
     use anyhow::Error;
-    use std::path::Path;
-    use std::fs::{read_to_string, remove_file};
+    use std::{
+        fs::{read_to_string, remove_file},
+        path::Path,
+    };
 
-    use crate::config::Config;
-    use crate::utils::{create_move_script, create_transcode_script};
+    use crate::{
+        config::Config,
+        utils::{create_move_script, create_transcode_script},
+    };
 
     #[test]
     fn test_create_move_script() -> Result<(), Error> {
@@ -425,7 +429,9 @@ mod tests {
         println!("{:?}", script_path);
         let s = read_to_string(&script_path)?;
         println!("{}", s);
-        assert!(s.contains(r#"ONAME="/media/seagate4000/Documents/movies/drama/a_night_to_remember""#));
+        assert!(
+            s.contains(r#"ONAME="/media/seagate4000/Documents/movies/drama/a_night_to_remember""#)
+        );
         remove_file(&script_path)?;
         Ok(())
     }

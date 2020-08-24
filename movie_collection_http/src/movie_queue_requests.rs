@@ -3,8 +3,8 @@ use async_trait::async_trait;
 use chrono::{DateTime, Utc};
 use futures::future::try_join_all;
 use serde::{Deserialize, Serialize};
-use std::path;
 use stack_string::StackString;
+use std::path;
 
 use super::HandleRequest;
 use movie_collection_lib::{

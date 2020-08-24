@@ -2,14 +2,12 @@
 
 use anyhow::Error;
 use futures::future::try_join_all;
+use stack_string::StackString;
 use std::path::Path;
 use structopt::StructOpt;
 use tokio::task::spawn_blocking;
-use stack_string::StackString;
 
-use movie_collection_lib::{
-    movie_collection::MovieCollection, utils::get_video_runtime,
-};
+use movie_collection_lib::{movie_collection::MovieCollection, utils::get_video_runtime};
 
 #[derive(StructOpt)]
 /// Collection Query/Parser

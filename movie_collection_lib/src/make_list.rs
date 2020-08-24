@@ -1,7 +1,7 @@
 use anyhow::Error;
 use rayon::iter::{IntoParallelRefIterator, ParallelIterator};
-use std::collections::HashMap;
 use stack_string::StackString;
+use std::collections::HashMap;
 
 use crate::{
     config::Config,

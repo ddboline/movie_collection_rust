@@ -7,6 +7,7 @@ use maplit::hashmap;
 use rand::{thread_rng, Rng};
 use reqwest::{header::HeaderMap, Client, Url};
 use serde::{Deserialize, Serialize};
+use stack_string::StackString;
 use std::{
     collections::{HashMap, HashSet},
     path::PathBuf,
@@ -16,7 +17,6 @@ use tokio::{
     fs::{read, write},
     sync::{Mutex, RwLock},
 };
-use stack_string::StackString;
 
 use crate::{
     config::Config,

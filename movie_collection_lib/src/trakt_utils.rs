@@ -5,6 +5,7 @@ use lazy_static::lazy_static;
 use log::debug;
 use postgres_query::FromSqlRow;
 use serde::{Deserialize, Serialize};
+use stack_string::StackString;
 use std::{
     borrow::Borrow,
     collections::{HashMap, HashSet},
@@ -13,7 +14,6 @@ use std::{
     str::FromStr,
     sync::Arc,
 };
-use stack_string::StackString;
 
 use crate::{
     config::Config, imdb_episodes::ImdbEpisodes, imdb_ratings::ImdbRatings,
@@ -1032,7 +1032,8 @@ pub async fn watch_list_http_worker(
         previous,
         buttons,
         entries.join("\n")
-    ).into();
+    )
+    .into();
     Ok(entries)
 }
 
@@ -1102,7 +1103,8 @@ pub async fn watched_action_http_worker(
             format!("{}", result)
         }
         _ => "".to_string(),
-    }.into();
+    }
+    .into();
     Ok(body)
 }
 

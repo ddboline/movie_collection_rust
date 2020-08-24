@@ -1,12 +1,10 @@
 #![allow(clippy::used_underscore_binding)]
 
 use anyhow::Error;
-use structopt::StructOpt;
 use stack_string::StackString;
+use structopt::StructOpt;
 
-use movie_collection_lib::{
-    movie_collection::MovieCollection, tv_show_source::TvShowSource,
-};
+use movie_collection_lib::{movie_collection::MovieCollection, tv_show_source::TvShowSource};
 
 #[derive(StructOpt)]
 /// Query and Parse Video Collection

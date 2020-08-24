@@ -1,13 +1,12 @@
 use anyhow::Error;
 use chrono::NaiveDate;
+use stack_string::StackString;
 use std::collections::HashMap;
 use structopt::StructOpt;
-use stack_string::StackString;
 
 use crate::{
     imdb_episodes::ImdbEpisodes, imdb_ratings::ImdbRatings, imdb_utils::ImdbConnection,
-    movie_collection::MovieCollection, pgpool::PgPool,
-    trakt_utils::WatchListMap,
+    movie_collection::MovieCollection, pgpool::PgPool, trakt_utils::WatchListMap,
 };
 
 #[derive(StructOpt, Default, Debug)]
@@ -168,7 +167,8 @@ impl ParseImdb {
                             output.push(vec![format!(
                                 "exists {} {} {}",
                                 opts.show, s, result.rating
-                            ).into()]);
+                            )
+                            .into()]);
                         }
                     } else {
                         output.push(vec![format!("not exists {} {}", opts.show, result).into()]);
@@ -213,7 +213,8 @@ impl ParseImdb {
                                     output.push(vec![format!(
                                         "exists {} {} {}",
                                         result, episode, e.rating
-                                    ).into()]);
+                                    )
+                                    .into()]);
                                     let mut new = e.clone();
                                     new.eptitle = episode.eptitle.unwrap_or_else(|| "".into());
                                     new.rating = episode.rating.unwrap_or(-1.0);
@@ -221,7 +222,9 @@ impl ParseImdb {
                                     new.update_episode(&self.mc.get_pool()).await?;
                                 }
                             } else {
-                                output.push(vec![format!("not exists {} {}", result, episode).into()]);
+                                output.push(vec![
+                                    format!("not exists {} {}", result, episode).into()
+                                ]);
                                 ImdbEpisodes {
                                     show: opts.show.clone(),
                                     title: result.title.clone().unwrap_or_else(|| "".into()),
@@ -265,20 +268,20 @@ impl ParseImdb {
             .into_iter()
             .map(|line| {
                 let mut imdb_url: StackString = "".into();
-                let tmp: Vec<_> = line
-                    .into_iter()
-                    .map(|imdb_url_| {
-                        if imdb_url_.starts_with("tt") {
-                            imdb_url = imdb_url_;
-                            format!(
+                let tmp: Vec<_> =
+                    line.into_iter()
+                        .map(|imdb_url_| {
+                            if imdb_url_.starts_with("tt") {
+                                imdb_url = imdb_url_;
+                                format!(
                                 r#"<a href="https://www.imdb.com/title/{}" target="_blank">{}</a>"#,
                                 imdb_url, imdb_url
                             ).into()
-                        } else {
-                            imdb_url_
-                        }
-                    })
-                    .collect();
+                            } else {
+                                imdb_url_
+                            }
+                        })
+                        .collect();
                 format!(
                     "<tr><td>{}</td><td>{}</td></tr>",
                     tmp.join("</td><td>"),

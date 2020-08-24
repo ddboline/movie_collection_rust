@@ -4,14 +4,12 @@ use futures::future::try_join_all;
 use log::debug;
 use postgres_query::FromSqlRow;
 use serde::{Deserialize, Serialize};
-use std::{fmt, path::Path};
 use stack_string::StackString;
+use std::{fmt, path::Path};
 
 use crate::{config::Config, movie_collection::MovieCollection, pgpool::PgPool};
 
-use crate::{
-    utils::{option_string_wrapper, parse_file_stem},
-};
+use crate::utils::{option_string_wrapper, parse_file_stem};
 
 #[derive(Default, Serialize)]
 pub struct MovieQueueResult {

@@ -1,9 +1,11 @@
 use anyhow::{format_err, Error};
 use chrono::{DateTime, Duration, Local, NaiveDate, Utc};
 use futures::future::try_join_all;
+use itertools::Itertools;
 use postgres_query::FromSqlRow;
 use rayon::iter::{IntoParallelIterator, IntoParallelRefIterator, ParallelIterator};
 use serde::{Deserialize, Serialize};
+use stack_string::StackString;
 use std::{
     collections::{HashMap, HashSet},
     ffi::OsStr,
@@ -11,8 +13,6 @@ use std::{
     path::Path,
     sync::Arc,
 };
-use itertools::Itertools;
-use stack_string::StackString;
 
 use crate::{
     config::Config,
@@ -224,7 +224,7 @@ impl MovieCollection {
             .collect();
 
         let shows = if shows.contains(show) {
-            vec!{show.into()}
+            vec![show.into()]
         } else {
             shows.into_iter().sorted().collect()
         };

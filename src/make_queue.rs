@@ -1,8 +1,8 @@
 #![allow(clippy::used_underscore_binding)]
 
 use anyhow::Error;
-use structopt::StructOpt;
 use stack_string::StackString;
+use structopt::StructOpt;
 
 use movie_collection_lib::{
     make_queue::{make_queue_worker, PathOrIndex},
