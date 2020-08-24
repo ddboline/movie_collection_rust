@@ -104,6 +104,11 @@ impl ConfigInner {
 }
 
 impl Config {
+    pub fn new() -> Result<Self, Error> {
+        let config: ConfigInner = envy::from_env()?;
+        Ok(Self(Arc::new(config)))
+    }
+
     pub fn with_config() -> Result<Self, Error> {
         let config_dir = dirs::config_dir().ok_or_else(|| format_err!("No CONFIG directory"))?;
         let env_file = config_dir.join("movie_collection_rust").join("config.env");
@@ -116,9 +121,7 @@ impl Config {
             dotenv::from_path(&env_file).ok();
         }
 
-        let config: ConfigInner = envy::from_env()?;
-
-        Ok(Self(Arc::new(config)))
+        Self::new()
     }
 }
 

@@ -207,6 +207,7 @@ pub fn create_move_script(
             .join("Documents")
             .join("movies")
             .join(d);
+        println!("{:?}", d);
         if !d.exists() {
             return Err(format_err!(
                 "Directory {} does not exist",
@@ -398,8 +399,9 @@ pub trait ExponentialRetry {
 #[cfg(test)]
 mod tests {
     use anyhow::Error;
+    use std::env::set_var;
     use std::{
-        fs::{read_to_string, remove_file},
+        fs::{create_dir_all, read_to_string, remove_file},
         path::Path,
     };
 
@@ -408,9 +410,28 @@ mod tests {
         utils::{create_move_script, create_transcode_script},
     };
 
+    fn init_env() {
+        set_var(
+            "PGURL",
+            "postgresql://USER:PASSWORD@localhost:5432/movie_queue",
+        );
+        set_var("AUTHDB", "postgresql://USER:PASSWORD@localhost:5432/auth");
+        set_var("MOVIE_DIRS", "/tmp");
+        set_var("PREFERED_DISK", "/tmp");
+        set_var("JWT_SECRET", "JWT_SECRET");
+        set_var("SECRET_KEY", "SECRET_KEY");
+        set_var("DOMAIN", "DOMAIN");
+        set_var("SPARKPOST_API_KEY", "SPARKPOST_API_KEY");
+        set_var("SENDING_EMAIL_ADDRESS", "SENDING_EMAIL_ADDRESS");
+        set_var("CALLBACK_URL", "https://{DOMAIN}/auth/register.html");
+        set_var("TRAKT_CLIENT_ID", "");
+        set_var("TRAKT_CLIENT_SECRET", "");
+    }
+
     #[test]
     fn test_create_move_script() -> Result<(), Error> {
-        let config = Config::with_config()?;
+        init_env();
+        let config = Config::new()?;
         let p = Path::new("mr_robot_s01_ep01.mp4");
         let script_path = create_move_script(&config, None, false, p)?;
         println!("{:?}", script_path);
@@ -423,22 +444,32 @@ mod tests {
 
     #[test]
     fn test_create_move_script_movie() -> Result<(), Error> {
-        let config = Config::with_config()?;
+        init_env();
+        let config = Config::new()?;
+        create_dir_all(
+            config
+                .preferred_dir
+                .join("Documents")
+                .join("movies")
+                .join("drama"),
+        )?;
         let p = Path::new("a_night_to_remember.mp4");
         let script_path = create_move_script(&config, Some(Path::new("drama")), false, p)?;
         println!("{:?}", script_path);
         let s = read_to_string(&script_path)?;
         println!("{}", s);
-        assert!(
-            s.contains(r#"ONAME="/media/seagate4000/Documents/movies/drama/a_night_to_remember""#)
-        );
+        assert!(s.contains(&format!(
+            r#"ONAME="{}/Documents/movies/drama/a_night_to_remember""#,
+            config.preferred_dir.to_string_lossy()
+        )));
         remove_file(&script_path)?;
         Ok(())
     }
 
     #[test]
     fn test_create_transcode_script() -> Result<(), Error> {
-        let config = Config::with_config()?;
+        init_env();
+        let config = Config::new()?;
         let p = Path::new("mr_robot_s01_ep01.mkv");
         let script_path = create_transcode_script(&config, &p)?;
         println!("{:?}", script_path);
