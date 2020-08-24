@@ -1,13 +1,17 @@
 use amqp::{protocol::basic::BasicProperties, Basic, Channel, Options, Session, Table};
 use anyhow::{format_err, Error};
 use async_trait::async_trait;
+use handlebars::Handlebars;
+use lazy_static::lazy_static;
 use log::{debug, error};
+use maplit::hashmap;
 use rand::{
     distributions::{Distribution, Uniform},
     thread_rng,
 };
 use reqwest::{Client, Response, Url};
 use serde::{Deserialize, Serialize};
+use stack_string::StackString;
 use std::{
     fs::{create_dir_all, rename, File, OpenOptions},
     io::{BufRead, BufReader, Write},
@@ -17,9 +21,26 @@ use std::{
 use subprocess::{Exec, Redirection};
 use tokio::time::{delay_for, Duration};
 use walkdir::WalkDir;
-use stack_string::StackString;
 
 use crate::{config::Config, stdout_channel::StdoutChannel};
+
+lazy_static! {
+    pub static ref HBR: Handlebars<'static> = get_templates().expect("Failed to parse templates");
+}
+
+fn get_templates() -> Result<Handlebars<'static>, Error> {
+    let mut h = Handlebars::new();
+    h.register_template_string(
+        "move_script.sh",
+        include_str!("../../templates/move_script.sh"),
+    )?;
+    h.register_template_string(
+        "transcode_script.sh",
+        include_str!("../../templates/transcode_script.sh"),
+    )?;
+    h.register_template_string("index.html", include_str!("../../templates/index.html"))?;
+    Ok(h)
+}
 
 #[inline]
 pub fn option_string_wrapper<T: AsRef<str>>(s: &Option<T>) -> &str {
@@ -155,11 +176,16 @@ pub fn create_transcode_script(config: &Config, path: &Path) -> Result<PathBuf, 
             .join("dvdrip")
             .join("avi")
             .join(&fstem)
-            .with_extension("mp4");
-        let template_file = include_str!("../../templates/transcode_script.sh")
-            .replace("INPUT_FILE", &full_path)
-            .replace("OUTPUT_FILE", &output_file.to_string_lossy())
-            .replace("PREFIX", &fstem.to_string_lossy());
+            .with_extension("mp4")
+            .to_string_lossy()
+            .into_owned();
+        let fstem = fstem.to_string_lossy();
+        let params = hashmap! {
+            "INPUT_FILE" => full_path.as_str(),
+            "OUTPUT_FILE" => &output_file,
+            "PREFIX" => &fstem,
+        };
+        let template_file = HBR.render("transcode_script.sh", &params)?;
         let mut file = File::create(&script_file)?;
         file.write_all(&template_file.into_bytes())?;
         Ok(script_file)
@@ -224,13 +250,14 @@ pub fn create_move_script(
         .join(format!("{}_copy.sh", prefix));
     let outname = output_dir.join(&prefix).to_string_lossy().to_string();
     let output_dir = output_dir.to_string_lossy();
-
-    let script_str = include_str!("../../templates/move_script.sh")
-        .replace("SHOW", &prefix)
-        .replace("OUTNAME", &outname)
-        .replace("FNAME", &file)
-        .replace("BNAME", &file_name)
-        .replace("ONAME", &outname);
+    let params = hashmap! {
+        "SHOW" => prefix.as_str(),
+        "OUTNAME" => &outname,
+        "FNAME" => &file,
+        "BNAME" => &file_name,
+        "ONAME" => &outname,
+    };
+    let script_str = HBR.render("move_script.sh", &params)?;
 
     let mut f = File::create(&mp4_script)?;
     f.write_all(&script_str.into_bytes())?;
@@ -365,5 +392,54 @@ pub trait ExponentialRetry {
                 }
             }
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use anyhow::Error;
+    use std::path::Path;
+    use std::fs::{read_to_string, remove_file};
+
+    use crate::config::Config;
+    use crate::utils::{create_move_script, create_transcode_script};
+
+    #[test]
+    fn test_create_move_script() -> Result<(), Error> {
+        let config = Config::with_config()?;
+        let p = Path::new("mr_robot_s01_ep01.mp4");
+        let script_path = create_move_script(&config, None, false, p)?;
+        println!("{:?}", script_path);
+        let s = read_to_string(&script_path)?;
+        println!("{}", s);
+        assert!(s.contains(r#"FNAME="mr_robot_s01_ep01.mp4""#));
+        remove_file(&script_path)?;
+        Ok(())
+    }
+
+    #[test]
+    fn test_create_move_script_movie() -> Result<(), Error> {
+        let config = Config::with_config()?;
+        let p = Path::new("a_night_to_remember.mp4");
+        let script_path = create_move_script(&config, Some(Path::new("drama")), false, p)?;
+        println!("{:?}", script_path);
+        let s = read_to_string(&script_path)?;
+        println!("{}", s);
+        assert!(s.contains(r#"ONAME="/media/seagate4000/Documents/movies/drama/a_night_to_remember""#));
+        remove_file(&script_path)?;
+        Ok(())
+    }
+
+    #[test]
+    fn test_create_transcode_script() -> Result<(), Error> {
+        let config = Config::with_config()?;
+        let p = Path::new("mr_robot_s01_ep01.mkv");
+        let script_path = create_transcode_script(&config, &p)?;
+        println!("{:?}", script_path);
+        let s = read_to_string(&script_path)?;
+        println!("{}", s);
+        assert!(s.contains(r#"INPUT_FILE="mr_robot_s01_ep01.mkv""#));
+        remove_file(&script_path)?;
+        Ok(())
     }
 }
