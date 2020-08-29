@@ -401,7 +401,7 @@ mod tests {
     use anyhow::Error;
     use std::{
         env::set_var,
-        fs::{create_dir_all, read_to_string, remove_file},
+        fs::{create_dir_all, read_to_string, remove_dir_all, remove_file},
         path::Path,
     };
 
@@ -432,6 +432,8 @@ mod tests {
     fn test_create_move_script() -> Result<(), Error> {
         init_env();
         let config = Config::new()?;
+        let job_path = config.home_dir.join("dvdrip").join("jobs");
+        create_dir_all(&job_path)?;
         let p = Path::new("mr_robot_s01_ep01.mp4");
         let script_path = create_move_script(&config, None, false, p)?;
         println!("{:?}", script_path);
@@ -446,13 +448,14 @@ mod tests {
     fn test_create_move_script_movie() -> Result<(), Error> {
         init_env();
         let config = Config::new()?;
-        create_dir_all(
-            config
-                .preferred_dir
-                .join("Documents")
-                .join("movies")
-                .join("drama"),
-        )?;
+        let job_path = config.home_dir.join("dvdrip").join("jobs");
+        create_dir_all(&job_path)?;
+        let drama_dir = config
+            .preferred_dir
+            .join("Documents")
+            .join("movies")
+            .join("drama");
+        create_dir_all(&drama_dir)?;
         let p = Path::new("a_night_to_remember.mp4");
         let script_path = create_move_script(&config, Some(Path::new("drama")), false, p)?;
         println!("{:?}", script_path);
@@ -470,6 +473,8 @@ mod tests {
     fn test_create_transcode_script() -> Result<(), Error> {
         init_env();
         let config = Config::new()?;
+        let job_path = config.home_dir.join("dvdrip").join("jobs");
+        create_dir_all(&job_path)?;
         let p = Path::new("mr_robot_s01_ep01.mkv");
         let script_path = create_transcode_script(&config, &p)?;
         println!("{:?}", script_path);
