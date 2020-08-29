@@ -4,17 +4,19 @@ use futures::future::try_join_all;
 use stack_string::StackString;
 use std::path::PathBuf;
 use structopt::StructOpt;
-use tokio::fs::{read_to_string, File};
-use tokio::io::{stdin, stdout, AsyncReadExt, AsyncWrite, AsyncWriteExt};
-
-use movie_collection_lib::config::Config;
-use movie_collection_lib::imdb_episodes::ImdbEpisodes;
-use movie_collection_lib::imdb_ratings::ImdbRatings;
-use movie_collection_lib::movie_collection::{
-    LastModifiedResponse, MovieCollection, MovieCollectionRow,
+use tokio::{
+    fs::{read_to_string, File},
+    io::{stdin, stdout, AsyncReadExt, AsyncWrite, AsyncWriteExt},
 };
-use movie_collection_lib::movie_queue::{MovieQueueDB, MovieQueueRow};
-use movie_collection_lib::pgpool::PgPool;
+
+use movie_collection_lib::{
+    config::Config,
+    imdb_episodes::ImdbEpisodes,
+    imdb_ratings::ImdbRatings,
+    movie_collection::{LastModifiedResponse, MovieCollection, MovieCollectionRow},
+    movie_queue::{MovieQueueDB, MovieQueueRow},
+    pgpool::PgPool,
+};
 
 #[derive(StructOpt)]
 enum MovieQueueCli {
@@ -29,7 +31,8 @@ enum MovieQueueCli {
     Export {
         #[structopt(short, long)]
         /// table -- possible values:
-        /// ['last_modified', 'imdb_ratings', 'imdb_episodes', 'movie_collection', 'movie_queue']
+        /// ['last_modified', 'imdb_ratings', 'imdb_episodes',
+        /// 'movie_collection', 'movie_queue']
         table: StackString,
         #[structopt(short, long)]
         filepath: Option<PathBuf>,
