@@ -1,7 +1,6 @@
 use anyhow::Error;
 use async_trait::async_trait;
 use chrono::{DateTime, Utc};
-use futures::future::try_join_all;
 use serde::{Deserialize, Serialize};
 use stack_string::StackString;
 use std::path;
@@ -11,8 +10,8 @@ use movie_collection_lib::{
     imdb_episodes::ImdbEpisodes,
     imdb_ratings::ImdbRatings,
     movie_collection::{
-        find_new_episodes_http_worker, ImdbSeason, MovieCollection, MovieCollectionRow,
-        TvShowsResult,
+        find_new_episodes_http_worker, ImdbSeason, LastModifiedResponse, MovieCollection,
+        MovieCollectionRow, TvShowsResult,
     },
     movie_queue::{MovieQueueDB, MovieQueueResult, MovieQueueRow},
     parse_imdb::{ParseImdb, ParseImdbOptions},
@@ -64,6 +63,7 @@ impl HandleRequest<QueueDeleteRequest> for PgPool {
     }
 }
 
+#[derive(Debug)]
 pub struct MovieQueueRequest {
     pub patterns: Vec<StackString>,
 }
@@ -445,12 +445,6 @@ impl HandleRequest<MovieCollectionUpdateRequest> for PgPool {
     }
 }
 
-#[derive(Serialize, Deserialize)]
-pub struct LastModifiedResponse {
-    pub table: StackString,
-    pub last_modified: DateTime<Utc>,
-}
-
 pub struct LastModifiedRequest {}
 
 #[async_trait]
@@ -458,27 +452,6 @@ impl HandleRequest<LastModifiedRequest> for PgPool {
     type Result = Result<Vec<LastModifiedResponse>, Error>;
 
     async fn handle(&self, _: LastModifiedRequest) -> Self::Result {
-        let tables = vec![
-            "imdb_episodes",
-            "imdb_ratings",
-            "movie_collection",
-            "movie_queue",
-        ];
-
-        let futures = tables.into_iter().map(|table| async move {
-            let query = format!("SELECT max(last_modified) FROM {}", table);
-            if let Some(row) = self.get().await?.query(query.as_str(), &[]).await?.get(0) {
-                let last_modified: DateTime<Utc> = row.try_get(0)?;
-                Ok(Some(LastModifiedResponse {
-                    table: (*table).into(),
-                    last_modified,
-                }))
-            } else {
-                Ok(None)
-            }
-        });
-        let results: Result<Vec<_>, Error> = try_join_all(futures).await;
-        let results: Vec<_> = results?.into_iter().filter_map(|x| x).collect();
-        Ok(results)
+        LastModifiedResponse::get_last_modified(self).await
     }
 }

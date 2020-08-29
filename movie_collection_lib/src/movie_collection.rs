@@ -1035,3 +1035,36 @@ pub async fn find_new_episodes_http_worker<T: AsRef<str>>(
 
     Ok(output)
 }
+
+#[derive(Serialize, Deserialize)]
+pub struct LastModifiedResponse {
+    pub table: StackString,
+    pub last_modified: DateTime<Utc>,
+}
+
+impl LastModifiedResponse {
+    pub async fn get_last_modified(pool: &PgPool) -> Result<Vec<Self>, Error> {
+        let tables = vec![
+            "imdb_episodes",
+            "imdb_ratings",
+            "movie_collection",
+            "movie_queue",
+        ];
+
+        let futures = tables.into_iter().map(|table| async move {
+            let query = format!("SELECT max(last_modified) FROM {}", table);
+            if let Some(row) = pool.get().await?.query(query.as_str(), &[]).await?.get(0) {
+                let last_modified: DateTime<Utc> = row.try_get(0)?;
+                Ok(Some(LastModifiedResponse {
+                    table: (*table).into(),
+                    last_modified,
+                }))
+            } else {
+                Ok(None)
+            }
+        });
+        let results: Result<Vec<_>, Error> = try_join_all(futures).await;
+        let results: Vec<_> = results?.into_iter().filter_map(|x| x).collect();
+        Ok(results)
+    }
+}
