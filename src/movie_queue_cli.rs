@@ -42,6 +42,7 @@ enum MovieQueueCli {
 }
 
 impl MovieQueueCli {
+    #[allow(clippy::too_many_lines)]
     async fn run() -> Result<(), Error> {
         let config = Config::with_config()?;
         let pool = PgPool::new(&config.pgurl);
