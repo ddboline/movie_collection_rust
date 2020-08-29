@@ -38,16 +38,17 @@ package_xenial:
 	rm $(cidfile)
 
 install:
-	cp target/$(build_type)/make-list /usr/bin/make-list
-	cp target/$(build_type)/remcom /usr/bin/remcom
-	cp target/$(build_type)/transcode-avi /usr/bin/transcode-avi
-	cp target/$(build_type)/run-encoding /usr/bin/run-encoding
-	cp target/$(build_type)/parse-imdb /usr/bin/parse-imdb
+	cp target/$(build_type)/find-new-episodes /usr/bin/find-new-episodes
 	cp target/$(build_type)/make-collection /usr/bin/make-collection
+	cp target/$(build_type)/make-list /usr/bin/make-list
 	cp target/$(build_type)/make-queue /usr/bin/make-queue
 	cp target/$(build_type)/movie-queue-http /usr/bin/movie-queue-http
+	cp target/$(build_type)/parse-imdb /usr/bin/parse-imdb
+	cp target/$(build_type)/remcom /usr/bin/remcom
+	cp target/$(build_type)/run-encoding /usr/bin/run-encoding
 	cp target/$(build_type)/trakt-app /usr/bin/trakt-app
-	cp target/$(build_type)/find-new-episodes /usr/bin/find-new-episodes
+	cp target/$(build_type)/transcode-avi /usr/bin/transcode-avi
+	cp target/$(build_type)/movie-queue-cli /usr/bin/movie-queue-cli
 
 pull:
 	`aws ecr --region us-east-1 get-login --no-include-email`

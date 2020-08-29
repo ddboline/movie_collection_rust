@@ -209,6 +209,7 @@ impl ParseImdb {
                             if let Some(e) = episodes.get(&key) {
                                 if (e.rating - episode.rating.unwrap_or(-1.0)).abs() > 0.1
                                     || e.airdate != airdate
+                                    || Some(&e.eptitle) != episode.eptitle.as_ref()
                                 {
                                     output.push(vec![format!(
                                         "exists {} {} {}",

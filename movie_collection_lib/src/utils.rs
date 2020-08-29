@@ -399,8 +399,8 @@ pub trait ExponentialRetry {
 #[cfg(test)]
 mod tests {
     use anyhow::Error;
-    use std::env::set_var;
     use std::{
+        env::set_var,
         fs::{create_dir_all, read_to_string, remove_file},
         path::Path,
     };

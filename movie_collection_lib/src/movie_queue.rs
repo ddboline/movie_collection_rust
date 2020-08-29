@@ -35,6 +35,7 @@ impl fmt::Display for MovieQueueResult {
     }
 }
 
+#[derive(Clone)]
 pub struct MovieQueueDB {
     pool: PgPool,
 }
