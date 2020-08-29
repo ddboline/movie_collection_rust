@@ -124,8 +124,8 @@ pub async fn start_app(config: Config) {
                         web::resource("/last_modified").route(web::get().to(last_modified_route)),
                     )
                     .service(web::resource("/user").route(web::get().to(user)))
-                    .service(web::resource("/{show}").route(web::get().to(movie_queue_show)))
-                    .service(web::resource("/index.html").route(web::get().to(movie_queue))),
+                    .service(web::resource("/full_queue").route(web::get().to(movie_queue)))
+                    .service(web::resource("/{show}").route(web::get().to(movie_queue_show))),
             )
     })
     .bind(&format!("127.0.0.1:{}", port))
