@@ -4,7 +4,7 @@ FNAME="{{FNAME}}"
 BNAME="{{BNAME}}"
 ONAME="{{ONAME}}"
 
-cp ~/Documents/movies/${SHOW}.mp4 ${OUTNAME}.mp4.new &
+cp ~/Documents/movies/${SHOW}.mp4 ${ONAME}.mp4.new &
 PID1=$!
 if [ -e $FNAME ]; then
     mv $FNAME ~/Documents/movies/${BNAME}.old &
