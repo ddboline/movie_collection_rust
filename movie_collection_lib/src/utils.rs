@@ -253,7 +253,6 @@ pub fn create_move_script(
     let output_dir = output_dir.to_string_lossy();
     let params = hashmap! {
         "SHOW" => prefix.as_str(),
-        "OUTNAME" => &outname,
         "FNAME" => &file,
         "BNAME" => &file_name,
         "ONAME" => &outname,
