@@ -24,14 +24,6 @@ lazy_static! {
 
 fn get_templates() -> Result<Handlebars<'static>, Error> {
     let mut h = Handlebars::new();
-    h.register_template_string(
-        "move_script.sh",
-        include_str!("../../templates/move_script.sh"),
-    )?;
-    h.register_template_string(
-        "transcode_script.sh",
-        include_str!("../../templates/transcode_script.sh"),
-    )?;
     h.register_template_string("index.html", include_str!("../../templates/index.html"))?;
     Ok(h)
 }
