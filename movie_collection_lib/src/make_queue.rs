@@ -34,6 +34,12 @@ impl From<&OsStr> for PathOrIndex {
     }
 }
 
+impl From<&Path> for PathOrIndex {
+    fn from(p: &Path) -> Self {
+        Self::Path(p.to_path_buf())
+    }
+}
+
 #[allow(clippy::cognitive_complexity)]
 pub async fn make_queue_worker(
     add_files: &[PathOrIndex],

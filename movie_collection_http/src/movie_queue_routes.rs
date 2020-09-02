@@ -17,14 +17,15 @@ use std::{
 use subprocess::Exec;
 
 use movie_collection_lib::{
+    config::Config,
     make_queue::movie_queue_http,
     movie_collection::{ImdbSeason, TvShowsResult},
     movie_queue::MovieQueueResult,
     pgpool::PgPool,
-    stdout_channel::StdoutChannel,
     trakt_utils::{TraktActions, WatchListShow, TRAKT_CONN},
+    transcode_service::{TranscodeService, TranscodeServiceRequest},
     tv_show_source::TvShowSource,
-    utils::{remcom_single_file, HBR},
+    utils::HBR,
 };
 
 use super::{
@@ -120,24 +121,25 @@ pub async fn movie_queue_delete(
     form_http_response(body.into())
 }
 
-fn transcode_worker(
+async fn transcode_worker(
     directory: Option<&path::Path>,
     entries: &[MovieQueueResult],
-    stdout: &StdoutChannel,
 ) -> HttpResult {
-    let entries: Result<Vec<_>, Error> = entries
-        .iter()
-        .map(|entry| {
-            remcom_single_file(
-                &path::Path::new(entry.path.as_str()),
-                directory,
-                false,
-                &stdout,
-            )?;
-            Ok(format!("{}", entry))
-        })
-        .collect();
-    form_http_response(entries?.join(""))
+    let config = Config::with_config()?;
+    let remcom_service = TranscodeService::new(config.clone(), &config.remcom_queue);
+    let mut output = Vec::new();
+    for entry in entries {
+        let payload = TranscodeServiceRequest::create_remcom_request(
+            &config,
+            &path::Path::new(entry.path.as_str()),
+            directory,
+            false,
+        )
+        .await?;
+        remcom_service.publish_transcode_job(&payload).await?;
+        output.push(format!("{:?}", payload));
+    }
+    form_http_response(output.join(""))
 }
 
 pub async fn movie_queue_transcode(
@@ -150,8 +152,7 @@ pub async fn movie_queue_transcode(
 
     let req = MovieQueueRequest { patterns };
     let (entries, _) = state.db.handle(req).await?;
-    let stdout = StdoutChannel::new();
-    transcode_worker(None, &entries, &stdout)
+    transcode_worker(None, &entries).await
 }
 
 pub async fn movie_queue_transcode_directory(
@@ -164,12 +165,7 @@ pub async fn movie_queue_transcode_directory(
 
     let req = MovieQueueRequest { patterns };
     let (entries, _) = state.db.handle(req).await?;
-    let stdout = StdoutChannel::new();
-    transcode_worker(
-        Some(&path::Path::new(directory.as_str())),
-        &entries,
-        &stdout,
-    )
+    transcode_worker(Some(&path::Path::new(directory.as_str())), &entries).await
 }
 
 fn play_worker(full_path: &path::Path) -> HttpResult {
