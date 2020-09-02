@@ -479,7 +479,6 @@ mod tests {
         assert_eq!(result, req);
         let result = service.cleanup().await?;
         println!("{}", result);
-        assert!(false);
         Ok(())
     }
 }
