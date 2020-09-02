@@ -2,10 +2,12 @@ use anyhow::{format_err, Error};
 use deadpool_lapin::Config as LapinConfig;
 use futures::stream::StreamExt;
 use lapin::{
-    options::BasicPublishOptions,
-    options::{BasicAckOptions, BasicConsumeOptions},
+    options::{
+        BasicAckOptions, BasicConsumeOptions, BasicPublishOptions, QueueDeclareOptions,
+        QueueDeleteOptions, QueuePurgeOptions,
+    },
     types::FieldTable,
-    BasicProperties, Channel,
+    BasicProperties, Channel, Queue,
 };
 use serde::{Deserialize, Serialize};
 use stack_string::StackString;
@@ -24,13 +26,13 @@ use crate::movie_collection::MovieCollection;
 use crate::stdout_channel::StdoutChannel;
 use crate::utils::parse_file_stem;
 
-#[derive(Serialize, Deserialize, Debug, PartialEq)]
+#[derive(Serialize, Deserialize, Debug, PartialEq, Clone, Copy)]
 pub enum JobType {
     Transcode,
     Move,
 }
 
-#[derive(Serialize, Deserialize, Debug)]
+#[derive(Serialize, Deserialize, Debug, PartialEq, Clone)]
 pub struct TranscodeServiceRequest {
     job_type: JobType,
     prefix: StackString,
@@ -39,6 +41,15 @@ pub struct TranscodeServiceRequest {
 }
 
 impl TranscodeServiceRequest {
+    pub fn new(job_type: JobType, prefix: &str, input_path: &Path, output_path: &Path) -> Self {
+        Self {
+            job_type,
+            prefix: prefix.into(),
+            input_path: input_path.to_path_buf(),
+            output_path: output_path.to_path_buf(),
+        }
+    }
+
     pub fn create_transcode_request(config: &Config, path: &Path) -> Result<Self, Error> {
         let input_path = path.to_path_buf();
         let fstem = path.file_stem().ok_or_else(|| format_err!("No stem"))?;
@@ -154,6 +165,27 @@ impl TranscodeService {
         }
     }
 
+    pub async fn init(&self) -> Result<Queue, Error> {
+        let chan = Self::open_transcode_channel().await?;
+        let queue = chan
+            .queue_declare(
+                &self.queue,
+                QueueDeclareOptions::default(),
+                FieldTable::default(),
+            )
+            .await?;
+        Ok(queue)
+    }
+
+    pub async fn cleanup(&self) -> Result<u32, Error> {
+        let chan = Self::open_transcode_channel().await?;
+        chan.queue_purge(&self.queue, QueuePurgeOptions::default())
+            .await?;
+        chan.queue_delete(&self.queue, QueueDeleteOptions::default())
+            .await
+            .map_err(Into::into)
+    }
+
     async fn open_transcode_channel() -> Result<Channel, Error> {
         let cfg = LapinConfig::default();
         let pool = cfg.create_pool();
@@ -206,6 +238,28 @@ impl TranscodeService {
                 .await?;
         }
         Ok(())
+    }
+
+    #[allow(dead_code)]
+    async fn get_single_job(&self) -> Result<TranscodeServiceRequest, Error> {
+        let chan = Self::open_transcode_channel().await?;
+        let mut consumer = chan
+            .basic_consume(
+                &self.queue,
+                &self.queue,
+                BasicConsumeOptions::default(),
+                FieldTable::default(),
+            )
+            .await?;
+        while let Some(delivery) = consumer.next().await {
+            let (channel, delivery) = delivery?;
+            let payload: TranscodeServiceRequest = serde_json::from_slice(&delivery.data)?;
+            channel
+                .basic_ack(delivery.delivery_tag, BasicAckOptions::default())
+                .await?;
+            return Ok(payload);
+        }
+        unreachable!();
     }
 
     async fn run_transcode(
@@ -316,10 +370,11 @@ impl TranscodeService {
 mod tests {
     use anyhow::Error;
     use std::{env::set_var, fs::create_dir_all, path::Path};
+    use tokio::task::spawn;
 
     use crate::{
         config::Config,
-        transcode_service::{JobType, TranscodeServiceRequest},
+        transcode_service::{JobType, TranscodeService, TranscodeServiceRequest},
     };
 
     fn init_env() {
@@ -401,6 +456,30 @@ mod tests {
             .join("avi")
             .join(&p.with_extension("mp4"));
         assert_eq!(payload.output_path, expected);
+        Ok(())
+    }
+
+    #[tokio::test]
+    #[ignore]
+    async fn test_transcode_service() -> Result<(), Error> {
+        let config = Config::with_config()?;
+        let service = TranscodeService::new(config.clone(), "test_queue");
+        let queue = service.init().await?;
+        println!("{:?}", queue);
+        let task = spawn(async move { service.get_single_job().await });
+        let service = TranscodeService::new(config, "test_queue");
+        let req = TranscodeServiceRequest::new(
+            JobType::Transcode,
+            "test_prefix",
+            &Path::new("test_input.mkv"),
+            &Path::new("test_output.mp4"),
+        );
+        service.publish_transcode_job(&req).await?;
+        let result = task.await??;
+        assert_eq!(result, req);
+        let result = service.cleanup().await?;
+        println!("{}", result);
+        assert!(false);
         Ok(())
     }
 }

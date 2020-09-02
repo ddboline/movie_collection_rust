@@ -22,6 +22,7 @@ async fn transcode_avi() -> Result<(), Error> {
 
     let opts = TranscodeAviOpts::from_args();
     let transcode_service = TranscodeService::new(config.clone(), &config.transcode_queue);
+    transcode_service.init().await?;
 
     for path in opts.files {
         let movie_path = config.home_dir.join("Documents").join("movies");
