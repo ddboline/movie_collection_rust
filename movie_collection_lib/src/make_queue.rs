@@ -34,6 +34,12 @@ impl From<&OsStr> for PathOrIndex {
     }
 }
 
+impl From<i32> for PathOrIndex {
+    fn from(i: i32) -> Self {
+        Self::Index(i)
+    }
+}
+
 impl From<&Path> for PathOrIndex {
     fn from(p: &Path) -> Self {
         Self::Path(p.to_path_buf())
