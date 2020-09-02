@@ -11,8 +11,10 @@ use lapin::{
 };
 use serde::{Deserialize, Serialize};
 use stack_string::StackString;
-use std::path::{Path, PathBuf};
-use std::process::Stdio;
+use std::{
+    path::{Path, PathBuf},
+    process::Stdio,
+};
 use tokio::{
     fs::{self, File},
     io::{AsyncBufReadExt, AsyncWriteExt, BufReader},
@@ -20,11 +22,10 @@ use tokio::{
     task::spawn,
 };
 
-use crate::config::Config;
-use crate::make_queue::make_queue_worker;
-use crate::movie_collection::MovieCollection;
-use crate::stdout_channel::StdoutChannel;
-use crate::utils::parse_file_stem;
+use crate::{
+    config::Config, make_queue::make_queue_worker, movie_collection::MovieCollection,
+    stdout_channel::StdoutChannel, utils::parse_file_stem,
+};
 
 #[derive(Serialize, Deserialize, Debug, PartialEq, Clone, Copy)]
 pub enum JobType {

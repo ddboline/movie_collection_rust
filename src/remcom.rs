@@ -4,9 +4,11 @@ use anyhow::Error;
 use std::path::PathBuf;
 use structopt::StructOpt;
 
-use movie_collection_lib::config::Config;
-use movie_collection_lib::stdout_channel::StdoutChannel;
-use movie_collection_lib::transcode_service::{TranscodeService, TranscodeServiceRequest};
+use movie_collection_lib::{
+    config::Config,
+    stdout_channel::StdoutChannel,
+    transcode_service::{TranscodeService, TranscodeServiceRequest},
+};
 
 #[derive(StructOpt)]
 /// Create script to copy files, push job to queue
