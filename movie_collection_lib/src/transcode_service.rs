@@ -91,9 +91,7 @@ impl TranscodeServiceRequest {
             .ok_or_else(|| format_err!("no extension"))?
             .to_string_lossy();
 
-        if ext != "mp4" {
-            Self::create_transcode_request(config, path)
-        } else {
+        if ext == "mp4" {
             let prefix = path.file_stem().unwrap().to_string_lossy().to_string();
             let output_dir = if let Some(d) = directory {
                 let d = config
@@ -149,6 +147,8 @@ impl TranscodeServiceRequest {
                 input_path,
                 output_path,
             })
+        } else {
+            Self::create_transcode_request(config, path)
         }
     }
 }
@@ -252,15 +252,16 @@ impl TranscodeService {
                 FieldTable::default(),
             )
             .await?;
-        while let Some(delivery) = consumer.next().await {
+        if let Some(delivery) = consumer.next().await {
             let (channel, delivery) = delivery?;
             let payload: TranscodeServiceRequest = serde_json::from_slice(&delivery.data)?;
             channel
                 .basic_ack(delivery.delivery_tag, BasicAckOptions::default())
                 .await?;
-            return Ok(payload);
+            Ok(payload)
+        } else {
+            Err(format_err!("No Messages?"))
         }
-        unreachable!();
     }
 
     async fn run_transcode(
@@ -311,11 +312,9 @@ impl TranscodeService {
                 }
             }
         }
-        if output_file.exists() {
-            if fs::rename(&output_file, &output_path).await.is_err() {
-                fs::copy(&output_file, &output_path).await?;
-                fs::remove_file(&output_file).await?;
-            }
+        if output_file.exists() && fs::rename(&output_file, &output_path).await.is_err() {
+            fs::copy(&output_file, &output_path).await?;
+            fs::remove_file(&output_file).await?;
         }
         if debug_output_path.exists() {
             let new_debug_output_path = self
