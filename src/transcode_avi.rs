@@ -7,7 +7,7 @@ use structopt::StructOpt;
 use movie_collection_lib::{
     config::Config,
     stdout_channel::StdoutChannel,
-    utils::{create_transcode_script, publish_transcode_job_to_queue},
+    transcode_service::{TranscodeService, TranscodeServiceRequest},
 };
 
 #[derive(StructOpt)]
@@ -21,6 +21,8 @@ async fn transcode_avi() -> Result<(), Error> {
     let task = stdout.spawn_stdout_task();
 
     let opts = TranscodeAviOpts::from_args();
+    let transcode_service = TranscodeService::new(config.clone(), &config.transcode_queue);
+    transcode_service.init().await?;
 
     for path in opts.files {
         let movie_path = config.home_dir.join("Documents").join("movies");
@@ -34,10 +36,9 @@ async fn transcode_avi() -> Result<(), Error> {
         if !path.exists() {
             panic!("file doesn't exist {}", path.to_string_lossy());
         }
-        create_transcode_script(&config, &path).and_then(|s| {
-            stdout.send(format!("script {:?}", s).into())?;
-            publish_transcode_job_to_queue(&s, &config.transcode_queue, &config.transcode_queue)
-        })?;
+        let payload = TranscodeServiceRequest::create_transcode_request(&config, &path)?;
+        transcode_service.publish_transcode_job(&payload).await?;
+        stdout.send(format!("script {:?}", payload).into())?;
     }
     stdout.close().await?;
     task.await?
