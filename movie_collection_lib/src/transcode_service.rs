@@ -311,7 +311,7 @@ impl TranscodeService {
                 let mut debug_output = File::create(&stdout_path).await?;
                 let mut reader = BufReader::new(stdout);
                 let mut buf = Vec::new();
-                while let Ok(bytes) = reader.read_until('\r' as u8, &mut buf).await {
+                while let Ok(bytes) = reader.read_until(b'\r', &mut buf).await {
                     if bytes > 0 {
                         debug_output.write_all(&buf).await?;
                     } else {
