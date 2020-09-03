@@ -301,8 +301,13 @@ impl TranscodeService {
             .kill_on_drop(true)
             .stdout(Stdio::piped())
             .spawn()?;
-        if let Some(stdout) = p.stdout.as_mut() {
+        if let Some(stdout) = p.stdout.take() {
             let mut reader = BufReader::new(stdout);
+
+            let transcode_task = spawn(async move {
+                p.await
+            });
+
             let mut buf = String::new();
             while let Ok(bytes) = reader.read_line(&mut buf).await {
                 if bytes > 0 {
@@ -311,6 +316,9 @@ impl TranscodeService {
                     break;
                 }
             }
+
+            let status = transcode_task.await??;
+            println!("Handbrake exited with {}", status);
         }
         if output_file.exists() && fs::rename(&output_file, &output_path).await.is_err() {
             fs::copy(&output_file, &output_path).await?;
