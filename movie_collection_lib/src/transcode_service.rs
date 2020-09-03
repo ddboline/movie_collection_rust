@@ -303,7 +303,7 @@ impl TranscodeService {
             .spawn()?;
 
         if let Some(stderr) = p.stderr.take() {
-            let mut reader = BufReader::new(stdout);
+            let mut reader = BufReader::new(stderr);
 
             let transcode_task = spawn(async move {
                 p.await
