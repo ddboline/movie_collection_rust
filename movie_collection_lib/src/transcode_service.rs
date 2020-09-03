@@ -19,7 +19,7 @@ use tokio::{
     fs::{self, File},
     io::{AsyncBufReadExt, AsyncWriteExt, BufReader},
     process::Command,
-    task::spawn,
+    task::{JoinHandle, spawn},
 };
 
 use crate::{
@@ -306,7 +306,7 @@ impl TranscodeService {
         let stdout = p.stdout.take().ok_or_else(|| format_err!("No Stdout"))?;
         let stderr = p.stderr.take().ok_or_else(|| format_err!("No Stderr"))?;
 
-        let stdout_task = spawn(
+        let stdout_task: JoinHandle<Result<(), Error>> = spawn(
             async move {
                 let mut debug_output = File::create(&stdout_path).await?;
                 let mut reader = BufReader::new(stdout);
@@ -323,10 +323,10 @@ impl TranscodeService {
             }
         );
 
-        let stderr_task = spawn(
+        let stderr_task: JoinHandle<Result<(), Error>> = spawn(
             async move {
                 let mut debug_output = File::create(&stderr_path).await?;
-                let mut reader = BufReader::new(stdout);
+                let mut reader = BufReader::new(stderr);
                 let mut buf = String::new();
                 while let Ok(bytes) = reader.read_line(&mut buf).await {
                     if bytes > 0 {
@@ -354,6 +354,7 @@ impl TranscodeService {
             fs::copy(&output_file, &output_path).await?;
             fs::remove_file(&output_file).await?;
         }
+        let stdout_path = debug_output_path.with_extension("out");
         if stdout_path.exists() {
             let new_debug_output_path = self
                 .config
@@ -362,6 +363,7 @@ impl TranscodeService {
                 .join(&format!("{}_mp4.out", prefix));
             fs::rename(&stdout_path, &new_debug_output_path).await?;
         }
+        let stderr_path = debug_output_path.with_extension("err");
         if stderr_path.exists() {
             let new_debug_output_path = self
                 .config
