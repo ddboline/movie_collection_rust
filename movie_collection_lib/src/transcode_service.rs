@@ -296,12 +296,13 @@ impl TranscodeService {
                 "-o",
                 output_file.to_string_lossy().as_ref(),
                 "--preset",
-                r#""Android 480p30""#,
+                "Android 480p30",
             ])
             .kill_on_drop(true)
-            .stdout(Stdio::piped())
+            .stderr(Stdio::piped())
             .spawn()?;
-        if let Some(stdout) = p.stdout.take() {
+
+        if let Some(stderr) = p.stderr.take() {
             let mut reader = BufReader::new(stdout);
 
             let transcode_task = spawn(async move {
@@ -320,6 +321,7 @@ impl TranscodeService {
             let status = transcode_task.await??;
             println!("Handbrake exited with {}", status);
         }
+
         if output_file.exists() && fs::rename(&output_file, &output_path).await.is_err() {
             fs::copy(&output_file, &output_path).await?;
             fs::remove_file(&output_file).await?;
