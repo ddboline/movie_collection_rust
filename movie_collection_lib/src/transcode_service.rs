@@ -303,8 +303,8 @@ impl TranscodeService {
             .stdout(Stdio::piped())
             .stderr(Stdio::piped())
             .spawn()?;
-        let stdout = p.stdout.take().ok_or_else(|| format_err!("No Stdout"));
-        let stderr = p.stderr.take().ok_or_else(|| format_err!("No Stderr"));
+        let stdout = p.stdout.take().ok_or_else(|| format_err!("No Stdout"))?;
+        let stderr = p.stderr.take().ok_or_else(|| format_err!("No Stderr"))?;
 
         let stdout_task = spawn(
             async move {
