@@ -17,9 +17,9 @@ use std::{
 };
 use tokio::{
     fs::{self, File},
-    io::{AsyncBufReadExt, AsyncWriteExt, BufReader},
+    io::{AsyncBufReadExt, AsyncRead, AsyncWriteExt, BufReader},
     process::Command,
-    task::{JoinHandle, spawn},
+    task::{spawn, JoinHandle},
 };
 
 use crate::{
@@ -270,6 +270,27 @@ impl TranscodeService {
         input_file: &Path,
         output_file: &Path,
     ) -> Result<(), Error> {
+        async fn output_to_file<T>(
+            mut reader: BufReader<T>,
+            output_path: &Path,
+            eol: u8,
+        ) -> Result<(), Error>
+        where
+            T: AsyncRead + Unpin,
+        {
+            let mut f = File::create(&output_path).await?;
+            let mut buf = Vec::new();
+            while let Ok(bytes) = reader.read_until(eol, &mut buf).await {
+                if bytes > 0 {
+                    f.write_all(&buf).await?;
+                } else {
+                    break;
+                }
+                buf.clear();
+            }
+            Ok(())
+        }
+
         if !input_file.exists() {
             return Err(format_err!("{:?} does not exist", input_file));
         }
@@ -290,6 +311,7 @@ impl TranscodeService {
             .join(&format!("{}_mp4", prefix));
         let stdout_path = debug_output_path.with_extension("out");
         let stderr_path = debug_output_path.with_extension("err");
+
         let mut p = Command::new("HandBrakeCLI")
             .args(&[
                 "-i",
@@ -306,44 +328,15 @@ impl TranscodeService {
         let stdout = p.stdout.take().ok_or_else(|| format_err!("No Stdout"))?;
         let stderr = p.stderr.take().ok_or_else(|| format_err!("No Stderr"))?;
 
-        let stdout_task: JoinHandle<Result<(), Error>> = spawn(
-            async move {
-                let mut debug_output = File::create(&stdout_path).await?;
-                let mut reader = BufReader::new(stdout);
-                let mut buf = Vec::new();
-                while let Ok(bytes) = reader.read_until(b'\r', &mut buf).await {
-                    if bytes > 0 {
-                        debug_output.write_all(&buf).await?;
-                    } else {
-                        break;
-                    }
-                    buf.clear();
-                }
-                Ok(())
-            }
-        );
+        let reader = BufReader::new(stdout);
+        let stdout_task: JoinHandle<Result<(), Error>> =
+            spawn(async move { output_to_file(reader, &stdout_path, b'\r').await });
 
-        let stderr_task: JoinHandle<Result<(), Error>> = spawn(
-            async move {
-                let mut debug_output = File::create(&stderr_path).await?;
-                let mut reader = BufReader::new(stderr);
-                let mut buf = String::new();
-                while let Ok(bytes) = reader.read_line(&mut buf).await {
-                    if bytes > 0 {
-                        debug_output.write_all(buf.as_bytes()).await?;
-                    } else {
-                        break;
-                    }
-                    buf.clear();
-                }
-                Ok(())
-            }
-        );
+        let reader = BufReader::new(stderr);
+        let stderr_task: JoinHandle<Result<(), Error>> =
+            spawn(async move { output_to_file(reader, &stderr_path, b'\n').await });
 
-        let transcode_task = spawn(async move {
-            p.await
-        });
-
+        let transcode_task = spawn(async move { p.await });
 
         let status = transcode_task.await??;
         println!("Handbrake exited with {}", status);
@@ -354,22 +347,16 @@ impl TranscodeService {
             fs::copy(&output_file, &output_path).await?;
             fs::remove_file(&output_file).await?;
         }
+
+        let tmp_avi_path = self.config.home_dir.join("tmp_avi");
         let stdout_path = debug_output_path.with_extension("out");
         if stdout_path.exists() {
-            let new_debug_output_path = self
-                .config
-                .home_dir
-                .join("tmp_avi")
-                .join(&format!("{}_mp4.out", prefix));
+            let new_debug_output_path = tmp_avi_path.join(&format!("{}_mp4.out", prefix));
             fs::rename(&stdout_path, &new_debug_output_path).await?;
         }
         let stderr_path = debug_output_path.with_extension("err");
         if stderr_path.exists() {
-            let new_debug_output_path = self
-                .config
-                .home_dir
-                .join("tmp_avi")
-                .join(&format!("{}_mp4.err", prefix));
+            let new_debug_output_path = tmp_avi_path.join(&format!("{}_mp4.err", prefix));
             fs::rename(&stderr_path, &new_debug_output_path).await?;
         }
         Ok(())
@@ -384,11 +371,24 @@ impl TranscodeService {
         let input_file = if input_file.exists() {
             input_file.to_path_buf()
         } else {
-            self.config.home_dir.join("Documents").join("movies").join(&input_file)
+            self.config
+                .home_dir
+                .join("Documents")
+                .join("movies")
+                .join(&input_file)
         };
         if !input_file.exists() {
             return Err(format_err!("{:?} does not exist", input_file));
         }
+
+        let debug_output_path = self
+            .config
+            .home_dir
+            .join("dvdrip")
+            .join("log")
+            .join(&format!("{}_copy.out", show));
+        let mut debug_output_file = File::create(&debug_output_path).await?;
+
         let show_path = self
             .config
             .home_dir
@@ -401,20 +401,45 @@ impl TranscodeService {
         let new_path = output_file.with_extension(".new");
         let task0 = spawn({
             let new_path = new_path.clone();
+            debug_output_file
+                .write_all(format!("copy {:?} to {:?}\n", show_path, new_path).as_bytes())
+                .await?;
             async move { fs::copy(&show_path, &new_path).await }
         });
         if output_file.exists() {
             let old_path = output_file.with_extension(".old");
+            debug_output_file
+                .write_all(format!("copy {:?} to {:?}\n", output_file, old_path).as_bytes())
+                .await?;
             fs::rename(&output_file, &old_path).await?;
         }
         task0.await??;
+        debug_output_file
+            .write_all(format!("copy {:?} to {:?}\n", new_path, output_file).as_bytes())
+            .await?;
         fs::rename(&new_path, &output_file).await?;
         let stdout = StdoutChannel::new();
         make_queue_worker(&[], &[output_file.into()], false, &[], false, &stdout).await?;
+        debug_output_file
+            .write_all(format!("add {:?} to queue\n", output_file).as_bytes())
+            .await?;
         make_queue_worker(&[output_file.into()], &[], false, &[], false, &stdout).await?;
         let mc = MovieCollection::new();
+        debug_output_file
+            .write_all("update collection".as_bytes())
+            .await?;
         mc.make_collection().await?;
         mc.fix_collection_show_id().await?;
+
+        if debug_output_path.exists() {
+            let new_debug_output_path = self
+                .config
+                .home_dir
+                .join("tmp_avi")
+                .join(&format!("{}_copy.out", show));
+            fs::rename(&debug_output_path, &new_debug_output_path).await?;
+        }
+
         Ok(())
     }
 }
