@@ -431,6 +431,8 @@ impl TranscodeService {
         mc.make_collection().await?;
         mc.fix_collection_show_id().await?;
 
+        debug_output_file.flush().await?;
+
         if debug_output_path.exists() {
             let new_debug_output_path = self
                 .config
