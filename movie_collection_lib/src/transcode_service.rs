@@ -287,8 +287,9 @@ impl TranscodeService {
             .home_dir
             .join("dvdrip")
             .join("log")
-            .join(&format!("{}_mp4.out", prefix));
-        let mut debug_output = File::create(&debug_output_path).await?;
+            .join(&format!("{}_mp4", prefix));
+        let stdout_path = debug_output_path.with_extension("out");
+        let stderr_path = debug_output_path.with_extension("err");
         let mut p = Command::new("HandBrakeCLI")
             .args(&[
                 "-i",
@@ -299,40 +300,73 @@ impl TranscodeService {
                 "Android 480p30",
             ])
             .kill_on_drop(true)
+            .stdout(Stdio::piped())
             .stderr(Stdio::piped())
             .spawn()?;
+        let stdout = p.stdout.take().ok_or_else(|| format_err!("No Stdout"));
+        let stderr = p.stderr.take().ok_or_else(|| format_err!("No Stderr"));
 
-        if let Some(stderr) = p.stderr.take() {
-            let mut reader = BufReader::new(stderr);
-
-            let transcode_task = spawn(async move {
-                p.await
-            });
-
-            let mut buf = String::new();
-            while let Ok(bytes) = reader.read_line(&mut buf).await {
-                if bytes > 0 {
-                    debug_output.write_all(buf.as_bytes()).await?;
-                } else {
-                    break;
+        let stdout_task = spawn(
+            async move {
+                let mut debug_output = File::create(&stdout_path).await?;
+                let mut reader = BufReader::new(stdout);
+                let mut buf = String::new();
+                while let Ok(bytes) = reader.read_until('\r', &mut buf).await {
+                    if bytes > 0 {
+                        debug_output.write_all(buf.as_bytes()).await?;
+                    } else {
+                        break;
+                    }
+                    buf.clear();
                 }
             }
+        );
 
-            let status = transcode_task.await??;
-            println!("Handbrake exited with {}", status);
-        }
+        let stderr_task = spawn(
+            async move {
+                let mut debug_output = File::create(&stderr_path).await?;
+                let mut reader = BufReader::new(stdout);
+                let mut buf = String::new();
+                while let Ok(bytes) = reader.read_line(&mut buf).await {
+                    if bytes > 0 {
+                        debug_output.write_all(buf.as_bytes()).await?;
+                    } else {
+                        break;
+                    }
+                    buf.clear();
+                }
+            }
+        );
+
+        let transcode_task = spawn(async move {
+            p.await
+        });
+
+
+        let status = transcode_task.await??;
+        println!("Handbrake exited with {}", status);
+        stdout_task.await??;
+        stderr_task.await??;
 
         if output_file.exists() && fs::rename(&output_file, &output_path).await.is_err() {
             fs::copy(&output_file, &output_path).await?;
             fs::remove_file(&output_file).await?;
         }
-        if debug_output_path.exists() {
+        if stdout_path.exists() {
             let new_debug_output_path = self
                 .config
                 .home_dir
                 .join("tmp_avi")
                 .join(&format!("{}_mp4.out", prefix));
-            fs::rename(&debug_output_path, &new_debug_output_path).await?;
+            fs::rename(&stdout_path, &new_debug_output_path).await?;
+        }
+        if stderr_path.exists() {
+            let new_debug_output_path = self
+                .config
+                .home_dir
+                .join("tmp_avi")
+                .join(&format!("{}_mp4.err", prefix));
+            fs::rename(&stderr_path, &new_debug_output_path).await?;
         }
         Ok(())
     }
