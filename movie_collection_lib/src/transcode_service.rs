@@ -271,7 +271,7 @@ impl TranscodeService {
         output_file: &Path,
     ) -> Result<(), Error> {
         if !input_file.exists() {
-            return Ok(());
+            return Err(format_err!("{:?} does not exist", input_file));
         }
         let output_path = output_file
             .file_name()
@@ -381,8 +381,13 @@ impl TranscodeService {
         input_file: &Path,
         output_file: &Path,
     ) -> Result<(), Error> {
+        let input_file = if input_file.exists() {
+            input_file.to_path_buf()
+        } else {
+            self.config.home_dir.join("Documents").join("movies").join(&input_file)
+        };
         if !input_file.exists() {
-            return Ok(());
+            return Err(format_err!("{:?} does not exist", input_file));
         }
         let show_path = self
             .config
