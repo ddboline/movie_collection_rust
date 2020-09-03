@@ -310,15 +310,16 @@ impl TranscodeService {
             async move {
                 let mut debug_output = File::create(&stdout_path).await?;
                 let mut reader = BufReader::new(stdout);
-                let mut buf = String::new();
-                while let Ok(bytes) = reader.read_until('\r', &mut buf).await {
+                let mut buf = Vec::new();
+                while let Ok(bytes) = reader.read_until('\r' as u8, &mut buf).await {
                     if bytes > 0 {
-                        debug_output.write_all(buf.as_bytes()).await?;
+                        debug_output.write_all(&buf).await?;
                     } else {
                         break;
                     }
                     buf.clear();
                 }
+                Ok(())
             }
         );
 
@@ -335,6 +336,7 @@ impl TranscodeService {
                     }
                     buf.clear();
                 }
+                Ok(())
             }
         );
 
