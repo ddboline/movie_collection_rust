@@ -18,7 +18,6 @@ struct TranscodeAviOpts {
 async fn transcode_avi() -> Result<(), Error> {
     let stdout = StdoutChannel::new();
     let config = Config::with_config()?;
-    let task = stdout.spawn_stdout_task();
 
     let opts = TranscodeAviOpts::from_args();
     let transcode_service = TranscodeService::new(config.clone(), &config.transcode_queue);
@@ -38,10 +37,9 @@ async fn transcode_avi() -> Result<(), Error> {
         }
         let payload = TranscodeServiceRequest::create_transcode_request(&config, &path)?;
         transcode_service.publish_transcode_job(&payload).await?;
-        stdout.send(format!("script {:?}", payload).into())?;
+        stdout.send(format!("script {:?}", payload));
     }
-    stdout.close().await?;
-    task.await?
+    stdout.close().await
 }
 
 #[tokio::main]

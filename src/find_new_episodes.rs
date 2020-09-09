@@ -27,15 +27,13 @@ async fn find_new_episodes() -> Result<(), Error> {
     };
 
     let mc = MovieCollection::new();
-    let task = mc.stdout.spawn_stdout_task();
 
     let output = mc.find_new_episodes(source, &opts.shows).await?;
 
     for epi in output {
-        mc.stdout.send(epi.to_string().into())?;
+        mc.stdout.send(epi.to_string());
     }
-    mc.stdout.close().await?;
-    task.await?
+    mc.stdout.close().await
 }
 
 #[tokio::main]

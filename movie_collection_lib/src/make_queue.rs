@@ -65,7 +65,7 @@ pub async fn make_queue_worker(
             .into_par_iter()
             .map(|s| s.to_string())
             .collect();
-        stdout.send(shows.join("\n").into())?;
+        stdout.send(shows.join("\n"));
     } else if !del_files.is_empty() {
         for file in del_files {
             match file {
@@ -87,10 +87,10 @@ pub async fn make_queue_worker(
                     Ok(format!("{} {}", result, timeval))
                 })
                 .collect();
-            stdout.send(results?.join("\n").into())?;
+            stdout.send(results?.join("\n"));
         } else {
             let results: Vec<_> = movie_queue.into_iter().map(|x| x.to_string()).collect();
-            stdout.send(results.join("\n").into())?;
+            stdout.send(results.join("\n"));
         }
     } else if add_files.len() == 1 {
         let max_idx = mq.get_max_queue_index().await?;
@@ -102,7 +102,7 @@ pub async fn make_queue_worker(
         }
     } else if add_files.len() == 2 {
         if let PathOrIndex::Index(idx) = &add_files[0] {
-            stdout.send(format!("inserting into {}", idx).into())?;
+            stdout.send(format!("inserting into {}", idx));
             if let PathOrIndex::Path(path) = &add_files[1] {
                 mq.insert_into_queue(*idx, &path.to_string_lossy()).await?;
             } else {

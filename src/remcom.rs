@@ -26,7 +26,6 @@ struct RemcomOpts {
 async fn remcom() -> Result<(), Error> {
     let opts = RemcomOpts::from_args();
     let stdout = StdoutChannel::new();
-    let task = stdout.spawn_stdout_task();
     let config = Config::with_config()?;
 
     let remcom_service = TranscodeService::new(config.clone(), &config.remcom_queue);
@@ -40,10 +39,9 @@ async fn remcom() -> Result<(), Error> {
         )
         .await?;
         remcom_service.publish_transcode_job(&payload).await?;
-        stdout.send(format!("script {:?}", payload).into())?;
+        stdout.send(format!("script {:?}", payload));
     }
-    stdout.close().await?;
-    task.await?
+    stdout.close().await
 }
 
 #[tokio::main]

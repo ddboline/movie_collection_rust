@@ -33,7 +33,6 @@ async fn make_collection() -> Result<(), Error> {
     let do_time = opts.time;
 
     let mc = MovieCollection::new();
-    let task = mc.stdout.spawn_stdout_task();
     if do_parse {
         mc.make_collection().await?;
         mc.fix_collection_show_id().await?;
@@ -50,15 +49,14 @@ async fn make_collection() -> Result<(), Error> {
                 Ok(format!("{} {}", timeval, result))
             });
             let shows: Result<Vec<_>, Error> = try_join_all(futures).await;
-            mc.stdout.send(shows?.join("\n").into())?;
+            mc.stdout.send(shows?.join("\n"));
         } else {
             for show in shows {
-                mc.stdout.send(show.to_string().into())?;
+                mc.stdout.send(show.to_string());
             }
         }
     }
-    mc.stdout.close().await?;
-    task.await?
+    mc.stdout.close().await
 }
 
 #[tokio::main]

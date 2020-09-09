@@ -66,7 +66,7 @@ pub fn make_list(stdout: &StdoutChannel) -> Result<(), Error> {
         .collect();
 
     for e in result {
-        stdout.send(e.into())?;
+        stdout.send(e);
     }
 
     let result: Vec<_> = file_list
@@ -78,7 +78,7 @@ pub fn make_list(stdout: &StdoutChannel) -> Result<(), Error> {
         .collect();
 
     for e in result {
-        stdout.send(e.into())?;
+        stdout.send(e);
     }
 
     Ok(())

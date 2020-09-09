@@ -607,7 +607,7 @@ pub async fn sync_trakt_with_db(mc: &MovieCollection) -> Result<(), Error> {
             if !watchlist_shows_db.contains(link.as_str()) {
                 show.insert_show(&mc.pool).await?;
                 mc.stdout
-                    .send(format!("insert watchlist {}", show).into())?;
+                    .send(format!("insert watchlist {}", show));
             }
             Ok(())
         }
@@ -632,7 +632,7 @@ pub async fn sync_trakt_with_db(mc: &MovieCollection) -> Result<(), Error> {
             if !watched_shows_db.contains_key(&key) {
                 episode.insert_episode(&mc.pool).await?;
                 mc.stdout
-                    .send(format!("insert watched {}", episode).into())?;
+                    .send(format!("insert watched {}", episode));
             }
             Ok(())
         }
@@ -654,7 +654,7 @@ pub async fn sync_trakt_with_db(mc: &MovieCollection) -> Result<(), Error> {
         async move {
             if !watched_movies_db.contains(movie.imdb_url.as_str()) {
                 movie.insert_movie(&mc.pool).await?;
-                mc.stdout.send(format!("insert watched {}", movie).into())?;
+                mc.stdout.send(format!("insert watched {}", movie));
             }
             Ok(())
         }
@@ -667,7 +667,7 @@ pub async fn sync_trakt_with_db(mc: &MovieCollection) -> Result<(), Error> {
         async move {
             if !watched_movies.contains(movie.imdb_url.as_str()) {
                 movie.delete_movie(&mc.pool).await?;
-                mc.stdout.send(format!("delete watched {}", movie).into())?;
+                mc.stdout.send(format!("delete watched {}", movie));
             }
             Ok(())
         }
@@ -719,7 +719,7 @@ async fn trakt_cal_list(mc: &MovieCollection) -> Result<(), Error> {
             .is_some()
         };
         if !exists {
-            mc.stdout.send(format!("{} {}", show, cal).into())?;
+            mc.stdout.send(format!("{} {}", show, cal));
         }
     }
     Ok(())
@@ -734,8 +734,7 @@ async fn watchlist_add(mc: &MovieCollection, show: Option<&str>) -> Result<(), E
                 "result: {}",
                 TRAKT_CONN.add_watchlist_show(&imdb_url_).await?
             )
-            .into(),
-        )?;
+        );
         debug!("GOT HERE");
         if let Some(show) = TRAKT_CONN
             .get_watchlist_shows()
@@ -758,8 +757,7 @@ async fn watchlist_rm(mc: &MovieCollection, show: Option<&str>) -> Result<(), Er
                 "result: {}",
                 TRAKT_CONN.remove_watchlist_show(&imdb_url_).await?
             )
-            .into(),
-        )?;
+        );
         if let Some(show) = WatchListShow::get_show_by_link(&imdb_url, &mc.pool).await? {
             show.delete_show(&mc.pool).await?;
         }
@@ -770,7 +768,7 @@ async fn watchlist_rm(mc: &MovieCollection, show: Option<&str>) -> Result<(), Er
 async fn watchlist_list(mc: &MovieCollection) -> Result<(), Error> {
     let show_map = get_watchlist_shows_db(&mc.pool).await?;
     let results: Vec<_> = show_map.iter().map(ToString::to_string).collect();
-    mc.stdout.send(results.join("\n").into())?;
+    mc.stdout.send(results.join("\n"));
     Ok(())
 }
 
@@ -862,7 +860,7 @@ async fn watched_list(mc: &MovieCollection, show: Option<&str>, season: i32) -> 
                 }
             })
             .collect();
-        mc.stdout.send(lines.join("\n").into())?;
+        mc.stdout.send(lines.join("\n"));
         let lines: Vec<_> = watched_movies
             .iter()
             .filter_map(|show| {
@@ -873,12 +871,12 @@ async fn watched_list(mc: &MovieCollection, show: Option<&str>, season: i32) -> 
                 }
             })
             .collect();
-        mc.stdout.send(lines.join("\n").into())?;
+        mc.stdout.send(lines.join("\n"));
     } else {
         let lines: Vec<_> = watched_shows.iter().map(ToString::to_string).collect();
-        mc.stdout.send(lines.join("\n").into())?;
+        mc.stdout.send(lines.join("\n"));
         let lines: Vec<_> = watched_movies.iter().map(ToString::to_string).collect();
-        mc.stdout.send(lines.join("\n").into())?;
+        mc.stdout.send(lines.join("\n"));
     }
     Ok(())
 }
@@ -891,7 +889,6 @@ pub async fn trakt_app_parse(
     episode: &[i32],
 ) -> Result<(), Error> {
     let mc = MovieCollection::new();
-    let task = mc.stdout.spawn_stdout_task();
     match trakt_command {
         TraktCommands::Calendar => trakt_cal_list(&mc).await?,
         TraktCommands::WatchList => match trakt_action {
@@ -908,8 +905,7 @@ pub async fn trakt_app_parse(
         },
         _ => {}
     }
-    mc.stdout.close().await?;
-    task.await?
+    mc.stdout.close().await
 }
 
 pub async fn watch_list_http_worker(

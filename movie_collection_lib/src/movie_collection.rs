@@ -683,7 +683,7 @@ impl MovieCollection {
                         .into();
                     if self.get_config().suffixes.contains(&ext) {
                         self.stdout
-                            .send(format!("not in collection {}", f).into())?;
+                            .send(format!("not in collection {}", f));
                         self.insert_into_collection(f).await?;
                     }
                 }
@@ -697,12 +697,12 @@ impl MovieCollection {
             if !file_list.contains(key.as_str()) {
                 if let Some(v) = movie_queue.get(key) {
                     self.stdout
-                        .send(format!("in queue but not disk {} {}", key, v).into())?;
+                        .send(format!("in queue but not disk {} {}", key, v));
                     let mq = MovieQueueDB::with_pool(self.get_pool());
                     mq.remove_from_queue_by_path(&key).await?;
                 } else {
                     self.stdout
-                        .send(format!("not on disk {} {}", key, val).into())?;
+                        .send(format!("not on disk {} {}", key, val));
                 }
                 self.remove_from_collection(&key).await?;
             }
@@ -715,10 +715,10 @@ impl MovieCollection {
                 if !file_list.contains(key.as_str()) {
                     if movie_queue.contains_key(key.as_str()) {
                         self.stdout
-                            .send(format!("in queue but not disk {}", key).into())?;
+                            .send(format!("in queue but not disk {}", key));
                     } else {
                         self.stdout
-                            .send(format!("not on disk {} {}", key, val).into())?;
+                            .send(format!("not on disk {} {}", key, val));
                     }
                 }
                 Ok(())
@@ -741,7 +741,7 @@ impl MovieCollection {
 
         for show in shows_not_in_db {
             self.stdout
-                .send(format!("show has episode not in db {} ", show).into())?;
+                .send(format!("show has episode not in db {} ", show));
         }
         Ok(())
     }

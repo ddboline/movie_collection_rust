@@ -45,7 +45,6 @@ async fn trakt_app() -> Result<(), Error> {
     let season = opts.season.unwrap_or(-1);
 
     let mc = MovieCollection::new();
-    let task = mc.stdout.spawn_stdout_task();
 
     let result = if do_parse {
         sync_trakt_with_db(&mc).await
@@ -53,7 +52,6 @@ async fn trakt_app() -> Result<(), Error> {
         trakt_app_parse(&trakt_command, trakt_action, show, season, &opts.episode).await
     };
     mc.stdout.close().await?;
-    task.await??;
     result
 }
 

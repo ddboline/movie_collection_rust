@@ -12,7 +12,6 @@ async fn parse_imdb_parser() -> Result<(), Error> {
     let opts = ParseImdbOptions::from_args();
 
     let mc = MovieCollection::new();
-    let task = mc.stdout.spawn_stdout_task();
     let pi = ParseImdb::with_pool(&mc.pool)?;
 
     let output: Vec<_> = pi
@@ -22,10 +21,9 @@ async fn parse_imdb_parser() -> Result<(), Error> {
         .map(|x| x.join(" "))
         .collect();
 
-    mc.stdout.send(output.join("\n").into())?;
+    mc.stdout.send(output.join("\n"));
 
-    mc.stdout.close().await?;
-    task.await?
+    mc.stdout.close().await
 }
 
 #[tokio::main]
