@@ -682,8 +682,7 @@ impl MovieCollection {
                         .to_string()
                         .into();
                     if self.get_config().suffixes.contains(&ext) {
-                        self.stdout
-                            .send(format!("not in collection {}", f));
+                        self.stdout.send(format!("not in collection {}", f));
                         self.insert_into_collection(f).await?;
                     }
                 }
@@ -701,8 +700,7 @@ impl MovieCollection {
                     let mq = MovieQueueDB::with_pool(self.get_pool());
                     mq.remove_from_queue_by_path(&key).await?;
                 } else {
-                    self.stdout
-                        .send(format!("not on disk {} {}", key, val));
+                    self.stdout.send(format!("not on disk {} {}", key, val));
                 }
                 self.remove_from_collection(&key).await?;
             }
@@ -714,11 +712,9 @@ impl MovieCollection {
             async move {
                 if !file_list.contains(key.as_str()) {
                     if movie_queue.contains_key(key.as_str()) {
-                        self.stdout
-                            .send(format!("in queue but not disk {}", key));
+                        self.stdout.send(format!("in queue but not disk {}", key));
                     } else {
-                        self.stdout
-                            .send(format!("not on disk {} {}", key, val));
+                        self.stdout.send(format!("not on disk {} {}", key, val));
                     }
                 }
                 Ok(())

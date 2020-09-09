@@ -16,7 +16,7 @@ use std::{
     process::Stdio,
 };
 use tokio::{
-    fs::{self, File},
+    fs::{self, File, OpenOptions},
     io::{AsyncBufReadExt, AsyncRead, AsyncWriteExt, BufReader},
     process::Command,
     task::{spawn, JoinHandle},
@@ -99,7 +99,7 @@ impl TranscodeServiceRequest {
                     .join("Documents")
                     .join("movies")
                     .join(d);
-                println!("{:?}", d);
+                println!("{}", d.to_string_lossy());
                 if !d.exists() {
                     return Err(format_err!(
                         "Directory {} does not exist",
@@ -264,33 +264,33 @@ impl TranscodeService {
         }
     }
 
+    async fn output_to_file<T>(
+        mut reader: BufReader<T>,
+        output_path: &Path,
+        eol: u8,
+    ) -> Result<(), Error>
+    where
+        T: AsyncRead + Unpin,
+    {
+        let mut f = File::create(&output_path).await?;
+        let mut buf = Vec::new();
+        while let Ok(bytes) = reader.read_until(eol, &mut buf).await {
+            if bytes > 0 {
+                f.write_all(&buf).await?;
+            } else {
+                break;
+            }
+            buf.clear();
+        }
+        Ok(())
+    }
+
     async fn run_transcode(
         &self,
         prefix: &str,
         input_file: &Path,
         output_file: &Path,
     ) -> Result<(), Error> {
-        async fn output_to_file<T>(
-            mut reader: BufReader<T>,
-            output_path: &Path,
-            eol: u8,
-        ) -> Result<(), Error>
-        where
-            T: AsyncRead + Unpin,
-        {
-            let mut f = File::create(&output_path).await?;
-            let mut buf = Vec::new();
-            while let Ok(bytes) = reader.read_until(eol, &mut buf).await {
-                if bytes > 0 {
-                    f.write_all(&buf).await?;
-                } else {
-                    break;
-                }
-                buf.clear();
-            }
-            Ok(())
-        }
-
         if !input_file.exists() {
             return Err(format_err!("{:?} does not exist", input_file));
         }
@@ -330,11 +330,11 @@ impl TranscodeService {
 
         let reader = BufReader::new(stdout);
         let stdout_task: JoinHandle<Result<(), Error>> =
-            spawn(async move { output_to_file(reader, &stdout_path, b'\r').await });
+            spawn(async move { Self::output_to_file(reader, &stdout_path, b'\r').await });
 
         let reader = BufReader::new(stderr);
         let stderr_task: JoinHandle<Result<(), Error>> =
-            spawn(async move { output_to_file(reader, &stderr_path, b'\n').await });
+            spawn(async move { Self::output_to_file(reader, &stderr_path, b'\n').await });
 
         let transcode_task = spawn(async move { p.await });
 
@@ -350,14 +350,16 @@ impl TranscodeService {
 
         let tmp_avi_path = self.config.home_dir.join("tmp_avi");
         let stdout_path = debug_output_path.with_extension("out");
-        if stdout_path.exists() {
+        let stderr_path = debug_output_path.with_extension("err");
+        if stdout_path.exists() && stderr_path.exists() {
+            if let Ok(mut f) = OpenOptions::new().append(true).open(&stderr_path).await {
+                if let Ok(stdout) = fs::read(&stdout_path).await {
+                    f.write_all(b"\n").await?;
+                    f.write_all(&stdout).await?;
+                }
+            }
             let new_debug_output_path = tmp_avi_path.join(&format!("{}_mp4.out", prefix));
             fs::rename(&stdout_path, &new_debug_output_path).await?;
-        }
-        let stderr_path = debug_output_path.with_extension("err");
-        if stderr_path.exists() {
-            let new_debug_output_path = tmp_avi_path.join(&format!("{}_mp4.err", prefix));
-            fs::rename(&stderr_path, &new_debug_output_path).await?;
         }
         Ok(())
     }
@@ -398,35 +400,56 @@ impl TranscodeService {
         if !show_path.exists() {
             return Ok(());
         }
-        let new_path = output_file.with_extension(".new");
+        let new_path = output_file.with_extension("new");
         let task0 = spawn({
             let new_path = new_path.clone();
             debug_output_file
-                .write_all(format!("copy {:?} to {:?}\n", show_path, new_path).as_bytes())
+                .write_all(
+                    format!(
+                        "copy {} to {}\n",
+                        show_path.to_string_lossy(),
+                        new_path.to_string_lossy()
+                    )
+                    .as_bytes(),
+                )
                 .await?;
             async move { fs::copy(&show_path, &new_path).await }
         });
         if output_file.exists() {
-            let old_path = output_file.with_extension(".old");
+            let old_path = output_file.with_extension("old");
             debug_output_file
-                .write_all(format!("copy {:?} to {:?}\n", output_file, old_path).as_bytes())
+                .write_all(
+                    format!(
+                        "copy {} to {}\n",
+                        output_file.to_string_lossy(),
+                        old_path.to_string_lossy()
+                    )
+                    .as_bytes(),
+                )
                 .await?;
             fs::rename(&output_file, &old_path).await?;
         }
         task0.await??;
         debug_output_file
-            .write_all(format!("copy {:?} to {:?}\n", new_path, output_file).as_bytes())
+            .write_all(
+                format!(
+                    "copy {} to {}\n",
+                    new_path.to_string_lossy(),
+                    output_file.to_string_lossy()
+                )
+                .as_bytes(),
+            )
             .await?;
         fs::rename(&new_path, &output_file).await?;
         let stdout = StdoutChannel::new();
         make_queue_worker(&[], &[output_file.into()], false, &[], false, &stdout).await?;
         debug_output_file
-            .write_all(format!("add {:?} to queue\n", output_file).as_bytes())
+            .write_all(format!("add {} to queue\n", output_file.to_string_lossy()).as_bytes())
             .await?;
         make_queue_worker(&[output_file.into()], &[], false, &[], false, &stdout).await?;
         let mc = MovieCollection::new();
         debug_output_file
-            .write_all("update collection".as_bytes())
+            .write_all("update collection\n".as_bytes())
             .await?;
         mc.make_collection().await?;
         mc.fix_collection_show_id().await?;

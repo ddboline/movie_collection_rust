@@ -606,8 +606,7 @@ pub async fn sync_trakt_with_db(mc: &MovieCollection) -> Result<(), Error> {
         async move {
             if !watchlist_shows_db.contains(link.as_str()) {
                 show.insert_show(&mc.pool).await?;
-                mc.stdout
-                    .send(format!("insert watchlist {}", show));
+                mc.stdout.send(format!("insert watchlist {}", show));
             }
             Ok(())
         }
@@ -631,8 +630,7 @@ pub async fn sync_trakt_with_db(mc: &MovieCollection) -> Result<(), Error> {
         async move {
             if !watched_shows_db.contains_key(&key) {
                 episode.insert_episode(&mc.pool).await?;
-                mc.stdout
-                    .send(format!("insert watched {}", episode));
+                mc.stdout.send(format!("insert watched {}", episode));
             }
             Ok(())
         }
@@ -729,12 +727,10 @@ async fn watchlist_add(mc: &MovieCollection, show: Option<&str>) -> Result<(), E
     TRAKT_CONN.init().await;
     if let Some(imdb_url) = get_imdb_url_from_show(&mc, show).await? {
         let imdb_url_ = imdb_url.clone();
-        mc.stdout.send(
-            format!(
-                "result: {}",
-                TRAKT_CONN.add_watchlist_show(&imdb_url_).await?
-            )
-        );
+        mc.stdout.send(format!(
+            "result: {}",
+            TRAKT_CONN.add_watchlist_show(&imdb_url_).await?
+        ));
         debug!("GOT HERE");
         if let Some(show) = TRAKT_CONN
             .get_watchlist_shows()
@@ -752,12 +748,10 @@ async fn watchlist_rm(mc: &MovieCollection, show: Option<&str>) -> Result<(), Er
     if let Some(imdb_url) = get_imdb_url_from_show(&mc, show).await? {
         let imdb_url_ = imdb_url.clone();
         TRAKT_CONN.init().await;
-        mc.stdout.send(
-            format!(
-                "result: {}",
-                TRAKT_CONN.remove_watchlist_show(&imdb_url_).await?
-            )
-        );
+        mc.stdout.send(format!(
+            "result: {}",
+            TRAKT_CONN.remove_watchlist_show(&imdb_url_).await?
+        ));
         if let Some(show) = WatchListShow::get_show_by_link(&imdb_url, &mc.pool).await? {
             show.delete_show(&mc.pool).await?;
         }

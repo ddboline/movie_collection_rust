@@ -1,8 +1,7 @@
 use anyhow::Error;
 use deadqueue::unlimited::Queue;
 use stack_string::StackString;
-use std::sync::Arc;
-use std::fmt;
+use std::{fmt, sync::Arc};
 use tokio::{
     io::{stderr, stdout, AsyncWriteExt},
     sync::Mutex,
