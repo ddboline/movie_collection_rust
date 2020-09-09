@@ -2,6 +2,7 @@ use anyhow::Error;
 use deadqueue::unlimited::Queue;
 use stack_string::StackString;
 use std::sync::Arc;
+use std::fmt;
 use tokio::{
     io::{stderr, stdout, AsyncWriteExt},
     sync::Mutex,
@@ -27,6 +28,12 @@ pub struct StdoutChannel {
 impl Default for StdoutChannel {
     fn default() -> Self {
         Self::new()
+    }
+}
+
+impl fmt::Debug for StdoutChannel {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        writeln!(f, "StdoutChannel")
     }
 }
 
