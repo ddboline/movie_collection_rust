@@ -72,7 +72,9 @@ impl MovieQueueCli {
                             }
                         });
                         let results: Result<Vec<_>, Error> = try_join_all(futures).await;
-                        results?;
+                        stdout()
+                            .write_all(format!("imdb_ratings {}\n", results?.len()).as_bytes())
+                            .await?;
                     }
                     "imdb_episodes" => {
                         let episodes: Vec<ImdbEpisodes> = serde_json::from_str(&data)?;
@@ -87,7 +89,9 @@ impl MovieQueueCli {
                             }
                         });
                         let results: Result<Vec<_>, Error> = try_join_all(futures).await;
-                        results?;
+                        stdout()
+                            .write_all(format!("imdb_episodes {}\n", results?.len()).as_bytes())
+                            .await?;
                     }
                     "movie_collection" => {
                         let rows: Vec<MovieCollectionRow> = serde_json::from_str(&data)?;
@@ -109,7 +113,9 @@ impl MovieQueueCli {
                             }
                         });
                         let results: Result<Vec<_>, Error> = try_join_all(futures).await;
-                        results?;
+                        stdout()
+                            .write_all(format!("movie_collection {}\n", results?.len()).as_bytes())
+                            .await?;
                     }
                     "movie_queue" => {
                         let mq = MovieQueueDB::with_pool(&pool);
@@ -141,7 +147,9 @@ impl MovieQueueCli {
                             }
                         });
                         let results: Result<Vec<_>, Error> = try_join_all(futures).await;
-                        results?;
+                        stdout()
+                            .write_all(format!("movie_queue {}\n", results?.len()).as_bytes())
+                            .await?;
                     }
                     _ => {}
                 }

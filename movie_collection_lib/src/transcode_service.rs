@@ -448,9 +448,7 @@ impl TranscodeService {
             .await?;
         make_queue_worker(&[output_file.into()], &[], false, &[], false, &stdout).await?;
         let mc = MovieCollection::new();
-        debug_output_file
-            .write_all(b"update collection\n")
-            .await?;
+        debug_output_file.write_all(b"update collection\n").await?;
         mc.make_collection().await?;
         mc.fix_collection_show_id().await?;
 
