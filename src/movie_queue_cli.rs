@@ -164,31 +164,25 @@ impl MovieQueueCli {
                         file.write_all(&serde_json::to_vec(&last_modified)?).await?;
                     }
                     "imdb_ratings" => {
-                        for show in
-                            ImdbRatings::get_shows_after_timestamp(start_timestamp, &pool).await?
-                        {
-                            file.write_all(&serde_json::to_vec(&show)?).await?;
-                        }
+                        let shows =
+                            ImdbRatings::get_shows_after_timestamp(start_timestamp, &pool).await?;
+                        file.write_all(&serde_json::to_vec(&shows)?).await?;
                     }
                     "imdb_episodes" => {
-                        for episode in
+                        let episodes =
                             ImdbEpisodes::get_episodes_after_timestamp(start_timestamp, &pool)
-                                .await?
-                        {
-                            file.write_all(&serde_json::to_vec(&episode)?).await?;
-                        }
+                                .await?;
+                        file.write_all(&serde_json::to_vec(&episodes)?).await?;
                     }
                     "movie_collection" => {
                         let mc = MovieCollection::with_pool(&pool)?;
-                        for entry in mc.get_collection_after_timestamp(start_timestamp).await? {
-                            file.write_all(&serde_json::to_vec(&entry)?).await?;
-                        }
+                        let entries = mc.get_collection_after_timestamp(start_timestamp).await?;
+                        file.write_all(&serde_json::to_vec(&entries)?).await?;
                     }
                     "movie_queue" => {
                         let mq = MovieQueueDB::with_pool(&pool);
-                        for entry in mq.get_queue_after_timestamp(start_timestamp).await? {
-                            file.write_all(&serde_json::to_vec(&entry)?).await?;
-                        }
+                        let entries = mq.get_queue_after_timestamp(start_timestamp).await?;
+                        file.write_all(&serde_json::to_vec(&entries)?).await?;
                     }
                     _ => {}
                 }
