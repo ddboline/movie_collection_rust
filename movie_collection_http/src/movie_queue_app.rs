@@ -2,8 +2,7 @@
 
 use actix_identity::{CookieIdentityPolicy, IdentityService};
 use actix_web::{web, web::block, App, HttpServer};
-use chrono::Duration;
-use std::time;
+use std::time::Duration;
 use subprocess::Exec;
 use tokio::time::interval;
 
@@ -27,7 +26,7 @@ pub struct AppState {
 
 pub async fn start_app(config: Config) {
     async fn _update_db(pool: PgPool) {
-        let mut i = interval(time::Duration::from_secs(60));
+        let mut i = interval(Duration::from_secs(60));
         loop {
             i.tick().await;
             let p = pool.clone();
@@ -54,7 +53,7 @@ pub async fn start_app(config: Config) {
                     .name("auth")
                     .path("/")
                     .domain(domain.as_str())
-                    .max_age_time(Duration::days(1))
+                    .max_age(24*3600)
                     .secure(false), // this can only be true if you have https
             ))
             .service(

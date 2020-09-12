@@ -1,6 +1,6 @@
 [package]
 name = "movie_collection_lib"
-version = "0.6.6"
+version = "0.6.7"
 authors = ["Daniel Boline <ddboline@gmail.com>"]
 edition = "2018"
 
@@ -36,8 +36,8 @@ maplit = "1.0"
 envy = "0.4"
 walkdir = "2.3"
 itertools = "0.9"
-stack-string = { git = "https://github.com/ddboline/stack-string-rs.git", tag="0.1.3", features=["postgres_types"] }
 handlebars = "3.4"
 deadpool-lapin = "0.6"
 lapin = "1.2"
 deadqueue = "0.1"
+stack-string = { git = "https://github.com/ddboline/stack-string-rs.git", tag="0.1.6", features=["postgres_types"] }
