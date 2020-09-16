@@ -9,5 +9,5 @@ async fn main() {
     env_logger::init();
 
     let config = Config::with_config().expect("Config init failed");
-    start_app(config).await;
+    start_app(config).await.unwrap();
 }

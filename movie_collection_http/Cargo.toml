@@ -1,6 +1,6 @@
 [package]
 name = "movie_collection_http"
-version = "0.6.7"
+version = "0.6.8"
 authors = ["Daniel Boline <ddboline@gmail.com>"]
 edition = "2018"
 
@@ -26,5 +26,5 @@ async-trait = "0.1"
 log = "0.4"
 maplit = "1.0"
 handlebars = "3.4"
-rust_auth_server = { git = "https://github.com/ddboline/rust-auth-server.git", tag="0.6.0" }
+auth_server_rust = { git = "https://github.com/ddboline/auth_server_rust.git", tag="0.1.5"}
 stack-string = { git = "https://github.com/ddboline/stack-string-rs.git", tag="0.1.6", features=["postgres_types"] }

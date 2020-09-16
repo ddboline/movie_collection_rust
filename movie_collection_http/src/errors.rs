@@ -1,8 +1,8 @@
 use actix_threadpool::BlockingError;
 use actix_web::{error::ResponseError, HttpResponse};
 use anyhow::Error as AnyhowError;
+use auth_server_rust::static_files::login_html;
 use handlebars::RenderError;
-use rust_auth_server::static_files::login_html;
 use stack_string::StackString;
 use std::fmt::Debug;
 use subprocess::PopenError;

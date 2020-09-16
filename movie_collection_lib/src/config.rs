@@ -40,8 +40,10 @@ pub struct ConfigInner {
     pub trakt_endpoint: StackString,
     pub trakt_client_id: StackString,
     pub trakt_client_secret: StackString,
-    #[serde(default = "default_secret_key")]
-    pub secret_key: StackString,
+    #[serde(default = "default_secret_path")]
+    pub secret_path: PathBuf,
+    #[serde(default = "default_secret_path")]
+    pub jwt_secret_path: PathBuf,
 }
 
 fn default_suffixes() -> Vec<StackString> {
@@ -55,9 +57,6 @@ fn default_home_dir() -> PathBuf {
 }
 fn default_port() -> u32 {
     8042
-}
-fn default_secret_key() -> StackString {
-    "0123".repeat(8).into()
 }
 fn default_domain() -> StackString {
     "localhost".into()
@@ -85,6 +84,12 @@ fn default_remcom_queue() -> StackString {
 }
 fn default_trakt_endpoint() -> StackString {
     "https://api.trakt.tv".into()
+}
+fn default_secret_path() -> PathBuf {
+    dirs::config_dir()
+        .unwrap()
+        .join("aws_app_rust")
+        .join("secret.bin")
 }
 
 #[derive(Debug, Default, Clone)]

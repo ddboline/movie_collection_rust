@@ -1,13 +1,13 @@
 #![allow(clippy::needless_pass_by_value)]
 
 use actix_identity::{CookieIdentityPolicy, IdentityService};
-use actix_web::{web, web::block, App, HttpServer};
+use actix_web::{web, App, HttpServer};
+use anyhow::Error;
 use std::time::Duration;
-use subprocess::Exec;
-use tokio::time::interval;
+use tokio::{fs::remove_dir_all, time::interval};
 
 use super::{
-    logged_user::{fill_from_db, TRIGGER_DB_UPDATE},
+    logged_user::{fill_from_db, get_secrets, SECRET_KEY, TRIGGER_DB_UPDATE},
     movie_queue_routes::{
         find_new_episodes, frontpage, imdb_episodes_route, imdb_episodes_update,
         imdb_ratings_route, imdb_ratings_update, imdb_show, last_modified_route,
@@ -24,21 +24,19 @@ pub struct AppState {
     pub db: PgPool,
 }
 
-pub async fn start_app(config: Config) {
+pub async fn start_app(config: Config) -> Result<(), Error> {
     async fn _update_db(pool: PgPool) {
         let mut i = interval(Duration::from_secs(60));
         loop {
+            fill_from_db(&pool).await.unwrap_or(());
             i.tick().await;
-            let p = pool.clone();
-            fill_from_db(&p).await.unwrap_or(());
         }
     }
     TRIGGER_DB_UPDATE.set();
+    get_secrets(&config.secret_path, &config.jwt_secret_path).await?;
 
-    let command = "rm -f /var/www/html/videos/partial/*";
-    block(move || Exec::shell(command).join()).await.unwrap();
+    remove_dir_all("/var/www/html/videos/partial").await?;
 
-    let secret = config.secret_key.clone();
     let domain = config.domain.to_string();
     let port = config.port;
     let pool = PgPool::new(&config.pgurl);
@@ -49,7 +47,7 @@ pub async fn start_app(config: Config) {
         App::new()
             .data(AppState { db: pool.clone() })
             .wrap(IdentityService::new(
-                CookieIdentityPolicy::new(secret.as_bytes())
+                CookieIdentityPolicy::new(&SECRET_KEY.load())
                     .name("auth")
                     .path("/")
                     .domain(domain.as_str())
@@ -131,5 +129,5 @@ pub async fn start_app(config: Config) {
     .unwrap_or_else(|_| panic!("Failed to bind to port {}", port))
     .run()
     .await
-    .expect("Failed to start app");
+    .map_err(Into::into)
 }
