@@ -4,7 +4,7 @@ use actix_identity::{CookieIdentityPolicy, IdentityService};
 use actix_web::{web, App, HttpServer};
 use anyhow::Error;
 use std::time::Duration;
-use tokio::{fs::remove_dir_all, time::interval};
+use tokio::{fs::{create_dir, remove_dir_all}, time::interval};
 
 use super::{
     logged_user::{fill_from_db, get_secrets, SECRET_KEY, TRIGGER_DB_UPDATE},
@@ -35,7 +35,11 @@ pub async fn start_app(config: Config) -> Result<(), Error> {
     TRIGGER_DB_UPDATE.set();
     get_secrets(&config.secret_path, &config.jwt_secret_path).await?;
 
-    remove_dir_all("/var/www/html/videos/partial").await?;
+    let partial_path = Path::new("/var/www/html/videos/partial");
+    if partial_path.exists() {
+        remove_dir_all(&partial_path).await?;
+        create_dir(&partial_path).await?;
+    }
 
     let domain = config.domain.to_string();
     let port = config.port;

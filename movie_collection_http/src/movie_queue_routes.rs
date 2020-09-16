@@ -15,6 +15,8 @@ use std::{
     path,
 };
 use subprocess::Exec;
+use std::fs::remove_file;
+use std::os::unix::fs::symlink;
 
 use movie_collection_lib::{
     config::Config,
@@ -186,14 +188,12 @@ fn play_worker(full_path: &path::Path) -> HttpResult {
         file_name, url
     );
 
-    let command = format!("rm -f /var/www/html/videos/partial/{}", file_name);
-    Exec::shell(&command).join()?;
-    let command = format!(
-        "ln -s {} /var/www/html/videos/partial/{}",
-        full_path.to_string_lossy(),
-        file_name
-    );
-    Exec::shell(&command).join()?;
+    let partial_path = Path::new("/var/www/html/videos/partial").join(file_name);
+    if partial_path.exists() {
+        remove_file(&partial_path)?;
+    }
+
+    symlink(&full_path, &partial_path)?;
     form_http_response(body)
 }
 
