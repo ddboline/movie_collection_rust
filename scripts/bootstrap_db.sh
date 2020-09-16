@@ -1,10 +1,5 @@
 #!/bin/bash
 
-sudo bash -c "echo deb [trusted=yes] https://py2deb-repo.s3.amazonaws.com/deb/bionic/python3 bionic main > /etc/apt/sources.list.d/py2deb3.list"
-sudo apt-key adv --receive-keys 25508FAF711C1DEB
-sudo apt-get update
-sudo apt-get install movie-collection-rust
-
 PASSWORD=`head -c1000 /dev/urandom | tr -dc [:alpha:][:digit:] | head -c 16; echo ;`
 JWT_SECRET=`head -c1000 /dev/urandom | tr -dc [:alpha:][:digit:] | head -c 32; echo ;`
 SECRET_KEY=`head -c1000 /dev/urandom | tr -dc [:alpha:][:digit:] | head -c 32; echo ;`

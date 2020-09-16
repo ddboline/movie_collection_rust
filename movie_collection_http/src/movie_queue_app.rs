@@ -1,13 +1,14 @@
 #![allow(clippy::needless_pass_by_value)]
 
 use actix_identity::{CookieIdentityPolicy, IdentityService};
-use actix_web::{web, web::block, App, HttpServer};
+use actix_web::{web, App, HttpServer};
 use std::time::Duration;
-use subprocess::Exec;
 use tokio::time::interval;
+use tokio::fs::remove_dir_all;
+use anyhow::Error;
 
 use super::{
-    logged_user::{fill_from_db, TRIGGER_DB_UPDATE},
+    logged_user::{fill_from_db, TRIGGER_DB_UPDATE, JWT_SECRET, SECRET_KEY},
     movie_queue_routes::{
         find_new_episodes, frontpage, imdb_episodes_route, imdb_episodes_update,
         imdb_ratings_route, imdb_ratings_update, imdb_show, last_modified_route,
@@ -20,11 +21,17 @@ use super::{
 };
 use movie_collection_lib::{config::Config, pgpool::PgPool};
 
+async fn get_secrets(config: &Config) -> Result<(), Error> {
+    SECRET_KEY.read_from_file(&config.secret_path).await?;
+    JWT_SECRET.read_from_file(&config.jwt_secret_path).await?;
+    Ok(())
+}
+
 pub struct AppState {
     pub db: PgPool,
 }
 
-pub async fn start_app(config: Config) {
+pub async fn start_app(config: Config) -> Result<(), Error> {
     async fn _update_db(pool: PgPool) {
         let mut i = interval(Duration::from_secs(60));
         loop {
@@ -34,11 +41,10 @@ pub async fn start_app(config: Config) {
         }
     }
     TRIGGER_DB_UPDATE.set();
+    get_secrets(&config).await?;
 
-    let command = "rm -f /var/www/html/videos/partial/*";
-    block(move || Exec::shell(command).join()).await.unwrap();
+    remove_dir_all("/var/www/html/videos/partial").await?;
 
-    let secret = config.secret_key.clone();
     let domain = config.domain.to_string();
     let port = config.port;
     let pool = PgPool::new(&config.pgurl);
@@ -49,7 +55,7 @@ pub async fn start_app(config: Config) {
         App::new()
             .data(AppState { db: pool.clone() })
             .wrap(IdentityService::new(
-                CookieIdentityPolicy::new(secret.as_bytes())
+                CookieIdentityPolicy::new(&SECRET_KEY.load())
                     .name("auth")
                     .path("/")
                     .domain(domain.as_str())
@@ -130,6 +136,5 @@ pub async fn start_app(config: Config) {
     .bind(&format!("127.0.0.1:{}", port))
     .unwrap_or_else(|_| panic!("Failed to bind to port {}", port))
     .run()
-    .await
-    .expect("Failed to start app");
+    .await.map_err(Into::into)
 }
