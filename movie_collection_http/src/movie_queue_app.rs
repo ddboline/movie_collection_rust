@@ -5,6 +5,7 @@ use actix_web::{web, App, HttpServer};
 use anyhow::Error;
 use std::time::Duration;
 use tokio::{fs::{create_dir, remove_dir_all}, time::interval};
+use std::path::Path;
 
 use super::{
     logged_user::{fill_from_db, get_secrets, SECRET_KEY, TRIGGER_DB_UPDATE},

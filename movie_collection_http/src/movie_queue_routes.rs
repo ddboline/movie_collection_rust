@@ -188,7 +188,7 @@ fn play_worker(full_path: &path::Path) -> HttpResult {
         file_name, url
     );
 
-    let partial_path = Path::new("/var/www/html/videos/partial").join(file_name);
+    let partial_path = path::Path::new("/var/www/html/videos/partial").join(file_name.as_ref());
     if partial_path.exists() {
         remove_file(&partial_path)?;
     }
