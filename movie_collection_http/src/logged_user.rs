@@ -1,8 +1,10 @@
 use anyhow::Error;
+pub use auth_server_rust::logged_user::{
+    LoggedUser, AUTHORIZED_USERS, JWT_SECRET, SECRET_KEY, TRIGGER_DB_UPDATE,
+};
 use log::debug;
-pub use auth_server_rust::logged_user::{LoggedUser, AUTHORIZED_USERS, TRIGGER_DB_UPDATE, JWT_SECRET, SECRET_KEY};
-use std::env::var;
 use stack_string::StackString;
+use std::env::var;
 
 use movie_collection_lib::pgpool::PgPool;
 

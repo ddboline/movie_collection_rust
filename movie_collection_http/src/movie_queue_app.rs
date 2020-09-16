@@ -2,13 +2,12 @@
 
 use actix_identity::{CookieIdentityPolicy, IdentityService};
 use actix_web::{web, App, HttpServer};
-use std::time::Duration;
-use tokio::time::interval;
-use tokio::fs::remove_dir_all;
 use anyhow::Error;
+use std::time::Duration;
+use tokio::{fs::remove_dir_all, time::interval};
 
 use super::{
-    logged_user::{fill_from_db, TRIGGER_DB_UPDATE, JWT_SECRET, SECRET_KEY},
+    logged_user::{fill_from_db, JWT_SECRET, SECRET_KEY, TRIGGER_DB_UPDATE},
     movie_queue_routes::{
         find_new_episodes, frontpage, imdb_episodes_route, imdb_episodes_update,
         imdb_ratings_route, imdb_ratings_update, imdb_show, last_modified_route,
@@ -136,5 +135,6 @@ pub async fn start_app(config: Config) -> Result<(), Error> {
     .bind(&format!("127.0.0.1:{}", port))
     .unwrap_or_else(|_| panic!("Failed to bind to port {}", port))
     .run()
-    .await.map_err(Into::into)
+    .await
+    .map_err(Into::into)
 }

@@ -44,7 +44,6 @@ pub struct ConfigInner {
     pub secret_path: PathBuf,
     #[serde(default = "default_secret_path")]
     pub jwt_secret_path: PathBuf,
-
 }
 
 fn default_suffixes() -> Vec<StackString> {
@@ -87,7 +86,10 @@ fn default_trakt_endpoint() -> StackString {
     "https://api.trakt.tv".into()
 }
 fn default_secret_path() -> PathBuf {
-    dirs::config_dir().unwrap().join("aws_app_rust").join("secret.bin")
+    dirs::config_dir()
+        .unwrap()
+        .join("aws_app_rust")
+        .join("secret.bin")
 }
 
 #[derive(Debug, Default, Clone)]
