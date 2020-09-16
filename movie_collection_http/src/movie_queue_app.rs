@@ -7,7 +7,7 @@ use std::time::Duration;
 use tokio::{fs::remove_dir_all, time::interval};
 
 use super::{
-    logged_user::{fill_from_db, JWT_SECRET, SECRET_KEY, TRIGGER_DB_UPDATE},
+    logged_user::{fill_from_db, get_secrets, SECRET_KEY, TRIGGER_DB_UPDATE},
     movie_queue_routes::{
         find_new_episodes, frontpage, imdb_episodes_route, imdb_episodes_update,
         imdb_ratings_route, imdb_ratings_update, imdb_show, last_modified_route,
@@ -19,12 +19,6 @@ use super::{
     },
 };
 use movie_collection_lib::{config::Config, pgpool::PgPool};
-
-async fn get_secrets(config: &Config) -> Result<(), Error> {
-    SECRET_KEY.read_from_file(&config.secret_path).await?;
-    JWT_SECRET.read_from_file(&config.jwt_secret_path).await?;
-    Ok(())
-}
 
 pub struct AppState {
     pub db: PgPool,
@@ -40,7 +34,7 @@ pub async fn start_app(config: Config) -> Result<(), Error> {
         }
     }
     TRIGGER_DB_UPDATE.set();
-    get_secrets(&config).await?;
+    get_secrets(&config.secret_path, &config.jwt_secret_path).await?;
 
     remove_dir_all("/var/www/html/videos/partial").await?;
 
