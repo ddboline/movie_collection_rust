@@ -28,9 +28,8 @@ pub async fn start_app(config: Config) -> Result<(), Error> {
     async fn _update_db(pool: PgPool) {
         let mut i = interval(Duration::from_secs(60));
         loop {
+            fill_from_db(&pool).await.unwrap_or(());
             i.tick().await;
-            let p = pool.clone();
-            fill_from_db(&p).await.unwrap_or(());
         }
     }
     TRIGGER_DB_UPDATE.set();
