@@ -4,7 +4,7 @@ use anyhow::Error as AnyhowError;
 use auth_server_rust::static_files::login_html;
 use handlebars::RenderError;
 use stack_string::StackString;
-use std::fmt::Debug;
+use std::{fmt::Debug, io::Error as IoError};
 use subprocess::PopenError;
 use thiserror::Error;
 
@@ -27,6 +27,8 @@ pub enum ServiceError {
     PopenError(#[from] PopenError),
     #[error("Template Parse Error {0}")]
     RenderError(#[from] RenderError),
+    #[error("IoError {0}")]
+    IoError(#[from] IoError),
 }
 
 // impl ResponseError trait allows to convert our errors into http responses

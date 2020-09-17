@@ -11,12 +11,11 @@ use stack_string::StackString;
 use std::{
     borrow::Borrow,
     collections::{HashMap, HashSet},
+    fs::remove_file,
     hash::{Hash, Hasher},
+    os::unix::fs::symlink,
     path,
 };
-use subprocess::Exec;
-use std::fs::remove_file;
-use std::os::unix::fs::symlink;
 
 use movie_collection_lib::{
     config::Config,
