@@ -2,6 +2,7 @@ use anyhow::Error;
 use rayon::iter::{IntoParallelRefIterator, ParallelIterator};
 use stack_string::StackString;
 use std::collections::HashMap;
+use futures::future::join_all;
 
 use crate::{
     config::Config,
@@ -9,7 +10,7 @@ use crate::{
     utils::{get_video_runtime, walk_directory},
 };
 
-pub fn make_list(stdout: &StdoutChannel) -> Result<(), Error> {
+pub async fn make_list(stdout: &StdoutChannel) -> Result<(), Error> {
     let config = Config::with_config()?;
     let movies_dir = config.home_dir.join("Documents").join("movies");
 
@@ -69,13 +70,13 @@ pub fn make_list(stdout: &StdoutChannel) -> Result<(), Error> {
         stdout.send(e);
     }
 
-    let result: Vec<_> = file_list
-        .par_iter()
-        .map(|f| {
-            let timeval = get_video_runtime(f).unwrap_or_else(|_| "".into());
+    let futures = file_list.iter().map(|f| {
+        async move {
+            let timeval = get_video_runtime(f).await.unwrap_or_else(|_| "".into());
             format!("{} {}", timeval, f.to_string_lossy())
-        })
-        .collect();
+        }
+    });
+    let result: Vec<_> = join_all(futures).await;
 
     for e in result {
         stdout.send(e);

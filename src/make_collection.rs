@@ -5,7 +5,6 @@ use futures::future::try_join_all;
 use stack_string::StackString;
 use std::path::Path;
 use structopt::StructOpt;
-use tokio::task::spawn_blocking;
 
 use movie_collection_lib::{movie_collection::MovieCollection, utils::get_video_runtime};
 
@@ -40,12 +39,8 @@ async fn make_collection() -> Result<(), Error> {
         let shows = mc.search_movie_collection(&opts.shows).await?;
         if do_time {
             let futures = shows.into_iter().map(|result| async move {
-                let path = result.path.clone();
-                let timeval = spawn_blocking(move || {
-                    let path = Path::new(path.as_str());
-                    get_video_runtime(&path)
-                })
-                .await??;
+                let path = Path::new(result.path.as_str());
+                let timeval = get_video_runtime(&path).await?;
                 Ok(format!("{} {}", timeval, result))
             });
             let shows: Result<Vec<_>, Error> = try_join_all(futures).await;

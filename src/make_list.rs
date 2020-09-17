@@ -9,7 +9,7 @@ async fn main() -> Result<(), Error> {
     env_logger::init();
     let stdout = StdoutChannel::new();
 
-    match make_list(&stdout) {
+    match make_list(&stdout).await {
         Ok(_) => {}
         Err(e) => {
             if e.to_string().contains("Broken pipe") {

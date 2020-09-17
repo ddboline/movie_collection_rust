@@ -10,11 +10,10 @@ use reqwest::{Client, Response, Url};
 use serde::{Deserialize, Serialize};
 use stack_string::StackString;
 use std::{
-    io::{BufRead, BufReader},
     path::{Path, PathBuf},
     string::ToString,
 };
-use subprocess::Exec;
+use tokio::process::Command;
 use tokio::time::{delay_for, Duration};
 use walkdir::WalkDir;
 
@@ -90,47 +89,48 @@ pub fn parse_file_stem(file_stem: &str) -> (StackString, i32, i32) {
     }
 }
 
-pub fn get_video_runtime(f: &Path) -> Result<StackString, Error> {
+pub async fn get_video_runtime(f: &Path) -> Result<StackString, Error> {
     let ext = f
         .extension()
         .ok_or_else(|| format_err!("No extension"))?
         .to_string_lossy();
     let fname = f.to_string_lossy();
-    let command = if ext == ".avi" {
-        format!("aviindex -i {} -o /dev/null", fname)
+
+    let (command, args) = if ext == ".avi" {
+        ("aviindex", vec!["-i", fname.as_ref(), "-o", "/dev/null"])
     } else {
-        format!("ffprobe {} 2>&1", fname)
+        ("ffprobe", vec![fname.as_ref()])
     };
 
     let mut timeval = "".into();
 
-    let stream = Exec::shell(command).stream_stdout()?;
-    let results: Result<Vec<_>, Error> = BufReader::new(stream)
-        .lines()
-        .map(|l| {
-            let items: Vec<_> = l?.split_whitespace().map(ToString::to_string).collect();
-            if items.len() > 5 && items[1] == "V:" {
-                let fps: f64 = items[2].parse()?;
-                let nframes: u64 = items[5]
-                    .trim_start_matches("frames=")
-                    .trim_matches(',')
-                    .parse()?;
-                let nsecs: f64 = nframes as f64 / fps;
-                let nmin = (nsecs / 60.) as u64;
-                let nhour = (nmin as f64 / 60.) as u64;
-                timeval = format!("{:02}:{:02}:{:02}", nhour, nmin % 60, nsecs as u64 % 60).into();
-            }
-            if items.len() > 1 && items[0] == "Duration:" {
-                let its: Vec<_> = items[1].trim_matches(',').split(':').collect();
-                let nhour: u64 = its[0].parse()?;
-                let nmin: u64 = its[1].parse()?;
-                let nsecs: f64 = its[2].parse()?;
-                timeval = format!("{:02}:{:02}:{:02}", nhour, nmin, nsecs as u64).into();
-            }
-            Ok(())
-        })
-        .collect();
-    results?;
+    let output = Command::new(command).args(&args).output().await?;
+    for l in output
+        .stdout
+        .split(|c| *c == b'\n')
+        .chain(output.stderr.split(|c| *c == b'\n'))
+    {
+        let line = std::str::from_utf8(&l)?;
+        let items: Vec<_> = line.split_whitespace().map(ToString::to_string).collect();
+        if items.len() > 5 && items[1] == "V:" {
+            let fps: f64 = items[2].parse()?;
+            let nframes: u64 = items[5]
+                .trim_start_matches("frames=")
+                .trim_matches(',')
+                .parse()?;
+            let nsecs: f64 = nframes as f64 / fps;
+            let nmin = (nsecs / 60.) as u64;
+            let nhour = (nmin as f64 / 60.) as u64;
+            timeval = format!("{:02}:{:02}:{:02}", nhour, nmin % 60, nsecs as u64 % 60).into();
+        }
+        if items.len() > 1 && items[0] == "Duration:" {
+            let its: Vec<_> = items[1].trim_matches(',').split(':').collect();
+            let nhour: u64 = its[0].parse()?;
+            let nmin: u64 = its[1].parse()?;
+            let nsecs: f64 = its[2].parse()?;
+            timeval = format!("{:02}:{:02}:{:02}", nhour, nmin, nsecs as u64).into();
+        }
+    }
     Ok(timeval)
 }
 

@@ -359,7 +359,8 @@ impl TranscodeService {
                 }
             }
             let new_debug_output_path = tmp_avi_path.join(&format!("{}_mp4.out", prefix));
-            fs::rename(&stdout_path, &new_debug_output_path).await?;
+            fs::rename(&stderr_path, &new_debug_output_path).await?;
+            fs::remove_file(&stdout_path).await?;
         }
         Ok(())
     }
