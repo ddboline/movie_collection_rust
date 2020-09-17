@@ -1,8 +1,8 @@
 use anyhow::Error;
+use futures::future::join_all;
 use rayon::iter::{IntoParallelRefIterator, ParallelIterator};
 use stack_string::StackString;
 use std::collections::HashMap;
-use futures::future::join_all;
 
 use crate::{
     config::Config,
@@ -70,11 +70,9 @@ pub async fn make_list(stdout: &StdoutChannel) -> Result<(), Error> {
         stdout.send(e);
     }
 
-    let futures = file_list.iter().map(|f| {
-        async move {
-            let timeval = get_video_runtime(f).await.unwrap_or_else(|_| "".into());
-            format!("{} {}", timeval, f.to_string_lossy())
-        }
+    let futures = file_list.iter().map(|f| async move {
+        let timeval = get_video_runtime(f).await.unwrap_or_else(|_| "".into());
+        format!("{} {}", timeval, f.to_string_lossy())
     });
     let result: Vec<_> = join_all(futures).await;
 

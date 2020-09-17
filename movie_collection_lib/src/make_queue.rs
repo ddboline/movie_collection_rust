@@ -79,12 +79,10 @@ pub async fn make_queue_worker(
     } else if add_files.is_empty() {
         let movie_queue = mq.print_movie_queue(&patterns).await?;
         if do_time {
-            let futures = movie_queue.into_iter().map(|result| {
-                async move {
-                    let path = Path::new(result.path.as_str());
-                    let timeval = get_video_runtime(path).await?;
-                    Ok(format!("{} {}", result, timeval))
-                }
+            let futures = movie_queue.into_iter().map(|result| async move {
+                let path = Path::new(result.path.as_str());
+                let timeval = get_video_runtime(path).await?;
+                Ok(format!("{} {}", result, timeval))
             });
             let results: Result<Vec<_>, Error> = try_join_all(futures).await;
             stdout.send(results?.join("\n"));

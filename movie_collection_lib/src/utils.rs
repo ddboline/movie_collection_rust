@@ -13,8 +13,10 @@ use std::{
     path::{Path, PathBuf},
     string::ToString,
 };
-use tokio::process::Command;
-use tokio::time::{delay_for, Duration};
+use tokio::{
+    process::Command,
+    time::{delay_for, Duration},
+};
 use walkdir::WalkDir;
 
 lazy_static! {
