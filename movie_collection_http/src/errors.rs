@@ -5,7 +5,6 @@ use auth_server_rust::static_files::login_html;
 use handlebars::RenderError;
 use stack_string::StackString;
 use std::{fmt::Debug, io::Error as IoError};
-use subprocess::PopenError;
 use thiserror::Error;
 
 use crate::logged_user::TRIGGER_DB_UPDATE;
@@ -23,8 +22,6 @@ pub enum ServiceError {
     AnyhowError(#[from] AnyhowError),
     #[error("blocking error {0}")]
     BlockingError(StackString),
-    #[error("Popen error {0}")]
-    PopenError(#[from] PopenError),
     #[error("Template Parse Error {0}")]
     RenderError(#[from] RenderError),
     #[error("IoError {0}")]
