@@ -3,6 +3,7 @@
 use anyhow::Error;
 use std::path::PathBuf;
 use structopt::StructOpt;
+use tokio::fs;
 
 use movie_collection_lib::{
     config::Config,
@@ -38,6 +39,15 @@ async fn remcom() -> Result<(), Error> {
             opts.unwatched,
         )
         .await?;
+
+        let script_file = config
+            .home_dir
+            .join("dvdrip")
+            .join("jobs")
+            .join(&format!("{}_copy", payload.prefix))
+            .with_extension("json");
+        fs::write(&script_file, &serde_json::to_vec(&payload)?).await?;
+
         remcom_service.publish_transcode_job(&payload).await?;
         stdout.send(format!("script {:?}", payload));
     }

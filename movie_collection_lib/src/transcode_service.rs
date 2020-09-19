@@ -35,10 +35,10 @@ pub enum JobType {
 
 #[derive(Serialize, Deserialize, Debug, PartialEq, Clone)]
 pub struct TranscodeServiceRequest {
-    job_type: JobType,
-    prefix: StackString,
-    input_path: PathBuf,
-    output_path: PathBuf,
+    pub job_type: JobType,
+    pub prefix: StackString,
+    pub input_path: PathBuf,
+    pub output_path: PathBuf,
 }
 
 impl TranscodeServiceRequest {
@@ -51,33 +51,25 @@ impl TranscodeServiceRequest {
         }
     }
 
-    pub fn create_transcode_request(config: &Config, path: &Path) -> Result<Self, Error> {
-        let input_path = path.to_path_buf();
-        let fstem = path.file_stem().ok_or_else(|| format_err!("No stem"))?;
-        let script_file = config
+    pub fn create_transcode_request(config: &Config, input_path: &Path) -> Result<Self, Error> {
+        let input_path = input_path.to_path_buf();
+        let fstem = input_path
+            .file_stem()
+            .ok_or_else(|| format_err!("No stem"))?;
+        let output_file = config
             .home_dir
             .join("dvdrip")
-            .join("jobs")
+            .join("avi")
             .join(&fstem)
-            .with_extension("sh");
-        if Path::new(&script_file).exists() {
-            Err(format_err!("File exists"))
-        } else {
-            let output_file = config
-                .home_dir
-                .join("dvdrip")
-                .join("avi")
-                .join(&fstem)
-                .with_extension("mp4");
-            let prefix = fstem.to_string_lossy().into_owned().into();
+            .with_extension("mp4");
+        let prefix = fstem.to_string_lossy().into_owned().into();
 
-            Ok(Self {
-                job_type: JobType::Transcode,
-                prefix,
-                input_path,
-                output_path: output_file,
-            })
-        }
+        Ok(Self {
+            job_type: JobType::Transcode,
+            prefix,
+            input_path,
+            output_path: output_file,
+        })
     }
 
     pub async fn create_remcom_request(
@@ -291,6 +283,17 @@ impl TranscodeService {
         input_file: &Path,
         output_file: &Path,
     ) -> Result<(), Error> {
+        let script_file = self
+            .config
+            .home_dir
+            .join("dvdrip")
+            .join("jobs")
+            .join(&prefix)
+            .with_extension("json");
+        if script_file.exists() {
+            fs::remove_file(&script_file).await?;
+        }
+
         if !input_file.exists() {
             return Err(format_err!("{:?} does not exist", input_file));
         }
@@ -371,6 +374,17 @@ impl TranscodeService {
         input_file: &Path,
         output_file: &Path,
     ) -> Result<(), Error> {
+        let script_file = self
+            .config
+            .home_dir
+            .join("dvdrip")
+            .join("jobs")
+            .join(&format!("{}_copy", show))
+            .with_extension("json");
+        if script_file.exists() {
+            fs::remove_file(&script_file).await?;
+        }
+
         let input_file = if input_file.exists() {
             input_file.to_path_buf()
         } else {

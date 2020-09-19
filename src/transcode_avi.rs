@@ -3,6 +3,7 @@
 use anyhow::Error;
 use std::path::PathBuf;
 use structopt::StructOpt;
+use tokio::fs;
 
 use movie_collection_lib::{
     config::Config,
@@ -36,6 +37,15 @@ async fn transcode_avi() -> Result<(), Error> {
             panic!("file doesn't exist {}", path.to_string_lossy());
         }
         let payload = TranscodeServiceRequest::create_transcode_request(&config, &path)?;
+
+        let script_file = config
+            .home_dir
+            .join("dvdrip")
+            .join("jobs")
+            .join(&payload.prefix)
+            .with_extension("json");
+        fs::write(&script_file, &serde_json::to_vec(&payload)?).await?;
+
         transcode_service.publish_transcode_job(&payload).await?;
         stdout.send(format!("script {:?}", payload));
     }
