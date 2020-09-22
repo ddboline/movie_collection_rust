@@ -5,3 +5,5 @@ Cargo.lock
 backup
 backup.tar.gz
 config.env
+.vscode
+.metals

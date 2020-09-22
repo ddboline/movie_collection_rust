@@ -25,5 +25,5 @@ async-trait = "0.1"
 log = "0.4"
 maplit = "1.0"
 handlebars = "3.4"
-auth_server_rust = { git = "https://github.com/ddboline/auth_server_rust.git", tag="0.1.10"}
+auth_server_rust = { git = "https://github.com/ddboline/auth_server_rust.git", tag="0.1.14"}
 stack-string = { git = "https://github.com/ddboline/stack-string-rs.git", tag="0.1.6", features=["postgres_types"] }
