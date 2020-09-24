@@ -55,7 +55,7 @@ pub async fn make_list(stdout: &StdoutChannel) -> Result<(), Error> {
         })
         .collect();
 
-    let result: Vec<_> = local_file_list
+    local_file_list
         .iter()
         .map(|f| {
             if let Some(full_path) = file_map.get(f.as_str()) {
@@ -64,19 +64,14 @@ pub async fn make_list(stdout: &StdoutChannel) -> Result<(), Error> {
                 f.to_string()
             }
         })
-        .collect();
-
-    for e in result {
-        stdout.send(e);
-    }
+        .for_each(|e| stdout.send(e));
 
     let futures = file_list.iter().map(|f| async move {
         let timeval = get_video_runtime(f).await.unwrap_or_else(|_| "".into());
         format!("{} {}", timeval, f.to_string_lossy())
     });
-    let result: Vec<_> = join_all(futures).await;
 
-    for e in result {
+    for e in join_all(futures).await {
         stdout.send(e);
     }
 

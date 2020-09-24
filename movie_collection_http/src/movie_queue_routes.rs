@@ -16,6 +16,7 @@ use std::{
     os::unix::fs::symlink,
     path,
 };
+use itertools::Itertools;
 
 use movie_collection_lib::{
     config::Config,
@@ -497,7 +498,7 @@ fn watchlist_worker(
 
     shows.sort();
 
-    let shows: Vec<_> = shows
+    let shows = shows
         .into_iter()
         .map(|(title, link, source)| {
             format!(
@@ -518,13 +519,13 @@ fn watchlist_worker(
                 },
             )
         })
-        .collect();
+        .join("");
 
     let previous = r#"<a href="javascript:updateMainArticle('/list/tvshows')">Go Back</a><br>"#;
     let entries = format!(
         r#"{}<table border="0">{}</table>"#,
         previous,
-        shows.join("")
+        shows
     );
 
     form_http_response(entries)
@@ -573,7 +574,7 @@ fn trakt_watched_seasons_worker(
             onclick="imdb_update('SHOW', 'LINK', SEASON, '/list/trakt/watched/list/LINK');"
             >update database</button></td>"#;
 
-    let entries: Vec<_> = entries
+    let entries = entries
         .iter()
         .map(|s| {
             format!(
@@ -590,14 +591,14 @@ fn trakt_watched_seasons_worker(
                     .replace("SEASON", &s.season.to_string())
             )
         })
-        .collect();
+        .join("");
 
     let previous =
         r#"<a href="javascript:updateMainArticle('/list/trakt/watchlist')">Go Back</a><br>"#;
     let entries = format!(
         r#"{}<table border="0">{}</table>"#,
         previous,
-        entries.join("")
+        entries
     )
     .into();
     Ok(entries)

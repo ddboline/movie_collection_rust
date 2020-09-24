@@ -276,8 +276,7 @@ impl MovieCollection {
             results
         });
         let results: Result<Vec<_>, Error> = try_join_all(futures).await;
-        let results: Vec<_> = results?.into_iter().flatten().collect();
-        Ok(results)
+        Ok(results?.into_iter().flatten().collect())
     }
 
     pub async fn print_imdb_episodes(
@@ -373,11 +372,11 @@ impl MovieCollection {
             if search_strs.is_empty() {
                 "".to_string()
             } else {
-                let search_strs: Vec<_> = search_strs
+                let search_strs = search_strs
                     .iter()
                     .map(|s| format!("a.path like '%{}%'", s.as_ref()))
-                    .collect();
-                format!("WHERE {}", search_strs.join(" OR "))
+                    .join(" OR ");
+                format!("WHERE {}", search_strs)
             },
         ),)?;
 

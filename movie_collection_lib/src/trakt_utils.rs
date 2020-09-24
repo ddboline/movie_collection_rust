@@ -14,6 +14,7 @@ use std::{
     str::FromStr,
     sync::Arc,
 };
+use itertools::Itertools;
 
 use crate::{
     config::Config, imdb_episodes::ImdbEpisodes, imdb_ratings::ImdbRatings,
@@ -761,8 +762,7 @@ async fn watchlist_rm(mc: &MovieCollection, show: Option<&str>) -> Result<(), Er
 
 async fn watchlist_list(mc: &MovieCollection) -> Result<(), Error> {
     let show_map = get_watchlist_shows_db(&mc.pool).await?;
-    let results: Vec<_> = show_map.iter().map(ToString::to_string).collect();
-    mc.stdout.send(results.join("\n"));
+    mc.stdout.send(show_map.iter().map(ToString::to_string).join("\n"));
     Ok(())
 }
 
@@ -841,7 +841,7 @@ async fn watched_list(mc: &MovieCollection, show: Option<&str>, season: i32) -> 
     let watched_movies = get_watched_movies_db(&mc.pool).await?;
 
     if let Some(imdb_url) = get_imdb_url_from_show(&mc, show).await? {
-        let lines: Vec<_> = watched_shows
+        let lines = watched_shows
             .iter()
             .filter_map(|show| {
                 if season != -1 && show.season != season {
@@ -853,9 +853,9 @@ async fn watched_list(mc: &MovieCollection, show: Option<&str>, season: i32) -> 
                     None
                 }
             })
-            .collect();
-        mc.stdout.send(lines.join("\n"));
-        let lines: Vec<_> = watched_movies
+            .join("\n");
+        mc.stdout.send(lines);
+        let lines = watched_movies
             .iter()
             .filter_map(|show| {
                 if show.imdb_url.as_str() == imdb_url.as_str() {
@@ -864,13 +864,11 @@ async fn watched_list(mc: &MovieCollection, show: Option<&str>, season: i32) -> 
                     None
                 }
             })
-            .collect();
-        mc.stdout.send(lines.join("\n"));
+            .join("\n");
+        mc.stdout.send(lines);
     } else {
-        let lines: Vec<_> = watched_shows.iter().map(ToString::to_string).collect();
-        mc.stdout.send(lines.join("\n"));
-        let lines: Vec<_> = watched_movies.iter().map(ToString::to_string).collect();
-        mc.stdout.send(lines.join("\n"));
+        mc.stdout.send(watched_shows.iter().map(ToString::to_string).join("\n"));
+        mc.stdout.send(watched_movies.iter().map(ToString::to_string).join("\n"));
     }
     Ok(())
 }
@@ -958,7 +956,7 @@ pub async fn watch_list_http_worker(
         }
     }
 
-    let entries: Vec<_> = entries
+    let entries = entries
         .iter()
         .map(|s| {
             let entry = if let Some(collection_idx) = collection_idx_map.get(&s.episode) {
@@ -998,7 +996,7 @@ pub async fn watch_list_http_worker(
                 }
             )
         })
-        .collect();
+        .join("\n");
 
     let previous = format!(
         r#"<a href="javascript:updateMainArticle('/list/trakt/watched/list/{}')">Go Back</a><br>"#,
@@ -1021,7 +1019,7 @@ pub async fn watch_list_http_worker(
         r#"{}{}<table border="0">{}</table>"#,
         previous,
         buttons,
-        entries.join("\n")
+        entries
     )
     .into();
     Ok(entries)
@@ -1107,7 +1105,7 @@ pub async fn trakt_cal_http_worker(pool: &PgPool) -> Result<Vec<StackString>, Er
     );
     TRAKT_CONN.init().await;
     let cal_list = TRAKT_CONN.get_calendar().await?;
-    let results: Vec<_> = cal_list
+    let results = cal_list
         .into_iter()
         .map(|cal| async {
             let show = match ImdbRatings::get_show_by_link(&cal.link, &pool).await? {
@@ -1161,7 +1159,6 @@ pub async fn trakt_cal_http_worker(pool: &PgPool) -> Result<Vec<StackString>, Er
                 },
             ).into();
             Ok(entry)
-        })
-        .collect();
+        });
     join_all(results).await.into_iter().collect()
 }

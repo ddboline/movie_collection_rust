@@ -11,13 +11,13 @@ use serde::{Deserialize, Serialize};
 use stack_string::StackString;
 use std::{
     path::{Path, PathBuf},
-    string::ToString,
 };
 use tokio::{
     process::Command,
     time::{delay_for, Duration},
 };
 use walkdir::WalkDir;
+use smallvec::SmallVec;
 
 lazy_static! {
     pub static ref HBR: Handlebars<'static> = get_templates().expect("Failed to parse templates");
@@ -113,7 +113,7 @@ pub async fn get_video_runtime(f: &Path) -> Result<StackString, Error> {
         .chain(output.stderr.split(|c| *c == b'\n'))
     {
         let line = std::str::from_utf8(&l)?;
-        let items: Vec<_> = line.split_whitespace().map(ToString::to_string).collect();
+        let items: SmallVec<[&str; 6]> = line.split_whitespace().take(6).collect();
         if items.len() > 5 && items[1] == "V:" {
             let fps: f64 = items[2].parse()?;
             let nframes: u64 = items[5]
@@ -126,7 +126,7 @@ pub async fn get_video_runtime(f: &Path) -> Result<StackString, Error> {
             timeval = format!("{:02}:{:02}:{:02}", nhour, nmin % 60, nsecs as u64 % 60).into();
         }
         if items.len() > 1 && items[0] == "Duration:" {
-            let its: Vec<_> = items[1].trim_matches(',').split(':').collect();
+            let its: SmallVec<[&str; 3]> = items[1].trim_matches(',').split(':').take(3).collect();
             let nhour: u64 = its[0].parse()?;
             let nmin: u64 = its[1].parse()?;
             let nsecs: f64 = its[2].parse()?;

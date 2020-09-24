@@ -17,6 +17,7 @@ use tokio::{
     fs::{read, write},
     sync::{Mutex, RwLock},
 };
+use smallvec::SmallVec;
 
 use crate::{
     config::Config,
@@ -82,7 +83,7 @@ impl TraktConnection {
     }
 
     fn get_random_string() -> String {
-        let random_bytes: Vec<u8> = (0..16).map(|_| thread_rng().gen::<u8>()).collect();
+        let random_bytes: SmallVec<[u8; 16]> = (0..16).map(|_| thread_rng().gen::<u8>()).collect();
         encode_config(&random_bytes, URL_SAFE_NO_PAD)
     }
 
@@ -460,7 +461,7 @@ impl TraktConnection {
             .error_for_status()?
             .json()
             .await?;
-        let cal_entries: Vec<_> = new_episodes
+        let cal_entries = new_episodes
             .into_iter()
             .map(|entry| {
                 let imdb: StackString = entry.show.ids.imdb.unwrap_or_else(|| "".into());

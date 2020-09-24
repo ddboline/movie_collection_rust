@@ -1,13 +1,13 @@
 use anyhow::{format_err, Error};
 use derive_more::Display;
 use futures::future::try_join_all;
-use rayon::iter::{IntoParallelIterator, ParallelIterator};
 use stack_string::StackString;
 use std::{
     ffi::OsStr,
     path::{Path, PathBuf},
     sync::Arc,
 };
+use itertools::Itertools;
 
 use crate::{
     movie_collection::MovieCollection,
@@ -59,13 +59,13 @@ pub async fn make_queue_worker(
     let mq = MovieQueueDB::with_pool(&mc.pool);
 
     if do_shows {
-        let shows: Vec<_> = mc
+        let shows = mc
             .print_tv_shows()
             .await?
-            .into_par_iter()
+            .into_iter()
             .map(|s| s.to_string())
-            .collect();
-        stdout.send(shows.join("\n"));
+            .join("\n");
+        stdout.send(shows);
     } else if !del_files.is_empty() {
         for file in del_files {
             match file {
@@ -87,8 +87,7 @@ pub async fn make_queue_worker(
             let results: Result<Vec<_>, Error> = try_join_all(futures).await;
             stdout.send(results?.join("\n"));
         } else {
-            let results: Vec<_> = movie_queue.into_iter().map(|x| x.to_string()).collect();
-            stdout.send(results.join("\n"));
+            stdout.send(movie_queue.into_iter().map(|x| x.to_string()).join("\n"));
         }
     } else if add_files.len() == 1 {
         let max_idx = mq.get_max_queue_index().await?;

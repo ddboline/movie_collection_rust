@@ -39,4 +39,5 @@ handlebars = "3.4"
 deadpool-lapin = "0.6"
 lapin = "1.2"
 deadqueue = "0.1"
+smallvec = "1.4"
 stack-string = { git = "https://github.com/ddboline/stack-string-rs.git", tag="0.1.6", features=["postgres_types"] }

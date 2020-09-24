@@ -89,13 +89,12 @@ impl ImdbConnection {
         let tl_vec: Vec<_> = Document::from(body.as_str())
             .find(Class("result_text"))
             .flat_map(|tr| {
-                let title = tr.text().trim().to_string();
                 tr.find(Name("a"))
                     .filter_map(|a| {
                         if let Some(link) = a.attr("href") {
                             if let Some(link) = link.split('/').nth(2) {
                                 if link.starts_with("tt") {
-                                    Some((title.to_string(), link.to_string()))
+                                    Some((tr.text().trim().to_string(), link.to_string()))
                                 } else {
                                     None
                                 }
@@ -187,8 +186,7 @@ impl ImdbConnection {
                 self.parse_episodes_url(&episodes_url, season_).await
             });
 
-        let results: Vec<_> = try_join_all(futures).await?.into_iter().flatten().collect();
-        Ok(results)
+        Ok(try_join_all(futures).await?.into_iter().flatten().collect())
     }
 
     async fn parse_episodes_url(
