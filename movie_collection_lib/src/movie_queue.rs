@@ -245,7 +245,7 @@ impl MovieQueueDB {
             istv: Option<bool>,
         }
         let constraints = patterns
-            .into_iter()
+            .iter()
             .map(|p| format!("b.path like '%{}%'", p))
             .join(" OR ");
 
