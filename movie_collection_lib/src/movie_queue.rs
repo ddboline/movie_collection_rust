@@ -1,6 +1,7 @@
 use anyhow::{format_err, Error};
 use chrono::{DateTime, Utc};
 use futures::future::try_join_all;
+use itertools::Itertools;
 use log::debug;
 use postgres_query::FromSqlRow;
 use serde::{Deserialize, Serialize};
@@ -243,6 +244,10 @@ impl MovieQueueDB {
             link: Option<StackString>,
             istv: Option<bool>,
         }
+        let constraints = patterns
+            .into_iter()
+            .map(|p| format!("b.path like '%{}%'", p))
+            .join(" OR ");
 
         let query = postgres_query::query_dyn!(&format!(
             r#"
@@ -253,14 +258,10 @@ impl MovieQueueDB {
                 {}
                 ORDER BY a.idx
             "#,
-            if patterns.is_empty() {
+            if constraints.is_empty() {
                 "".to_string()
             } else {
-                let constraints: Vec<_> = patterns
-                    .iter()
-                    .map(|p| format!("b.path like '%{}%'", p))
-                    .collect();
-                format!("WHERE {}", constraints.join(" OR "))
+                format!("WHERE {}", constraints)
             }
         ),)?;
 
