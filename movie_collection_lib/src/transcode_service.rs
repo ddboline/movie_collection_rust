@@ -39,7 +39,7 @@ pub enum JobType {
 }
 
 impl JobType {
-    fn get_str(&self) -> &'static str {
+    fn get_str(self) -> &'static str {
         match self {
             Self::Transcode => "transcode",
             Self::Move => "move",
@@ -621,7 +621,7 @@ fn get_procs_sync() -> Result<Vec<ProcInfo>, Error> {
                     let cmdline: Vec<_> = cmdline
                         .get(1..)
                         .unwrap_or(&[])
-                        .into_iter()
+                        .iter()
                         .map(Into::into)
                         .collect();
                     let status = p.status()?;
@@ -635,12 +635,12 @@ fn get_procs_sync() -> Result<Vec<ProcInfo>, Error> {
             }
             Ok(None)
         })
-        .filter_map(|x| x.transpose())
+        .filter_map(Result::transpose)
         .collect()
 }
 
 async fn get_procs() -> Result<Vec<ProcInfo>, Error> {
-    spawn_blocking(move || get_procs_sync()).await?
+    spawn_blocking(get_procs_sync).await?
 }
 
 fn get_paths_sync(dir: impl AsRef<Path>, ext: &str) -> Vec<PathBuf> {
@@ -671,9 +671,8 @@ async fn get_last_line(fpath: &Path) -> Result<String, Error> {
     let f = File::open(&fpath).await?;
     let mut reader = BufReader::new(f);
     loop {
-        match reader.read_until(b'\n', &mut buf).await {
-            Ok(0) => break,
-            _ => {}
+        if let Ok(0) = reader.read_until(b'\n', &mut buf).await {
+            break;
         }
         buf.clear();
     }
