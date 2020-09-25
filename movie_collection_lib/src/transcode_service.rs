@@ -610,33 +610,31 @@ fn get_procs_sync() -> Result<Vec<ProcInfo>, Error> {
         Path::new("/usr/bin/run-encoding"),
         Path::new("/usr/bin/HandBrakeCLI"),
     ];
-    process::all_processes()?
+    let procs = process::all_processes()?
         .into_iter()
-        .map(|p| {
-            if let Ok(exe) = p.exe() {
-                if !accept_paths.iter().any(|p| &exe == p) {
-                    return Ok(None);
-                }
-                if let Ok(cmdline) = p.cmdline() {
-                    let cmdline: Vec<_> = cmdline
-                        .get(1..)
-                        .unwrap_or(&[])
-                        .iter()
-                        .map(Into::into)
-                        .collect();
-                    let status = p.status()?;
-                    return Ok(Some(ProcInfo {
-                        pid: p.pid as u64,
-                        name: status.name.into(),
-                        exe,
-                        cmdline,
-                    }));
-                }
+        .filter_map(|p| {
+            let exe = p.exe().ok()?;
+            if accept_paths.iter().any(|x| &exe == x) {
+                let cmdline: Vec<_> = p
+                    .cmdline()
+                    .ok()?
+                    .get(1..)
+                    .unwrap_or(&[])
+                    .iter()
+                    .map(Into::into)
+                    .collect();
+                let status = p.status().ok()?;
+                return Some(ProcInfo {
+                    pid: p.pid as u64,
+                    name: status.name.into(),
+                    exe,
+                    cmdline,
+                });
             }
-            Ok(None)
+            None
         })
-        .filter_map(Result::transpose)
-        .collect()
+        .collect();
+    Ok(procs)
 }
 
 async fn get_procs() -> Result<Vec<ProcInfo>, Error> {
@@ -685,26 +683,32 @@ async fn get_last_line(fpath: &Path) -> Result<String, Error> {
     }
 }
 
+async fn get_upcoming_jobs(config: &Config) -> Result<Vec<TranscodeServiceRequest>, Error> {
+    let futures = get_paths(job_dir(config), "json")
+        .await?
+        .into_iter()
+        .map(|fpath| async move {
+            let js: TranscodeServiceRequest = serde_json::from_slice(&fs::read(fpath).await?)?;
+            Ok(js)
+        });
+    try_join_all(futures).await
+}
+
+async fn get_current_jobs(config: &Config) -> Result<Vec<String>, Error> {
+    let futures = get_paths(log_dir(config), "out")
+        .await?
+        .into_iter()
+        .map(|fpath| async move { get_last_line(&fpath).await });
+    try_join_all(futures).await
+}
+
 pub async fn transcode_status(config: &Config) -> Result<TranscodeStatus, Error> {
     let (procs, upcoming_jobs, current_jobs, finished_jobs) = try_join!(
         get_procs(),
-        get_paths(job_dir(config), "json"),
-        get_paths(log_dir(config), "out"),
+        get_upcoming_jobs(config),
+        get_current_jobs(config),
         get_paths(tmp_dir(config), "out")
     )?;
-
-    let futures = upcoming_jobs.into_iter().map(|fpath| async move {
-        let js: TranscodeServiceRequest = serde_json::from_slice(&fs::read(fpath).await?)?;
-        Ok(js)
-    });
-    let upcoming_jobs: Result<Vec<_>, Error> = try_join_all(futures).await;
-    let upcoming_jobs = upcoming_jobs?;
-
-    let futures = current_jobs
-        .into_iter()
-        .map(|fpath| async move { get_last_line(&fpath).await });
-    let current_jobs: Result<Vec<_>, Error> = try_join_all(futures).await;
-    let current_jobs = current_jobs?;
 
     Ok(TranscodeStatus {
         procs,
@@ -722,7 +726,9 @@ mod tests {
 
     use crate::{
         config::Config,
-        transcode_service::{transcode_status, JobType, TranscodeService, TranscodeServiceRequest},
+        transcode_service::{
+            get_procs_sync, transcode_status, JobType, TranscodeService, TranscodeServiceRequest,
+        },
     };
 
     fn init_env() {
@@ -838,6 +844,13 @@ mod tests {
         println!("{:?}", status);
         println!("{}", status);
         assert_eq!(status.procs.len(), 1);
+        Ok(())
+    }
+
+    #[test]
+    fn test_get_procs_sync() -> Result<(), Error> {
+        let procs = get_procs_sync()?;
+        assert!(procs.len() > 0);
         Ok(())
     }
 }
