@@ -17,6 +17,7 @@ use std::{
     fmt,
     path::{Path, PathBuf},
     process::Stdio,
+    str,
 };
 use tokio::{
     fs::{self, File, OpenOptions},
@@ -37,32 +38,27 @@ pub enum JobType {
     Move,
 }
 
+impl JobType {
+    fn get_str(&self) -> &'static str {
+        match self {
+            Self::Transcode => "transcode",
+            Self::Move => "move",
+        }
+    }
+}
+
+impl fmt::Display for JobType {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "{}", self.get_str())
+    }
+}
+
 #[derive(Serialize, Deserialize, Debug, PartialEq, Clone)]
 pub struct TranscodeServiceRequest {
     pub job_type: JobType,
     pub prefix: StackString,
     pub input_path: PathBuf,
     pub output_path: PathBuf,
-}
-
-fn dvdrip_dir(config: &Config) -> PathBuf {
-    config.home_dir.join("dvdrip")
-}
-
-fn avi_dir(config: &Config) -> PathBuf {
-    dvdrip_dir(config).join("avi")
-}
-
-fn log_dir(config: &Config) -> PathBuf {
-    dvdrip_dir(config).join("log")
-}
-
-fn job_dir(config: &Config) -> PathBuf {
-    dvdrip_dir(config).join("job")
-}
-
-fn tmp_dir(config: &Config) -> PathBuf {
-    config.home_dir.join("tmp_avi")
 }
 
 impl TranscodeServiceRequest {
@@ -477,12 +473,47 @@ impl TranscodeService {
     }
 }
 
+fn dvdrip_dir(config: &Config) -> PathBuf {
+    config.home_dir.join("dvdrip")
+}
+
+fn avi_dir(config: &Config) -> PathBuf {
+    dvdrip_dir(config).join("avi")
+}
+
+fn log_dir(config: &Config) -> PathBuf {
+    dvdrip_dir(config).join("log")
+}
+
+fn job_dir(config: &Config) -> PathBuf {
+    dvdrip_dir(config).join("job")
+}
+
+fn tmp_dir(config: &Config) -> PathBuf {
+    config.home_dir.join("tmp_avi")
+}
+
 #[derive(Debug)]
 pub struct ProcInfo {
     pub pid: u64,
-    pub name: String,
+    pub name: StackString,
     pub exe: PathBuf,
-    pub cmdline: Vec<String>,
+    pub cmdline: Vec<StackString>,
+}
+
+impl ProcInfo {
+    pub fn get_header() -> Vec<&'static str> {
+        vec!["Pid", "Name", "Exe Path", "Cmdline Args"]
+    }
+
+    pub fn get_html(&self) -> Vec<StackString> {
+        let mut output = Vec::new();
+        output.push(self.pid.to_string().into());
+        output.push(self.name.clone());
+        output.push(self.exe.to_string_lossy().to_string().into());
+        output.push(self.cmdline.join(" ").into());
+        output
+    }
 }
 
 #[derive(Debug)]
@@ -491,6 +522,60 @@ pub struct TranscodeStatus {
     pub upcoming_jobs: Vec<TranscodeServiceRequest>,
     pub current_jobs: Vec<String>,
     pub finished_jobs: Vec<PathBuf>,
+}
+
+impl TranscodeStatus {
+    pub fn get_html(&self) -> Vec<StackString> {
+        let mut output: Vec<StackString> = Vec::new();
+        output.push("Running procs:<br>".into());
+        output.push(r#"<table border="1" class="dataframe">"#.into());
+        output.push(
+            format!(
+                r#"<thead><tr><th>{}</th></tr></thead>"#,
+                ProcInfo::get_header().join("</th><th>")
+            )
+            .into(),
+        );
+        output.push(
+            format!(
+                r#"<tbody><tr><td>{}</td></tr></tbody>"#,
+                self.procs
+                    .iter()
+                    .map(|p| p.get_html().join("</td><td>"))
+                    .join("</tr><tr>")
+            )
+            .into(),
+        );
+        output.push("</table>".into());
+        output.push("Upcoming jobs:<br>".into());
+        output.push(
+            self.upcoming_jobs
+                .iter()
+                .map(|t| {
+                    format!(
+                        "Type: {}, Name: {}, Input: {}, Output: {}",
+                        t.job_type,
+                        t.prefix,
+                        t.input_path.to_string_lossy(),
+                        t.output_path.to_string_lossy(),
+                    )
+                })
+                .join("<br>")
+                .into(),
+        );
+        output.push(format!("Current jobs:<br>{}", self.current_jobs.join("<br>")).into());
+        output.push(
+            format!(
+                "Finished jobs:<br>{}",
+                self.finished_jobs
+                    .iter()
+                    .map(|p| p.to_string_lossy())
+                    .join("<br>")
+            )
+            .into(),
+        );
+        output
+    }
 }
 
 impl fmt::Display for TranscodeStatus {
@@ -533,10 +618,16 @@ fn get_procs_sync() -> Result<Vec<ProcInfo>, Error> {
                     return Ok(None);
                 }
                 if let Ok(cmdline) = p.cmdline() {
+                    let cmdline: Vec<_> = cmdline
+                        .get(1..)
+                        .unwrap_or(&[])
+                        .into_iter()
+                        .map(Into::into)
+                        .collect();
                     let status = p.status()?;
                     return Ok(Some(ProcInfo {
                         pid: p.pid as u64,
-                        name: status.name,
+                        name: status.name.into(),
                         exe,
                         cmdline,
                     }));
@@ -575,6 +666,26 @@ async fn get_paths(dir: impl AsRef<Path>, ext: &str) -> Result<Vec<PathBuf>, Err
         .map_err(Into::into)
 }
 
+async fn get_last_line(fpath: &Path) -> Result<String, Error> {
+    let mut buf = Vec::new();
+    let f = File::open(&fpath).await?;
+    let mut reader = BufReader::new(f);
+    loop {
+        match reader.read_until(b'\n', &mut buf).await {
+            Ok(0) => break,
+            _ => {}
+        }
+        buf.clear();
+    }
+    if let Some(buf) = buf.split(|b| *b == b'\r').last() {
+        str::from_utf8(buf)
+            .map(ToString::to_string)
+            .map_err(Into::into)
+    } else {
+        String::from_utf8(buf).map_err(Into::into)
+    }
+}
+
 pub async fn transcode_status(config: &Config) -> Result<TranscodeStatus, Error> {
     let (procs, upcoming_jobs, current_jobs, finished_jobs) = try_join!(
         get_procs(),
@@ -584,26 +695,15 @@ pub async fn transcode_status(config: &Config) -> Result<TranscodeStatus, Error>
     )?;
 
     let futures = upcoming_jobs.into_iter().map(|fpath| async move {
-        let data = fs::read(fpath).await?;
-        let js: TranscodeServiceRequest = serde_json::from_slice(&data)?;
+        let js: TranscodeServiceRequest = serde_json::from_slice(&fs::read(fpath).await?)?;
         Ok(js)
     });
     let upcoming_jobs: Result<Vec<_>, Error> = try_join_all(futures).await;
     let upcoming_jobs = upcoming_jobs?;
 
-    let futures = current_jobs.into_iter().map(|fpath| async move {
-        let mut buf = String::new();
-        let f = File::open(&fpath).await?;
-        let mut reader = BufReader::new(f);
-        loop {
-            match reader.read_line(&mut buf).await {
-                Ok(0) => break,
-                _ => {}
-            }
-            buf.clear();
-        }
-        Ok(buf)
-    });
+    let futures = current_jobs
+        .into_iter()
+        .map(|fpath| async move { get_last_line(&fpath).await });
     let current_jobs: Result<Vec<_>, Error> = try_join_all(futures).await;
     let current_jobs = current_jobs?;
 
@@ -738,7 +838,7 @@ mod tests {
         let status = transcode_status(&config).await?;
         println!("{:?}", status);
         println!("{}", status);
-        assert!(false);
+        assert_eq!(status.procs.len(), 1);
         Ok(())
     }
 }

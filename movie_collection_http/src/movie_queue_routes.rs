@@ -53,10 +53,7 @@ fn form_http_response(body: String) -> HttpResult {
         .body(body))
 }
 
-fn to_json<T>(js: T) -> HttpResult
-where
-    T: Serialize,
-{
+fn to_json(js: impl Serialize) -> HttpResult {
     Ok(HttpResponse::Ok().json(js))
 }
 
@@ -694,5 +691,5 @@ pub async fn refresh_auth(_: LoggedUser, _: Data<AppState>) -> HttpResult {
 
 pub async fn movie_queue_transcode_status(_: LoggedUser, _: Data<AppState>) -> HttpResult {
     let status = transcode_status(&CONFIG).await?;
-    form_http_response(status.to_string())
+    form_http_response(status.get_html().join(""))
 }
