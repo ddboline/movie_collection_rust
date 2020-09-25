@@ -3,6 +3,7 @@
 use actix_identity::{CookieIdentityPolicy, IdentityService};
 use actix_web::{web, App, HttpServer};
 use anyhow::Error;
+use lazy_static::lazy_static;
 use std::{path::Path, time::Duration};
 use tokio::{
     fs::{create_dir, remove_dir_all},
@@ -16,18 +17,23 @@ use super::{
         imdb_ratings_route, imdb_ratings_update, imdb_show, last_modified_route,
         movie_collection_route, movie_collection_update, movie_queue, movie_queue_delete,
         movie_queue_play, movie_queue_route, movie_queue_show, movie_queue_transcode,
-        movie_queue_transcode_directory, movie_queue_update, refresh_auth, trakt_auth_url,
-        trakt_cal, trakt_callback, trakt_watched_action, trakt_watched_list, trakt_watched_seasons,
-        trakt_watchlist, trakt_watchlist_action, tvshows, user,
+        movie_queue_transcode_directory, movie_queue_transcode_status, movie_queue_update,
+        refresh_auth, trakt_auth_url, trakt_cal, trakt_callback, trakt_watched_action,
+        trakt_watched_list, trakt_watched_seasons, trakt_watchlist, trakt_watchlist_action,
+        tvshows, user,
     },
 };
 use movie_collection_lib::{config::Config, pgpool::PgPool};
+
+lazy_static! {
+    pub static ref CONFIG: Config = Config::with_config().expect("Config init failed");
+}
 
 pub struct AppState {
     pub db: PgPool,
 }
 
-pub async fn start_app(config: Config) -> Result<(), Error> {
+pub async fn start_app() -> Result<(), Error> {
     async fn _update_db(pool: PgPool) {
         let mut i = interval(Duration::from_secs(60));
         loop {
@@ -36,7 +42,7 @@ pub async fn start_app(config: Config) -> Result<(), Error> {
         }
     }
     TRIGGER_DB_UPDATE.set();
-    get_secrets(&config.secret_path, &config.jwt_secret_path).await?;
+    get_secrets(&CONFIG.secret_path, &CONFIG.jwt_secret_path).await?;
 
     let partial_path = Path::new("/var/www/html/videos/partial");
     if partial_path.exists() {
@@ -44,9 +50,9 @@ pub async fn start_app(config: Config) -> Result<(), Error> {
         create_dir(&partial_path).await?;
     }
 
-    let domain = config.domain.to_string();
-    let port = config.port;
-    let pool = PgPool::new(&config.pgurl);
+    let domain = CONFIG.domain.to_string();
+    let port = CONFIG.port;
+    let pool = PgPool::new(&CONFIG.pgurl);
 
     actix_rt::spawn(_update_db(pool.clone()));
 
@@ -68,6 +74,10 @@ pub async fn start_app(config: Config) -> Result<(), Error> {
                     .service(web::resource("/tvshows").route(web::get().to(tvshows)))
                     .service(
                         web::resource("/delete/{path}").route(web::get().to(movie_queue_delete)),
+                    )
+                    .service(
+                        web::resource("/transcode/status")
+                            .route(web::get().to(movie_queue_transcode_status)),
                     )
                     .service(
                         web::resource("/transcode/{file}")

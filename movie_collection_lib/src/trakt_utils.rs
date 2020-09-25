@@ -1,6 +1,7 @@
 use anyhow::{format_err, Error};
 use chrono::NaiveDate;
 use futures::future::{join_all, try_join_all};
+use itertools::Itertools;
 use lazy_static::lazy_static;
 use log::debug;
 use postgres_query::FromSqlRow;
@@ -14,7 +15,6 @@ use std::{
     str::FromStr,
     sync::Arc,
 };
-use itertools::Itertools;
 
 use crate::{
     config::Config, imdb_episodes::ImdbEpisodes, imdb_ratings::ImdbRatings,
@@ -762,7 +762,8 @@ async fn watchlist_rm(mc: &MovieCollection, show: Option<&str>) -> Result<(), Er
 
 async fn watchlist_list(mc: &MovieCollection) -> Result<(), Error> {
     let show_map = get_watchlist_shows_db(&mc.pool).await?;
-    mc.stdout.send(show_map.iter().map(ToString::to_string).join("\n"));
+    mc.stdout
+        .send(show_map.iter().map(ToString::to_string).join("\n"));
     Ok(())
 }
 
@@ -867,8 +868,10 @@ async fn watched_list(mc: &MovieCollection, show: Option<&str>, season: i32) -> 
             .join("\n");
         mc.stdout.send(lines);
     } else {
-        mc.stdout.send(watched_shows.iter().map(ToString::to_string).join("\n"));
-        mc.stdout.send(watched_movies.iter().map(ToString::to_string).join("\n"));
+        mc.stdout
+            .send(watched_shows.iter().map(ToString::to_string).join("\n"));
+        mc.stdout
+            .send(watched_movies.iter().map(ToString::to_string).join("\n"));
     }
     Ok(())
 }
@@ -1017,9 +1020,7 @@ pub async fn watch_list_http_worker(
 
     let entries = format!(
         r#"{}{}<table border="0">{}</table>"#,
-        previous,
-        buttons,
-        entries
+        previous, buttons, entries
     )
     .into();
     Ok(entries)

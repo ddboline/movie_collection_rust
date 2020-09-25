@@ -7,6 +7,7 @@ use maplit::hashmap;
 use rand::{thread_rng, Rng};
 use reqwest::{header::HeaderMap, Client, Url};
 use serde::{Deserialize, Serialize};
+use smallvec::SmallVec;
 use stack_string::StackString;
 use std::{
     collections::{HashMap, HashSet},
@@ -17,7 +18,6 @@ use tokio::{
     fs::{read, write},
     sync::{Mutex, RwLock},
 };
-use smallvec::SmallVec;
 
 use crate::{
     config::Config,

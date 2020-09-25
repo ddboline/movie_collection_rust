@@ -1,6 +1,7 @@
 use anyhow::{format_err, Error};
 use deadpool_lapin::Config as LapinConfig;
-use futures::stream::StreamExt;
+use futures::{future::try_join_all, stream::StreamExt, try_join};
+use itertools::Itertools;
 use lapin::{
     options::{
         BasicAckOptions, BasicConsumeOptions, BasicPublishOptions, QueueDeclareOptions,
@@ -9,9 +10,11 @@ use lapin::{
     types::FieldTable,
     BasicProperties, Channel, Queue,
 };
+use procfs::process;
 use serde::{Deserialize, Serialize};
 use stack_string::StackString;
 use std::{
+    fmt,
     path::{Path, PathBuf},
     process::Stdio,
 };
@@ -19,8 +22,9 @@ use tokio::{
     fs::{self, File, OpenOptions},
     io::{AsyncBufReadExt, AsyncRead, AsyncWriteExt, BufReader},
     process::Command,
-    task::{spawn, JoinHandle},
+    task::{spawn, spawn_blocking, JoinHandle},
 };
+use walkdir::WalkDir;
 
 use crate::{
     config::Config, make_queue::make_queue_worker, movie_collection::MovieCollection,
@@ -41,6 +45,26 @@ pub struct TranscodeServiceRequest {
     pub output_path: PathBuf,
 }
 
+fn dvdrip_dir(config: &Config) -> PathBuf {
+    config.home_dir.join("dvdrip")
+}
+
+fn avi_dir(config: &Config) -> PathBuf {
+    dvdrip_dir(config).join("avi")
+}
+
+fn log_dir(config: &Config) -> PathBuf {
+    dvdrip_dir(config).join("log")
+}
+
+fn job_dir(config: &Config) -> PathBuf {
+    dvdrip_dir(config).join("job")
+}
+
+fn tmp_dir(config: &Config) -> PathBuf {
+    config.home_dir.join("tmp_avi")
+}
+
 impl TranscodeServiceRequest {
     pub fn new(job_type: JobType, prefix: &str, input_path: &Path, output_path: &Path) -> Self {
         Self {
@@ -56,12 +80,7 @@ impl TranscodeServiceRequest {
         let fstem = input_path
             .file_stem()
             .ok_or_else(|| format_err!("No stem"))?;
-        let output_file = config
-            .home_dir
-            .join("dvdrip")
-            .join("avi")
-            .join(&fstem)
-            .with_extension("mp4");
+        let output_file = avi_dir(config).join(&fstem).with_extension("mp4");
         let prefix = fstem.to_string_lossy().into_owned().into();
 
         Ok(Self {
@@ -283,13 +302,7 @@ impl TranscodeService {
         input_file: &Path,
         output_file: &Path,
     ) -> Result<(), Error> {
-        let script_file = self
-            .config
-            .home_dir
-            .join("dvdrip")
-            .join("jobs")
-            .join(&prefix)
-            .with_extension("json");
+        let script_file = job_dir(&self.config).join(&prefix).with_extension("json");
         if script_file.exists() {
             fs::remove_file(&script_file).await?;
         }
@@ -306,12 +319,7 @@ impl TranscodeService {
             .join("Documents")
             .join("movies")
             .join(output_path);
-        let debug_output_path = self
-            .config
-            .home_dir
-            .join("dvdrip")
-            .join("log")
-            .join(&format!("{}_mp4", prefix));
+        let debug_output_path = log_dir(&self.config).join(&format!("{}_mp4", prefix));
         let stdout_path = debug_output_path.with_extension("out");
         let stderr_path = debug_output_path.with_extension("err");
 
@@ -351,7 +359,7 @@ impl TranscodeService {
             fs::remove_file(&output_file).await?;
         }
 
-        let tmp_avi_path = self.config.home_dir.join("tmp_avi");
+        let tmp_avi_path = tmp_dir(&self.config);
         let stdout_path = debug_output_path.with_extension("out");
         let stderr_path = debug_output_path.with_extension("err");
         if stdout_path.exists() && stderr_path.exists() {
@@ -374,11 +382,7 @@ impl TranscodeService {
         input_file: &Path,
         output_file: &Path,
     ) -> Result<(), Error> {
-        let script_file = self
-            .config
-            .home_dir
-            .join("dvdrip")
-            .join("jobs")
+        let script_file = job_dir(&self.config)
             .join(&format!("{}_copy", show))
             .with_extension("json");
         if script_file.exists() {
@@ -398,12 +402,7 @@ impl TranscodeService {
             return Err(format_err!("{:?} does not exist", input_file));
         }
 
-        let debug_output_path = self
-            .config
-            .home_dir
-            .join("dvdrip")
-            .join("log")
-            .join(&format!("{}_copy.out", show));
+        let debug_output_path = log_dir(&self.config).join(&format!("{}_copy.out", show));
         let mut debug_output_file = File::create(&debug_output_path).await?;
 
         let show_path = self
@@ -470,16 +469,150 @@ impl TranscodeService {
         debug_output_file.flush().await?;
 
         if debug_output_path.exists() {
-            let new_debug_output_path = self
-                .config
-                .home_dir
-                .join("tmp_avi")
-                .join(&format!("{}_copy.out", show));
+            let new_debug_output_path = tmp_dir(&self.config).join(&format!("{}_copy.out", show));
             fs::rename(&debug_output_path, &new_debug_output_path).await?;
         }
 
         Ok(())
     }
+}
+
+#[derive(Debug)]
+pub struct ProcInfo {
+    pub pid: u64,
+    pub name: String,
+    pub exe: PathBuf,
+    pub cmdline: Vec<String>,
+}
+
+#[derive(Debug)]
+pub struct TranscodeStatus {
+    pub procs: Vec<ProcInfo>,
+    pub upcoming_jobs: Vec<TranscodeServiceRequest>,
+    pub current_jobs: Vec<String>,
+    pub finished_jobs: Vec<PathBuf>,
+}
+
+impl fmt::Display for TranscodeStatus {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(
+            f,
+            "Running procs:\n{}\n",
+            self.procs.iter().map(|p| format!("{:?}", p)).join("\n")
+        )?;
+        write!(
+            f,
+            "Upcoming jobs:\n{}\n",
+            self.upcoming_jobs
+                .iter()
+                .map(|j| format!("{:?}", j))
+                .join("\n")
+        )?;
+        write!(f, "Current jobs:\n{}\n", self.current_jobs.join("\n"))?;
+        write!(
+            f,
+            "Finished jobs:\n{}\n",
+            self.finished_jobs
+                .iter()
+                .map(|p| format!("{:?}", p))
+                .join("\n")
+        )
+    }
+}
+
+fn get_procs_sync() -> Result<Vec<ProcInfo>, Error> {
+    let accept_paths = &[
+        Path::new("/usr/bin/run-encoding"),
+        Path::new("/usr/bin/HandBrakeCLI"),
+    ];
+    process::all_processes()?
+        .into_iter()
+        .map(|p| {
+            if let Ok(exe) = p.exe() {
+                if !accept_paths.iter().any(|p| &exe == p) {
+                    return Ok(None);
+                }
+                if let Ok(cmdline) = p.cmdline() {
+                    let status = p.status()?;
+                    return Ok(Some(ProcInfo {
+                        pid: p.pid as u64,
+                        name: status.name,
+                        exe,
+                        cmdline,
+                    }));
+                }
+            }
+            Ok(None)
+        })
+        .filter_map(|x| x.transpose())
+        .collect()
+}
+
+async fn get_procs() -> Result<Vec<ProcInfo>, Error> {
+    spawn_blocking(move || get_procs_sync()).await?
+}
+
+fn get_paths_sync(dir: impl AsRef<Path>, ext: &str) -> Vec<PathBuf> {
+    WalkDir::new(dir)
+        .into_iter()
+        .filter_map(|fpath| {
+            let fpath = fpath.ok()?;
+            let fpath = fpath.path();
+            if fpath.extension() == Some(ext.as_ref()) {
+                Some(fpath.to_path_buf())
+            } else {
+                None
+            }
+        })
+        .collect()
+}
+
+async fn get_paths(dir: impl AsRef<Path>, ext: &str) -> Result<Vec<PathBuf>, Error> {
+    let dir = dir.as_ref().to_owned();
+    let ext = ext.to_owned();
+    spawn_blocking(move || get_paths_sync(dir, &ext))
+        .await
+        .map_err(Into::into)
+}
+
+pub async fn transcode_status(config: &Config) -> Result<TranscodeStatus, Error> {
+    let (procs, upcoming_jobs, current_jobs, finished_jobs) = try_join!(
+        get_procs(),
+        get_paths(job_dir(config), "json"),
+        get_paths(log_dir(config), "out"),
+        get_paths(tmp_dir(config), "out")
+    )?;
+
+    let futures = upcoming_jobs.into_iter().map(|fpath| async move {
+        let data = fs::read(fpath).await?;
+        let js: TranscodeServiceRequest = serde_json::from_slice(&data)?;
+        Ok(js)
+    });
+    let upcoming_jobs: Result<Vec<_>, Error> = try_join_all(futures).await;
+    let upcoming_jobs = upcoming_jobs?;
+
+    let futures = current_jobs.into_iter().map(|fpath| async move {
+        let mut buf = String::new();
+        let f = File::open(&fpath).await?;
+        let mut reader = BufReader::new(f);
+        loop {
+            match reader.read_line(&mut buf).await {
+                Ok(0) => break,
+                _ => {}
+            }
+            buf.clear();
+        }
+        Ok(buf)
+    });
+    let current_jobs: Result<Vec<_>, Error> = try_join_all(futures).await;
+    let current_jobs = current_jobs?;
+
+    Ok(TranscodeStatus {
+        procs,
+        upcoming_jobs,
+        current_jobs,
+        finished_jobs,
+    })
 }
 
 #[cfg(test)]
@@ -490,7 +623,7 @@ mod tests {
 
     use crate::{
         config::Config,
-        transcode_service::{JobType, TranscodeService, TranscodeServiceRequest},
+        transcode_service::{transcode_status, JobType, TranscodeService, TranscodeServiceRequest},
     };
 
     fn init_env() {
@@ -595,6 +728,17 @@ mod tests {
         assert_eq!(result, req);
         let result = service.cleanup().await?;
         println!("{}", result);
+        Ok(())
+    }
+
+    #[tokio::test]
+    #[ignore]
+    async fn test_transcode_status() -> Result<(), Error> {
+        let config = Config::with_config()?;
+        let status = transcode_status(&config).await?;
+        println!("{:?}", status);
+        println!("{}", status);
+        assert!(false);
         Ok(())
     }
 }

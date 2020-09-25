@@ -8,16 +8,14 @@ use rand::{
 };
 use reqwest::{Client, Response, Url};
 use serde::{Deserialize, Serialize};
+use smallvec::SmallVec;
 use stack_string::StackString;
-use std::{
-    path::{Path, PathBuf},
-};
+use std::path::{Path, PathBuf};
 use tokio::{
     process::Command,
     time::{delay_for, Duration},
 };
 use walkdir::WalkDir;
-use smallvec::SmallVec;
 
 lazy_static! {
     pub static ref HBR: Handlebars<'static> = get_templates().expect("Failed to parse templates");

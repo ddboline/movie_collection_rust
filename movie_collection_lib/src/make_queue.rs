@@ -1,13 +1,13 @@
 use anyhow::{format_err, Error};
 use derive_more::Display;
 use futures::future::try_join_all;
+use itertools::Itertools;
 use stack_string::StackString;
 use std::{
     ffi::OsStr,
     path::{Path, PathBuf},
     sync::Arc,
 };
-use itertools::Itertools;
 
 use crate::{
     movie_collection::MovieCollection,

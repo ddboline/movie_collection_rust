@@ -16,6 +16,7 @@ use movie_collection_lib::{
     movie_collection::{LastModifiedResponse, MovieCollection, MovieCollectionRow},
     movie_queue::{MovieQueueDB, MovieQueueRow},
     pgpool::PgPool,
+    transcode_service::transcode_status,
 };
 
 #[derive(StructOpt)]
@@ -39,6 +40,7 @@ enum MovieQueueCli {
         #[structopt(short, long)]
         start_timestamp: Option<DateTime<Utc>>,
     },
+    Status,
 }
 
 impl MovieQueueCli {
@@ -194,6 +196,10 @@ impl MovieQueueCli {
                     }
                     _ => {}
                 }
+            }
+            Self::Status => {
+                let status = transcode_status(&config).await?;
+                println!("{}", status);
             }
         }
 

@@ -5,6 +5,7 @@ use actix_web::{
     HttpResponse,
 };
 use anyhow::format_err;
+use itertools::Itertools;
 use maplit::hashmap;
 use serde::{Deserialize, Serialize};
 use stack_string::StackString;
@@ -16,16 +17,14 @@ use std::{
     os::unix::fs::symlink,
     path,
 };
-use itertools::Itertools;
 
 use movie_collection_lib::{
-    config::Config,
     make_queue::movie_queue_http,
     movie_collection::{ImdbSeason, TvShowsResult},
     movie_queue::MovieQueueResult,
     pgpool::PgPool,
     trakt_utils::{TraktActions, WatchListShow, TRAKT_CONN},
-    transcode_service::{TranscodeService, TranscodeServiceRequest},
+    transcode_service::{transcode_status, TranscodeService, TranscodeServiceRequest},
     tv_show_source::TvShowSource,
     utils::HBR,
 };
@@ -33,7 +32,7 @@ use movie_collection_lib::{
 use super::{
     errors::ServiceError as Error,
     logged_user::LoggedUser,
-    movie_queue_app::AppState,
+    movie_queue_app::{AppState, CONFIG},
     movie_queue_requests::{
         FindNewEpisodeRequest, ImdbEpisodesSyncRequest, ImdbEpisodesUpdateRequest,
         ImdbRatingsRequest, ImdbRatingsSyncRequest, ImdbRatingsUpdateRequest, ImdbSeasonsRequest,
@@ -127,12 +126,11 @@ async fn transcode_worker(
     directory: Option<&path::Path>,
     entries: &[MovieQueueResult],
 ) -> HttpResult {
-    let config = Config::with_config()?;
-    let remcom_service = TranscodeService::new(config.clone(), &config.remcom_queue);
+    let remcom_service = TranscodeService::new(CONFIG.clone(), &CONFIG.remcom_queue);
     let mut output = Vec::new();
     for entry in entries {
         let payload = TranscodeServiceRequest::create_remcom_request(
-            &config,
+            &CONFIG,
             &path::Path::new(entry.path.as_str()),
             directory,
             false,
@@ -522,11 +520,7 @@ fn watchlist_worker(
         .join("");
 
     let previous = r#"<a href="javascript:updateMainArticle('/list/tvshows')">Go Back</a><br>"#;
-    let entries = format!(
-        r#"{}<table border="0">{}</table>"#,
-        previous,
-        shows
-    );
+    let entries = format!(r#"{}<table border="0">{}</table>"#, previous, shows);
 
     form_http_response(entries)
 }
@@ -595,12 +589,7 @@ fn trakt_watched_seasons_worker(
 
     let previous =
         r#"<a href="javascript:updateMainArticle('/list/trakt/watchlist')">Go Back</a><br>"#;
-    let entries = format!(
-        r#"{}<table border="0">{}</table>"#,
-        previous,
-        entries
-    )
-    .into();
+    let entries = format!(r#"{}<table border="0">{}</table>"#, previous, entries).into();
     Ok(entries)
 }
 
@@ -701,4 +690,9 @@ pub async fn refresh_auth(_: LoggedUser, _: Data<AppState>) -> HttpResult {
     TRAKT_CONN.init().await;
     TRAKT_CONN.exchange_refresh_token().await?;
     form_http_response("finished".to_string())
+}
+
+pub async fn movie_queue_transcode_status(_: LoggedUser, _: Data<AppState>) -> HttpResult {
+    let status = transcode_status(&CONFIG).await?;
+    form_http_response(status.to_string())
 }
