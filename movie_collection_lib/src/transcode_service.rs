@@ -486,7 +486,7 @@ fn log_dir(config: &Config) -> PathBuf {
 }
 
 fn job_dir(config: &Config) -> PathBuf {
-    dvdrip_dir(config).join("job")
+    dvdrip_dir(config).join("jobs")
 }
 
 fn tmp_dir(config: &Config) -> PathBuf {
@@ -666,15 +666,19 @@ async fn get_paths(dir: impl AsRef<Path>, ext: &str) -> Result<Vec<PathBuf>, Err
 
 async fn get_last_line(fpath: &Path) -> Result<String, Error> {
     let mut buf = Vec::new();
+    let mut last = Vec::new();
     let f = File::open(&fpath).await?;
     let mut reader = BufReader::new(f);
     loop {
         if let Ok(0) = reader.read_until(b'\n', &mut buf).await {
             break;
         }
+        if !buf.is_empty() {
+            std::mem::swap(&mut buf, &mut last);
+        }
         buf.clear();
     }
-    if let Some(buf) = buf.split(|b| *b == b'\r').last() {
+    if let Some(buf) = last.rsplit(|b| *b == b'\r').find(|b| !b.is_empty()) {
         str::from_utf8(buf)
             .map(ToString::to_string)
             .map_err(Into::into)
@@ -683,8 +687,8 @@ async fn get_last_line(fpath: &Path) -> Result<String, Error> {
     }
 }
 
-async fn get_upcoming_jobs(config: &Config) -> Result<Vec<TranscodeServiceRequest>, Error> {
-    let futures = get_paths(job_dir(config), "json")
+async fn get_upcoming_jobs(p: impl AsRef<Path>) -> Result<Vec<TranscodeServiceRequest>, Error> {
+    let futures = get_paths(p, "json")
         .await?
         .into_iter()
         .map(|fpath| async move {
@@ -694,8 +698,8 @@ async fn get_upcoming_jobs(config: &Config) -> Result<Vec<TranscodeServiceReques
     try_join_all(futures).await
 }
 
-async fn get_current_jobs(config: &Config) -> Result<Vec<String>, Error> {
-    let futures = get_paths(log_dir(config), "out")
+async fn get_current_jobs(p: impl AsRef<Path>) -> Result<Vec<String>, Error> {
+    let futures = get_paths(p, "out")
         .await?
         .into_iter()
         .map(|fpath| async move { get_last_line(&fpath).await });
@@ -705,8 +709,8 @@ async fn get_current_jobs(config: &Config) -> Result<Vec<String>, Error> {
 pub async fn transcode_status(config: &Config) -> Result<TranscodeStatus, Error> {
     let (procs, upcoming_jobs, current_jobs, finished_jobs) = try_join!(
         get_procs(),
-        get_upcoming_jobs(config),
-        get_current_jobs(config),
+        get_upcoming_jobs(job_dir(config)),
+        get_current_jobs(log_dir(config)),
         get_paths(tmp_dir(config), "out")
     )?;
 
@@ -727,7 +731,8 @@ mod tests {
     use crate::{
         config::Config,
         transcode_service::{
-            get_procs_sync, transcode_status, JobType, TranscodeService, TranscodeServiceRequest,
+            get_last_line, get_paths, get_procs_sync, transcode_status, JobType, TranscodeService,
+            TranscodeServiceRequest, get_upcoming_jobs, get_current_jobs,
         },
     };
 
@@ -851,6 +856,42 @@ mod tests {
     fn test_get_procs_sync() -> Result<(), Error> {
         let procs = get_procs_sync()?;
         assert!(procs.len() > 0);
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn test_get_last_line() -> Result<(), Error> {
+        println!("{:?}", std::env::current_dir());
+        let p = Path::new("../tests/data/fargo_2014_s04_ep02_mp4.out");
+        let output = get_last_line(&p).await?;
+        assert_eq!(
+            &output,
+            "Encoding: task 1 of 1, 22.61 % (76.06 fps, avg 94.82 fps, ETA 00h12m06s)"
+        );
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn test_get_current_jobs() -> Result<(), Error> {
+        let result = get_current_jobs("../tests/data").await?;
+        assert_eq!(result[0], "Encoding: task 1 of 1, 22.61 % (76.06 fps, avg 94.82 fps, ETA 00h12m06s)");
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn test_get_paths() -> Result<(), Error> {
+        let results = get_paths("../tests/data", "out").await?;
+        println!("{:?}", results);
+        assert!(results.len() > 0);
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn test_get_upcoming_jobs() -> Result<(), Error> {
+        let results = get_upcoming_jobs("../tests/data").await?;
+        println!("{:?}", results);
+        assert_eq!(results.len(), 1);
+        assert_eq!(results[0].prefix, "fargo_2014_s04_ep02");
         Ok(())
     }
 }

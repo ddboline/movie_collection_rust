@@ -1,0 +1,247 @@
+[07:24:31] hb_init: starting libhb thread
+[07:24:31] thread 7fd34d73d700 started ("libhb")
+HandBrake 1.3.1 (2020032300) - Linux x86_64 - https://handbrake.fr
+8 CPUs detected
+Opening /home/ddboline/Documents/movies/fargo_2014_s04_ep02.mp4...
+[07:24:31] CPU: Intel(R) Xeon(R) CPU           E5420  @ 2.50GHz
+[07:24:31]  - logical processor count: 8
+[07:24:31] hb_scan: path=/home/ddboline/Documents/movies/fargo_2014_s04_ep02.mp4, title_index=1
+udfread ERROR: ECMA 167 Volume Recognition failed
+disc.c:323: failed opening UDF image /home/ddboline/Documents/movies/fargo_2014_s04_ep02.mp4
+disc.c:424: error opening file BDMV/index.bdmv
+disc.c:424: error opening file BDMV/BACKUP/index.bdmv
+bluray.c:2585: nav_get_title_list(/home/ddboline/Documents/movies/fargo_2014_s04_ep02.mp4/) failed
+[07:24:31] bd: not a bd - trying as a stream/file instead
+libdvdnav: Using dvdnav version 6.0.1
+libdvdread: Encrypted DVD support unavailable.
+************************************************
+**                                            **
+**  No css library available. See             **
+**  /usr/share/doc/libdvdread4/README.css     **
+**  for more information.                     **
+**                                            **
+************************************************
+libdvdread:DVDOpenFileUDF:UDFFindFile /VIDEO_TS/VIDEO_TS.IFO failed
+libdvdread:DVDOpenFileUDF:UDFFindFile /VIDEO_TS/VIDEO_TS.BUP failed
+libdvdread: Can't open file VIDEO_TS.IFO.
+libdvdnav: vm: failed to read VIDEO_TS.IFO
+[07:24:31] dvd: not a dvd - trying as a stream/file instead
+Scanning title 1 of 1, 0.00 %Scanning title 1 of 1, 0.00 %Scanning title 1 of 1, 0.00 %Input #0, mov,mp4,m4a,3gp,3g2,mj2, from '/home/ddboline/Documents/movies/fargo_2014_s04_ep02.mp4':
+  Metadata:
+    major_brand     : isom
+    minor_version   : 512
+    compatible_brands: isomiso2avc1mp41
+    creation_time   : 2020-09-28T08:28:40.000000Z
+    title           : RARBG - Fargo.S04E02.WEBRip.x264-ION10
+    encoder         : Lavf58.20.100
+    comment         : RARBG - Fargo.S04E02.WEBRip.x264-ION10
+  Duration: 01:01:53.45, start: 0.000000, bitrate: 1323 kb/s
+    Stream #0:0(und): Video: h264 (High) (avc1 / 0x31637661), yuv420p, 720x400 [SAR 80:81 DAR 16:9], 1061 kb/s, 23.98 fps, 23.98 tbr, 24k tbn, 47.95 tbc (default)
+    Metadata:
+      creation_time   : 2020-09-28T08:28:40.000000Z
+      handler_name    : VideoHandler
+    Stream #0:1(eng): Audio: aac (LC) (mp4a / 0x6134706D), 48000 Hz, stereo, fltp, 256 kb/s (default)
+    Metadata:
+      creation_time   : 2020-09-28T08:28:40.000000Z
+      handler_name    : SoundHandler
+[07:24:32] scan: decoding previews for title 1
+[07:24:32] scan: audio 0x1: aac, rate=48000Hz, bitrate=256000 English (AAC LC) (2.0 ch) (256 kbps)
+Scanning title 1 of 1, preview 7, 70.00 %[07:24:32] scan: 10 previews, 720x400, 23.976 fps, autocrop = 22/22/0/0, aspect 16:9, PAR 80:81
+[07:24:32] libhb: scan thread found 1 valid title(s)
++ Using preset: Android 480p30
++ title 1:
+  + stream: /home/ddboline/Documents/movies/fargo_2014_s04_ep02.mp4
+  + duration: 01:01:53
+  + size: 720x400, pixel aspect: 80/81, display aspect: 1.78, 23.976 fps
+  + autocrop: 22/22/0/0
+  + chapters:
+    + 1: duration 01:01:53
+  + audio tracks:
+    + 1, English (AAC LC) (2.0 ch) (256 kbps) (iso639-2: eng)
+  + subtitle tracks:
+[07:24:32] Starting work at: Mon Sep 28 07:24:32 2020
+
+[07:24:32] 1 job(s) to process
+[07:24:32] json job:
+{
+    "Audio": {
+        "AudioList": [
+            {
+                "Bitrate": 128,
+                "CompressionLevel": -1.0,
+                "DRC": 0.0,
+                "DitherMethod": "auto",
+                "Encoder": "av_aac",
+                "Gain": 0.0,
+                "Mixdown": "stereo",
+                "NormalizeMixLevel": false,
+                "PresetEncoder": "av_aac",
+                "Quality": -3.0,
+                "Samplerate": 0,
+                "Track": 0
+            }
+        ],
+        "CopyMask": [
+            "copy:aac"
+        ],
+        "FallbackEncoder": "av_aac"
+    },
+    "Destination": {
+        "AlignAVStart": false,
+        "ChapterList": [
+            {
+                "Duration": {
+                    "Hours": 1,
+                    "Minutes": 1,
+                    "Seconds": 53,
+                    "Ticks": 334210590
+                },
+                "Name": ""
+            }
+        ],
+        "ChapterMarkers": false,
+        "File": "/home/ddboline/dvdrip/avi/fargo_2014_s04_ep02.mp4",
+        "InlineParameterSets": false,
+        "Mp4Options": {
+            "IpodAtom": false,
+            "Mp4Optimize": false
+        },
+        "Mux": "m4v"
+    },
+    "Filters": {
+        "FilterList": [
+            {
+                "ID": 3,
+                "Settings": {
+                    "block-height": "16",
+                    "block-thresh": "40",
+                    "block-width": "16",
+                    "filter-mode": "2",
+                    "mode": "3",
+                    "motion-thresh": "1",
+                    "spatial-metric": "2",
+                    "spatial-thresh": "1"
+                }
+            },
+            {
+                "ID": 4,
+                "Settings": {
+                    "mode": "7"
+                }
+            },
+            {
+                "ID": 6,
+                "Settings": {
+                    "mode": 2,
+                    "rate": "27000000/900000"
+                }
+            },
+            {
+                "ID": 12,
+                "Settings": {
+                    "crop-bottom": 22,
+                    "crop-left": 0,
+                    "crop-right": 0,
+                    "crop-top": 22,
+                    "height": 356,
+                    "width": 720
+                }
+            }
+        ]
+    },
+    "Metadata": {
+        "Comment": "RARBG - Fargo.S04E02.WEBRip.x264-ION10",
+        "Name": "RARBG - Fargo.S04E02.WEBRip.x264-ION10"
+    },
+    "PAR": {
+        "Den": 81,
+        "Num": 80
+    },
+    "SequenceID": 0,
+    "Source": {
+        "Angle": 0,
+        "Path": "/home/ddboline/Documents/movies/fargo_2014_s04_ep02.mp4",
+        "Range": {
+            "End": 1,
+            "Start": 1,
+            "Type": "chapter"
+        },
+        "Title": 1
+    },
+    "Subtitle": {
+        "Search": {
+            "Burn": true,
+            "Default": false,
+            "Enable": false,
+            "Forced": false
+        },
+        "SubtitleList": []
+    },
+    "Video": {
+        "ColorFormat": 0,
+        "ColorMatrix": 6,
+        "ColorPrimaries": 6,
+        "ColorRange": 0,
+        "ColorTransfer": 1,
+        "Encoder": "x264",
+        "Level": "3.0",
+        "Options": "",
+        "Preset": "medium",
+        "Profile": "main",
+        "QSV": {
+            "AsyncDepth": 4,
+            "Decode": false
+        },
+        "Quality": 20.0,
+        "Tune": "",
+        "Turbo": false,
+        "TwoPass": false
+    }
+}
+[07:24:32] Starting Task: Encoding Pass
+[07:24:32] job configuration:
+[07:24:32]  * source
+[07:24:32]    + /home/ddboline/Documents/movies/fargo_2014_s04_ep02.mp4
+[07:24:32]    + title 1, chapter(s) 1 to 1
+[07:24:32]    + container: mov,mp4,m4a,3gp,3g2,mj2
+[07:24:32]    + data rate: 1323 kbps
+[07:24:32]  * destination
+[07:24:32]    + /home/ddboline/dvdrip/avi/fargo_2014_s04_ep02.mp4
+[07:24:32]    + container: MPEG-4 (libavformat)
+[07:24:32]  * video track
+[07:24:32]    + decoder: h264
+[07:24:32]      + bitrate 1061 kbps
+[07:24:32]    + filters
+[07:24:32]      + Comb Detect (mode=3:spatial-metric=2:motion-thresh=1:spatial-thresh=1:filter-mode=2:block-thresh=40:block-width=16:block-height=16)
+[07:24:32]      + Decomb (mode=39)
+[07:24:32]      + Framerate Shaper (mode=2:rate=27000000/900000)
+[07:24:32]        + frame rate: 23.976 fps -> peak rate limited to 30.000 fps
+[07:24:32]      + Crop and Scale (width=720:height=356:crop-top=22:crop-bottom=22:crop-left=0:crop-right=0)
+[07:24:32]        + source: 720 * 400, crop (22/22/0/0): 720 * 356, scale: 720 * 356
+[07:24:32]    + Output geometry
+[07:24:32]      + storage dimensions: 720 x 356
+[07:24:32]      + pixel aspect ratio: 80 : 81
+[07:24:32]      + display dimensions: 711 x 356
+[07:24:32]    + encoder: H.264 (libx264)
+[07:24:32]      + preset:  medium
+[07:24:32]      + profile: main
+[07:24:32]      + level:   3.0
+[07:24:32]      + quality: 20.00 (RF)
+[07:24:32]      + color profile: 6-1-6
+[07:24:32]  * audio track 1
+[07:24:32]    + decoder: English (AAC LC) (2.0 ch) (256 kbps) (track 1, id 0x1)
+[07:24:32]      + bitrate: 256 kbps, samplerate: 48000 Hz
+[07:24:32]    + mixdown: Stereo
+[07:24:32]    + dither: triangular
+[07:24:32]    + encoder: AAC (libavcodec)
+[07:24:32]      + bitrate: 128 kbps, samplerate: 48000 Hz
+[07:24:32] sync: expecting 89033 video frames
+[07:24:32] encx264: min-keyint: 24, keyint: 240
+[07:24:32] encx264: encoding at constant RF 20.000000
+[07:24:32] encx264: unparsed options: level=3.0:8x8dct=0:vbv-bufsize=10000:vbv-maxrate=10000
+x264 [info]: using SAR=80/81
+x264 [info]: using cpu capabilities: MMX2 SSE2Fast SSSE3 SSE4.1 Cache64
+x264 [info]: profile Main, level 3.0
+[07:24:33] sync: first pts video is 0
+[07:24:33] sync: Chapter 1 at frame 1 time 0
+[07:24:33] sync: first pts audio 0x1 is 0
