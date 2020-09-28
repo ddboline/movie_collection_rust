@@ -731,8 +731,8 @@ mod tests {
     use crate::{
         config::Config,
         transcode_service::{
-            get_last_line, get_paths, get_procs_sync, transcode_status, JobType, TranscodeService,
-            TranscodeServiceRequest, get_upcoming_jobs, get_current_jobs,
+            get_current_jobs, get_last_line, get_paths, get_procs_sync, get_upcoming_jobs,
+            transcode_status, JobType, TranscodeService, TranscodeServiceRequest,
         },
     };
 
@@ -875,7 +875,10 @@ mod tests {
     #[tokio::test]
     async fn test_get_current_jobs() -> Result<(), Error> {
         let result = get_current_jobs("../tests/data").await?;
-        assert_eq!(result[0], "Encoding: task 1 of 1, 22.61 % (76.06 fps, avg 94.82 fps, ETA 00h12m06s)");
+        assert_eq!(
+            result[0],
+            "Encoding: task 1 of 1, 22.61 % (76.06 fps, avg 94.82 fps, ETA 00h12m06s)"
+        );
         Ok(())
     }
 
