@@ -162,17 +162,16 @@ impl MovieQueueDB {
             r#"SELECT idx FROM movie_queue WHERE collection_idx = $idx"#,
             idx = collection_idx
         );
-        let current_idx: i32 = self
+
+        if let Some(current_idx) = self
             .pool
             .get()
             .await?
-            .query(query.sql(), query.parameters())
+            .query_opt(query.sql(), query.parameters())
             .await?
-            .iter()
-            .last()
-            .map_or(Ok(-1), |row| row.try_get("idx"))?;
-
-        if current_idx != -1 {
+            .map(|row| row.try_get("idx"))
+            .transpose()?
+        {
             self.remove_from_queue_by_idx(current_idx).await?;
         }
 
