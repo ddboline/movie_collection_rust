@@ -853,6 +853,7 @@ mod tests {
     }
 
     #[test]
+    #[ignore]
     fn test_get_procs_sync() -> Result<(), Error> {
         let procs = get_procs_sync()?;
         assert!(procs.len() > 0);
