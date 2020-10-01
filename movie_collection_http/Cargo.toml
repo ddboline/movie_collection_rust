@@ -1,13 +1,12 @@
 [package]
 name = "movie_collection_http"
-version = "0.6.15"
+version = "0.6.16"
 authors = ["Daniel Boline <ddboline@gmail.com>"]
 edition = "2018"
 
 [dependencies]
 movie_collection_lib = {path = "../movie_collection_lib"}
-actix = "0.10"
-actix-web = "3.0"
+actix-web = "3.1"
 actix-rt = "1.1"
 actix-identity = "0.3"
 futures = "0.3"
@@ -24,7 +23,7 @@ actix-threadpool = "0.3"
 async-trait = "0.1"
 log = "0.4"
 maplit = "1.0"
-handlebars = "3.4"
+handlebars = "3.5"
 itertools = "0.9"
-auth_server_rust = { git = "https://github.com/ddboline/auth_server_rust.git", tag="0.1.14"}
+auth_server_rust = { git = "https://github.com/ddboline/auth_server_rust.git", tag="0.1.18"}
 stack-string = { git = "https://github.com/ddboline/stack-string-rs.git", tag="0.1.6", features=["postgres_types"] }
