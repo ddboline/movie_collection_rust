@@ -886,8 +886,9 @@ mod tests {
         let job_path = config.home_dir.join("dvdrip").join("jobs");
         create_dir_all(&job_path)?;
         let p = Path::new("mr_robot_s01_ep01.mp4");
+        let d: Option<&Path> = None;
         let payload =
-            TranscodeServiceRequest::create_remcom_request(&config, p, None, false).await?;
+            TranscodeServiceRequest::create_remcom_request(&config, p, d, false).await?;
         println!("{:?}", payload);
         assert_eq!(payload.job_type, JobType::Move);
         assert_eq!(&payload.input_path, p);
@@ -1001,7 +1002,7 @@ mod tests {
     async fn test_get_current_jobs() -> Result<(), Error> {
         let result = get_current_jobs("../tests/data").await?;
         assert_eq!(
-            result[0],
+            result[0].1,
             "Encoding: task 1 of 1, 22.61 % (76.06 fps, avg 94.82 fps, ETA 00h12m06s)"
         );
         Ok(())
