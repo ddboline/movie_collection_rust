@@ -28,6 +28,7 @@ fn get_templates() -> Result<Handlebars<'static>, Error> {
 }
 
 #[inline]
+#[allow(clippy::needless_lifetimes)]
 pub fn option_string_wrapper<'a>(s: Option<&'a impl AsRef<str>>) -> &'a str {
     s.map_or("", AsRef::as_ref)
 }
