@@ -25,7 +25,7 @@ impl fmt::Display for ImdbRatings {
             f,
             "{} {} {} {} {} {} ",
             self.show,
-            option_string_wrapper(&self.title),
+            option_string_wrapper(self.title.as_ref()),
             self.link,
             self.rating.unwrap_or(-1.0),
             self.istv.unwrap_or(false),
@@ -127,7 +127,7 @@ impl ImdbRatings {
     pub fn get_string_vec(&self) -> Vec<StackString> {
         vec![
             self.show.clone(),
-            option_string_wrapper(&self.title).into(),
+            option_string_wrapper(self.title.as_ref()).into(),
             self.link.clone(),
             self.rating.unwrap_or(-1.0).to_string().into(),
             self.istv.unwrap_or(false).to_string().into(),

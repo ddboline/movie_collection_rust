@@ -3,32 +3,38 @@ use futures::future::join_all;
 use rayon::iter::{IntoParallelRefIterator, ParallelIterator};
 use stack_string::StackString;
 use std::collections::HashMap;
+use tokio::{fs, stream::StreamExt, task::spawn};
+use log::debug;
 
 use crate::{
     config::Config,
     stdout_channel::StdoutChannel,
+    transcode_service::transcode_status,
     utils::{get_video_runtime, walk_directory},
 };
 
 pub async fn make_list(stdout: &StdoutChannel) -> Result<(), Error> {
     let config = Config::with_config()?;
     let movies_dir = config.home_dir.join("Documents").join("movies");
+    let transcode_task = {
+        let config = config.clone();
+        spawn(async move { transcode_status(&config).await })
+    };
 
-    let mut local_file_list: Vec<_> = movies_dir
-        .read_dir()?
-        .filter_map(|f| match f {
-            Ok(fname) => {
-                let file_name = fname.file_name().into_string().unwrap();
-                for suffix in &config.suffixes {
-                    if file_name.ends_with(suffix.as_str()) {
-                        return Some(file_name);
-                    }
+    let mut local_file_list: Vec<_> = fs::read_dir(movies_dir)
+        .await?
+        .filter_map(|f| {
+            let fname = f.ok()?;
+            let file_name = fname.file_name().to_string_lossy().into_owned();
+            for suffix in &config.suffixes {
+                if file_name.ends_with(suffix.as_str()) {
+                    return Some(file_name);
                 }
-                None
             }
-            Err(_) => None,
+            None
         })
-        .collect();
+        .collect()
+        .await;
 
     if local_file_list.is_empty() {
         return Ok(());
@@ -55,11 +61,16 @@ pub async fn make_list(stdout: &StdoutChannel) -> Result<(), Error> {
         })
         .collect();
 
+    let proc_map = transcode_task.await??.get_proc_map();
+    debug!("{:?}", proc_map);
+
     local_file_list
         .iter()
         .map(|f| {
             if let Some(full_path) = file_map.get(f.as_str()) {
                 format!("{} {}", f, full_path.to_string_lossy())
+            } else if let Some(Some(status)) = proc_map.get(f.as_str()) {
+                format!("{} {}", f, status)
             } else {
                 f.to_string()
             }

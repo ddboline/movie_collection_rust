@@ -3,12 +3,9 @@
 use anyhow::Error;
 use std::path::PathBuf;
 use structopt::StructOpt;
-use tokio::fs;
 
 use movie_collection_lib::{
-    config::Config,
-    stdout_channel::StdoutChannel,
-    transcode_service::{TranscodeService, TranscodeServiceRequest},
+    config::Config, stdout_channel::StdoutChannel, transcode_service::remcom,
 };
 
 #[derive(StructOpt)]
@@ -24,41 +21,22 @@ struct RemcomOpts {
     files: Vec<PathBuf>,
 }
 
-async fn remcom() -> Result<(), Error> {
+#[tokio::main]
+async fn main() -> Result<(), Error> {
+    env_logger::init();
     let opts = RemcomOpts::from_args();
     let stdout = StdoutChannel::new();
     let config = Config::with_config()?;
 
-    let remcom_service = TranscodeService::new(config.clone(), &config.remcom_queue);
-
-    for file in opts.files {
-        let payload = TranscodeServiceRequest::create_remcom_request(
-            &config,
-            &file,
-            opts.directory.as_deref(),
-            opts.unwatched,
-        )
-        .await?;
-
-        let script_file = config
-            .home_dir
-            .join("dvdrip")
-            .join("jobs")
-            .join(&format!("{}_copy", payload.prefix))
-            .with_extension("json");
-        fs::write(&script_file, &serde_json::to_vec(&payload)?).await?;
-
-        remcom_service.publish_transcode_job(&payload).await?;
-        stdout.send(format!("script {:?}", payload));
-    }
-    stdout.close().await
-}
-
-#[tokio::main]
-async fn main() {
-    env_logger::init();
-
-    match remcom().await {
+    match remcom(
+        opts.files,
+        opts.directory.as_deref(),
+        opts.unwatched,
+        &config,
+        &stdout,
+    )
+    .await
+    {
         Ok(_) => (),
         Err(e) => {
             if e.to_string().contains("Broken pipe") {
@@ -67,4 +45,5 @@ async fn main() {
             }
         }
     }
+    Ok(())
 }

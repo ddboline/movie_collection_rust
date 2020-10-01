@@ -116,8 +116,8 @@ impl fmt::Display for MovieCollectionResult {
                 self.season.unwrap_or(-1),
                 self.episode.unwrap_or(-1),
                 self.title,
-                option_string_wrapper(&self.eptitle),
-                option_string_wrapper(&self.epurl),
+                option_string_wrapper(self.eptitle.as_ref()),
+                option_string_wrapper(self.epurl.as_ref()),
             )
         } else {
             write!(

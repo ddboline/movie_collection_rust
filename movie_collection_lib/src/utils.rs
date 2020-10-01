@@ -28,8 +28,9 @@ fn get_templates() -> Result<Handlebars<'static>, Error> {
 }
 
 #[inline]
-pub fn option_string_wrapper<T: AsRef<str>>(s: &Option<T>) -> &str {
-    s.as_ref().map_or("", AsRef::as_ref)
+#[allow(clippy::needless_lifetimes)]
+pub fn option_string_wrapper<'a>(s: Option<&'a impl AsRef<str>>) -> &'a str {
+    s.map_or("", AsRef::as_ref)
 }
 
 pub fn walk_directory<T: AsRef<str>>(path: &Path, match_strs: &[T]) -> Result<Vec<PathBuf>, Error> {
