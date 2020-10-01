@@ -13,8 +13,8 @@ use lapin::{
 use procfs::process;
 use serde::{Deserialize, Serialize};
 use stack_string::StackString;
-use std::collections::HashMap;
 use std::{
+    collections::HashMap,
     fmt,
     path::{Path, PathBuf},
     process::Stdio,
@@ -789,9 +789,8 @@ pub async fn transcode_status(config: &Config) -> Result<TranscodeStatus, Error>
 pub async fn transcode_avi(
     config: &Config,
     stdout: &StdoutChannel,
-    files: impl IntoIterator<Item=impl AsRef<Path>>,
-) -> Result<(), Error>
-{
+    files: impl IntoIterator<Item = impl AsRef<Path>>,
+) -> Result<(), Error> {
     let transcode_service = TranscodeService::new(config.clone(), &config.transcode_queue);
     transcode_service.init().await?;
 
@@ -820,13 +819,12 @@ pub async fn transcode_avi(
 }
 
 pub async fn remcom(
-    files: impl IntoIterator<Item=impl AsRef<Path>>,
+    files: impl IntoIterator<Item = impl AsRef<Path>>,
     directory: Option<impl AsRef<Path>>,
     unwatched: bool,
     config: &Config,
     stdout: &StdoutChannel,
-) -> Result<(), Error>
-{
+) -> Result<(), Error> {
     let remcom_service = TranscodeService::new(config.clone(), &config.remcom_queue);
 
     for file in files {

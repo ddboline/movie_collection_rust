@@ -3,9 +3,7 @@ use futures::future::join_all;
 use rayon::iter::{IntoParallelRefIterator, ParallelIterator};
 use stack_string::StackString;
 use std::collections::HashMap;
-use tokio::fs;
-use tokio::stream::StreamExt;
-use tokio::task::spawn;
+use tokio::{fs, stream::StreamExt, task::spawn};
 
 use crate::{
     config::Config,
