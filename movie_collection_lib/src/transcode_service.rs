@@ -529,7 +529,7 @@ pub struct TranscodeStatus {
     pub finished_jobs: Vec<PathBuf>,
 }
 
-#[derive(Copy, Clone)]
+#[derive(Copy, Clone, Debug)]
 pub enum ProcStatus {
     Upcoming,
     Current,
@@ -559,22 +559,33 @@ impl TranscodeStatus {
         });
         let current = self.current_jobs.iter().filter_map(|(p, _)| {
             p.file_name().map(|f| {
+                let f = f.to_string_lossy().replace("_mp4.out", ".mp4").into();
                 (
-                    f.to_string_lossy().into_owned().into(),
+                    f,
+                    Some(ProcStatus::Current),
+                )
+            })
+        });
+        let current_alt = self.current_jobs.iter().filter_map(|(p, _)| {
+            p.file_name().map(|f| {
+                let f = f.to_string_lossy().replace("_mp4.out", ".mkv").into();
+                (
+                    f,
                     Some(ProcStatus::Current),
                 )
             })
         });
         let finished = self.finished_jobs.iter().filter_map(|p| {
             p.file_name().map(|f| {
+                let f = f.to_string_lossy().replace("_copy.out", ".mp4").replace("_mp4.out", ".mp4").into();
                 (
-                    f.to_string_lossy().into_owned().into(),
+                    f,
                     Some(ProcStatus::Finished),
                 )
             })
         });
 
-        upcoming.chain(current).chain(finished).collect()
+        upcoming.chain(current).chain(current_alt).chain(finished).collect()
     }
 
     pub fn get_html(&self) -> Vec<StackString> {

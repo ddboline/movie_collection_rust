@@ -4,6 +4,7 @@ use rayon::iter::{IntoParallelRefIterator, ParallelIterator};
 use stack_string::StackString;
 use std::collections::HashMap;
 use tokio::{fs, stream::StreamExt, task::spawn};
+use log::debug;
 
 use crate::{
     config::Config,
@@ -61,6 +62,7 @@ pub async fn make_list(stdout: &StdoutChannel) -> Result<(), Error> {
         .collect();
 
     let proc_map = transcode_task.await??.get_proc_map();
+    debug!("{:?}", proc_map);
 
     local_file_list
         .iter()
