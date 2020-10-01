@@ -13,6 +13,7 @@ use lapin::{
 use procfs::process;
 use serde::{Deserialize, Serialize};
 use stack_string::StackString;
+use std::collections::HashMap;
 use std::{
     fmt,
     path::{Path, PathBuf},
@@ -89,17 +90,18 @@ impl TranscodeServiceRequest {
 
     pub async fn create_remcom_request(
         config: &Config,
-        path: &Path,
-        directory: Option<&Path>,
+        path: impl AsRef<Path>,
+        directory: Option<impl AsRef<Path>>,
         unwatched: bool,
     ) -> Result<Self, Error> {
+        let path = path.as_ref();
         let ext = path
             .extension()
             .ok_or_else(|| format_err!("no extension"))?
             .to_string_lossy();
-
+        let file_stem = path.file_stem().expect("No file stem");
         if ext == "mp4" {
-            let prefix = path.file_stem().unwrap().to_string_lossy().to_string();
+            let prefix = file_stem.to_string_lossy().to_string();
             let output_dir = if let Some(d) = directory {
                 let d = config
                     .preferred_dir
@@ -124,7 +126,7 @@ impl TranscodeServiceRequest {
                 }
                 d
             } else {
-                let file_stem = path.file_stem().unwrap().to_string_lossy();
+                let file_stem = file_stem.to_string_lossy();
 
                 let (show, season, episode) = parse_file_stem(&file_stem);
 
@@ -473,6 +475,9 @@ impl TranscodeService {
     }
 }
 
+fn movie_dir(config: &Config) -> PathBuf {
+    config.home_dir.join("Documents").join("movies")
+}
 fn dvdrip_dir(config: &Config) -> PathBuf {
     config.home_dir.join("dvdrip")
 }
@@ -520,11 +525,58 @@ impl ProcInfo {
 pub struct TranscodeStatus {
     pub procs: Vec<ProcInfo>,
     pub upcoming_jobs: Vec<TranscodeServiceRequest>,
-    pub current_jobs: Vec<String>,
+    pub current_jobs: Vec<(PathBuf, StackString)>,
     pub finished_jobs: Vec<PathBuf>,
 }
 
+#[derive(Copy, Clone)]
+pub enum ProcStatus {
+    Upcoming,
+    Current,
+    Finished,
+}
+
+impl fmt::Display for ProcStatus {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        let s = match self {
+            Self::Upcoming => "upcoming",
+            Self::Current => "current",
+            Self::Finished => "finished",
+        };
+        write!(f, "{}", s)
+    }
+}
+
 impl TranscodeStatus {
+    pub fn get_proc_map(&self) -> HashMap<StackString, Option<ProcStatus>> {
+        let upcoming = self.upcoming_jobs.iter().filter_map(|j| {
+            j.input_path.file_name().map(|f| {
+                (
+                    f.to_string_lossy().into_owned().into(),
+                    Some(ProcStatus::Upcoming),
+                )
+            })
+        });
+        let current = self.current_jobs.iter().filter_map(|(p, _)| {
+            p.file_name().map(|f| {
+                (
+                    f.to_string_lossy().into_owned().into(),
+                    Some(ProcStatus::Current),
+                )
+            })
+        });
+        let finished = self.finished_jobs.iter().filter_map(|p| {
+            p.file_name().map(|f| {
+                (
+                    f.to_string_lossy().into_owned().into(),
+                    Some(ProcStatus::Finished),
+                )
+            })
+        });
+
+        upcoming.chain(current).chain(finished).collect()
+    }
+
     pub fn get_html(&self) -> Vec<StackString> {
         let mut output: Vec<StackString> = Vec::new();
         output.push("Running procs:<br>".into());
@@ -563,7 +615,13 @@ impl TranscodeStatus {
                 .join("<br>")
                 .into(),
         );
-        output.push(format!("Current jobs:<br>{}", self.current_jobs.join("<br>")).into());
+        output.push(
+            format!(
+                "Current jobs:<br>{}",
+                self.current_jobs.iter().map(|(_, s)| s).join("<br>")
+            )
+            .into(),
+        );
         output.push(
             format!(
                 "Finished jobs:<br>{}",
@@ -593,7 +651,11 @@ impl fmt::Display for TranscodeStatus {
                 .map(|j| format!("{:?}", j))
                 .join("\n")
         )?;
-        write!(f, "Current jobs:\n{}\n", self.current_jobs.join("\n"))?;
+        write!(
+            f,
+            "Current jobs:\n{}\n",
+            self.current_jobs.iter().map(|(_, s)| s).join("\n")
+        )?;
         write!(
             f,
             "Finished jobs:\n{}\n",
@@ -664,7 +726,7 @@ async fn get_paths(dir: impl AsRef<Path>, ext: &str) -> Result<Vec<PathBuf>, Err
         .map_err(Into::into)
 }
 
-async fn get_last_line(fpath: &Path) -> Result<String, Error> {
+async fn get_last_line(fpath: &Path) -> Result<StackString, Error> {
     let mut buf = Vec::new();
     let mut last = Vec::new();
     let f = File::open(&fpath).await?;
@@ -679,11 +741,9 @@ async fn get_last_line(fpath: &Path) -> Result<String, Error> {
         buf.clear();
     }
     if let Some(buf) = last.rsplit(|b| *b == b'\r').find(|b| !b.is_empty()) {
-        str::from_utf8(buf)
-            .map(ToString::to_string)
-            .map_err(Into::into)
+        str::from_utf8(buf).map(Into::into).map_err(Into::into)
     } else {
-        String::from_utf8(buf).map_err(Into::into)
+        String::from_utf8(buf).map_err(Into::into).map(Into::into)
     }
 }
 
@@ -698,11 +758,15 @@ async fn get_upcoming_jobs(p: impl AsRef<Path>) -> Result<Vec<TranscodeServiceRe
     try_join_all(futures).await
 }
 
-async fn get_current_jobs(p: impl AsRef<Path>) -> Result<Vec<String>, Error> {
+async fn get_current_jobs(p: impl AsRef<Path>) -> Result<Vec<(PathBuf, StackString)>, Error> {
     let futures = get_paths(p, "out")
         .await?
         .into_iter()
-        .map(|fpath| async move { get_last_line(&fpath).await });
+        .map(|fpath| async move {
+            get_last_line(&fpath)
+                .await
+                .map(|p| (fpath.to_path_buf(), p))
+        });
     try_join_all(futures).await
 }
 
@@ -720,6 +784,69 @@ pub async fn transcode_status(config: &Config) -> Result<TranscodeStatus, Error>
         current_jobs,
         finished_jobs,
     })
+}
+
+pub async fn transcode_avi(
+    config: &Config,
+    stdout: &StdoutChannel,
+    files: impl IntoIterator<Item=impl AsRef<Path>>,
+) -> Result<(), Error>
+{
+    let transcode_service = TranscodeService::new(config.clone(), &config.transcode_queue);
+    transcode_service.init().await?;
+
+    for path in files {
+        let path = path.as_ref();
+        let movie_path = movie_dir(config);
+        let path = if path.exists() {
+            path.to_path_buf()
+        } else {
+            movie_path.join(path)
+        }
+        .canonicalize()?;
+
+        if !path.exists() {
+            panic!("file doesn't exist {}", path.to_string_lossy());
+        }
+        let payload = TranscodeServiceRequest::create_transcode_request(&config, &path)?;
+
+        let script_file = job_dir(config).join(&payload.prefix).with_extension("json");
+        fs::write(&script_file, &serde_json::to_vec(&payload)?).await?;
+
+        transcode_service.publish_transcode_job(&payload).await?;
+        stdout.send(format!("script {:?}", payload));
+    }
+    stdout.close().await
+}
+
+pub async fn remcom(
+    files: impl IntoIterator<Item=impl AsRef<Path>>,
+    directory: Option<impl AsRef<Path>>,
+    unwatched: bool,
+    config: &Config,
+    stdout: &StdoutChannel,
+) -> Result<(), Error>
+{
+    let remcom_service = TranscodeService::new(config.clone(), &config.remcom_queue);
+
+    for file in files {
+        let payload = TranscodeServiceRequest::create_remcom_request(
+            &config,
+            file.as_ref(),
+            directory.as_ref(),
+            unwatched,
+        )
+        .await?;
+
+        let script_file = job_dir(config)
+            .join(&format!("{}_copy", payload.prefix))
+            .with_extension("json");
+        fs::write(&script_file, &serde_json::to_vec(&payload)?).await?;
+
+        remcom_service.publish_transcode_job(&payload).await?;
+        stdout.send(format!("script {:?}", payload));
+    }
+    stdout.close().await
 }
 
 #[cfg(test)]

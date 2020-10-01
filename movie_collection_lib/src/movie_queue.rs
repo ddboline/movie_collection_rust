@@ -31,7 +31,7 @@ impl fmt::Display for MovieQueueResult {
             "{} {} {}",
             self.idx,
             self.path,
-            option_string_wrapper(&self.eplink),
+            option_string_wrapper(self.eplink.as_ref()),
         )
     }
 }

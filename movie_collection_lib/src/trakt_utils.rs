@@ -99,7 +99,7 @@ impl fmt::Display for TraktCalEntry {
             self.link,
             self.season,
             self.episode,
-            option_string_wrapper(&self.ep_link),
+            option_string_wrapper(self.ep_link.as_ref()),
             self.airdate,
         )
     }

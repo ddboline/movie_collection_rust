@@ -48,8 +48,8 @@ impl fmt::Display for ImdbEpisodeResult {
             "{} {} {} {} {} {} {} ",
             self.season,
             self.episode,
-            option_string_wrapper(&self.epurl),
-            option_string_wrapper(&self.eptitle),
+            option_string_wrapper(self.epurl.as_ref()),
+            option_string_wrapper(self.eptitle.as_ref()),
             self.airdate
                 .unwrap_or_else(|| NaiveDate::from_ymd(1970, 1, 1)),
             self.rating.unwrap_or(-1.0),
