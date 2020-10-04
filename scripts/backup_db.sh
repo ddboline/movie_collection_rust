@@ -11,7 +11,8 @@ movie_collection
 movie_queue
 trakt_watched_episodes
 trakt_watched_movies
-trakt_watchlist"
+trakt_watchlist
+"
 
 mkdir -p backup
 for T in $TABLES;
