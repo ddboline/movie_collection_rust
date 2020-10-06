@@ -33,7 +33,7 @@ pub fn option_string_wrapper<'a>(s: Option<&'a impl AsRef<str>>) -> &'a str {
     s.map_or("", AsRef::as_ref)
 }
 
-pub fn walk_directory<T: AsRef<str>>(path: &Path, match_strs: &[T]) -> Result<Vec<PathBuf>, Error> {
+pub fn walk_directory(path: &Path, match_strs: &[impl AsRef<str>]) -> Result<Vec<PathBuf>, Error> {
     WalkDir::new(path)
         .into_iter()
         .filter_map(|f| match f {

@@ -1,10 +1,10 @@
 use anyhow::Error;
 use futures::future::join_all;
+use log::debug;
 use rayon::iter::{IntoParallelRefIterator, ParallelIterator};
 use stack_string::StackString;
 use std::collections::HashMap;
 use tokio::{fs, stream::StreamExt, task::spawn};
-use log::debug;
 
 use crate::{
     config::Config,

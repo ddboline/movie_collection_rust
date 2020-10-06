@@ -388,6 +388,7 @@ impl TraktConnection {
             .await?;
         let episode_map = watched_episodes
             .into_iter()
+            .filter(|show_entry| show_entry.show.ids.imdb.is_some())
             .flat_map(|show_entry| {
                 let title = show_entry.show.title.clone();
                 let imdb_url: StackString = show_entry

@@ -27,6 +27,7 @@ use tokio::{
     task::{spawn, spawn_blocking, JoinHandle},
 };
 use walkdir::WalkDir;
+use smallvec::{smallvec, SmallVec};
 
 use crate::{
     config::Config, make_queue::make_queue_worker, movie_collection::MovieCollection,
@@ -507,8 +508,8 @@ pub struct ProcInfo {
 }
 
 impl ProcInfo {
-    pub fn get_header() -> Vec<&'static str> {
-        vec!["Pid", "Name", "Exe Path", "Cmdline Args"]
+    pub fn get_header() -> SmallVec<[&'static str; 4]> {
+        smallvec!["Pid", "Name", "Exe Path", "Cmdline Args"]
     }
 
     pub fn get_html(&self) -> Vec<StackString> {
@@ -560,32 +561,31 @@ impl TranscodeStatus {
         let current = self.current_jobs.iter().filter_map(|(p, _)| {
             p.file_name().map(|f| {
                 let f = f.to_string_lossy().replace("_mp4.out", ".mp4").into();
-                (
-                    f,
-                    Some(ProcStatus::Current),
-                )
+                (f, Some(ProcStatus::Current))
             })
         });
         let current_alt = self.current_jobs.iter().filter_map(|(p, _)| {
             p.file_name().map(|f| {
                 let f = f.to_string_lossy().replace("_mp4.out", ".mkv").into();
-                (
-                    f,
-                    Some(ProcStatus::Current),
-                )
+                (f, Some(ProcStatus::Current))
             })
         });
         let finished = self.finished_jobs.iter().filter_map(|p| {
             p.file_name().map(|f| {
-                let f = f.to_string_lossy().replace("_copy.out", ".mp4").replace("_mp4.out", ".mp4").into();
-                (
-                    f,
-                    Some(ProcStatus::Finished),
-                )
+                let f = f
+                    .to_string_lossy()
+                    .replace("_copy.out", ".mp4")
+                    .replace("_mp4.out", ".mp4")
+                    .into();
+                (f, Some(ProcStatus::Finished))
             })
         });
 
-        upcoming.chain(current).chain(current_alt).chain(finished).collect()
+        upcoming
+            .chain(current)
+            .chain(current_alt)
+            .chain(finished)
+            .collect()
     }
 
     pub fn get_html(&self) -> Vec<StackString> {
@@ -898,8 +898,7 @@ mod tests {
         create_dir_all(&job_path)?;
         let p = Path::new("mr_robot_s01_ep01.mp4");
         let d: Option<&Path> = None;
-        let payload =
-            TranscodeServiceRequest::create_remcom_request(&config, p, d, false).await?;
+        let payload = TranscodeServiceRequest::create_remcom_request(&config, p, d, false).await?;
         println!("{:?}", payload);
         assert_eq!(payload.job_type, JobType::Move);
         assert_eq!(&payload.input_path, p);

@@ -631,7 +631,8 @@ pub async fn sync_trakt_with_db(mc: &MovieCollection) -> Result<(), Error> {
         async move {
             if !watched_shows_db.contains_key(&key) {
                 episode.insert_episode(&mc.pool).await?;
-                mc.stdout.send(format!("insert watched {}", episode));
+                mc.stdout
+                    .send(format!("insert watched episode {}", episode));
             }
             Ok(())
         }
@@ -653,7 +654,7 @@ pub async fn sync_trakt_with_db(mc: &MovieCollection) -> Result<(), Error> {
         async move {
             if !watched_movies_db.contains(movie.imdb_url.as_str()) {
                 movie.insert_movie(&mc.pool).await?;
-                mc.stdout.send(format!("insert watched {}", movie));
+                mc.stdout.send(format!("insert watched movie {}", movie));
             }
             Ok(())
         }

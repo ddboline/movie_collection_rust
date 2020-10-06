@@ -346,9 +346,9 @@ impl MovieCollection {
             .collect()
     }
 
-    pub async fn search_movie_collection<T: AsRef<str>>(
+    pub async fn search_movie_collection(
         &self,
-        search_strs: &[T],
+        search_strs: &[impl AsRef<str>],
     ) -> Result<Vec<MovieCollectionResult>, Error> {
         #[derive(FromSqlRow)]
         struct SearchMovieCollection {
@@ -867,10 +867,10 @@ impl MovieCollection {
             .collect()
     }
 
-    pub async fn find_new_episodes<T: AsRef<str>>(
+    pub async fn find_new_episodes(
         &self,
         source: Option<TvShowSource>,
-        shows: &[T],
+        shows: &[impl AsRef<str>],
     ) -> Result<Vec<NewEpisodesResult>, Error> {
         let mindate = Local::today() + Duration::days(-14);
         let maxdate = Local::today() + Duration::days(7);
@@ -929,9 +929,9 @@ impl MovieCollection {
     }
 }
 
-pub async fn find_new_episodes_http_worker<T: AsRef<str>>(
+pub async fn find_new_episodes_http_worker(
     pool: &PgPool,
-    shows: Option<T>,
+    shows: Option<impl AsRef<str>>,
     source: Option<TvShowSource>,
 ) -> Result<Vec<StackString>, Error> {
     let button_add = format!(
