@@ -12,7 +12,9 @@ use lapin::{
 };
 use procfs::process;
 use serde::{Deserialize, Serialize};
+use smallvec::{smallvec, SmallVec};
 use stack_string::StackString;
+use std::ffi::OsStr;
 use std::{
     collections::HashMap,
     fmt,
@@ -27,7 +29,6 @@ use tokio::{
     task::{spawn, spawn_blocking, JoinHandle},
 };
 use walkdir::WalkDir;
-use smallvec::{smallvec, SmallVec};
 
 use crate::{
     config::Config, make_queue::make_queue_worker, movie_collection::MovieCollection,
@@ -63,7 +64,32 @@ pub struct TranscodeServiceRequest {
     pub output_path: PathBuf,
 }
 
+impl fmt::Display for TranscodeServiceRequest {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(
+            f,
+            "{job_type}\t{prefix}\t{input_path}\t{output_path}",
+            job_type = self.job_type,
+            prefix = self.prefix,
+            input_path = self
+                .input_path
+                .file_name()
+                .unwrap_or_else(|| OsStr::new(""))
+                .to_string_lossy(),
+            output_path = self
+                .output_path
+                .file_name()
+                .unwrap_or_else(|| OsStr::new(""))
+                .to_string_lossy()
+        )
+    }
+}
+
 impl TranscodeServiceRequest {
+    pub fn get_header() -> SmallVec<[&'static str; 4]> {
+        smallvec!["Job Type", "Prefix", "Input Path", "Output Path"]
+    }
+
     pub fn new(job_type: JobType, prefix: &str, input_path: &Path, output_path: &Path) -> Self {
         Self {
             job_type,
@@ -160,6 +186,29 @@ impl TranscodeServiceRequest {
         } else {
             Self::create_transcode_request(config, path)
         }
+    }
+
+    pub fn get_html(&self) -> Vec<StackString> {
+        let mut output = Vec::new();
+        output.push(self.job_type.to_string().into());
+        output.push(self.prefix.clone());
+        output.push(
+            self.input_path
+                .file_name()
+                .unwrap_or_else(|| OsStr::new(""))
+                .to_string_lossy()
+                .to_string()
+                .into(),
+        );
+        output.push(
+            self.output_path
+                .file_name()
+                .unwrap_or_else(|| OsStr::new(""))
+                .to_string_lossy()
+                .to_string()
+                .into(),
+        );
+        output
     }
 }
 
@@ -522,6 +571,19 @@ impl ProcInfo {
     }
 }
 
+impl fmt::Display for ProcInfo {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(
+            f,
+            "{pid}\t{name}\t{exe}\t{cmdline}",
+            pid = self.pid,
+            name = self.name,
+            exe = self.exe.to_string_lossy(),
+            cmdline = self.cmdline.join(" "),
+        )
+    }
+}
+
 #[derive(Debug)]
 pub struct TranscodeStatus {
     pub procs: Vec<ProcInfo>,
@@ -611,20 +673,23 @@ impl TranscodeStatus {
         );
         output.push("</table>".into());
         output.push("Upcoming jobs:<br>".into());
+        output.push(r#"<table border="1" class="dataframe">"#.into());
         output.push(
-            self.upcoming_jobs
-                .iter()
-                .map(|t| {
-                    format!(
-                        "Type: {}, Name: {}, Input: {}, Output: {}",
-                        t.job_type,
-                        t.prefix,
-                        t.input_path.to_string_lossy(),
-                        t.output_path.to_string_lossy(),
-                    )
-                })
-                .join("<br>")
-                .into(),
+            format!(
+                r#"<thead><tr><th>{}</th></tr></thead>"#,
+                TranscodeServiceRequest::get_header().join("</th><th>")
+            )
+            .into(),
+        );
+        output.push(
+            format!(
+                r#"<tbody><tr><td>{}</td></tr></tbody>"#,
+                self.upcoming_jobs
+                    .iter()
+                    .map(|t| { t.get_html().join("</td><td>") })
+                    .join("<br>")
+            )
+            .into(),
         );
         output.push(
             format!(
@@ -638,7 +703,10 @@ impl TranscodeStatus {
                 "Finished jobs:<br>{}",
                 self.finished_jobs
                     .iter()
-                    .map(|p| p.to_string_lossy())
+                    .map(|p| p
+                        .file_name()
+                        .unwrap_or_else(|| OsStr::new(""))
+                        .to_string_lossy())
                     .join("<br>")
             )
             .into(),
@@ -651,28 +719,31 @@ impl fmt::Display for TranscodeStatus {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(
             f,
-            "Running procs:\n{}\n",
-            self.procs.iter().map(|p| format!("{:?}", p)).join("\n")
+            "Running procs:\n\n{}\n\n",
+            self.procs.iter().map(|p| format!("{}", p)).join("\n")
         )?;
         write!(
             f,
-            "Upcoming jobs:\n{}\n",
+            "Upcoming jobs:\n\n{}\n\n",
             self.upcoming_jobs
                 .iter()
-                .map(|j| format!("{:?}", j))
+                .map(ToString::to_string)
                 .join("\n")
         )?;
         write!(
             f,
-            "Current jobs:\n{}\n",
+            "Current jobs:\n\n{}\n\n",
             self.current_jobs.iter().map(|(_, s)| s).join("\n")
         )?;
         write!(
             f,
-            "Finished jobs:\n{}\n",
+            "Finished jobs:\n\n{}\n\n",
             self.finished_jobs
                 .iter()
-                .map(|p| format!("{:?}", p))
+                .map(|p| p
+                    .file_name()
+                    .unwrap_or_else(|| OsStr::new(""))
+                    .to_string_lossy())
                 .join("\n")
         )
     }
@@ -868,7 +939,7 @@ mod tests {
         config::Config,
         transcode_service::{
             get_current_jobs, get_last_line, get_paths, get_procs_sync, get_upcoming_jobs,
-            transcode_status, JobType, TranscodeService, TranscodeServiceRequest,
+            transcode_status, JobType, ProcInfo, TranscodeService, TranscodeServiceRequest,
         },
     };
 
@@ -993,6 +1064,32 @@ mod tests {
     fn test_get_procs_sync() -> Result<(), Error> {
         let procs = get_procs_sync()?;
         assert!(procs.len() > 0);
+        Ok(())
+    }
+
+    #[test]
+    fn test_procinfo_display() -> Result<(), Error> {
+        let cmdline = vec![
+            "-i".into(),
+            "/home/ddboline/Documents/movies/the_walking_dead_s10_ep02.mkv".into(),
+            "-o".into(),
+            "/home/ddboline/dvdrip/avi/the_walking_dead_s10_ep02.mp4".into(),
+            "--preset".into(),
+            "Android 480p30".into(),
+        ];
+        let p = ProcInfo {
+            pid: 25625,
+            name: "HandBrakeCLI".into(),
+            exe: "/usr/bin/HandBrakeCLI".into(),
+            cmdline: cmdline.clone(),
+        };
+        assert_eq!(
+            p.to_string(),
+            format!(
+                "25625\tHandBrakeCLI\t/usr/bin/HandBrakeCLI\t{}",
+                cmdline.join(" ")
+            )
+        );
         Ok(())
     }
 

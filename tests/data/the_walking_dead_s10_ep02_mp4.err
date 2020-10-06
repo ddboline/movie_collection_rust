@@ -1,0 +1,250 @@
+[11:45:11] hb_init: starting libhb thread
+[11:45:11] thread 7ff97d2fa700 started ("libhb")
+HandBrake 1.3.1 (2020032300) - Linux x86_64 - https://handbrake.fr
+8 CPUs detected
+Opening /home/ddboline/Documents/movies/the_walking_dead_s10_ep02.mkv...
+[11:45:11] CPU: Intel(R) Xeon(R) CPU           E5420  @ 2.50GHz
+[11:45:11]  - logical processor count: 8
+[11:45:11] hb_scan: path=/home/ddboline/Documents/movies/the_walking_dead_s10_ep02.mkv, title_index=1
+udfread ERROR: ECMA 167 Volume Recognition failed
+disc.c:323: failed opening UDF image /home/ddboline/Documents/movies/the_walking_dead_s10_ep02.mkv
+disc.c:424: error opening file BDMV/index.bdmv
+disc.c:424: error opening file BDMV/BACKUP/index.bdmv
+bluray.c:2585: nav_get_title_list(/home/ddboline/Documents/movies/the_walking_dead_s10_ep02.mkv/) failed
+[11:45:11] bd: not a bd - trying as a stream/file instead
+libdvdnav: Using dvdnav version 6.0.1
+libdvdread: Encrypted DVD support unavailable.
+************************************************
+**                                            **
+**  No css library available. See             **
+**  /usr/share/doc/libdvdread4/README.css     **
+**  for more information.                     **
+**                                            **
+************************************************
+libdvdread:DVDOpenFileUDF:UDFFindFile /VIDEO_TS/VIDEO_TS.IFO failed
+libdvdread:DVDOpenFileUDF:UDFFindFile /VIDEO_TS/VIDEO_TS.BUP failed
+libdvdread: Can't open file VIDEO_TS.IFO.
+libdvdnav: vm: failed to read VIDEO_TS.IFO
+[11:45:11] dvd: not a dvd - trying as a stream/file instead
+Scanning title 1 of 1, 0.00 %Input #0, matroska,webm, from '/home/ddboline/Documents/movies/the_walking_dead_s10_ep02.mkv':
+  Metadata:
+    encoder         : libebml v1.3.6 + libmatroska v1.4.9
+    creation_time   : 2019-10-12T01:01:33.000000Z
+  Duration: 00:44:53.90, start: 0.000000, bitrate: 1490 kb/s
+    Stream #0:0: Video: h264 (Main), yuv420p(progressive), 960x540 [SAR 1:1 DAR 16:9], Closed Captions, 23.98 fps, 23.98 tbr, 1k tbn, 47.95 tbc (default)
+    Metadata:
+      BPS-eng         : 1394328
+      DURATION-eng    : 00:44:53.900000000
+      NUMBER_OF_FRAMES-eng: 64589
+      NUMBER_OF_BYTES-eng: 469522566
+      _STATISTICS_WRITING_APP-eng: mkvmerge v29.0.0 ('Like It Or Not') 64-bit
+      _STATISTICS_WRITING_DATE_UTC-eng: 2019-10-12 01:01:33
+      _STATISTICS_TAGS-eng: BPS DURATION NUMBER_OF_FRAMES NUMBER_OF_BYTES
+    Stream #0:1: Audio: aac (LC), 44100 Hz, stereo, fltp (default)
+    Metadata:
+      BPS-eng         : 93587
+      DURATION-eng    : 00:44:53.840000000
+      NUMBER_OF_FRAMES-eng: 116014
+      NUMBER_OF_BYTES-eng: 31513612
+      _STATISTICS_WRITING_APP-eng: mkvmerge v29.0.0 ('Like It Or Not') 64-bit
+      _STATISTICS_WRITING_DATE_UTC-eng: 2019-10-12 01:01:33
+      _STATISTICS_TAGS-eng: BPS DURATION NUMBER_OF_FRAMES NUMBER_OF_BYTES
+[11:45:11] scan: decoding previews for title 1
+[11:45:11] scan: audio 0x1: aac, rate=44100Hz, bitrate=1 Unknown (AAC LC) (2.0 ch)
+Scanning title 1 of 1, preview 4, 40.00 %[11:45:11] scan: 10 previews, 960x540, 23.976 fps, autocrop = 0/0/0/0, aspect 16:9, PAR 1:1
+[11:45:11] libhb: scan thread found 1 valid title(s)
++ Using preset: Android 480p30
++ title 1:
+  + stream: /home/ddboline/Documents/movies/the_walking_dead_s10_ep02.mkv
+  + duration: 00:44:53
+  + size: 960x540, pixel aspect: 1/1, display aspect: 1.78, 23.976 fps
+  + autocrop: 0/0/0/0
+  + chapters:
+    + 1: duration 00:44:53
+  + audio tracks:
+    + 1, Unknown (AAC LC) (2.0 ch) (iso639-2: und)
+  + subtitle tracks:
+    + 1, Unknown, Closed Caption [CC608]
+[11:45:12] Starting work at: Tue Oct  6 11:45:12 2020
+
+[11:45:12] 1 job(s) to process
+[11:45:12] json job:
+{
+    "Audio": {
+        "AudioList": [
+            {
+                "Bitrate": 128,
+                "CompressionLevel": -1.0,
+                "DRC": 0.0,
+                "DitherMethod": "auto",
+                "Encoder": "av_aac",
+                "Gain": 0.0,
+                "Mixdown": "stereo",
+                "NormalizeMixLevel": false,
+                "PresetEncoder": "av_aac",
+                "Quality": -3.0,
+                "Samplerate": 0,
+                "Track": 0
+            }
+        ],
+        "CopyMask": [
+            "copy:aac"
+        ],
+        "FallbackEncoder": "av_aac"
+    },
+    "Destination": {
+        "AlignAVStart": false,
+        "ChapterList": [
+            {
+                "Duration": {
+                    "Hours": 0,
+                    "Minutes": 44,
+                    "Seconds": 53,
+                    "Ticks": 242451000
+                },
+                "Name": ""
+            }
+        ],
+        "ChapterMarkers": false,
+        "File": "/home/ddboline/dvdrip/avi/the_walking_dead_s10_ep02.mp4",
+        "InlineParameterSets": false,
+        "Mp4Options": {
+            "IpodAtom": false,
+            "Mp4Optimize": false
+        },
+        "Mux": "m4v"
+    },
+    "Filters": {
+        "FilterList": [
+            {
+                "ID": 3,
+                "Settings": {
+                    "block-height": "16",
+                    "block-thresh": "40",
+                    "block-width": "16",
+                    "filter-mode": "2",
+                    "mode": "3",
+                    "motion-thresh": "1",
+                    "spatial-metric": "2",
+                    "spatial-thresh": "1"
+                }
+            },
+            {
+                "ID": 4,
+                "Settings": {
+                    "mode": "7"
+                }
+            },
+            {
+                "ID": 6,
+                "Settings": {
+                    "mode": 2,
+                    "rate": "27000000/900000"
+                }
+            },
+            {
+                "ID": 12,
+                "Settings": {
+                    "crop-bottom": 0,
+                    "crop-left": 0,
+                    "crop-right": 0,
+                    "crop-top": 0,
+                    "height": 480,
+                    "width": 720
+                }
+            }
+        ]
+    },
+    "Metadata": {},
+    "PAR": {
+        "Den": 27,
+        "Num": 32
+    },
+    "SequenceID": 0,
+    "Source": {
+        "Angle": 0,
+        "Path": "/home/ddboline/Documents/movies/the_walking_dead_s10_ep02.mkv",
+        "Range": {
+            "End": 1,
+            "Start": 1,
+            "Type": "chapter"
+        },
+        "Title": 1
+    },
+    "Subtitle": {
+        "Search": {
+            "Burn": true,
+            "Default": false,
+            "Enable": true,
+            "Forced": true
+        },
+        "SubtitleList": []
+    },
+    "Video": {
+        "ColorFormat": 0,
+        "ColorMatrix": 6,
+        "ColorPrimaries": 6,
+        "ColorRange": 0,
+        "ColorTransfer": 1,
+        "Encoder": "x264",
+        "Level": "3.0",
+        "Options": "",
+        "Preset": "medium",
+        "Profile": "main",
+        "QSV": {
+            "AsyncDepth": 4,
+            "Decode": false
+        },
+        "Quality": 20.0,
+        "Tune": "",
+        "Turbo": false,
+        "TwoPass": false
+    }
+}
+[11:45:12] Skipping subtitle scan.  No suitable subtitle tracks.
+[11:45:12] Starting Task: Encoding Pass
+[11:45:12] job configuration:
+[11:45:12]  * source
+[11:45:12]    + /home/ddboline/Documents/movies/the_walking_dead_s10_ep02.mkv
+[11:45:12]    + title 1, chapter(s) 1 to 1
+[11:45:12]    + container: matroska,webm
+[11:45:12]    + data rate: 1490 kbps
+[11:45:12]  * destination
+[11:45:12]    + /home/ddboline/dvdrip/avi/the_walking_dead_s10_ep02.mp4
+[11:45:12]    + container: MPEG-4 (libavformat)
+[11:45:12]  * video track
+[11:45:12]    + decoder: h264
+[11:45:12]    + filters
+[11:45:12]      + Comb Detect (mode=3:spatial-metric=2:motion-thresh=1:spatial-thresh=1:filter-mode=2:block-thresh=40:block-width=16:block-height=16)
+[11:45:12]      + Decomb (mode=39)
+[11:45:12]      + Framerate Shaper (mode=2:rate=27000000/900000)
+[11:45:12]        + frame rate: 23.976 fps -> peak rate limited to 30.000 fps
+[11:45:12]      + Crop and Scale (width=720:height=480:crop-top=0:crop-bottom=0:crop-left=0:crop-right=0)
+[11:45:12]        + source: 960 * 540, crop (0/0/0/0): 960 * 540, scale: 720 * 480
+[11:45:12]    + Output geometry
+[11:45:12]      + storage dimensions: 720 x 480
+[11:45:12]      + pixel aspect ratio: 32 : 27
+[11:45:12]      + display dimensions: 853 x 480
+[11:45:12]    + encoder: H.264 (libx264)
+[11:45:12]      + preset:  medium
+[11:45:12]      + profile: main
+[11:45:12]      + level:   3.0
+[11:45:12]      + quality: 20.00 (RF)
+[11:45:12]      + color profile: 6-1-6
+[11:45:12]  * audio track 1
+[11:45:12]    + decoder: Unknown (AAC LC) (2.0 ch) (track 1, id 0x1)
+[11:45:12]      + samplerate: 44100 Hz
+[11:45:12]    + mixdown: Stereo
+[11:45:12]    + dither: triangular
+[11:45:12]    + encoder: AAC (libavcodec)
+[11:45:12]      + bitrate: 128 kbps, samplerate: 44100 Hz
+[11:45:12] sync: expecting 64589 video frames
+[11:45:12] encx264: min-keyint: 24, keyint: 240
+[11:45:12] encx264: encoding at constant RF 20.000000
+[11:45:12] encx264: unparsed options: level=3.0:8x8dct=0:vbv-bufsize=10000:vbv-maxrate=10000
+x264 [info]: using SAR=32/27
+x264 [info]: using cpu capabilities: MMX2 SSE2Fast SSSE3 SSE4.1 Cache64
+x264 [info]: profile Main, level 3.0
+[11:45:12] sync: first pts video is 0
+[11:45:12] sync: Chapter 1 at frame 1 time 0
+[11:45:12] sync: first pts audio 0x1 is 1890
