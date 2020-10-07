@@ -667,7 +667,7 @@ impl TranscodeStatus {
                         .iter()
                         .map(|f| {
                             let f_key = f.replace(".mkv", "").replace(".avi", "").replace(".mp4", "");
-                            if let Some(_) = file_map.get(f_key.as_str()) {
+                            if file_map.get(f_key.as_str()).is_some() {
                                 format!(
                                     r#"{file_name}</td><td><button type="submit" id="{file_name}" onclick="cleanup_file('{file_name}');"> cleanup </button>"#,
                                     file_name=f,
@@ -855,7 +855,7 @@ fn get_paths_sync(dir: impl AsRef<Path>, ext: &str) -> Vec<PathBuf> {
             let fpath = fpath.ok()?;
             let fpath = fpath.path();
             if fpath.extension() == Some(ext.as_ref()) {
-                Some(fpath.to_path_buf())
+                Some(fpath)
             } else {
                 None
             }

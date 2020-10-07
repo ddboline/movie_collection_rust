@@ -45,7 +45,7 @@ pub fn walk_directory(path: &Path, match_strs: &[impl AsRef<str>]) -> Result<Vec
                     && (match_strs.is_empty()
                         || match_strs.iter().any(|m| path_name.contains(m.as_ref())))
                 {
-                    Some(Ok(path.to_path_buf()))
+                    Some(Ok(path))
                 } else {
                     None
                 }
