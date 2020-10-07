@@ -12,12 +12,12 @@ use stack_string::StackString;
 use std::{
     borrow::Borrow,
     collections::{HashMap, HashSet},
-    fs::remove_file,
     hash::{Hash, Hasher},
     os::unix::fs::symlink,
     path,
+    path::PathBuf,
 };
-use tokio::task::spawn_blocking;
+use tokio::{fs::remove_file, task::spawn_blocking};
 
 use movie_collection_lib::{
     make_list::FileLists,
@@ -187,7 +187,7 @@ fn play_worker(full_path: &path::Path) -> HttpResult {
 
     let partial_path = path::Path::new("/var/www/html/videos/partial").join(file_name.as_ref());
     if partial_path.exists() {
-        remove_file(&partial_path)?;
+        std::fs::remove_file(&partial_path)?;
     }
 
     symlink(&full_path, &partial_path)?;
@@ -695,7 +695,7 @@ pub async fn movie_queue_transcode_status(_: LoggedUser, _: Data<AppState>) -> H
     let task = spawn_blocking(move || FileLists::get_file_lists(&CONFIG));
     let status = transcode_status(&CONFIG).await?;
     let file_lists = task.await.unwrap()?;
-    form_http_response(status.get_html(&file_lists).join(""))
+    form_http_response(status.get_html(&file_lists, &CONFIG).join(""))
 }
 
 pub async fn movie_queue_transcode_file(
@@ -703,15 +703,14 @@ pub async fn movie_queue_transcode_file(
     _: LoggedUser,
     _: Data<AppState>,
 ) -> HttpResult {
-    let config = CONFIG.clone();
-    let transcode_service = TranscodeService::new(&config, &config.transcode_queue);
     let filename = path.into_inner();
-    let input_path = config
+    let transcode_service = TranscodeService::new(CONFIG.clone(), &CONFIG.transcode_queue);
+    let input_path = CONFIG
         .home_dir
         .join("Documents")
         .join("movies")
         .join(&filename);
-    let req = TranscodeServiceRequest::create_transcode_request(&config, &input_path)?;
+    let req = TranscodeServiceRequest::create_transcode_request(&CONFIG, &input_path)?;
     transcode_service.publish_transcode_job(&req).await?;
     form_http_response("".to_string())
 }
@@ -721,5 +720,59 @@ pub async fn movie_queue_remcom_file(
     _: LoggedUser,
     _: Data<AppState>,
 ) -> HttpResult {
+    let filename = path.into_inner();
+    let transcode_service = TranscodeService::new(CONFIG.clone(), &CONFIG.transcode_queue);
+    let input_path = CONFIG
+        .home_dir
+        .join("Documents")
+        .join("movies")
+        .join(&filename);
+    let directory: Option<PathBuf> = None;
+    let req =
+        TranscodeServiceRequest::create_remcom_request(&CONFIG, &input_path, directory, false)
+            .await?;
+    transcode_service.publish_transcode_job(&req).await?;
     form_http_response("".to_string())
+}
+
+pub async fn movie_queue_remcom_directory_file(
+    path: Path<(StackString, StackString)>,
+    _: LoggedUser,
+    _: Data<AppState>,
+) -> HttpResult {
+    let (directory, filename) = path.into_inner();
+    let transcode_service = TranscodeService::new(CONFIG.clone(), &CONFIG.transcode_queue);
+    let input_path = CONFIG
+        .home_dir
+        .join("Documents")
+        .join("movies")
+        .join(&filename);
+    let req = TranscodeServiceRequest::create_remcom_request(
+        &CONFIG,
+        &input_path,
+        Some(directory),
+        false,
+    )
+    .await?;
+    transcode_service.publish_transcode_job(&req).await?;
+    form_http_response("".to_string())
+}
+
+pub async fn movie_queue_transcode_cleanup(
+    path: Path<StackString>,
+    _: LoggedUser,
+    _: Data<AppState>,
+) -> HttpResult {
+    let path = path.into_inner();
+    let movie_path = CONFIG.home_dir.join("Documents").join("movies").join(&path);
+    let tmp_path = CONFIG.home_dir.join("tmp_avi").join(&path);
+    if movie_path.exists() {
+        remove_file(&movie_path).await?;
+        form_http_response(format!("Removed {}", movie_path.to_string_lossy()))
+    } else if tmp_path.exists() {
+        remove_file(&tmp_path).await?;
+        form_http_response(format!("Removed {}", tmp_path.to_string_lossy()))
+    } else {
+        form_http_response(format!("File not found {}", path))
+    }
 }

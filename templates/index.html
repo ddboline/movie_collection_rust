@@ -86,9 +86,9 @@ footer {
         xmlhttp.send(null);
     }
     function watched_add(link, season, episode) {
-        let ostr = "/list/trakt/watched/add/" + link + "/" + season + "/" + episode;
+        let url = "/list/trakt/watched/add/" + link + "/" + season + "/" + episode;
         let xmlhttp = new XMLHttpRequest();
-        xmlhttp.open("GET", ostr, true);
+        xmlhttp.open("GET", url, true);
         xmlhttp.onload = function nothing() {
             let url = "/list/trakt/watched/list/" + link + "/" + season;
             updateMainArticle(url);
@@ -98,9 +98,9 @@ footer {
         document.getElementById("remcomoutput").innerHTML = out;
     }
     function watched_rm(link, season, episode) {
-        let ostr = "/list/trakt/watched/rm/" + link + "/" + season + "/" + episode
+        let url = "/list/trakt/watched/rm/" + link + "/" + season + "/" + episode
         let xmlhttp = new XMLHttpRequest();
-        xmlhttp.open("GET", ostr, true);
+        xmlhttp.open("GET", url, true);
         xmlhttp.onload = function nothing() {
             let url = "/list/trakt/watched/list/" + link + "/" + season;
             updateMainArticle(url);
@@ -109,39 +109,18 @@ footer {
         let out = "requested " + link + "/" + season + "/" + episode
         document.getElementById("remcomoutput").innerHTML = out;
     }
-    function transcode(index) {
-        let ostr = "/list/transcode/" + index
-        let xmlhttp = new XMLHttpRequest();
-        xmlhttp.open("GET", ostr, true);
-        xmlhttp.onload = function nothing() {
-        }
-        xmlhttp.send(null);
-        let out = "requested " + index
-        document.getElementById("remcomoutput").innerHTML = out;
-    }
-    function transcode_directory(index, directory) {
-        let ostr = "/list/transcode/" + directory + "/" + index
-        let xmlhttp = new XMLHttpRequest();
-        xmlhttp.open("GET", ostr, true);
-        xmlhttp.onload = function nothing() {
-        }
-        xmlhttp.send(null);
-        let out = "requested " + index
-        document.getElementById("remcomoutput").innerHTML = out;
-    }
-
     function delete_show(index) {
-        let ostr = "/list/delete/" + index
+        let url = "/list/delete/" + index
         let xmlhttp = new XMLHttpRequest();
-        xmlhttp.open("GET", ostr, true);
+        xmlhttp.open("GET", url, true);
         xmlhttp.onload = function nothing() {
         }
         xmlhttp.send(null);
     }
     function watchlist_add(link) {
-        let ostr = "/list/trakt/watchlist/add/" + link
+        let url = "/list/trakt/watchlist/add/" + link
         let xmlhttp = new XMLHttpRequest();
-        xmlhttp.open("GET", ostr, true);
+        xmlhttp.open("GET", url, true);
         xmlhttp.onload = function nothing() {
             let url = "/list/tvshows";
             updateMainArticle(url);
@@ -151,9 +130,9 @@ footer {
         document.getElementById("remcomoutput").innerHTML = out;
     }
     function watchlist_rm(link) {
-        let ostr = "/list/trakt/watchlist/rm/" + link
+        let url = "/list/trakt/watchlist/rm/" + link
         let xmlhttp = new XMLHttpRequest();
-        xmlhttp.open("GET", ostr, true);
+        xmlhttp.open("GET", url, true);
         xmlhttp.onload = function nothing() {
             let url = "/list/tvshows";
             updateMainArticle(url);
@@ -163,9 +142,9 @@ footer {
         document.getElementById("remcomoutput").innerHTML = out;
     }
     function imdb_update(show, link, season, referal_url) {
-        let ostr = "/list/imdb/" + show + "?tv=true&update=true&database=true&link=" + link + "&season=" + season;
+        let url = "/list/imdb/" + show + "?tv=true&update=true&database=true&link=" + link + "&season=" + season;
         let xmlhttp = new XMLHttpRequest();
-        xmlhttp.open("GET", ostr, true);
+        xmlhttp.open("GET", url, true);
         xmlhttp.onload = function nothing() {
             updateMainArticle(referal_url);
         }
@@ -191,6 +170,63 @@ footer {
         }
         xmlhttp.open("GET", url, true);
         xmlhttp.send(null);
+    }
+    function transcode_queue(index) {
+        let url = "/list/transcode/queue/" + index
+        let xmlhttp = new XMLHttpRequest();
+        xmlhttp.open("GET", url, true);
+        xmlhttp.onload = function nothing() {
+        }
+        xmlhttp.send(null);
+        let out = "requested " + index
+        document.getElementById("remcomoutput").innerHTML = out;
+    }
+    function transcode_queue_directory(index, directory) {
+        let url = "/list/transcode/queue/" + directory + "/" + index
+        let xmlhttp = new XMLHttpRequest();
+        xmlhttp.open("GET", url, true);
+        xmlhttp.onload = function nothing() {
+        }
+        xmlhttp.send(null);
+        let out = "requested " + index
+        document.getElementById("remcomoutput").innerHTML = out;
+    }
+    function transcode_file(file) {
+        let url = "/list/transcode/file/" + file
+        let xmlhttp = new XMLHttpRequest();
+        xmlhttp.open("GET", url, true);
+        xmlhttp.onload = function nothing() {
+            updateMainArticle('/list/transcode/status');
+        }
+        xmlhttp.send(null);
+        let out = "requested " + file
+        document.getElementById("remcomoutput").innerHTML = out;
+    }
+    function remcom_file(file) {
+        let movie_dir = document.getElementById('movie_dir').value;
+        let url = "/list/remcom/directory/" + movie_dir + "/" + file;
+        if (movie_dir == '') {
+            url = "/list/remcom/file/" + file;
+        }
+        let xmlhttp = new XMLHttpRequest();
+        xmlhttp.open("GET", url, true);
+        xmlhttp.onload = function nothing() {
+            updateMainArticle('/list/transcode/status');
+        }
+        xmlhttp.send(null);
+        let out = "requested " + file
+        document.getElementById("remcomoutput").innerHTML = out;
+    }
+    function cleanup_file(file) {
+        let url = "/list/transcode/cleanup/" + file
+        let xmlhttp = new XMLHttpRequest();
+        xmlhttp.open("GET", url, true);
+        xmlhttp.onload = function nothing() {
+            updateMainArticle('/list/transcode/status');
+        }
+        xmlhttp.send(null);
+        let out = "requested " + file
+        document.getElementById("remcomoutput").innerHTML = out;
     }
     </script>
 </body>

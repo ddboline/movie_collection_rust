@@ -650,8 +650,9 @@ impl TranscodeStatus {
             .collect()
     }
 
-    pub fn get_html(&self, flists: &FileLists) -> Vec<StackString> {
+    pub fn get_html(&self, flists: &FileLists, config: &Config) -> Vec<StackString> {
         let mut output: Vec<StackString> = Vec::new();
+        output.push(r#"<button name="remcomout" id="remcomoutput"> &nbsp; </button><br>"#.into());
         if !flists.local_file_list.is_empty() {
             let file_map = flists.get_file_map();
             let proc_map = self.get_proc_map();
@@ -665,16 +666,34 @@ impl TranscodeStatus {
                         .local_file_list
                         .iter()
                         .map(|f| {
-                            if let Some(_) = file_map.get(f.as_str()) {
-                                format!("{}</td><td>remove", f)
-                            } else if let Some(Some(status)) = proc_map.get(f.as_str()) {
+                            let f_key = f.replace(".mkv", "").replace(".avi", "").replace(".mp4", "");
+                            if let Some(_) = file_map.get(f_key.as_str()) {
+                                format!(
+                                    r#"{file_name}</td><td><button type="submit" id="{file_name}" onclick="cleanup_file('{file_name}');"> cleanup </button>"#,
+                                    file_name=f,
+
+                                )
+                            } else if let Some(Some(status)) = proc_map.get(f_key.as_str()) {
                                 match status {
                                     ProcStatus::Current => format!("{}</td><td>running", f),
                                     ProcStatus::Upcoming => format!("{}</td><td>upcoming", f),
-                                    ProcStatus::Finished => format!("{}</td><td>remcom", f),
+                                    ProcStatus::Finished => {
+                                        let mut movie_dirs = movie_directories(config).unwrap_or_else(|_| Vec::new());
+                                        movie_dirs.insert(0, "".into());
+                                        let movie_dirs = movie_dirs.into_iter().map(|d| format!(r#"<option value="{d}">{d}</option>"#, d=d)).join("\n");
+                                        format!(
+                                        r#"{file_name}</td>
+                                            <td><select id="movie_dir">{movie_dirs}</select>
+                                            <button type="submit" id="{file_name}" onclick="remcom_file('{file_name}');"> move </button>"#,
+                                        file_name=f,
+                                        movie_dirs=movie_dirs,
+                                    )},
                                 }
                             } else {
-                                format!("{}</td><td>transcode", f)
+                                format!(
+                                    r#"{file_name}</td><td><button type="submit" id="{file_name}" onclick="transcode_file('{file_name}');"> transcode </button>"#,
+                                    file_name=f
+                                )
                             }
                         })
                         .join("</td></tr><tr><td>"),
@@ -683,78 +702,78 @@ impl TranscodeStatus {
             )
         }
 
-        output.push("Running procs:<br>".into());
-        output.push(r#"<table border="1" class="dataframe">"#.into());
-        output.push(
-            format!(
-                r#"<thead><tr><th>{}</th></tr></thead>"#,
-                ProcInfo::get_header().join("</th><th>")
-            )
-            .into(),
-        );
-        output.push(
-            format!(
-                r#"<tbody><tr><td>{}</td></tr></tbody>"#,
-                self.procs
-                    .iter()
-                    .map(|p| p.get_html().join("</td><td>"))
-                    .join("</td></tr><tr><td>")
-            )
-            .into(),
-        );
-        output.push("</table>".into());
-        output.push("Upcoming jobs:<br>".into());
-        output.push(r#"<table border="1" class="dataframe">"#.into());
-        output.push(
-            format!(
-                r#"<thead><tr><th>{}</th></tr></thead>"#,
-                TranscodeServiceRequest::get_header().join("</th><th>")
-            )
-            .into(),
-        );
-        output.push(
-            format!(
-                r#"<tbody><tr><td>{}</td></tr></tbody>"#,
-                self.upcoming_jobs
-                    .iter()
-                    .map(|t| { t.get_html().join("</td><td>") })
-                    .join("<br>")
-            )
-            .into(),
-        );
-        output.push(
-            format!(
-                "Current jobs:<br>{}",
-                self.current_jobs.iter().map(|(_, s)| s).join("<br>")
-            )
-            .into(),
-        );
-        output.push(
-            format!(
-                "Finished jobs:<br>{}",
-                self.finished_jobs
-                    .iter()
-                    .map(|p| p
-                        .file_name()
-                        .unwrap_or_else(|| OsStr::new(""))
-                        .to_string_lossy())
-                    .join("<br>")
-            )
-            .into(),
-        );
-        output.push("Finished jobs:<br>".into());
-        output.push(r#"<table border="1" class="dataframe">"#.into());
-        output.push(r#"<thead><tr><th>File</th><th>Action</th></tr></thead>"#.into());
-        output.push(
-            format!(
-                r#"<tbody><tr><td>{}</td></tr></tbody>"#,
-                self.finished_jobs
-                    .iter()
-                    .map(|f| format!("{}</td><td>remove", f.to_string_lossy()))
-                    .join("</td></tr><tr><td>"),
-            )
-            .into(),
-        );
+        if !self.procs.is_empty() {
+            output.push("Running procs:<br>".into());
+            output.push(r#"<table border="1" class="dataframe">"#.into());
+            output.push(
+                format!(
+                    r#"<thead><tr><th>{}</th></tr></thead>"#,
+                    ProcInfo::get_header().join("</th><th>")
+                )
+                .into(),
+            );
+            output.push(
+                format!(
+                    r#"<tbody><tr><td>{}</td></tr></tbody>"#,
+                    self.procs
+                        .iter()
+                        .map(|p| p.get_html().join("</td><td>"))
+                        .join("</td></tr><tr><td>")
+                )
+                .into(),
+            );
+            output.push("</table>".into());
+        }
+        if !self.upcoming_jobs.is_empty() {
+            output.push("Upcoming jobs:<br>".into());
+            output.push(r#"<table border="1" class="dataframe">"#.into());
+            output.push(
+                format!(
+                    r#"<thead><tr><th>{}</th></tr></thead>"#,
+                    TranscodeServiceRequest::get_header().join("</th><th>")
+                )
+                .into(),
+            );
+            output.push(
+                format!(
+                    r#"<tbody><tr><td>{}</td></tr></tbody>"#,
+                    self.upcoming_jobs
+                        .iter()
+                        .map(|t| { t.get_html().join("</td><td>") })
+                        .join("<br>")
+                )
+                .into(),
+            );
+            output.push("</table>".into());
+        }
+        if !self.current_jobs.is_empty() {
+            output.push(
+                format!(
+                    "Current jobs:<br>{}<br>",
+                    self.current_jobs.iter().map(|(_, s)| s).join("<br>")
+                )
+                .into(),
+            );
+        }
+        if !self.finished_jobs.is_empty() {
+            output.push("Finished jobs:<br>".into());
+            output.push(r#"<table border="1" class="dataframe">"#.into());
+            output.push(r#"<thead><tr><th>File</th><th>Action</th></tr></thead>"#.into());
+            output.push(
+                format!(
+                    r#"<tbody><tr><td>{}</td></tr></tbody>"#,
+                    self.finished_jobs
+                        .iter()
+                        .map(|f| format!(
+                            r#"{file_name}</td><td><button type="submit" id="{file_name}" onclick="cleanup_file('{file_name}');"> cleanup </button>"#,
+                            file_name=f.file_name().unwrap_or_else(|| OsStr::new("")).to_string_lossy()
+                        ))
+                        .join("</td></tr><tr><td>"),
+                )
+                .into(),
+            );
+            output.push("</table>".into());
+        }
         output
     }
 }
@@ -973,6 +992,21 @@ pub async fn remcom(
     stdout.close().await
 }
 
+pub fn movie_directories(config: &Config) -> Result<Vec<StackString>, Error> {
+    let movie_dir = config.preferred_dir.join("Documents").join("movies");
+    std::fs::read_dir(&movie_dir)?
+        .map(|entry| {
+            let p = entry?
+                .path()
+                .file_name()
+                .unwrap_or_else(|| OsStr::new(""))
+                .to_string_lossy()
+                .into_owned();
+            Ok(p.into())
+        })
+        .collect()
+}
+
 #[cfg(test)]
 mod tests {
     use anyhow::Error;
@@ -1171,7 +1205,7 @@ mod tests {
     async fn test_get_upcoming_jobs() -> Result<(), Error> {
         let results = get_upcoming_jobs("../tests/data").await?;
         println!("{:?}", results);
-        assert_eq!(results.len(), 1);
+        assert_eq!(results.len(), 2);
         assert_eq!(results[0].prefix, "fargo_2014_s04_ep02");
         Ok(())
     }

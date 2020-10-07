@@ -6,6 +6,7 @@ use rayon::{
     slice::ParallelSliceMut,
 };
 use stack_string::StackString;
+use std::ffi::OsStr;
 use std::{collections::HashMap, path::PathBuf};
 use tokio::task::{spawn, spawn_blocking};
 
@@ -28,7 +29,7 @@ impl FileLists {
 
         let movies_dir = config.home_dir.join("Documents").join("movies");
 
-        let mut local_file_list: Vec<_> = fs::read_dir(movies_dir)?
+        let mut local_file_list: Vec<StackString> = fs::read_dir(movies_dir)?
             .filter_map(|f| {
                 let fname = f.ok()?;
                 let file_name = fname.file_name().to_string_lossy().into_owned();
@@ -47,11 +48,20 @@ impl FileLists {
 
         local_file_list.sort();
 
+        let patterns: Vec<_> = local_file_list
+            .iter()
+            .map(|f| {
+                f.replace(".mkv", "")
+                    .replace(".avi", "")
+                    .replace(".mp4", "")
+            })
+            .collect();
+
         let file_list: Result<Vec<_>, Error> = config
             .movie_dirs
             .par_iter()
             .filter(|d| d.exists())
-            .map(|d| walk_directory(&d, &local_file_list))
+            .map(|d| walk_directory(&d, &patterns))
             .collect();
 
         let mut file_list: Vec<_> = file_list?.into_iter().flatten().collect();
@@ -68,7 +78,12 @@ impl FileLists {
         self.file_list
             .iter()
             .map(|f| {
-                let file_name = f.file_name().unwrap().to_string_lossy().to_string().into();
+                let file_name = f
+                    .file_stem()
+                    .unwrap_or_else(|| OsStr::new(""))
+                    .to_string_lossy()
+                    .to_string()
+                    .into();
                 (file_name, f)
             })
             .collect()
@@ -96,9 +111,13 @@ pub async fn make_list(stdout: &StdoutChannel) -> Result<(), Error> {
         .local_file_list
         .iter()
         .map(|f| {
-            if let Some(full_path) = file_map.get(f.as_str()) {
+            let f_key = f
+                .replace(".mkv", "")
+                .replace(".avi", "")
+                .replace(".mp4", "");
+            if let Some(full_path) = file_map.get(f_key.as_str()) {
                 format!("{} {}", f, full_path.to_string_lossy())
-            } else if let Some(Some(status)) = proc_map.get(f.as_str()) {
+            } else if let Some(Some(status)) = proc_map.get(f_key.as_str()) {
                 format!("{} {}", f, status)
             } else {
                 f.to_string()
