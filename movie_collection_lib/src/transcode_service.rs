@@ -2,6 +2,7 @@ use anyhow::{format_err, Error};
 use deadpool_lapin::Config as LapinConfig;
 use futures::{future::try_join_all, stream::StreamExt, try_join};
 use itertools::Itertools;
+use jwalk::WalkDir;
 use lapin::{
     options::{
         BasicAckOptions, BasicConsumeOptions, BasicPublishOptions, QueueDeclareOptions,
@@ -28,11 +29,10 @@ use tokio::{
     process::Command,
     task::{spawn, spawn_blocking, JoinHandle},
 };
-use walkdir::WalkDir;
 
 use crate::{
-    config::Config, make_queue::make_queue_worker, movie_collection::MovieCollection,
-    stdout_channel::StdoutChannel, utils::parse_file_stem,
+    config::Config, make_list::FileLists, make_queue::make_queue_worker,
+    movie_collection::MovieCollection, stdout_channel::StdoutChannel, utils::parse_file_stem,
 };
 
 #[derive(Serialize, Deserialize, Debug, PartialEq, Clone, Copy)]
@@ -650,8 +650,39 @@ impl TranscodeStatus {
             .collect()
     }
 
-    pub fn get_html(&self) -> Vec<StackString> {
+    pub fn get_html(&self, flists: &FileLists) -> Vec<StackString> {
         let mut output: Vec<StackString> = Vec::new();
+        if !flists.local_file_list.is_empty() {
+            let file_map = flists.get_file_map();
+            let proc_map = self.get_proc_map();
+            output.push("On-deck Media Files<br>".into());
+            output.push(r#"<table border="1" class="dataframe">"#.into());
+            output.push(r#"<thead><tr><th>File</th><th>Action</th></tr></thead>"#.into());
+            output.push(
+                format!(
+                    r#"<tbody><tr><td>{}</td></tr></tbody>"#,
+                    flists
+                        .local_file_list
+                        .iter()
+                        .map(|f| {
+                            if let Some(_) = file_map.get(f.as_str()) {
+                                format!("{}</td><td>remove", f)
+                            } else if let Some(Some(status)) = proc_map.get(f.as_str()) {
+                                match status {
+                                    ProcStatus::Current => format!("{}</td><td>running", f),
+                                    ProcStatus::Upcoming => format!("{}</td><td>upcoming", f),
+                                    ProcStatus::Finished => format!("{}</td><td>remcom", f),
+                                }
+                            } else {
+                                format!("{}</td><td>transcode", f)
+                            }
+                        })
+                        .join("</td></tr><tr><td>"),
+                )
+                .into(),
+            )
+        }
+
         output.push("Running procs:<br>".into());
         output.push(r#"<table border="1" class="dataframe">"#.into());
         output.push(
@@ -667,7 +698,7 @@ impl TranscodeStatus {
                 self.procs
                     .iter()
                     .map(|p| p.get_html().join("</td><td>"))
-                    .join("</tr><tr>")
+                    .join("</td></tr><tr><td>")
             )
             .into(),
         );
@@ -708,6 +739,19 @@ impl TranscodeStatus {
                         .unwrap_or_else(|| OsStr::new(""))
                         .to_string_lossy())
                     .join("<br>")
+            )
+            .into(),
+        );
+        output.push("Finished jobs:<br>".into());
+        output.push(r#"<table border="1" class="dataframe">"#.into());
+        output.push(r#"<thead><tr><th>File</th><th>Action</th></tr></thead>"#.into());
+        output.push(
+            format!(
+                r#"<tbody><tr><td>{}</td></tr></tbody>"#,
+                self.finished_jobs
+                    .iter()
+                    .map(|f| format!("{}</td><td>remove", f.to_string_lossy()))
+                    .join("</td></tr><tr><td>"),
             )
             .into(),
         );

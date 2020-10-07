@@ -1,6 +1,7 @@
 use anyhow::{format_err, Error};
 use async_trait::async_trait;
 use handlebars::Handlebars;
+use jwalk::WalkDir;
 use lazy_static::lazy_static;
 use rand::{
     distributions::{Distribution, Uniform},
@@ -15,7 +16,6 @@ use tokio::{
     process::Command,
     time::{delay_for, Duration},
 };
-use walkdir::WalkDir;
 
 lazy_static! {
     pub static ref HBR: Handlebars<'static> = get_templates().expect("Failed to parse templates");

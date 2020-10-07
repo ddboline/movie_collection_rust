@@ -17,8 +17,10 @@ use std::{
     os::unix::fs::symlink,
     path,
 };
+use tokio::task::spawn_blocking;
 
 use movie_collection_lib::{
+    make_list::FileLists,
     make_queue::movie_queue_http,
     movie_collection::{ImdbSeason, TvShowsResult},
     movie_queue::MovieQueueResult,
@@ -690,6 +692,8 @@ pub async fn refresh_auth(_: LoggedUser, _: Data<AppState>) -> HttpResult {
 }
 
 pub async fn movie_queue_transcode_status(_: LoggedUser, _: Data<AppState>) -> HttpResult {
+    let task = spawn_blocking(move || FileLists::get_file_lists(&CONFIG));
     let status = transcode_status(&CONFIG).await?;
-    form_http_response(status.get_html().join(""))
+    let file_lists = task.await.unwrap()?;
+    form_http_response(status.get_html(&file_lists).join(""))
 }
