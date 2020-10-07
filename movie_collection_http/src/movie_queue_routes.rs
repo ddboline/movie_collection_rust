@@ -697,3 +697,28 @@ pub async fn movie_queue_transcode_status(_: LoggedUser, _: Data<AppState>) -> H
     let file_lists = task.await.unwrap()?;
     form_http_response(status.get_html(&file_lists).join(""))
 }
+
+pub async fn movie_queue_transcode_file(
+    path: Path<StackString>,
+    _: LoggedUser,
+    _: Data<AppState>,
+) -> HttpResult {
+    let transcode_service = TranscodeService::new(CONFIG, &CONFIG.transcode_queue);
+    let filename = path.into_inner();
+    let input_path = CONFIG
+        .home_dir
+        .join("Documents")
+        .join("movies")
+        .join(&filename);
+    let req = TranscodeServiceRequest::create_transcode_request(&CONFIG, &input_path)?;
+    transcode_service.publish_transcode_job(&req).await?;
+    form_http_response("".to_string())
+}
+
+pub async fn movie_queue_remcom_file(
+    path: Path<StackString>,
+    _: LoggedUser,
+    _: Data<AppState>,
+) -> HttpResult {
+    form_http_response("".to_string())
+}

@@ -1,11 +1,12 @@
 use anyhow::Error;
 use futures::future::join_all;
 use log::debug;
-use rayon::iter::{IntoParallelRefIterator, ParallelIterator};
-use rayon::slice::ParallelSliceMut;
+use rayon::{
+    iter::{IntoParallelRefIterator, ParallelIterator},
+    slice::ParallelSliceMut,
+};
 use stack_string::StackString;
-use std::collections::HashMap;
-use std::path::PathBuf;
+use std::{collections::HashMap, path::PathBuf};
 use tokio::task::{spawn, spawn_blocking};
 
 use crate::{

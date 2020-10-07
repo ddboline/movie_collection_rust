@@ -15,9 +15,9 @@ use procfs::process;
 use serde::{Deserialize, Serialize};
 use smallvec::{smallvec, SmallVec};
 use stack_string::StackString;
-use std::ffi::OsStr;
 use std::{
     collections::HashMap,
+    ffi::OsStr,
     fmt,
     path::{Path, PathBuf},
     process::Stdio,
