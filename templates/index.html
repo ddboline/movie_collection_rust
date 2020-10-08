@@ -204,9 +204,9 @@ footer {
     }
     function remcom_file(file) {
         let movie_dir = document.getElementById('movie_dir').value;
-        let url = "/list/remcom/directory/" + movie_dir + "/" + file;
+        let url = "/list/transcode/remcom/directory/" + movie_dir + "/" + file;
         if (movie_dir == '') {
-            url = "/list/remcom/file/" + file;
+            url = "/list/transcode/remcom/file/" + file;
         }
         let xmlhttp = new XMLHttpRequest();
         xmlhttp.open("GET", url, true);
