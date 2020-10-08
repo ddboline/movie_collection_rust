@@ -85,7 +85,7 @@ pub async fn start_app() -> Result<(), Error> {
                             .route(web::get().to(movie_queue_transcode_file)),
                     )
                     .service(
-                        web::resource("/transcode/remcom/{file}")
+                        web::resource("/transcode/remcom/file/{file}")
                             .route(web::get().to(movie_queue_remcom_file)),
                     )
                     .service(
