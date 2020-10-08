@@ -614,21 +614,17 @@ impl TranscodeStatus {
     pub fn get_proc_map(&self) -> HashMap<StackString, Option<ProcStatus>> {
         let upcoming = self.upcoming_jobs.iter().filter_map(|j| {
             j.input_path.file_name().map(|f| {
-                (
-                    f.to_string_lossy().into_owned().into(),
-                    Some(ProcStatus::Upcoming),
-                )
+                let f_key = f
+                    .to_string_lossy()
+                    .replace(".mkv", "")
+                    .replace(".avi", "")
+                    .replace(".mp4", "");
+                (f_key.into(), Some(ProcStatus::Upcoming))
             })
         });
         let current = self.current_jobs.iter().filter_map(|(p, _)| {
             p.file_name().map(|f| {
-                let f = f.to_string_lossy().replace("_mp4.out", ".mp4").into();
-                (f, Some(ProcStatus::Current))
-            })
-        });
-        let current_alt = self.current_jobs.iter().filter_map(|(p, _)| {
-            p.file_name().map(|f| {
-                let f = f.to_string_lossy().replace("_mp4.out", ".mkv").into();
+                let f = f.to_string_lossy().replace("_mp4.out", "").into();
                 (f, Some(ProcStatus::Current))
             })
         });
@@ -636,18 +632,14 @@ impl TranscodeStatus {
             p.file_name().map(|f| {
                 let f = f
                     .to_string_lossy()
-                    .replace("_copy.out", ".mp4")
-                    .replace("_mp4.out", ".mp4")
+                    .replace("_copy.out", "")
+                    .replace("_mp4.out", "")
                     .into();
                 (f, Some(ProcStatus::Finished))
             })
         });
 
-        upcoming
-            .chain(current)
-            .chain(current_alt)
-            .chain(finished)
-            .collect()
+        upcoming.chain(current).chain(finished).collect()
     }
 
     pub fn get_html(&self, flists: &FileLists, config: &Config) -> Vec<StackString> {

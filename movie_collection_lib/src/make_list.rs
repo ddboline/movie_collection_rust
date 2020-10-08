@@ -6,8 +6,7 @@ use rayon::{
     slice::ParallelSliceMut,
 };
 use stack_string::StackString;
-use std::ffi::OsStr;
-use std::{collections::HashMap, path::PathBuf};
+use std::{collections::HashMap, ffi::OsStr, path::PathBuf};
 use tokio::task::{spawn, spawn_blocking};
 
 use crate::{
