@@ -624,7 +624,11 @@ impl TranscodeStatus {
         });
         let current = self.current_jobs.iter().filter_map(|(p, _)| {
             p.file_name().map(|f| {
-                let f = f.to_string_lossy().replace("_mp4.out", "").into();
+                let f = f
+                    .to_string_lossy()
+                    .replace("_mp4.out", "")
+                    .replace("_copy.out", "")
+                    .into();
                 (f, Some(ProcStatus::Current))
             })
         });
