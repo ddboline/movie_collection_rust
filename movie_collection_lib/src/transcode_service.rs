@@ -1125,7 +1125,7 @@ mod tests {
         let status = transcode_status(&config).await?;
         println!("{:?}", status);
         println!("{}", status);
-        assert_eq!(status.procs.len(), 1);
+        assert!(status.procs.len() >= 1);
         Ok(())
     }
 
