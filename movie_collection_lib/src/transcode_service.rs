@@ -776,35 +776,44 @@ impl TranscodeStatus {
 
 impl fmt::Display for TranscodeStatus {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(
-            f,
-            "Running procs:\n\n{}\n\n",
-            self.procs.iter().map(|p| format!("{}", p)).join("\n")
-        )?;
-        write!(
-            f,
-            "Upcoming jobs:\n\n{}\n\n",
-            self.upcoming_jobs
-                .iter()
-                .map(ToString::to_string)
-                .join("\n")
-        )?;
-        write!(
-            f,
-            "Current jobs:\n\n{}\n\n",
-            self.current_jobs.iter().map(|(_, s)| s).join("\n")
-        )?;
-        write!(
-            f,
-            "Finished jobs:\n\n{}\n\n",
-            self.finished_jobs
-                .iter()
-                .map(|p| p
-                    .file_name()
-                    .unwrap_or_else(|| OsStr::new(""))
-                    .to_string_lossy())
-                .join("\n")
-        )
+        if !self.procs.is_empty() {
+            write!(
+                f,
+                "Running procs:\n\n{}\n\n",
+                self.procs.iter().map(|p| format!("{}", p)).join("\n")
+            )?;
+        }
+        if !self.upcoming_jobs.is_empty() {
+            write!(
+                f,
+                "Upcoming jobs:\n\n{}\n\n",
+                self.upcoming_jobs
+                    .iter()
+                    .map(ToString::to_string)
+                    .join("\n")
+            )?;
+        }
+        if !self.current_jobs.is_empty() {
+            write!(
+                f,
+                "Current jobs:\n\n{}\n\n",
+                self.current_jobs.iter().map(|(_, s)| s).join("\n")
+            )?;
+        }
+        if !self.finished_jobs.is_empty() {
+            write!(
+                f,
+                "Finished jobs:\n\n{}\n\n",
+                self.finished_jobs
+                    .iter()
+                    .map(|p| p
+                        .file_name()
+                        .unwrap_or_else(|| OsStr::new(""))
+                        .to_string_lossy())
+                    .join("\n")
+            )?;
+        }
+        Ok(())
     }
 }
 
