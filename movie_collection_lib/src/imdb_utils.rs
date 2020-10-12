@@ -92,7 +92,7 @@ impl ImdbConnection {
                 tr.find(Name("a"))
                     .filter_map(|a| {
                         a.attr("href").and_then(|link| {
-                            link.split('/').nth(2).map_or(None, |imdb_id| {
+                            link.split('/').nth(2).and_then(|imdb_id| {
                                 if imdb_id.starts_with("tt") {
                                     Some((tr.text().trim().to_string(), imdb_id.to_string()))
                                 } else {
