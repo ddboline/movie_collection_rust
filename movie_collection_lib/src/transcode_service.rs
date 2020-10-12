@@ -11,6 +11,7 @@ use lapin::{
     types::FieldTable,
     BasicProperties, Channel, Queue,
 };
+use log::{debug, error};
 use procfs::process;
 use serde::{Deserialize, Serialize};
 use smallvec::{smallvec, SmallVec};
@@ -257,6 +258,21 @@ impl TranscodeService {
         &self,
         payload: &TranscodeServiceRequest,
     ) -> Result<(), Error> {
+        match payload.job_type {
+            JobType::Transcode => {
+                let script_file = job_dir(&self.config)
+                    .join(&payload.prefix)
+                    .with_extension("json");
+                fs::write(&script_file, &serde_json::to_vec(&payload)?).await?;
+            }
+            JobType::Move => {
+                let script_file = job_dir(&self.config)
+                    .join(&format!("{}_copy", payload.prefix))
+                    .with_extension("json");
+                fs::write(&script_file, &serde_json::to_vec(&payload)?).await?;
+            }
+        }
+
         let chan = Self::open_transcode_channel().await?;
         let payload = serde_json::to_vec(&payload)?;
         chan.basic_publish(
@@ -268,6 +284,20 @@ impl TranscodeService {
         )
         .await?;
         Ok(())
+    }
+
+    async fn process_data(&self, data: &[u8]) -> Result<(), Error> {
+        let payload: TranscodeServiceRequest = serde_json::from_slice(&data)?;
+        match payload.job_type {
+            JobType::Transcode => {
+                self.run_transcode(&payload.prefix, &payload.input_path, &payload.output_path)
+                    .await
+            }
+            JobType::Move => {
+                self.run_move(&payload.prefix, &payload.input_path, &payload.output_path)
+                    .await
+            }
+        }
     }
 
     pub async fn read_transcode_job(&self) -> Result<(), Error> {
@@ -282,16 +312,9 @@ impl TranscodeService {
             .await?;
         while let Some(delivery) = consumer.next().await {
             let (channel, delivery) = delivery?;
-            let payload: TranscodeServiceRequest = serde_json::from_slice(&delivery.data)?;
-            match payload.job_type {
-                JobType::Transcode => {
-                    self.run_transcode(&payload.prefix, &payload.input_path, &payload.output_path)
-                        .await?
-                }
-                JobType::Move => {
-                    self.run_move(&payload.prefix, &payload.input_path, &payload.output_path)
-                        .await?
-                }
+            match self.process_data(&delivery.data).await {
+                Ok(_) => debug!("process_data succeeded"),
+                Err(e) => error!("process data failed {:?}", e),
             }
             channel
                 .basic_ack(delivery.delivery_tag, BasicAckOptions::default())
@@ -958,10 +981,6 @@ pub async fn transcode_avi(
             panic!("file doesn't exist {}", path.to_string_lossy());
         }
         let payload = TranscodeServiceRequest::create_transcode_request(&config, &path)?;
-
-        let script_file = job_dir(config).join(&payload.prefix).with_extension("json");
-        fs::write(&script_file, &serde_json::to_vec(&payload)?).await?;
-
         transcode_service.publish_transcode_job(&payload).await?;
         stdout.send(format!("script {:?}", payload));
     }
@@ -985,12 +1004,6 @@ pub async fn remcom(
             unwatched,
         )
         .await?;
-
-        let script_file = job_dir(config)
-            .join(&format!("{}_copy", payload.prefix))
-            .with_extension("json");
-        fs::write(&script_file, &serde_json::to_vec(&payload)?).await?;
-
         remcom_service.publish_transcode_job(&payload).await?;
         stdout.send(format!("script {:?}", payload));
     }

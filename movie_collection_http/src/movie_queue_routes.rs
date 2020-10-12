@@ -721,7 +721,7 @@ pub async fn movie_queue_remcom_file(
     _: Data<AppState>,
 ) -> HttpResult {
     let filename = path.into_inner();
-    let transcode_service = TranscodeService::new(CONFIG.clone(), &CONFIG.transcode_queue);
+    let transcode_service = TranscodeService::new(CONFIG.clone(), &CONFIG.remcom_queue);
     let input_path = CONFIG
         .home_dir
         .join("Documents")
@@ -741,7 +741,7 @@ pub async fn movie_queue_remcom_directory_file(
     _: Data<AppState>,
 ) -> HttpResult {
     let (directory, filename) = path.into_inner();
-    let transcode_service = TranscodeService::new(CONFIG.clone(), &CONFIG.transcode_queue);
+    let transcode_service = TranscodeService::new(CONFIG.clone(), &CONFIG.remcom_queue);
     let input_path = CONFIG
         .home_dir
         .join("Documents")
