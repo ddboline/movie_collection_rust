@@ -129,6 +129,7 @@ impl ParseImdb {
         Ok(output)
     }
 
+    #[allow(clippy::option_if_let_else)]
     async fn parse_imdb_update_worker(
         &self,
         opts: &ParseImdbOptions,

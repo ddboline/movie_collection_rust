@@ -91,19 +91,15 @@ impl ImdbConnection {
             .flat_map(|tr| {
                 tr.find(Name("a"))
                     .filter_map(|a| {
-                        if let Some(link) = a.attr("href") {
-                            if let Some(link) = link.split('/').nth(2) {
-                                if link.starts_with("tt") {
-                                    Some((tr.text().trim().to_string(), link.to_string()))
+                        a.attr("href").and_then(|link| {
+                            link.split('/').nth(2).map_or(None, |imdb_id| {
+                                if imdb_id.starts_with("tt") {
+                                    Some((tr.text().trim().to_string(), imdb_id.to_string()))
                                 } else {
                                     None
                                 }
-                            } else {
-                                None
-                            }
-                        } else {
-                            None
-                        }
+                            })
+                        })
                     })
                     .collect::<Vec<_>>()
             })

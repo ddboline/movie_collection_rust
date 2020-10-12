@@ -913,11 +913,12 @@ async fn get_last_line(fpath: &Path) -> Result<StackString, Error> {
         }
         buf.clear();
     }
-    if let Some(buf) = last.rsplit(|b| *b == b'\r').find(|b| !b.is_empty()) {
-        str::from_utf8(buf).map(Into::into).map_err(Into::into)
-    } else {
-        String::from_utf8(buf).map_err(Into::into).map(Into::into)
-    }
+    last.rsplit(|b| *b == b'\r')
+        .find(|b| !b.is_empty())
+        .map_or_else(
+            || String::from_utf8(buf).map_err(Into::into).map(Into::into),
+            |line| str::from_utf8(line).map_err(Into::into).map(Into::into),
+        )
 }
 
 async fn get_upcoming_jobs(p: impl AsRef<Path>) -> Result<Vec<TranscodeServiceRequest>, Error> {
