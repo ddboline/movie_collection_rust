@@ -1030,12 +1030,12 @@ pub fn movie_directories(config: &Config) -> Result<Vec<StackString>, Error> {
 mod tests {
     use anyhow::Error;
     use std::{env::set_var, fs::create_dir_all, path::Path};
-    use tokio::task::spawn;
+    use tokio::{fs, task::spawn};
 
     use crate::{
         config::Config,
         transcode_service::{
-            get_current_jobs, get_last_line, get_paths, get_procs_sync, get_upcoming_jobs,
+            get_current_jobs, get_last_line, get_paths, get_procs_sync, get_upcoming_jobs, job_dir,
             transcode_status, JobType, ProcInfo, TranscodeService, TranscodeServiceRequest,
         },
     };
@@ -1142,6 +1142,11 @@ mod tests {
         assert_eq!(result, req);
         let result = service.cleanup().await?;
         println!("{}", result);
+        let script_file = job_dir(&service.config)
+            .join(&req.prefix)
+            .with_extension("json");
+        fs::write(&script_file, &serde_json::to_vec(&req)?).await?;
+
         Ok(())
     }
 
