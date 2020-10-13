@@ -1145,7 +1145,7 @@ mod tests {
         let script_file = job_dir(&service.config)
             .join(&req.prefix)
             .with_extension("json");
-        fs::write(&script_file, &serde_json::to_vec(&req)?).await?;
+        fs::remove_file(&script_file).await?;
 
         Ok(())
     }
