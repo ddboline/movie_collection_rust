@@ -759,7 +759,7 @@ impl TranscodeStatus {
                     self.upcoming_jobs
                         .iter()
                         .map(|t| { t.get_html().join("</td><td>") })
-                        .join("<br>")
+                        .join("</td></tr><tr><td>")
                 )
                 .into(),
             );
