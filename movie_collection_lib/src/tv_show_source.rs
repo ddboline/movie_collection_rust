@@ -4,7 +4,7 @@ use serde::{Deserialize, Serialize};
 use std::{cmp::Ordering, fmt, str::FromStr};
 use tokio_postgres::types::{FromSql, IsNull, ToSql, Type};
 
-#[derive(Serialize, Deserialize, Clone, Debug, Eq, Copy)]
+#[derive(Serialize, Deserialize, Clone, Debug, Eq, Copy, PartialEq)]
 pub enum TvShowSource {
     #[serde(rename = "netflix")]
     Netflix,
@@ -54,12 +54,6 @@ impl Ord for TvShowSource {
 impl PartialOrd for TvShowSource {
     fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
         Some(self.cmp(other))
-    }
-}
-
-impl PartialEq for TvShowSource {
-    fn eq(&self, other: &Self) -> bool {
-        self.to_string() == other.to_string()
     }
 }
 

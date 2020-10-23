@@ -228,6 +228,16 @@ footer {
         let out = "requested " + file
         document.getElementById("remcomoutput").innerHTML = out;
     }
+    function setSource( link, source_id ) {
+        let source = document.getElementById( source_id ).value;
+        let url = "/list/imdb_ratings/set_source?link=" + link + "&source=" + source;
+        let xmlhttp = new XMLHttpRequest();
+        xmlhttp.open("GET", url, true);
+        xmlhttp.onload = function nothing() {
+            updateMainArticle('/list/trakt/watchlist');
+        }
+        xmlhttp.send(null);
+    }
     </script>
 </body>
 </html>
