@@ -70,30 +70,22 @@ impl ImdbRatings {
                 SET last_modified=now(){}{}{}{}
                 WHERE show=$show
             "#,
-            if let Some(title) = &self.title {
+            self.title.as_ref().map_or("", |title| {
                 bindings.push(("title", title as Parameter));
                 ",title=$title"
-            } else {
-                ""
-            },
-            if let Some(rating) = &self.rating {
+            }),
+            self.rating.as_ref().map_or("", |rating| {
                 bindings.push(("rating", rating as Parameter));
                 ",rating=$rating"
-            } else {
-                ""
-            },
-            if let Some(istv) = &self.istv {
+            }),
+            self.istv.as_ref().map_or("", |istv| {
                 bindings.push(("istv", istv as Parameter));
                 ",istv=$istv"
-            } else {
-                ""
-            },
-            if let Some(source) = &self.source {
+            }),
+            self.source.as_ref().map_or("", |source| {
                 bindings.push(("source", source as Parameter));
                 ",source=$source"
-            } else {
-                ""
-            }
+            }),
         );
         let query = postgres_query::query_dyn!(&query, show = self.show, ..bindings)?;
         pool.get()
