@@ -37,12 +37,12 @@ use super::{
     movie_queue_app::{AppState, CONFIG},
     movie_queue_requests::{
         FindNewEpisodeRequest, ImdbEpisodesSyncRequest, ImdbEpisodesUpdateRequest,
-        ImdbRatingsRequest, ImdbRatingsSyncRequest, ImdbRatingsUpdateRequest, ImdbSeasonsRequest,
-        ImdbShowRequest, LastModifiedRequest, MovieCollectionSyncRequest,
-        MovieCollectionUpdateRequest, MoviePathRequest, MovieQueueRequest, MovieQueueSyncRequest,
-        MovieQueueUpdateRequest, ParseImdbRequest, QueueDeleteRequest, TraktCalRequest,
-        TvShowsRequest, WatchedActionRequest, WatchedListRequest, WatchlistActionRequest,
-        WatchlistShowsRequest,
+        ImdbRatingsRequest, ImdbRatingsSetSourceRequest, ImdbRatingsSyncRequest,
+        ImdbRatingsUpdateRequest, ImdbSeasonsRequest, ImdbShowRequest, LastModifiedRequest,
+        MovieCollectionSyncRequest, MovieCollectionUpdateRequest, MoviePathRequest,
+        MovieQueueRequest, MovieQueueSyncRequest, MovieQueueUpdateRequest, ParseImdbRequest,
+        QueueDeleteRequest, TraktCalRequest, TvShowsRequest, WatchedActionRequest,
+        WatchedListRequest, WatchlistActionRequest, WatchlistShowsRequest,
     },
     HandleRequest,
 };
@@ -288,6 +288,16 @@ pub async fn imdb_ratings_update(
     form_http_response("Success".to_string())
 }
 
+pub async fn imdb_ratings_set_source(
+    query: Query<ImdbRatingsSetSourceRequest>,
+    _: LoggedUser,
+    state: Data<AppState>,
+) -> HttpResult {
+    let query = query.into_inner();
+    state.db.handle(query).await?;
+    form_http_response("Success".to_string())
+}
+
 pub async fn movie_queue_route(
     query: Query<MovieQueueSyncRequest>,
     _: LoggedUser,
@@ -499,21 +509,56 @@ fn watchlist_worker(
         .into_iter()
         .map(|(title, link, source)| {
             format!(
-                r#"<tr><td>{}</td>
-            <td><a href="https://www.imdb.com/title/{}" target="_blank">imdb</a> {} </tr>"#,
+                r#"<tr><td>{}</td><td>
+                   <a href="https://www.imdb.com/title/{}" target="_blank">imdb</a> {} </tr>"#,
                 format!(
                     r#"<a href="javascript:updateMainArticle('/list/trakt/watched/list/{}')">{}</a>"#,
                     link, title
                 ),
                 link,
-                match source {
-                    Some(TvShowSource::Netflix) => {
-                        r#"<td><a href="https://netflix.com" target="_blank">netflix</a>"#
-                    }
-                    Some(TvShowSource::Hulu) => r#"<td><a href="https://hulu.com" target="_blank">netflix</a>"#,
-                    Some(TvShowSource::Amazon) => r#"<td><a href="https://amazon.com" target="_blank">netflix</a>"#,
-                    _ => "",
-                },
+                format!(
+                    r#"<td><form action="javascript:setSource('{link}', '{link}_source_id')">
+                       <select id="{link}_source_id" onchange="setSource('{link}', '{link}_source_id');">
+                       {options}
+                       </select>
+                       </form></td>
+                    "#,
+                    link = link,
+                    options = match source {
+                        Some(TvShowSource::All) | None => {
+                            r#"
+                                <option value="all"></option>
+                                <option value="amazon">Amazon</option>
+                                <option value="hulu">Hulu</option>
+                                <option value="netflix">Netflix</option>
+                            "#
+                        }
+                        Some(TvShowSource::Amazon) => {
+                            r#"
+                                <option value="amazon">Amazon</option>
+                                <option value="all"></option>
+                                <option value="hulu">Hulu</option>
+                                <option value="netflix">Netflix</option>
+                            "#
+                        }
+                        Some(TvShowSource::Hulu) => {
+                            r#"
+                                <option value="hulu">Hulu</option>
+                                <option value="all"></option>
+                                <option value="amazon">Amazon</option>
+                                <option value="netflix">Netflix</option>
+                            "#
+                        }
+                        Some(TvShowSource::Netflix) => {
+                            r#"
+                                <option value="netflix">Netflix</option>
+                                <option value="all"></option>
+                                <option value="amazon">Amazon</option>
+                                <option value="hulu">Hulu</option>
+                            "#
+                        }
+                    },
+                )
             )
         })
         .join("");
@@ -526,8 +571,12 @@ fn watchlist_worker(
 
 pub async fn trakt_watchlist(_: LoggedUser, state: Data<AppState>) -> HttpResult {
     let req = WatchlistShowsRequest {};
-    let x = state.db.handle(req).await?;
-    watchlist_worker(x)
+    state
+        .db
+        .handle(req)
+        .await
+        .map_err(Into::into)
+        .and_then(watchlist_worker)
 }
 
 async fn watchlist_action_worker(action: TraktActions, imdb_url: &str) -> HttpResult {

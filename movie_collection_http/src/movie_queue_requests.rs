@@ -1,4 +1,4 @@
-use anyhow::Error;
+use anyhow::{format_err, Error};
 use async_trait::async_trait;
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
@@ -388,6 +388,29 @@ impl HandleRequest<ImdbRatingsUpdateRequest> for PgPool {
                 None => show.insert_show(&self).await?,
             }
         }
+        Ok(())
+    }
+}
+
+#[derive(Serialize, Deserialize)]
+pub struct ImdbRatingsSetSourceRequest {
+    pub link: StackString,
+    pub source: TvShowSource,
+}
+
+#[async_trait]
+impl HandleRequest<ImdbRatingsSetSourceRequest> for PgPool {
+    type Result = Result<(), Error>;
+    async fn handle(&self, msg: ImdbRatingsSetSourceRequest) -> Self::Result {
+        let mut imdb = ImdbRatings::get_show_by_link(msg.link.as_ref(), self)
+            .await?
+            .ok_or_else(|| format_err!("No show found for {}", msg.link))?;
+        imdb.source = if msg.source == TvShowSource::All {
+            None
+        } else {
+            Some(msg.source)
+        };
+        imdb.update_show(self).await?;
         Ok(())
     }
 }

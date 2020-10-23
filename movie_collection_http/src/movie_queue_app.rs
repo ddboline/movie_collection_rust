@@ -14,14 +14,14 @@ use super::{
     logged_user::{fill_from_db, get_secrets, SECRET_KEY, TRIGGER_DB_UPDATE},
     movie_queue_routes::{
         find_new_episodes, frontpage, imdb_episodes_route, imdb_episodes_update,
-        imdb_ratings_route, imdb_ratings_update, imdb_show, last_modified_route,
-        movie_collection_route, movie_collection_update, movie_queue, movie_queue_delete,
-        movie_queue_play, movie_queue_remcom_directory_file, movie_queue_remcom_file,
-        movie_queue_route, movie_queue_show, movie_queue_transcode, movie_queue_transcode_cleanup,
-        movie_queue_transcode_directory, movie_queue_transcode_file, movie_queue_transcode_status,
-        movie_queue_update, refresh_auth, trakt_auth_url, trakt_cal, trakt_callback,
-        trakt_watched_action, trakt_watched_list, trakt_watched_seasons, trakt_watchlist,
-        trakt_watchlist_action, tvshows, user,
+        imdb_ratings_route, imdb_ratings_set_source, imdb_ratings_update, imdb_show,
+        last_modified_route, movie_collection_route, movie_collection_update, movie_queue,
+        movie_queue_delete, movie_queue_play, movie_queue_remcom_directory_file,
+        movie_queue_remcom_file, movie_queue_route, movie_queue_show, movie_queue_transcode,
+        movie_queue_transcode_cleanup, movie_queue_transcode_directory, movie_queue_transcode_file,
+        movie_queue_transcode_status, movie_queue_update, refresh_auth, trakt_auth_url, trakt_cal,
+        trakt_callback, trakt_watched_action, trakt_watched_list, trakt_watched_seasons,
+        trakt_watchlist, trakt_watchlist_action, tvshows, user,
     },
 };
 use movie_collection_lib::{config::Config, pgpool::PgPool};
@@ -134,6 +134,10 @@ pub async fn start_app() -> Result<(), Error> {
                         web::resource("/imdb_episodes")
                             .route(web::get().to(imdb_episodes_route))
                             .route(web::post().to(imdb_episodes_update)),
+                    )
+                    .service(
+                        web::resource("/imdb_ratings/set_source")
+                            .route(web::get().to(imdb_ratings_set_source)),
                     )
                     .service(
                         web::resource("/imdb_ratings")

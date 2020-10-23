@@ -4,16 +4,28 @@ use serde::{Deserialize, Serialize};
 use std::{cmp::Ordering, fmt, str::FromStr};
 use tokio_postgres::types::{FromSql, IsNull, ToSql, Type};
 
-#[derive(Serialize, Deserialize, Clone, Debug, Eq, Copy)]
+#[derive(Serialize, Deserialize, Clone, Debug, Eq, Copy, PartialEq)]
 pub enum TvShowSource {
-    #[serde(rename = "netflix")]
-    Netflix,
-    #[serde(rename = "hulu")]
-    Hulu,
-    #[serde(rename = "amazon")]
-    Amazon,
     #[serde(rename = "all")]
     All,
+    #[serde(rename = "amazon")]
+    Amazon,
+    #[serde(rename = "hulu")]
+    Hulu,
+    #[serde(rename = "netflix")]
+    Netflix,
+}
+
+impl TvShowSource {
+    #[inline]
+    fn ordering(self) -> u8 {
+        match self {
+            Self::All => 0,
+            Self::Amazon => 1,
+            Self::Hulu => 2,
+            Self::Netflix => 3,
+        }
+    }
 }
 
 impl fmt::Display for TvShowSource {
@@ -47,19 +59,13 @@ impl FromStr for TvShowSource {
 
 impl Ord for TvShowSource {
     fn cmp(&self, other: &Self) -> Ordering {
-        self.to_string().cmp(&other.to_string())
+        self.ordering().cmp(&other.ordering())
     }
 }
 
 impl PartialOrd for TvShowSource {
     fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
         Some(self.cmp(other))
-    }
-}
-
-impl PartialEq for TvShowSource {
-    fn eq(&self, other: &Self) -> bool {
-        self.to_string() == other.to_string()
     }
 }
 
