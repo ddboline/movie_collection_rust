@@ -11,7 +11,6 @@ use maplit::hashmap;
 use serde::{Deserialize, Serialize};
 use stack_string::StackString;
 use std::{os::unix::fs::symlink, path, path::PathBuf};
-
 use tokio::{fs::remove_file, task::spawn_blocking};
 
 use movie_collection_lib::{
