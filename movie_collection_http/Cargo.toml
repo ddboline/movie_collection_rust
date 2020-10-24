@@ -25,5 +25,5 @@ log = "0.4"
 maplit = "1.0"
 handlebars = "3.5"
 itertools = "0.9"
-auth_server_rust = { git = "https://github.com/ddboline/auth_server_rust.git", tag="0.1.22"}
+auth_server_rust = { git = "https://github.com/ddboline/auth_server_rust.git", tag="0.1.21"}
 stack-string = { git = "https://github.com/ddboline/stack-string-rs.git", tag="0.1.7", features=["postgres_types"] }
