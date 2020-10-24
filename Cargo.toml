@@ -7,12 +7,12 @@ edition = "2018"
 [dependencies]
 movie_collection_lib = {path = "movie_collection_lib"}
 movie_collection_http = {path = "movie_collection_http"}
-rayon = "1.4"
+rayon = "1.5"
 clap = "2.33"
 log = "0.4"
-env_logger = "0.7"
+env_logger = "0.8"
 actix-rt = "1.1"
-crossbeam-utils = "0.7"
+crossbeam-utils = "0.8"
 anyhow = "1.0"
 thiserror = "1.0"
 tokio = {version="0.2", features=["full"]}
@@ -20,7 +20,7 @@ structopt = "0.3"
 futures = "0.3"
 serde_json = "1.0"
 chrono = "0.4"
-stack-string = { git = "https://github.com/ddboline/stack-string-rs.git", tag="0.1.6", features=["postgres_types"] }
+stack-string = { git = "https://github.com/ddboline/stack-string-rs.git", tag="0.1.7", features=["postgres_types"] }
 
 [workspace]
 members = [

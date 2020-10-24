@@ -1,58 +1,16 @@
 use anyhow::{format_err, Error};
-use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 use stack_string::StackString;
-use std::path;
 
 use movie_collection_lib::{
-    imdb_episodes::ImdbEpisodes,
     imdb_ratings::ImdbRatings,
-    movie_collection::{
-        find_new_episodes_http_worker, ImdbSeason, LastModifiedResponse, MovieCollection,
-        MovieCollectionRow, TvShowsResult,
-    },
+    movie_collection::{MovieCollection, MovieCollectionRow},
     movie_queue::{MovieQueueDB, MovieQueueResult, MovieQueueRow},
     parse_imdb::{ParseImdb, ParseImdbOptions},
     pgpool::PgPool,
-    trakt_utils::{
-        get_watchlist_shows_db_map, trakt_cal_http_worker, watch_list_http_worker,
-        watched_action_http_worker, TraktActions, WatchListMap, WatchListShow, TRAKT_CONN,
-    },
+    trakt_utils::{get_watchlist_shows_db_map, TraktActions, WatchListShow, TRAKT_CONN},
     tv_show_source::TvShowSource,
 };
-
-#[derive(Clone, Copy)]
-pub struct TvShowsRequest {}
-
-impl TvShowsRequest {
-    pub async fn handle(self, pool: &PgPool) -> Result<Vec<TvShowsResult>, Error> {
-        MovieCollection::with_pool(pool)?.print_tv_shows().await
-    }
-}
-
-#[derive(Clone, Copy)]
-pub struct WatchlistShowsRequest {}
-
-impl WatchlistShowsRequest {
-    pub async fn handle(self, pool: &PgPool) -> Result<WatchListMap, Error> {
-        get_watchlist_shows_db_map(pool).await
-    }
-}
-
-pub struct QueueDeleteRequest {
-    pub path: StackString,
-}
-
-impl QueueDeleteRequest {
-    pub async fn handle(self, pool: &PgPool) -> Result<StackString, Error> {
-        if path::Path::new(self.path.as_str()).exists() {
-            MovieQueueDB::with_pool(pool)
-                .remove_from_queue_by_path(&self.path)
-                .await?;
-        }
-        Ok(self.path)
-    }
-}
 
 #[derive(Debug)]
 pub struct MovieQueueRequest {
@@ -69,47 +27,6 @@ impl MovieQueueRequest {
             .print_movie_queue(&patterns)
             .await?;
         Ok((queue, self.patterns))
-    }
-}
-
-#[derive(Clone, Copy)]
-pub struct MoviePathRequest {
-    pub idx: i32,
-}
-
-impl MoviePathRequest {
-    pub async fn handle(self, pool: &PgPool) -> Result<StackString, Error> {
-        MovieCollection::with_pool(pool)?
-            .get_collection_path(self.idx)
-            .await
-    }
-}
-
-pub struct ImdbRatingsRequest {
-    pub imdb_url: StackString,
-}
-
-impl ImdbRatingsRequest {
-    pub async fn handle(self, pool: &PgPool) -> Result<Option<(StackString, ImdbRatings)>, Error> {
-        ImdbRatings::get_show_by_link(&self.imdb_url, pool)
-            .await
-            .map(|s| s.map(|sh| (self.imdb_url, sh)))
-    }
-}
-
-pub struct ImdbSeasonsRequest {
-    pub show: StackString,
-}
-
-impl ImdbSeasonsRequest {
-    pub async fn handle(&self, pool: &PgPool) -> Result<Vec<ImdbSeason>, Error> {
-        if &self.show == "" {
-            Ok(Vec::new())
-        } else {
-            MovieCollection::with_pool(pool)?
-                .print_imdb_all_seasons(&self.show)
-                .await
-        }
     }
 }
 
@@ -135,31 +52,6 @@ impl WatchlistActionRequest {
             _ => {}
         }
         Ok(self.imdb_url)
-    }
-}
-
-pub struct WatchedListRequest {
-    pub imdb_url: StackString,
-    pub season: i32,
-}
-
-impl WatchedListRequest {
-    pub async fn handle(&self, pool: &PgPool) -> Result<StackString, Error> {
-        watch_list_http_worker(pool, &self.imdb_url, self.season).await
-    }
-}
-
-pub struct WatchedActionRequest {
-    pub action: TraktActions,
-    pub imdb_url: StackString,
-    pub season: i32,
-    pub episode: i32,
-}
-
-impl WatchedActionRequest {
-    pub async fn handle(&self, pool: &PgPool) -> Result<StackString, Error> {
-        watched_action_http_worker(pool, self.action, &self.imdb_url, self.season, self.episode)
-            .await
     }
 }
 
@@ -207,108 +99,6 @@ impl ImdbShowRequest {
         let pi = ParseImdb::with_pool(pool)?;
         let body = pi.parse_imdb_http_worker(&self.into(), &watchlist).await?;
         Ok(body)
-    }
-}
-
-#[derive(Clone, Copy)]
-pub struct TraktCalRequest {}
-
-impl TraktCalRequest {
-    pub async fn handle(self, pool: &PgPool) -> Result<Vec<StackString>, Error> {
-        trakt_cal_http_worker(pool).await
-    }
-}
-
-#[derive(Serialize, Deserialize)]
-pub struct FindNewEpisodeRequest {
-    pub source: Option<TvShowSource>,
-    pub shows: Option<StackString>,
-}
-
-impl FindNewEpisodeRequest {
-    pub async fn handle(self, pool: &PgPool) -> Result<Vec<StackString>, Error> {
-        find_new_episodes_http_worker(pool, self.shows, self.source).await
-    }
-}
-
-#[derive(Serialize, Deserialize, Debug, Clone, Copy)]
-pub struct ImdbEpisodesSyncRequest {
-    pub start_timestamp: DateTime<Utc>,
-}
-
-impl ImdbEpisodesSyncRequest {
-    pub async fn handle(self, pool: &PgPool) -> Result<Vec<ImdbEpisodes>, Error> {
-        ImdbEpisodes::get_episodes_after_timestamp(self.start_timestamp, pool).await
-    }
-}
-
-#[derive(Serialize, Deserialize, Clone, Copy)]
-pub struct ImdbRatingsSyncRequest {
-    pub start_timestamp: DateTime<Utc>,
-}
-
-impl ImdbRatingsSyncRequest {
-    pub async fn handle(self, pool: &PgPool) -> Result<Vec<ImdbRatings>, Error> {
-        ImdbRatings::get_shows_after_timestamp(self.start_timestamp, pool).await
-    }
-}
-
-#[derive(Serialize, Deserialize, Clone, Copy)]
-pub struct MovieQueueSyncRequest {
-    pub start_timestamp: DateTime<Utc>,
-}
-
-impl MovieQueueSyncRequest {
-    pub async fn handle(self, pool: &PgPool) -> Result<Vec<MovieQueueRow>, Error> {
-        let mq = MovieQueueDB::with_pool(pool);
-        mq.get_queue_after_timestamp(self.start_timestamp).await
-    }
-}
-
-#[derive(Serialize, Deserialize, Clone, Copy)]
-pub struct MovieCollectionSyncRequest {
-    pub start_timestamp: DateTime<Utc>,
-}
-
-impl MovieCollectionSyncRequest {
-    pub async fn handle(self, pool: &PgPool) -> Result<Vec<MovieCollectionRow>, Error> {
-        let mc = MovieCollection::with_pool(pool)?;
-        mc.get_collection_after_timestamp(self.start_timestamp)
-            .await
-    }
-}
-
-#[derive(Serialize, Deserialize)]
-pub struct ImdbEpisodesUpdateRequest {
-    pub episodes: Vec<ImdbEpisodes>,
-}
-
-impl ImdbEpisodesUpdateRequest {
-    pub async fn handle(&self, pool: &PgPool) -> Result<(), Error> {
-        for episode in &self.episodes {
-            match episode.get_index(pool).await? {
-                Some(_) => episode.update_episode(pool).await?,
-                None => episode.insert_episode(pool).await?,
-            }
-        }
-        Ok(())
-    }
-}
-
-#[derive(Serialize, Deserialize)]
-pub struct ImdbRatingsUpdateRequest {
-    pub shows: Vec<ImdbRatings>,
-}
-
-impl ImdbRatingsUpdateRequest {
-    pub async fn handle(&self, pool: &PgPool) -> Result<(), Error> {
-        for show in &self.shows {
-            match ImdbRatings::get_show_by_link(show.link.as_ref(), pool).await? {
-                Some(_) => show.update_show(pool).await?,
-                None => show.insert_show(pool).await?,
-            }
-        }
-        Ok(())
     }
 }
 
@@ -377,14 +167,5 @@ impl MovieCollectionUpdateRequest {
                 .await?;
         }
         Ok(())
-    }
-}
-
-#[derive(Clone, Copy)]
-pub struct LastModifiedRequest {}
-
-impl LastModifiedRequest {
-    pub async fn handle(self, pool: &PgPool) -> Result<Vec<LastModifiedResponse>, Error> {
-        LastModifiedResponse::get_last_modified(pool).await
     }
 }

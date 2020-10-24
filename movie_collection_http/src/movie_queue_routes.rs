@@ -5,6 +5,8 @@ use actix_web::{
     HttpResponse,
 };
 use anyhow::format_err;
+use chrono::{DateTime, Utc};
+use futures::future::try_join_all;
 use itertools::Itertools;
 use maplit::hashmap;
 use serde::{Deserialize, Serialize};
@@ -20,12 +22,20 @@ use std::{
 use tokio::{fs::remove_file, task::spawn_blocking};
 
 use movie_collection_lib::{
+    imdb_episodes::ImdbEpisodes,
+    imdb_ratings::ImdbRatings,
     make_list::FileLists,
     make_queue::movie_queue_http,
-    movie_collection::{ImdbSeason, TvShowsResult},
-    movie_queue::MovieQueueResult,
+    movie_collection::{
+        find_new_episodes_http_worker, ImdbSeason, LastModifiedResponse, MovieCollection,
+        TvShowsResult,
+    },
+    movie_queue::{MovieQueueDB, MovieQueueResult},
     pgpool::PgPool,
-    trakt_utils::{TraktActions, WatchListShow, TRAKT_CONN},
+    trakt_utils::{
+        get_watchlist_shows_db_map, trakt_cal_http_worker, watch_list_http_worker,
+        watched_action_http_worker, TraktActions, WatchListShow, TRAKT_CONN,
+    },
     transcode_service::{transcode_status, TranscodeService, TranscodeServiceRequest},
     tv_show_source::TvShowSource,
     utils::HBR,
@@ -36,13 +46,8 @@ use super::{
     logged_user::LoggedUser,
     movie_queue_app::{AppState, CONFIG},
     movie_queue_requests::{
-        FindNewEpisodeRequest, ImdbEpisodesSyncRequest, ImdbEpisodesUpdateRequest,
-        ImdbRatingsRequest, ImdbRatingsSetSourceRequest, ImdbRatingsSyncRequest,
-        ImdbRatingsUpdateRequest, ImdbSeasonsRequest, ImdbShowRequest, LastModifiedRequest,
-        MovieCollectionSyncRequest, MovieCollectionUpdateRequest, MoviePathRequest,
-        MovieQueueRequest, MovieQueueSyncRequest, MovieQueueUpdateRequest, ParseImdbRequest,
-        QueueDeleteRequest, TraktCalRequest, TvShowsRequest, WatchedActionRequest,
-        WatchedListRequest, WatchlistActionRequest, WatchlistShowsRequest,
+        ImdbRatingsSetSourceRequest, ImdbShowRequest, MovieCollectionUpdateRequest,
+        MovieQueueRequest, MovieQueueUpdateRequest, ParseImdbRequest, WatchlistActionRequest,
     },
 };
 
@@ -114,10 +119,12 @@ pub async fn movie_queue_delete(
     state: Data<AppState>,
 ) -> HttpResult {
     let path = path.into_inner();
-
-    let req = QueueDeleteRequest { path };
-    let body = req.handle(&state.db).await?;
-    form_http_response(body.into())
+    if path::Path::new(path.as_str()).exists() {
+        MovieQueueDB::with_pool(&state.db)
+            .remove_from_queue_by_path(&path)
+            .await?;
+    }
+    form_http_response(path.into())
 }
 
 async fn transcode_worker(
@@ -196,8 +203,9 @@ fn play_worker(full_path: &path::Path) -> HttpResult {
 pub async fn movie_queue_play(idx: Path<i32>, _: LoggedUser, state: Data<AppState>) -> HttpResult {
     let idx = idx.into_inner();
 
-    let req = MoviePathRequest { idx };
-    let movie_path = req.handle(&state.db).await?;
+    let movie_path = MovieCollection::with_pool(&state.db)?
+        .get_collection_path(idx)
+        .await?;
     let movie_path = path::Path::new(movie_path.as_str());
     play_worker(&movie_path)
 }
@@ -235,14 +243,25 @@ fn new_episode_worker(entries: &[StackString]) -> HttpResult {
     form_http_response(entries)
 }
 
+#[derive(Serialize, Deserialize)]
+pub struct FindNewEpisodeRequest {
+    pub source: Option<TvShowSource>,
+    pub shows: Option<StackString>,
+}
+
 pub async fn find_new_episodes(
     query: Query<FindNewEpisodeRequest>,
     _: LoggedUser,
     state: Data<AppState>,
 ) -> HttpResult {
     let req = query.into_inner();
-    let entries = req.handle(&state.db).await?;
+    let entries = find_new_episodes_http_worker(&state.db, req.shows, req.source).await?;
     new_episode_worker(&entries)
+}
+
+#[derive(Serialize, Deserialize, Debug, Clone, Copy)]
+pub struct ImdbEpisodesSyncRequest {
+    pub start_timestamp: DateTime<Utc>,
 }
 
 pub async fn imdb_episodes_route(
@@ -251,8 +270,13 @@ pub async fn imdb_episodes_route(
     state: Data<AppState>,
 ) -> HttpResult {
     let req = query.into_inner();
-    let x = req.handle(&state.db).await?;
+    let x = ImdbEpisodes::get_episodes_after_timestamp(req.start_timestamp, &state.db).await?;
     to_json(x)
+}
+
+#[derive(Serialize, Deserialize)]
+pub struct ImdbEpisodesUpdateRequest {
+    pub episodes: Vec<ImdbEpisodes>,
 }
 
 pub async fn imdb_episodes_update(
@@ -260,11 +284,24 @@ pub async fn imdb_episodes_update(
     _: LoggedUser,
     state: Data<AppState>,
 ) -> HttpResult {
-    let episodes = data.into_inner();
-
-    let req = episodes;
-    req.handle(&state.db).await?;
+    let futures = data.episodes.iter().map(|episode| {
+        let pool = state.db.clone();
+        async move {
+            match episode.get_index(&pool).await? {
+                Some(_) => episode.update_episode(&pool).await?,
+                None => episode.insert_episode(&pool).await?,
+            };
+            Ok(())
+        }
+    });
+    let results: Result<Vec<_>, Error> = try_join_all(futures).await;
+    results?;
     form_http_response("Success".to_string())
+}
+
+#[derive(Serialize, Deserialize, Clone, Copy)]
+pub struct ImdbRatingsSyncRequest {
+    pub start_timestamp: DateTime<Utc>,
 }
 
 pub async fn imdb_ratings_route(
@@ -273,8 +310,13 @@ pub async fn imdb_ratings_route(
     state: Data<AppState>,
 ) -> HttpResult {
     let req = query.into_inner();
-    let x = req.handle(&state.db).await?;
+    let x = ImdbRatings::get_shows_after_timestamp(req.start_timestamp, &state.db).await?;
     to_json(x)
+}
+
+#[derive(Serialize, Deserialize)]
+pub struct ImdbRatingsUpdateRequest {
+    pub shows: Vec<ImdbRatings>,
 }
 
 pub async fn imdb_ratings_update(
@@ -282,10 +324,18 @@ pub async fn imdb_ratings_update(
     _: LoggedUser,
     state: Data<AppState>,
 ) -> HttpResult {
-    let shows = data.into_inner();
-
-    let req = shows;
-    req.handle(&state.db).await?;
+    let futures = data.shows.iter().map(|show| {
+        let pool = state.db.clone();
+        async move {
+            match ImdbRatings::get_show_by_link(show.link.as_ref(), &pool).await? {
+                Some(_) => show.update_show(&pool).await?,
+                None => show.insert_show(&pool).await?,
+            };
+            Ok(())
+        }
+    });
+    let results: Result<Vec<_>, Error> = try_join_all(futures).await;
+    results?;
     form_http_response("Success".to_string())
 }
 
@@ -299,13 +349,19 @@ pub async fn imdb_ratings_set_source(
     form_http_response("Success".to_string())
 }
 
+#[derive(Serialize, Deserialize, Clone, Copy)]
+pub struct MovieQueueSyncRequest {
+    pub start_timestamp: DateTime<Utc>,
+}
+
 pub async fn movie_queue_route(
     query: Query<MovieQueueSyncRequest>,
     _: LoggedUser,
     state: Data<AppState>,
 ) -> HttpResult {
     let req = query.into_inner();
-    let x = req.handle(&state.db).await?;
+    let mq = MovieQueueDB::with_pool(&state.db);
+    let x = mq.get_queue_after_timestamp(req.start_timestamp).await?;
     to_json(x)
 }
 
@@ -321,13 +377,21 @@ pub async fn movie_queue_update(
     form_http_response("Success".to_string())
 }
 
+#[derive(Serialize, Deserialize, Clone, Copy)]
+pub struct MovieCollectionSyncRequest {
+    pub start_timestamp: DateTime<Utc>,
+}
+
 pub async fn movie_collection_route(
     query: Query<MovieCollectionSyncRequest>,
     _: LoggedUser,
     state: Data<AppState>,
 ) -> HttpResult {
     let req = query.into_inner();
-    let x = req.handle(&state.db).await?;
+    let mc = MovieCollection::with_pool(&state.db)?;
+    let x = mc
+        .get_collection_after_timestamp(req.start_timestamp)
+        .await?;
     to_json(x)
 }
 
@@ -344,8 +408,7 @@ pub async fn movie_collection_update(
 }
 
 pub async fn last_modified_route(_: LoggedUser, state: Data<AppState>) -> HttpResult {
-    let req = LastModifiedRequest {};
-    let x = req.handle(&state.db).await?;
+    let x = LastModifiedResponse::get_last_modified(&state.db).await?;
     to_json(x)
 }
 
@@ -436,9 +499,11 @@ fn tvshows_worker(res1: TvShowsMap, tvshows: Vec<TvShowsResult>) -> Result<Stack
 }
 
 pub async fn tvshows(_: LoggedUser, state: Data<AppState>) -> HttpResult {
-    let shows = TvShowsRequest {}.handle(&state.db).await?;
-    let res1 = WatchlistShowsRequest {}.handle(&state.db).await?;
-    let entries = tvshows_worker(res1, shows)?;
+    let shows = MovieCollection::with_pool(&state.db)?
+        .print_tv_shows()
+        .await?;
+    let tvshowsmap = get_watchlist_shows_db_map(&state.db).await?;
+    let entries = tvshows_worker(tvshowsmap, shows)?;
     form_http_response(entries.into())
 }
 
@@ -570,8 +635,7 @@ fn watchlist_worker(
 }
 
 pub async fn trakt_watchlist(_: LoggedUser, state: Data<AppState>) -> HttpResult {
-    let req = WatchlistShowsRequest {};
-    req.handle(&state.db)
+    get_watchlist_shows_db_map(&state.db)
         .await
         .map_err(Into::into)
         .and_then(watchlist_worker)
@@ -645,13 +709,21 @@ pub async fn trakt_watched_seasons(
     state: Data<AppState>,
 ) -> HttpResult {
     let imdb_url = path.into_inner();
-    let req = ImdbRatingsRequest { imdb_url };
-    let show_opt = req.handle(&state.db).await?;
+    let show_opt = ImdbRatings::get_show_by_link(&imdb_url, &state.db)
+        .await?
+        .map(|sh| (imdb_url, sh));
     let empty = || ("".into(), "".into(), "".into());
     let (imdb_url, show, link) =
         show_opt.map_or_else(empty, |(imdb_url, t)| (imdb_url, t.show, t.link));
-    let req = ImdbSeasonsRequest { show };
-    let entries = req.handle(&state.db).await?;
+
+    let entries = if &show == "" {
+        Vec::new()
+    } else {
+        MovieCollection::with_pool(&state.db)?
+            .print_imdb_all_seasons(&show)
+            .await?
+    };
+
     let entries = trakt_watched_seasons_worker(&link, &imdb_url, &entries)?;
     form_http_response(entries.into())
 }
@@ -663,8 +735,7 @@ pub async fn trakt_watched_list(
 ) -> HttpResult {
     let (imdb_url, season) = path.into_inner();
 
-    let req = WatchedListRequest { imdb_url, season };
-    req.handle(&state.db)
+    watch_list_http_worker(&state.db, &imdb_url, season)
         .await
         .map_err(Into::into)
         .and_then(|x| form_http_response(x.into()))
@@ -676,15 +747,16 @@ pub async fn trakt_watched_action(
     state: Data<AppState>,
 ) -> HttpResult {
     let (action, imdb_url, season, episode) = path.into_inner();
-
-    let req = WatchedActionRequest {
-        action: action.parse().expect("impossible"),
-        imdb_url,
+    watched_action_http_worker(
+        &state.db,
+        action.parse().expect("impossible"),
+        &imdb_url,
         season,
         episode,
-    };
-    let x = req.handle(&state.db).await?;
-    form_http_response(x.into())
+    )
+    .await
+    .map_err(Into::into)
+    .and_then(|x| form_http_response(x.into()))
 }
 
 fn trakt_cal_worker(entries: &[StackString]) -> HttpResult {
@@ -698,8 +770,7 @@ fn trakt_cal_worker(entries: &[StackString]) -> HttpResult {
 }
 
 pub async fn trakt_cal(_: LoggedUser, state: Data<AppState>) -> HttpResult {
-    let req = TraktCalRequest {};
-    let entries = req.handle(&state.db).await?;
+    let entries = trakt_cal_http_worker(&state.db).await?;
     trakt_cal_worker(&entries)
 }
 
