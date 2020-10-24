@@ -17,8 +17,13 @@ use std::{
 };
 
 use crate::{
-    config::Config, imdb_episodes::ImdbEpisodes, imdb_ratings::ImdbRatings,
-    movie_collection::MovieCollection, movie_queue::MovieQueueDB, pgpool::PgPool,
+    config::Config,
+    imdb_episodes::ImdbEpisodes,
+    imdb_ratings::ImdbRatings,
+    movie_collection::{ImdbSeason, MovieCollection, TvShowsResult},
+    movie_queue::MovieQueueDB,
+    pgpool::PgPool,
+    process_show_item::ProcessShowItem,
     trakt_connection::TraktConnection,
 };
 
@@ -28,6 +33,8 @@ lazy_static! {
     static ref CONFIG: Config = Config::with_config().unwrap();
     pub static ref TRAKT_CONN: TraktConnection = TraktConnection::new(CONFIG.clone());
 }
+
+type TvShowsMap = HashMap<StackString, (StackString, WatchListShow, Option<TvShowSource>)>;
 
 #[derive(Clone, Copy)]
 pub enum TraktActions {
@@ -287,6 +294,132 @@ pub async fn get_watchlist_shows_db_map(pool: &PgPool) -> Result<WatchListMap, E
             ))
         })
         .collect()
+}
+
+pub fn tvshows_worker(res1: TvShowsMap, tvshows: Vec<TvShowsResult>) -> Result<StackString, Error> {
+    let tvshows: HashSet<_> = tvshows
+        .into_iter()
+        .map(|s| {
+            let item: ProcessShowItem = s.into();
+            item
+        })
+        .collect();
+    let watchlist: HashSet<_> = res1
+        .into_iter()
+        .map(|(link, (show, s, source))| {
+            let item = ProcessShowItem {
+                show,
+                title: s.title,
+                link: s.link,
+                source,
+            };
+            debug_assert!(link.as_str() == item.link.as_str());
+            item
+        })
+        .collect();
+
+    let shows = ProcessShowItem::process_shows(tvshows, watchlist)?;
+
+    let previous = r#"
+        <a href="javascript:updateMainArticle('/list/watchlist')">Go Back</a><br>
+        <a href="javascript:updateMainArticle('/list/trakt/watchlist')">Watch List</a>
+        <button name="remcomout" id="remcomoutput"> &nbsp; </button><br>
+    "#;
+
+    let entries = format!(
+        r#"{}<table border="0">{}</table>"#,
+        previous,
+        shows.join("")
+    )
+    .into();
+
+    Ok(entries)
+}
+
+pub fn watchlist_worker(shows: TvShowsMap) -> String {
+    let mut shows: Vec<_> = shows
+        .into_iter()
+        .map(|(_, (_, s, source))| (s.title, s.link, source))
+        .collect();
+
+    shows.sort();
+
+    let shows = shows
+        .into_iter()
+        .map(|(title, link, source)| {
+            format!(
+                r#"<tr><td>{}</td><td>
+                   <a href="https://www.imdb.com/title/{}" target="_blank">imdb</a> {} </tr>"#,
+                format!(
+                    r#"<a href="javascript:updateMainArticle('/list/trakt/watched/list/{}')">{}</a>"#,
+                    link, title
+                ),
+                link,
+                format!(
+                    r#"<td><form action="javascript:setSource('{link}', '{link}_source_id')">
+                       <select id="{link}_source_id" onchange="setSource('{link}', '{link}_source_id');">
+                       {options}
+                       </select>
+                       </form></td>
+                    "#,
+                    link = link,
+                    options = match source {
+                        Some(TvShowSource::All) | None => {
+                            r#"
+                                <option value="all"></option>
+                                <option value="amazon">Amazon</option>
+                                <option value="hulu">Hulu</option>
+                                <option value="netflix">Netflix</option>
+                            "#
+                        }
+                        Some(TvShowSource::Amazon) => {
+                            r#"
+                                <option value="amazon">Amazon</option>
+                                <option value="all"></option>
+                                <option value="hulu">Hulu</option>
+                                <option value="netflix">Netflix</option>
+                            "#
+                        }
+                        Some(TvShowSource::Hulu) => {
+                            r#"
+                                <option value="hulu">Hulu</option>
+                                <option value="all"></option>
+                                <option value="amazon">Amazon</option>
+                                <option value="netflix">Netflix</option>
+                            "#
+                        }
+                        Some(TvShowSource::Netflix) => {
+                            r#"
+                                <option value="netflix">Netflix</option>
+                                <option value="all"></option>
+                                <option value="amazon">Amazon</option>
+                                <option value="hulu">Hulu</option>
+                            "#
+                        }
+                    },
+                )
+            )
+        })
+        .join("");
+
+    let previous = r#"<a href="javascript:updateMainArticle('/list/tvshows')">Go Back</a><br>"#;
+    format!(r#"{}<table border="0">{}</table>"#, previous, shows)
+}
+
+pub async fn watchlist_action_worker(
+    action: TraktActions,
+    imdb_url: &str,
+) -> Result<String, Error> {
+    TRAKT_CONN.init().await;
+    let body = match action {
+        TraktActions::Add => TRAKT_CONN.add_watchlist_show(&imdb_url).await?.to_string(),
+        TraktActions::Remove => TRAKT_CONN
+            .remove_watchlist_show(&imdb_url)
+            .await?
+            .to_string(),
+        _ => "".to_string(),
+    };
+    Ok(body)
 }
 
 #[derive(Serialize, Deserialize, Debug, Default, PartialEq, Eq, Hash)]
@@ -1163,4 +1296,40 @@ pub async fn trakt_cal_http_worker(pool: &PgPool) -> Result<Vec<StackString>, Er
             Ok(entry)
         });
     join_all(results).await.into_iter().collect()
+}
+
+pub fn trakt_watched_seasons_worker(
+    link: &str,
+    imdb_url: &str,
+    entries: &[ImdbSeason],
+) -> Result<StackString, Error> {
+    let button_add = r#"
+        <td>
+        <button type="submit" id="ID"
+            onclick="imdb_update('SHOW', 'LINK', SEASON, '/list/trakt/watched/list/LINK');"
+            >update database</button></td>"#;
+
+    let entries = entries
+        .iter()
+        .map(|s| {
+            format!(
+                "<tr><td>{}<td>{}<td>{}<td>{}</tr>",
+                format!(
+                    r#"<a href="javascript:updateMainArticle('/list/trakt/watched/list/{}/{}')">{}</t>"#,
+                    imdb_url, s.season, s.title
+                ),
+                s.season,
+                s.nepisodes,
+                button_add
+                    .replace("SHOW", &s.show)
+                    .replace("LINK", &link)
+                    .replace("SEASON", &s.season.to_string())
+            )
+        })
+        .join("");
+
+    let previous =
+        r#"<a href="javascript:updateMainArticle('/list/trakt/watchlist')">Go Back</a><br>"#;
+    let entries = format!(r#"{}<table border="0">{}</table>"#, previous, entries).into();
+    Ok(entries)
 }

@@ -7,18 +7,11 @@ use actix_web::{
 use anyhow::format_err;
 use chrono::{DateTime, Utc};
 use futures::future::try_join_all;
-use itertools::Itertools;
 use maplit::hashmap;
 use serde::{Deserialize, Serialize};
 use stack_string::StackString;
-use std::{
-    borrow::Borrow,
-    collections::{HashMap, HashSet},
-    hash::{Hash, Hasher},
-    os::unix::fs::symlink,
-    path,
-    path::PathBuf,
-};
+use std::{os::unix::fs::symlink, path, path::PathBuf};
+
 use tokio::{fs::remove_file, task::spawn_blocking};
 
 use movie_collection_lib::{
@@ -26,15 +19,13 @@ use movie_collection_lib::{
     imdb_ratings::ImdbRatings,
     make_list::FileLists,
     make_queue::movie_queue_http,
-    movie_collection::{
-        find_new_episodes_http_worker, ImdbSeason, LastModifiedResponse, MovieCollection,
-        TvShowsResult,
-    },
+    movie_collection::{find_new_episodes_http_worker, LastModifiedResponse, MovieCollection},
     movie_queue::{MovieQueueDB, MovieQueueResult},
     pgpool::PgPool,
     trakt_utils::{
-        get_watchlist_shows_db_map, trakt_cal_http_worker, watch_list_http_worker,
-        watched_action_http_worker, TraktActions, WatchListShow, TRAKT_CONN,
+        get_watchlist_shows_db_map, trakt_cal_http_worker, trakt_watched_seasons_worker,
+        tvshows_worker, watch_list_http_worker, watched_action_http_worker,
+        watchlist_action_worker, watchlist_worker, TRAKT_CONN,
     },
     transcode_service::{transcode_status, TranscodeService, TranscodeServiceRequest},
     tv_show_source::TvShowSource,
@@ -63,33 +54,184 @@ fn to_json(js: impl Serialize) -> HttpResult {
     Ok(HttpResponse::Ok().json(js))
 }
 
-fn movie_queue_body(patterns: &[StackString], entries: &[StackString]) -> StackString {
-    let previous = r#"<a href="javascript:updateMainArticle('/list/tvshows')">Go Back</a><br>"#;
-
-    let watchlist_url = if patterns.is_empty() {
-        "/list/trakt/watchlist".to_string()
-    } else {
-        format!("/list/trakt/watched/list/{}", patterns.join("_"))
-    };
-
-    let entries = format!(
-        r#"{}<a href="javascript:updateMainArticle('{}')">Watch List</a><table border="0">{}</table>"#,
-        previous,
-        watchlist_url,
-        entries.join("")
-    );
-
-    entries.into()
+pub async fn frontpage(_: LoggedUser) -> HttpResult {
+    form_http_response(HBR.render("index.html", &hashmap! {"BODY" => ""})?)
 }
 
-async fn queue_body_resp(
-    patterns: Vec<StackString>,
-    queue: Vec<MovieQueueResult>,
-    pool: &PgPool,
+#[derive(Serialize, Deserialize)]
+pub struct FindNewEpisodeRequest {
+    pub source: Option<TvShowSource>,
+    pub shows: Option<StackString>,
+}
+
+pub async fn find_new_episodes(
+    query: Query<FindNewEpisodeRequest>,
+    _: LoggedUser,
+    state: Data<AppState>,
 ) -> HttpResult {
-    let entries = movie_queue_http(&queue, pool).await?;
-    let body = movie_queue_body(&patterns, &entries);
-    form_http_response(body.into())
+    let req = query.into_inner();
+    let entries = find_new_episodes_http_worker(&state.db, req.shows, req.source).await?;
+    new_episode_worker(&entries)
+}
+
+fn new_episode_worker(entries: &[StackString]) -> HttpResult {
+    let previous = r#"
+        <a href="javascript:updateMainArticle('/list/tvshows')">Go Back</a><br>
+        <input type="button" name="list_cal" value="TVCalendar" onclick="updateMainArticle('/list/cal');"/>
+        <input type="button" name="list_cal" value="NetflixCalendar" onclick="updateMainArticle('/list/cal?source=netflix');"/>
+        <input type="button" name="list_cal" value="AmazonCalendar" onclick="updateMainArticle('/list/cal?source=amazon');"/>
+        <input type="button" name="list_cal" value="HuluCalendar" onclick="updateMainArticle('/list/cal?source=hulu');"/><br>
+        <button name="remcomout" id="remcomoutput"> &nbsp; </button>
+    "#;
+    let entries = format!(
+        r#"{}<table border="0">{}</table>"#,
+        previous,
+        entries.join("")
+    );
+    form_http_response(entries)
+}
+
+pub async fn tvshows(_: LoggedUser, state: Data<AppState>) -> HttpResult {
+    let shows = MovieCollection::with_pool(&state.db)?
+        .print_tv_shows()
+        .await?;
+    let tvshowsmap = get_watchlist_shows_db_map(&state.db).await?;
+    let entries = tvshows_worker(tvshowsmap, shows)?;
+    form_http_response(entries.into())
+}
+
+pub async fn user(user: LoggedUser) -> HttpResult {
+    to_json(user)
+}
+
+pub async fn movie_queue_delete(
+    path: Path<StackString>,
+    _: LoggedUser,
+    state: Data<AppState>,
+) -> HttpResult {
+    let path = path.into_inner();
+    if std::path::Path::new(path.as_str()).exists() {
+        MovieQueueDB::with_pool(&state.db)
+            .remove_from_queue_by_path(&path)
+            .await?;
+    }
+    form_http_response(path.into())
+}
+
+pub async fn movie_queue_play(idx: Path<i32>, _: LoggedUser, state: Data<AppState>) -> HttpResult {
+    let idx = idx.into_inner();
+
+    let movie_path = MovieCollection::with_pool(&state.db)?
+        .get_collection_path(idx)
+        .await?;
+    let movie_path = std::path::Path::new(movie_path.as_str());
+    play_worker(&movie_path)
+}
+
+fn play_worker(full_path: &path::Path) -> HttpResult {
+    let file_name = full_path
+        .file_name()
+        .ok_or_else(|| format_err!("Invalid path"))?
+        .to_string_lossy();
+    let url = format!("/videos/partial/{}", file_name);
+
+    let body = format!(
+        r#"
+        {}<br>
+        <video width="720" controls>
+        <source src="{}" type="video/mp4">
+        Your browser does not support HTML5 video.
+        </video>
+    "#,
+        file_name, url
+    );
+
+    let partial_path =
+        std::path::Path::new("/var/www/html/videos/partial").join(file_name.as_ref());
+    if partial_path.exists() {
+        std::fs::remove_file(&partial_path)?;
+    }
+
+    symlink(&full_path, &partial_path)?;
+    form_http_response(body)
+}
+
+#[derive(Serialize, Deserialize, Clone, Copy)]
+pub struct MovieQueueSyncRequest {
+    pub start_timestamp: DateTime<Utc>,
+}
+
+pub async fn movie_queue_route(
+    query: Query<MovieQueueSyncRequest>,
+    _: LoggedUser,
+    state: Data<AppState>,
+) -> HttpResult {
+    let req = query.into_inner();
+    let mq = MovieQueueDB::with_pool(&state.db);
+    let x = mq.get_queue_after_timestamp(req.start_timestamp).await?;
+    to_json(x)
+}
+
+pub async fn movie_queue_update(
+    data: Json<MovieQueueUpdateRequest>,
+    _: LoggedUser,
+    state: Data<AppState>,
+) -> HttpResult {
+    let queue = data.into_inner();
+    let req = queue;
+    req.handle(&state.db).await?;
+    form_http_response("Success".to_string())
+}
+
+#[derive(Serialize, Deserialize, Clone, Copy)]
+pub struct MovieCollectionSyncRequest {
+    pub start_timestamp: DateTime<Utc>,
+}
+
+pub async fn movie_collection_route(
+    query: Query<MovieCollectionSyncRequest>,
+    _: LoggedUser,
+    state: Data<AppState>,
+) -> HttpResult {
+    let req = query.into_inner();
+    let mc = MovieCollection::with_pool(&state.db)?;
+    let x = mc
+        .get_collection_after_timestamp(req.start_timestamp)
+        .await?;
+    to_json(x)
+}
+
+pub async fn movie_collection_update(
+    data: Json<MovieCollectionUpdateRequest>,
+    _: LoggedUser,
+    state: Data<AppState>,
+) -> HttpResult {
+    let collection = data.into_inner();
+
+    let req = collection;
+    req.handle(&state.db).await?;
+    form_http_response("Success".to_string())
+}
+
+pub async fn imdb_show(
+    path: Path<StackString>,
+    query: Query<ParseImdbRequest>,
+    _: LoggedUser,
+    state: Data<AppState>,
+) -> HttpResult {
+    let show = path.into_inner();
+    let query = query.into_inner();
+
+    let req = ImdbShowRequest { show, query };
+    req.handle(&state.db)
+        .await
+        .map_err(Into::into)
+        .and_then(|x| form_http_response(x.into()))
+}
+
+pub async fn last_modified_route(_: LoggedUser, state: Data<AppState>) -> HttpResult {
+    let x = LastModifiedResponse::get_last_modified(&state.db).await?;
+    to_json(x)
 }
 
 pub async fn movie_queue(_: LoggedUser, state: Data<AppState>) -> HttpResult {
@@ -113,150 +255,33 @@ pub async fn movie_queue_show(
     queue_body_resp(patterns, queue, &state.db).await
 }
 
-pub async fn movie_queue_delete(
-    path: Path<StackString>,
-    _: LoggedUser,
-    state: Data<AppState>,
+async fn queue_body_resp(
+    patterns: Vec<StackString>,
+    queue: Vec<MovieQueueResult>,
+    pool: &PgPool,
 ) -> HttpResult {
-    let path = path.into_inner();
-    if path::Path::new(path.as_str()).exists() {
-        MovieQueueDB::with_pool(&state.db)
-            .remove_from_queue_by_path(&path)
-            .await?;
-    }
-    form_http_response(path.into())
+    let entries = movie_queue_http(&queue, pool).await?;
+    let body = movie_queue_body(&patterns, &entries);
+    form_http_response(body.into())
 }
 
-async fn transcode_worker(
-    directory: Option<&path::Path>,
-    entries: &[MovieQueueResult],
-) -> HttpResult {
-    let remcom_service = TranscodeService::new(CONFIG.clone(), &CONFIG.remcom_queue);
-    let mut output = Vec::new();
-    for entry in entries {
-        let payload = TranscodeServiceRequest::create_remcom_request(
-            &CONFIG,
-            &path::Path::new(entry.path.as_str()),
-            directory,
-            false,
-        )
-        .await?;
-        remcom_service.publish_transcode_job(&payload).await?;
-        output.push(format!("{:?}", payload));
-    }
-    form_http_response(output.join(""))
-}
+fn movie_queue_body(patterns: &[StackString], entries: &[StackString]) -> StackString {
+    let previous = r#"<a href="javascript:updateMainArticle('/list/tvshows')">Go Back</a><br>"#;
 
-pub async fn movie_queue_transcode(
-    path: Path<StackString>,
-    _: LoggedUser,
-    state: Data<AppState>,
-) -> HttpResult {
-    let path = path.into_inner();
-    let patterns = vec![path];
+    let watchlist_url = if patterns.is_empty() {
+        "/list/trakt/watchlist".to_string()
+    } else {
+        format!("/list/trakt/watched/list/{}", patterns.join("_"))
+    };
 
-    let req = MovieQueueRequest { patterns };
-    let (entries, _) = req.handle(&state.db).await?;
-    transcode_worker(None, &entries).await
-}
-
-pub async fn movie_queue_transcode_directory(
-    path: Path<(StackString, StackString)>,
-    _: LoggedUser,
-    state: Data<AppState>,
-) -> HttpResult {
-    let (directory, file) = path.into_inner();
-    let patterns = vec![file];
-
-    let req = MovieQueueRequest { patterns };
-    let (entries, _) = req.handle(&state.db).await?;
-    transcode_worker(Some(&path::Path::new(directory.as_str())), &entries).await
-}
-
-fn play_worker(full_path: &path::Path) -> HttpResult {
-    let file_name = full_path
-        .file_name()
-        .ok_or_else(|| format_err!("Invalid path"))?
-        .to_string_lossy();
-    let url = format!("/videos/partial/{}", file_name);
-
-    let body = format!(
-        r#"
-        {}<br>
-        <video width="720" controls>
-        <source src="{}" type="video/mp4">
-        Your browser does not support HTML5 video.
-        </video>
-    "#,
-        file_name, url
-    );
-
-    let partial_path = path::Path::new("/var/www/html/videos/partial").join(file_name.as_ref());
-    if partial_path.exists() {
-        std::fs::remove_file(&partial_path)?;
-    }
-
-    symlink(&full_path, &partial_path)?;
-    form_http_response(body)
-}
-
-pub async fn movie_queue_play(idx: Path<i32>, _: LoggedUser, state: Data<AppState>) -> HttpResult {
-    let idx = idx.into_inner();
-
-    let movie_path = MovieCollection::with_pool(&state.db)?
-        .get_collection_path(idx)
-        .await?;
-    let movie_path = path::Path::new(movie_path.as_str());
-    play_worker(&movie_path)
-}
-
-pub async fn imdb_show(
-    path: Path<StackString>,
-    query: Query<ParseImdbRequest>,
-    _: LoggedUser,
-    state: Data<AppState>,
-) -> HttpResult {
-    let show = path.into_inner();
-    let query = query.into_inner();
-
-    let req = ImdbShowRequest { show, query };
-    req.handle(&state.db)
-        .await
-        .map_err(Into::into)
-        .and_then(|x| form_http_response(x.into()))
-}
-
-fn new_episode_worker(entries: &[StackString]) -> HttpResult {
-    let previous = r#"
-        <a href="javascript:updateMainArticle('/list/tvshows')">Go Back</a><br>
-        <input type="button" name="list_cal" value="TVCalendar" onclick="updateMainArticle('/list/cal');"/>
-        <input type="button" name="list_cal" value="NetflixCalendar" onclick="updateMainArticle('/list/cal?source=netflix');"/>
-        <input type="button" name="list_cal" value="AmazonCalendar" onclick="updateMainArticle('/list/cal?source=amazon');"/>
-        <input type="button" name="list_cal" value="HuluCalendar" onclick="updateMainArticle('/list/cal?source=hulu');"/><br>
-        <button name="remcomout" id="remcomoutput"> &nbsp; </button>
-    "#;
     let entries = format!(
-        r#"{}<table border="0">{}</table>"#,
+        r#"{}<a href="javascript:updateMainArticle('{}')">Watch List</a><table border="0">{}</table>"#,
         previous,
+        watchlist_url,
         entries.join("")
     );
-    form_http_response(entries)
-}
 
-#[derive(Serialize, Deserialize)]
-pub struct FindNewEpisodeRequest {
-    pub source: Option<TvShowSource>,
-    pub shows: Option<StackString>,
-}
-
-pub async fn find_new_episodes(
-    query: Query<FindNewEpisodeRequest>,
-    _: LoggedUser,
-    state: Data<AppState>,
-) -> HttpResult {
-    let req = query.into_inner();
-    let entries = find_new_episodes_http_worker(&state.db, req.shows, req.source).await?;
-    new_episode_worker(&entries)
+    entries.into()
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone, Copy)]
@@ -296,6 +321,16 @@ pub async fn imdb_episodes_update(
     });
     let results: Result<Vec<_>, Error> = try_join_all(futures).await;
     results?;
+    form_http_response("Success".to_string())
+}
+
+pub async fn imdb_ratings_set_source(
+    query: Query<ImdbRatingsSetSourceRequest>,
+    _: LoggedUser,
+    state: Data<AppState>,
+) -> HttpResult {
+    let query = query.into_inner();
+    query.handle(&state.db).await?;
     form_http_response("Success".to_string())
 }
 
@@ -339,319 +374,55 @@ pub async fn imdb_ratings_update(
     form_http_response("Success".to_string())
 }
 
-pub async fn imdb_ratings_set_source(
-    query: Query<ImdbRatingsSetSourceRequest>,
-    _: LoggedUser,
-    state: Data<AppState>,
-) -> HttpResult {
-    let query = query.into_inner();
-    query.handle(&state.db).await?;
-    form_http_response("Success".to_string())
+pub async fn trakt_auth_url(_: LoggedUser) -> HttpResult {
+    TRAKT_CONN.init().await;
+    let url = TRAKT_CONN.get_auth_url().await?;
+    form_http_response(url.to_string())
 }
 
-#[derive(Serialize, Deserialize, Clone, Copy)]
-pub struct MovieQueueSyncRequest {
-    pub start_timestamp: DateTime<Utc>,
+#[derive(Serialize, Deserialize)]
+pub struct TraktCallbackRequest {
+    pub code: StackString,
+    pub state: StackString,
 }
 
-pub async fn movie_queue_route(
-    query: Query<MovieQueueSyncRequest>,
-    _: LoggedUser,
-    state: Data<AppState>,
-) -> HttpResult {
-    let req = query.into_inner();
-    let mq = MovieQueueDB::with_pool(&state.db);
-    let x = mq.get_queue_after_timestamp(req.start_timestamp).await?;
-    to_json(x)
-}
-
-pub async fn movie_queue_update(
-    data: Json<MovieQueueUpdateRequest>,
-    _: LoggedUser,
-    state: Data<AppState>,
-) -> HttpResult {
-    let queue = data.into_inner();
-
-    let req = queue;
-    req.handle(&state.db).await?;
-    form_http_response("Success".to_string())
-}
-
-#[derive(Serialize, Deserialize, Clone, Copy)]
-pub struct MovieCollectionSyncRequest {
-    pub start_timestamp: DateTime<Utc>,
-}
-
-pub async fn movie_collection_route(
-    query: Query<MovieCollectionSyncRequest>,
-    _: LoggedUser,
-    state: Data<AppState>,
-) -> HttpResult {
-    let req = query.into_inner();
-    let mc = MovieCollection::with_pool(&state.db)?;
-    let x = mc
-        .get_collection_after_timestamp(req.start_timestamp)
+pub async fn trakt_callback(query: Query<TraktCallbackRequest>, _: LoggedUser) -> HttpResult {
+    TRAKT_CONN.init().await;
+    TRAKT_CONN
+        .exchange_code_for_auth_token(query.code.as_str(), query.state.as_str())
         .await?;
-    to_json(x)
+    let body = r#"
+        <title>Trakt auth code received!</title>
+        This window can be closed.
+        <script language="JavaScript" type="text/javascript">window.close()</script>"#;
+    form_http_response(body.to_string())
 }
 
-pub async fn movie_collection_update(
-    data: Json<MovieCollectionUpdateRequest>,
-    _: LoggedUser,
-    state: Data<AppState>,
-) -> HttpResult {
-    let collection = data.into_inner();
-
-    let req = collection;
-    req.handle(&state.db).await?;
-    form_http_response("Success".to_string())
+pub async fn refresh_auth(_: LoggedUser) -> HttpResult {
+    TRAKT_CONN.init().await;
+    TRAKT_CONN.exchange_refresh_token().await?;
+    form_http_response("finished".to_string())
 }
 
-pub async fn last_modified_route(_: LoggedUser, state: Data<AppState>) -> HttpResult {
-    let x = LastModifiedResponse::get_last_modified(&state.db).await?;
-    to_json(x)
+pub async fn trakt_cal(_: LoggedUser, state: Data<AppState>) -> HttpResult {
+    let entries = trakt_cal_http_worker(&state.db).await?;
+    trakt_cal_worker(&entries)
 }
 
-pub async fn frontpage(_: LoggedUser, _: Data<AppState>) -> HttpResult {
-    form_http_response(HBR.render("index.html", &hashmap! {"BODY" => ""})?)
-}
-
-type TvShowsMap = HashMap<StackString, (StackString, WatchListShow, Option<TvShowSource>)>;
-
-#[derive(Debug, Default, Eq)]
-struct ProcessShowItem {
-    show: StackString,
-    title: StackString,
-    link: StackString,
-    source: Option<TvShowSource>,
-}
-
-impl PartialEq for ProcessShowItem {
-    fn eq(&self, other: &Self) -> bool {
-        self.link == other.link
-    }
-}
-
-impl Hash for ProcessShowItem {
-    fn hash<H>(&self, state: &mut H)
-    where
-        H: Hasher,
-    {
-        self.link.hash(state)
-    }
-}
-
-impl Borrow<str> for ProcessShowItem {
-    fn borrow(&self) -> &str {
-        self.link.as_str()
-    }
-}
-
-impl From<TvShowsResult> for ProcessShowItem {
-    fn from(item: TvShowsResult) -> Self {
-        Self {
-            show: item.show,
-            title: item.title,
-            link: item.link,
-            source: item.source,
-        }
-    }
-}
-
-fn tvshows_worker(res1: TvShowsMap, tvshows: Vec<TvShowsResult>) -> Result<StackString, Error> {
-    let tvshows: HashSet<_> = tvshows
-        .into_iter()
-        .map(|s| {
-            let item: ProcessShowItem = s.into();
-            item
-        })
-        .collect();
-    let watchlist: HashSet<_> = res1
-        .into_iter()
-        .map(|(link, (show, s, source))| {
-            let item = ProcessShowItem {
-                show,
-                title: s.title,
-                link: s.link,
-                source,
-            };
-            debug_assert!(link.as_str() == item.link.as_str());
-            item
-        })
-        .collect();
-
-    let shows = process_shows(tvshows, watchlist)?;
-
-    let previous = r#"
-        <a href="javascript:updateMainArticle('/list/watchlist')">Go Back</a><br>
-        <a href="javascript:updateMainArticle('/list/trakt/watchlist')">Watch List</a>
-        <button name="remcomout" id="remcomoutput"> &nbsp; </button><br>
-    "#;
-
+fn trakt_cal_worker(entries: &[StackString]) -> HttpResult {
+    let previous = r#"<a href="javascript:updateMainArticle('/list/tvshows')">Go Back</a><br>"#;
     let entries = format!(
         r#"{}<table border="0">{}</table>"#,
         previous,
-        shows.join("")
-    )
-    .into();
-
-    Ok(entries)
-}
-
-pub async fn tvshows(_: LoggedUser, state: Data<AppState>) -> HttpResult {
-    let shows = MovieCollection::with_pool(&state.db)?
-        .print_tv_shows()
-        .await?;
-    let tvshowsmap = get_watchlist_shows_db_map(&state.db).await?;
-    let entries = tvshows_worker(tvshowsmap, shows)?;
-    form_http_response(entries.into())
-}
-
-fn process_shows(
-    tvshows: HashSet<ProcessShowItem>,
-    watchlist: HashSet<ProcessShowItem>,
-) -> Result<Vec<StackString>, Error> {
-    let watchlist_shows: Vec<_> = watchlist
-        .iter()
-        .filter(|item| tvshows.get(item.link.as_str()).is_none())
-        .collect();
-
-    let mut shows: Vec<_> = tvshows.iter().chain(watchlist_shows.into_iter()).collect();
-    shows.sort_by(|x, y| x.show.cmp(&y.show));
-
-    let button_add = r#"<td><button type="submit" id="ID" onclick="watchlist_add('SHOW');">add to watchlist</button></td>"#;
-    let button_rm = r#"<td><button type="submit" id="ID" onclick="watchlist_rm('SHOW');">remove from watchlist</button></td>"#;
-
-    let shows: Vec<_> = shows
-        .into_iter()
-        .map(|item| {
-            let has_watchlist = watchlist.contains(item.link.as_str());
-            format!(
-                r#"<tr><td>{}</td>
-                <td><a href="https://www.imdb.com/title/{}" target="_blank">imdb</a></td><td>{}</td><td>{}</td><td>{}</td></tr>"#,
-                if tvshows.contains(item.link.as_str()) {
-                    format!(r#"<a href="javascript:updateMainArticle('/list/{}')">{}</a>"#, item.show, item.title)
-                } else {
-                    format!(
-                        r#"<a href="javascript:updateMainArticle('/list/trakt/watched/list/{}')">{}</a>"#,
-                        item.link, item.title
-                    )
-                },
-                item.link,
-                match item.source {
-                    Some(TvShowSource::Netflix) => r#"<a href="https://netflix.com" target="_blank">netflix</a>"#,
-                    Some(TvShowSource::Hulu) => r#"<a href="https://hulu.com" target="_blank">hulu</a>"#,
-                    Some(TvShowSource::Amazon) => r#"<a href="https://amazon.com" target="_blank">amazon</a>"#,
-                    _ => "",
-                },
-                if has_watchlist {
-                    format!(r#"<a href="javascript:updateMainArticle('/list/trakt/watched/list/{}')">watchlist</a>"#, item.link)
-                } else {
-                    "".to_string()
-                },
-                if has_watchlist {
-                    button_rm.replace("SHOW", &item.link)
-                } else {
-                    button_add.replace("SHOW", &item.link)
-                },
-            ).into()
-        })
-        .collect();
-    Ok(shows)
-}
-
-fn watchlist_worker(
-    shows: HashMap<StackString, (StackString, WatchListShow, Option<TvShowSource>)>,
-) -> HttpResult {
-    let mut shows: Vec<_> = shows
-        .into_iter()
-        .map(|(_, (_, s, source))| (s.title, s.link, source))
-        .collect();
-
-    shows.sort();
-
-    let shows = shows
-        .into_iter()
-        .map(|(title, link, source)| {
-            format!(
-                r#"<tr><td>{}</td><td>
-                   <a href="https://www.imdb.com/title/{}" target="_blank">imdb</a> {} </tr>"#,
-                format!(
-                    r#"<a href="javascript:updateMainArticle('/list/trakt/watched/list/{}')">{}</a>"#,
-                    link, title
-                ),
-                link,
-                format!(
-                    r#"<td><form action="javascript:setSource('{link}', '{link}_source_id')">
-                       <select id="{link}_source_id" onchange="setSource('{link}', '{link}_source_id');">
-                       {options}
-                       </select>
-                       </form></td>
-                    "#,
-                    link = link,
-                    options = match source {
-                        Some(TvShowSource::All) | None => {
-                            r#"
-                                <option value="all"></option>
-                                <option value="amazon">Amazon</option>
-                                <option value="hulu">Hulu</option>
-                                <option value="netflix">Netflix</option>
-                            "#
-                        }
-                        Some(TvShowSource::Amazon) => {
-                            r#"
-                                <option value="amazon">Amazon</option>
-                                <option value="all"></option>
-                                <option value="hulu">Hulu</option>
-                                <option value="netflix">Netflix</option>
-                            "#
-                        }
-                        Some(TvShowSource::Hulu) => {
-                            r#"
-                                <option value="hulu">Hulu</option>
-                                <option value="all"></option>
-                                <option value="amazon">Amazon</option>
-                                <option value="netflix">Netflix</option>
-                            "#
-                        }
-                        Some(TvShowSource::Netflix) => {
-                            r#"
-                                <option value="netflix">Netflix</option>
-                                <option value="all"></option>
-                                <option value="amazon">Amazon</option>
-                                <option value="hulu">Hulu</option>
-                            "#
-                        }
-                    },
-                )
-            )
-        })
-        .join("");
-
-    let previous = r#"<a href="javascript:updateMainArticle('/list/tvshows')">Go Back</a><br>"#;
-    let entries = format!(r#"{}<table border="0">{}</table>"#, previous, shows);
-
+        entries.join("")
+    );
     form_http_response(entries)
 }
 
 pub async fn trakt_watchlist(_: LoggedUser, state: Data<AppState>) -> HttpResult {
-    get_watchlist_shows_db_map(&state.db)
-        .await
-        .map_err(Into::into)
-        .and_then(watchlist_worker)
-}
-
-async fn watchlist_action_worker(action: TraktActions, imdb_url: &str) -> HttpResult {
-    TRAKT_CONN.init().await;
-    let body = match action {
-        TraktActions::Add => TRAKT_CONN.add_watchlist_show(&imdb_url).await?.to_string(),
-        TraktActions::Remove => TRAKT_CONN
-            .remove_watchlist_show(&imdb_url)
-            .await?
-            .to_string(),
-        _ => "".to_string(),
-    };
-    form_http_response(body)
+    let shows = get_watchlist_shows_db_map(&state.db).await?;
+    let entries = watchlist_worker(shows);
+    form_http_response(entries)
 }
 
 pub async fn trakt_watchlist_action(
@@ -664,43 +435,8 @@ pub async fn trakt_watchlist_action(
 
     let req = WatchlistActionRequest { action, imdb_url };
     let imdb_url = req.handle(&state.db).await?;
-    watchlist_action_worker(action, &imdb_url).await
-}
-
-fn trakt_watched_seasons_worker(
-    link: &str,
-    imdb_url: &str,
-    entries: &[ImdbSeason],
-) -> Result<StackString, Error> {
-    let button_add = r#"
-        <td>
-        <button type="submit" id="ID"
-            onclick="imdb_update('SHOW', 'LINK', SEASON, '/list/trakt/watched/list/LINK');"
-            >update database</button></td>"#;
-
-    let entries = entries
-        .iter()
-        .map(|s| {
-            format!(
-                "<tr><td>{}<td>{}<td>{}<td>{}</tr>",
-                format!(
-                    r#"<a href="javascript:updateMainArticle('/list/trakt/watched/list/{}/{}')">{}</t>"#,
-                    imdb_url, s.season, s.title
-                ),
-                s.season,
-                s.nepisodes,
-                button_add
-                    .replace("SHOW", &s.show)
-                    .replace("LINK", &link)
-                    .replace("SEASON", &s.season.to_string())
-            )
-        })
-        .join("");
-
-    let previous =
-        r#"<a href="javascript:updateMainArticle('/list/trakt/watchlist')">Go Back</a><br>"#;
-    let entries = format!(r#"{}<table border="0">{}</table>"#, previous, entries).into();
-    Ok(entries)
+    let body = watchlist_action_worker(action, &imdb_url).await?;
+    form_http_response(body)
 }
 
 pub async fn trakt_watched_seasons(
@@ -747,69 +483,15 @@ pub async fn trakt_watched_action(
     state: Data<AppState>,
 ) -> HttpResult {
     let (action, imdb_url, season, episode) = path.into_inner();
-    watched_action_http_worker(
+    let body = watched_action_http_worker(
         &state.db,
         action.parse().expect("impossible"),
         &imdb_url,
         season,
         episode,
     )
-    .await
-    .map_err(Into::into)
-    .and_then(|x| form_http_response(x.into()))
-}
-
-fn trakt_cal_worker(entries: &[StackString]) -> HttpResult {
-    let previous = r#"<a href="javascript:updateMainArticle('/list/tvshows')">Go Back</a><br>"#;
-    let entries = format!(
-        r#"{}<table border="0">{}</table>"#,
-        previous,
-        entries.join("")
-    );
-    form_http_response(entries)
-}
-
-pub async fn trakt_cal(_: LoggedUser, state: Data<AppState>) -> HttpResult {
-    let entries = trakt_cal_http_worker(&state.db).await?;
-    trakt_cal_worker(&entries)
-}
-
-pub async fn user(user: LoggedUser) -> HttpResult {
-    to_json(user)
-}
-
-pub async fn trakt_auth_url(_: LoggedUser, _: Data<AppState>) -> HttpResult {
-    TRAKT_CONN.init().await;
-    let url = TRAKT_CONN.get_auth_url().await?;
-    form_http_response(url.to_string())
-}
-
-#[derive(Serialize, Deserialize)]
-pub struct TraktCallbackRequest {
-    pub code: StackString,
-    pub state: StackString,
-}
-
-pub async fn trakt_callback(
-    query: Query<TraktCallbackRequest>,
-    _: LoggedUser,
-    _: Data<AppState>,
-) -> HttpResult {
-    TRAKT_CONN.init().await;
-    TRAKT_CONN
-        .exchange_code_for_auth_token(query.code.as_str(), query.state.as_str())
-        .await?;
-    let body = r#"
-        <title>Trakt auth code received!</title>
-        This window can be closed.
-        <script language="JavaScript" type="text/javascript">window.close()</script>"#;
-    form_http_response(body.to_string())
-}
-
-pub async fn refresh_auth(_: LoggedUser, _: Data<AppState>) -> HttpResult {
-    TRAKT_CONN.init().await;
-    TRAKT_CONN.exchange_refresh_token().await?;
-    form_http_response("finished".to_string())
+    .await?;
+    form_http_response(body.into())
 }
 
 pub async fn movie_queue_transcode_status(_: LoggedUser, _: Data<AppState>) -> HttpResult {
@@ -819,11 +501,7 @@ pub async fn movie_queue_transcode_status(_: LoggedUser, _: Data<AppState>) -> H
     form_http_response(status.get_html(&file_lists, &CONFIG).join(""))
 }
 
-pub async fn movie_queue_transcode_file(
-    path: Path<StackString>,
-    _: LoggedUser,
-    _: Data<AppState>,
-) -> HttpResult {
+pub async fn movie_queue_transcode_file(path: Path<StackString>, _: LoggedUser) -> HttpResult {
     let filename = path.into_inner();
     let transcode_service = TranscodeService::new(CONFIG.clone(), &CONFIG.transcode_queue);
     let input_path = CONFIG
@@ -836,11 +514,7 @@ pub async fn movie_queue_transcode_file(
     form_http_response("".to_string())
 }
 
-pub async fn movie_queue_remcom_file(
-    path: Path<StackString>,
-    _: LoggedUser,
-    _: Data<AppState>,
-) -> HttpResult {
+pub async fn movie_queue_remcom_file(path: Path<StackString>, _: LoggedUser) -> HttpResult {
     let filename = path.into_inner();
     let transcode_service = TranscodeService::new(CONFIG.clone(), &CONFIG.remcom_queue);
     let input_path = CONFIG
@@ -859,7 +533,6 @@ pub async fn movie_queue_remcom_file(
 pub async fn movie_queue_remcom_directory_file(
     path: Path<(StackString, StackString)>,
     _: LoggedUser,
-    _: Data<AppState>,
 ) -> HttpResult {
     let (directory, filename) = path.into_inner();
     let transcode_service = TranscodeService::new(CONFIG.clone(), &CONFIG.remcom_queue);
@@ -879,11 +552,7 @@ pub async fn movie_queue_remcom_directory_file(
     form_http_response("".to_string())
 }
 
-pub async fn movie_queue_transcode_cleanup(
-    path: Path<StackString>,
-    _: LoggedUser,
-    _: Data<AppState>,
-) -> HttpResult {
+pub async fn movie_queue_transcode_cleanup(path: Path<StackString>, _: LoggedUser) -> HttpResult {
     let path = path.into_inner();
     let movie_path = CONFIG.home_dir.join("Documents").join("movies").join(&path);
     let tmp_path = CONFIG.home_dir.join("tmp_avi").join(&path);
@@ -896,4 +565,50 @@ pub async fn movie_queue_transcode_cleanup(
     } else {
         form_http_response(format!("File not found {}", path))
     }
+}
+
+async fn transcode_worker(
+    directory: Option<&path::Path>,
+    entries: &[MovieQueueResult],
+) -> HttpResult {
+    let remcom_service = TranscodeService::new(CONFIG.clone(), &CONFIG.remcom_queue);
+    let mut output = Vec::new();
+    for entry in entries {
+        let payload = TranscodeServiceRequest::create_remcom_request(
+            &CONFIG,
+            &path::Path::new(entry.path.as_str()),
+            directory,
+            false,
+        )
+        .await?;
+        remcom_service.publish_transcode_job(&payload).await?;
+        output.push(format!("{:?}", payload));
+    }
+    form_http_response(output.join(""))
+}
+
+pub async fn movie_queue_transcode(
+    path: Path<StackString>,
+    _: LoggedUser,
+    state: Data<AppState>,
+) -> HttpResult {
+    let path = path.into_inner();
+    let patterns = vec![path];
+
+    let req = MovieQueueRequest { patterns };
+    let (entries, _) = req.handle(&state.db).await?;
+    transcode_worker(None, &entries).await
+}
+
+pub async fn movie_queue_transcode_directory(
+    path: Path<(StackString, StackString)>,
+    _: LoggedUser,
+    state: Data<AppState>,
+) -> HttpResult {
+    let (directory, file) = path.into_inner();
+    let patterns = vec![file];
+
+    let req = MovieQueueRequest { patterns };
+    let (entries, _) = req.handle(&state.db).await?;
+    transcode_worker(Some(&path::Path::new(directory.as_str())), &entries).await
 }

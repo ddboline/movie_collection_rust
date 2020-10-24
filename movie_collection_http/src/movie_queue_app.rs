@@ -73,8 +73,65 @@ pub async fn start_app() -> Result<(), Error> {
                     .service(web::resource("/index.html").route(web::get().to(frontpage)))
                     .service(web::resource("/cal").route(web::get().to(find_new_episodes)))
                     .service(web::resource("/tvshows").route(web::get().to(tvshows)))
+                    .service(web::resource("/user").route(web::get().to(user)))
                     .service(
                         web::resource("/delete/{path}").route(web::get().to(movie_queue_delete)),
+                    )
+                    .service(web::resource("/play/{index}").route(web::get().to(movie_queue_play)))
+                    .service(
+                        web::resource("/movie_queue")
+                            .route(web::get().to(movie_queue_route))
+                            .route(web::post().to(movie_queue_update)),
+                    )
+                    .service(
+                        web::resource("/movie_collection")
+                            .route(web::get().to(movie_collection_route))
+                            .route(web::post().to(movie_collection_update)),
+                    )
+                    .service(web::resource("/imdb/{show}").route(web::get().to(imdb_show)))
+                    .service(
+                        web::resource("/last_modified").route(web::get().to(last_modified_route)),
+                    )
+                    .service(web::resource("/full_queue").route(web::get().to(movie_queue)))
+                    .service(web::resource("/queue/{show}").route(web::get().to(movie_queue_show)))
+                    .service(
+                        web::resource("/imdb_episodes")
+                            .route(web::get().to(imdb_episodes_route))
+                            .route(web::post().to(imdb_episodes_update)),
+                    )
+                    .service(
+                        web::resource("/imdb_ratings/set_source")
+                            .route(web::get().to(imdb_ratings_set_source)),
+                    )
+                    .service(
+                        web::resource("/imdb_ratings")
+                            .route(web::get().to(imdb_ratings_route))
+                            .route(web::post().to(imdb_ratings_update)),
+                    )
+                    .service(web::resource("/trakt/auth_url").route(web::get().to(trakt_auth_url)))
+                    .service(web::resource("/trakt/callback").route(web::get().to(trakt_callback)))
+                    .service(
+                        web::resource("/trakt/refresh_auth").route(web::get().to(refresh_auth)),
+                    )
+                    .service(web::resource("/trakt/cal").route(web::get().to(trakt_cal)))
+                    .service(
+                        web::resource("/trakt/watchlist").route(web::get().to(trakt_watchlist)),
+                    )
+                    .service(
+                        web::resource("/trakt/watchlist/{action}/{imdb_url}")
+                            .route(web::get().to(trakt_watchlist_action)),
+                    )
+                    .service(
+                        web::resource("/trakt/watched/list/{imdb_url}")
+                            .route(web::get().to(trakt_watched_seasons)),
+                    )
+                    .service(
+                        web::resource("/trakt/watched/list/{imdb_url}/{season}")
+                            .route(web::get().to(trakt_watched_list)),
+                    )
+                    .service(
+                        web::resource("/trakt/watched/{action}/{imdb_url}/{season}/{episode}")
+                            .route(web::get().to(trakt_watched_action)),
                     )
                     .service(
                         web::resource("/transcode/status")
@@ -103,68 +160,10 @@ pub async fn start_app() -> Result<(), Error> {
                     .service(
                         web::resource("/transcode/cleanup/{file}")
                             .route(web::get().to(movie_queue_transcode_cleanup)),
-                    )
-                    .service(web::resource("/play/{index}").route(web::get().to(movie_queue_play)))
-                    .service(web::resource("/trakt/auth_url").route(web::get().to(trakt_auth_url)))
-                    .service(web::resource("/trakt/callback").route(web::get().to(trakt_callback)))
-                    .service(
-                        web::resource("/trakt/refresh_auth").route(web::get().to(refresh_auth)),
-                    )
-                    .service(web::resource("/trakt/cal").route(web::get().to(trakt_cal)))
-                    .service(
-                        web::resource("/trakt/watchlist").route(web::get().to(trakt_watchlist)),
-                    )
-                    .service(
-                        web::resource("/trakt/watchlist/{action}/{imdb_url}")
-                            .route(web::get().to(trakt_watchlist_action)),
-                    )
-                    .service(
-                        web::resource("/trakt/watched/list/{imdb_url}")
-                            .route(web::get().to(trakt_watched_seasons)),
-                    )
-                    .service(
-                        web::resource("/trakt/watched/list/{imdb_url}/{season}")
-                            .route(web::get().to(trakt_watched_list)),
-                    )
-                    .service(
-                        web::resource("/trakt/watched/{action}/{imdb_url}/{season}/{episode}")
-                            .route(web::get().to(trakt_watched_action)),
-                    )
-                    .service(
-                        web::resource("/imdb_episodes")
-                            .route(web::get().to(imdb_episodes_route))
-                            .route(web::post().to(imdb_episodes_update)),
-                    )
-                    .service(
-                        web::resource("/imdb_ratings/set_source")
-                            .route(web::get().to(imdb_ratings_set_source)),
-                    )
-                    .service(
-                        web::resource("/imdb_ratings")
-                            .route(web::get().to(imdb_ratings_route))
-                            .route(web::post().to(imdb_ratings_update)),
-                    )
-                    .service(
-                        web::resource("/movie_queue")
-                            .route(web::get().to(movie_queue_route))
-                            .route(web::post().to(movie_queue_update)),
-                    )
-                    .service(
-                        web::resource("/movie_collection")
-                            .route(web::get().to(movie_collection_route))
-                            .route(web::post().to(movie_collection_update)),
-                    )
-                    .service(web::resource("/imdb/{show}").route(web::get().to(imdb_show)))
-                    .service(
-                        web::resource("/last_modified").route(web::get().to(last_modified_route)),
-                    )
-                    .service(web::resource("/user").route(web::get().to(user)))
-                    .service(web::resource("/full_queue").route(web::get().to(movie_queue)))
-                    .service(web::resource("/{show}").route(web::get().to(movie_queue_show))),
+                    ),
             )
     })
-    .bind(&format!("127.0.0.1:{}", port))
-    .unwrap_or_else(|_| panic!("Failed to bind to port {}", port))
+    .bind(&format!("127.0.0.1:{}", port))?
     .run()
     .await
     .map_err(Into::into)
