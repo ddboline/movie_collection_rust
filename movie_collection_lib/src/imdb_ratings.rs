@@ -1,7 +1,7 @@
 use anyhow::Error;
 use chrono::{DateTime, Utc};
 use log::debug;
-use postgres_query::{FromSqlRow, Parameter};
+use postgres_query::FromSqlRow;
 use serde::{Deserialize, Serialize};
 use stack_string::StackString;
 use std::fmt;
@@ -63,31 +63,18 @@ impl ImdbRatings {
     }
 
     pub async fn update_show(&self, pool: &PgPool) -> Result<(), Error> {
-        let mut bindings = Vec::new();
-        let query = format!(
+        let query = postgres_query::query!(
             r#"
                 UPDATE imdb_ratings
-                SET last_modified=now(){}{}{}{}
+                SET last_modified=now(),title=$title,rating=$rating,istv=$istv,source=$source
                 WHERE show=$show
             "#,
-            self.title.as_ref().map_or("", |title| {
-                bindings.push(("title", title as Parameter));
-                ",title=$title"
-            }),
-            self.rating.as_ref().map_or("", |rating| {
-                bindings.push(("rating", rating as Parameter));
-                ",rating=$rating"
-            }),
-            self.istv.as_ref().map_or("", |istv| {
-                bindings.push(("istv", istv as Parameter));
-                ",istv=$istv"
-            }),
-            self.source.as_ref().map_or("", |source| {
-                bindings.push(("source", source as Parameter));
-                ",source=$source"
-            }),
+            title = self.title,
+            rating = self.rating,
+            istv = self.istv,
+            source = self.source,
+            show = self.show,
         );
-        let query = postgres_query::query_dyn!(&query, show = self.show, ..bindings)?;
         pool.get()
             .await?
             .execute(query.sql(), query.parameters())
