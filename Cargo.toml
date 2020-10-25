@@ -7,6 +7,7 @@ edition = "2018"
 [dependencies]
 movie_collection_lib = {path = "movie_collection_lib"}
 movie_collection_http = {path = "movie_collection_http"}
+movie_sync_http = {path = "movie_sync_http"}
 movie_trakt_http = {path = "movie_trakt_http"}
 movie_transcode_http = {path = "movie_transcode_http"}
 rayon = "1.5"
@@ -67,6 +68,11 @@ doc = false
 [[bin]]
 name = "movie-queue-http"
 path = "src/movie_queue_http.rs"
+doc = false
+
+[[bin]]
+name = "movie-sync-http"
+path = "src/movie_sync_http.rs"
 doc = false
 
 [[bin]]

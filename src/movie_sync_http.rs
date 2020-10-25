@@ -1,7 +1,7 @@
 #![allow(clippy::used_underscore_binding)]
 #![allow(clippy::needless_pass_by_value)]
 
-use movie_collection_http::app::start_app;
+use movie_sync_http::app::start_app;
 
 #[actix_rt::main]
 async fn main() {
