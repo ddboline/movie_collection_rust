@@ -6,7 +6,6 @@ use actix_web::{
 };
 use anyhow::format_err;
 use chrono::{DateTime, Utc};
-use futures::future::try_join_all;
 use maplit::hashmap;
 use serde::{Deserialize, Serialize};
 use stack_string::StackString;
@@ -124,10 +123,11 @@ pub async fn movie_queue_play(idx: Path<i32>, _: LoggedUser, state: Data<AppStat
         .get_collection_path(idx)
         .await?;
     let movie_path = std::path::Path::new(movie_path.as_str());
-    play_worker(&movie_path)
+    let body = play_worker(&movie_path)?;
+    form_http_response(body)
 }
 
-fn play_worker(full_path: &path::Path) -> HttpResult {
+fn play_worker(full_path: &path::Path) -> Result<String, Error> {
     let file_name = full_path
         .file_name()
         .ok_or_else(|| format_err!("Invalid path"))?
@@ -135,13 +135,12 @@ fn play_worker(full_path: &path::Path) -> HttpResult {
     let url = format!("/videos/partial/{}", file_name);
 
     let body = format!(
-        r#"
-        {}<br>
-        <video width="720" controls>
-        <source src="{}" type="video/mp4">
-        Your browser does not support HTML5 video.
-        </video>
-    "#,
+        r#"{}<br>
+            <video width="720" controls>
+            <source src="{}" type="video/mp4">
+            Your browser does not support HTML5 video.
+            </video>
+        "#,
         file_name, url
     );
 
@@ -152,7 +151,7 @@ fn play_worker(full_path: &path::Path) -> HttpResult {
     }
 
     symlink(&full_path, &partial_path)?;
-    form_http_response(body)
+    Ok(body)
 }
 
 #[derive(Serialize, Deserialize, Clone, Copy)]
@@ -167,8 +166,8 @@ pub async fn movie_queue_route(
 ) -> HttpResult {
     let req = query.into_inner();
     let mq = MovieQueueDB::with_pool(&state.db);
-    let x = mq.get_queue_after_timestamp(req.start_timestamp).await?;
-    to_json(x)
+    let queue = mq.get_queue_after_timestamp(req.start_timestamp).await?;
+    to_json(queue)
 }
 
 pub async fn movie_queue_update(
@@ -222,15 +221,13 @@ pub async fn imdb_show(
     let query = query.into_inner();
 
     let req = ImdbShowRequest { show, query };
-    req.handle(&state.db)
-        .await
-        .map_err(Into::into)
-        .and_then(|x| form_http_response(x.into()))
+    let body = req.handle(&state.db).await?;
+    form_http_response(body.into())
 }
 
 pub async fn last_modified_route(_: LoggedUser, state: Data<AppState>) -> HttpResult {
-    let x = LastModifiedResponse::get_last_modified(&state.db).await?;
-    to_json(x)
+    let last_mods = LastModifiedResponse::get_last_modified(&state.db).await?;
+    to_json(last_mods)
 }
 
 pub async fn movie_queue(_: LoggedUser, state: Data<AppState>) -> HttpResult {
@@ -238,7 +235,8 @@ pub async fn movie_queue(_: LoggedUser, state: Data<AppState>) -> HttpResult {
         patterns: Vec::new(),
     };
     let (queue, _) = req.handle(&state.db).await?;
-    queue_body_resp(Vec::new(), queue, &state.db).await
+    let body = queue_body_resp(Vec::new(), queue, &state.db).await?;
+    form_http_response(body.into())
 }
 
 pub async fn movie_queue_show(
@@ -251,17 +249,18 @@ pub async fn movie_queue_show(
 
     let req = MovieQueueRequest { patterns };
     let (queue, patterns) = req.handle(&state.db).await?;
-    queue_body_resp(patterns, queue, &state.db).await
+    let body = queue_body_resp(patterns, queue, &state.db).await?;
+    form_http_response(body.into())
 }
 
 async fn queue_body_resp(
     patterns: Vec<StackString>,
     queue: Vec<MovieQueueResult>,
     pool: &PgPool,
-) -> HttpResult {
+) -> Result<StackString, Error> {
     let entries = movie_queue_http(&queue, pool).await?;
     let body = movie_queue_body(&patterns, &entries);
-    form_http_response(body.into())
+    Ok(body)
 }
 
 fn movie_queue_body(patterns: &[StackString], entries: &[StackString]) -> StackString {
@@ -294,8 +293,9 @@ pub async fn imdb_episodes_route(
     state: Data<AppState>,
 ) -> HttpResult {
     let req = query.into_inner();
-    let x = ImdbEpisodes::get_episodes_after_timestamp(req.start_timestamp, &state.db).await?;
-    to_json(x)
+    let episodes =
+        ImdbEpisodes::get_episodes_after_timestamp(req.start_timestamp, &state.db).await?;
+    to_json(episodes)
 }
 
 #[derive(Serialize, Deserialize)]
@@ -308,18 +308,7 @@ pub async fn imdb_episodes_update(
     _: LoggedUser,
     state: Data<AppState>,
 ) -> HttpResult {
-    let futures = data.episodes.iter().map(|episode| {
-        let pool = state.db.clone();
-        async move {
-            match episode.get_index(&pool).await? {
-                Some(_) => episode.update_episode(&pool).await?,
-                None => episode.insert_episode(&pool).await?,
-            };
-            Ok(())
-        }
-    });
-    let results: Result<Vec<_>, Error> = try_join_all(futures).await;
-    results?;
+    ImdbEpisodes::update_episodes(&data.episodes, &state.db).await?;
     form_http_response("Success".to_string())
 }
 
@@ -344,8 +333,8 @@ pub async fn imdb_ratings_route(
     state: Data<AppState>,
 ) -> HttpResult {
     let req = query.into_inner();
-    let x = ImdbRatings::get_shows_after_timestamp(req.start_timestamp, &state.db).await?;
-    to_json(x)
+    let shows = ImdbRatings::get_shows_after_timestamp(req.start_timestamp, &state.db).await?;
+    to_json(shows)
 }
 
 #[derive(Serialize, Deserialize)]
@@ -358,18 +347,7 @@ pub async fn imdb_ratings_update(
     _: LoggedUser,
     state: Data<AppState>,
 ) -> HttpResult {
-    let futures = data.shows.iter().map(|show| {
-        let pool = state.db.clone();
-        async move {
-            match ImdbRatings::get_show_by_link(show.link.as_ref(), &pool).await? {
-                Some(_) => show.update_show(&pool).await?,
-                None => show.insert_show(&pool).await?,
-            };
-            Ok(())
-        }
-    });
-    let results: Result<Vec<_>, Error> = try_join_all(futures).await;
-    results?;
+    ImdbRatings::update_ratings(&data.shows, &state.db).await?;
     form_http_response("Success".to_string())
 }
 
@@ -405,17 +383,17 @@ pub async fn refresh_auth(_: LoggedUser) -> HttpResult {
 
 pub async fn trakt_cal(_: LoggedUser, state: Data<AppState>) -> HttpResult {
     let entries = trakt_cal_http_worker(&state.db).await?;
-    trakt_cal_worker(&entries)
+    form_http_response(trakt_cal_worker(&entries).into())
 }
 
-fn trakt_cal_worker(entries: &[StackString]) -> HttpResult {
+fn trakt_cal_worker(entries: &[StackString]) -> StackString {
     let previous = r#"<a href="javascript:updateMainArticle('/list/tvshows')">Go Back</a><br>"#;
-    let entries = format!(
+    format!(
         r#"{}<table border="0">{}</table>"#,
         previous,
         entries.join("")
-    );
-    form_http_response(entries)
+    )
+    .into()
 }
 
 pub async fn trakt_watchlist(_: LoggedUser, state: Data<AppState>) -> HttpResult {

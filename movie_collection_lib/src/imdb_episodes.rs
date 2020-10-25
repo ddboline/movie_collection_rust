@@ -1,5 +1,6 @@
 use anyhow::Error;
 use chrono::{DateTime, NaiveDate, Utc};
+use futures::future::try_join_all;
 use postgres_query::FromSqlRow;
 use serde::{Deserialize, Serialize};
 use stack_string::StackString;
@@ -187,5 +188,21 @@ impl ImdbEpisodes {
             self.eptitle.clone(),
             self.epurl.clone(),
         ]
+    }
+
+    pub async fn update_episodes(episodes: &[Self], pool: &PgPool) -> Result<(), Error> {
+        let futures = episodes.iter().map(|episode| {
+            let pool = pool.clone();
+            async move {
+                match episode.get_index(&pool).await? {
+                    Some(_) => episode.update_episode(&pool).await?,
+                    None => episode.insert_episode(&pool).await?,
+                };
+                Ok(())
+            }
+        });
+        let results: Result<Vec<_>, Error> = try_join_all(futures).await;
+        results?;
+        Ok(())
     }
 }

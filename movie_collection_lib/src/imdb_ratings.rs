@@ -1,5 +1,6 @@
 use anyhow::Error;
 use chrono::{DateTime, Utc};
+use futures::future::try_join_all;
 use log::debug;
 use postgres_query::FromSqlRow;
 use serde::{Deserialize, Serialize};
@@ -138,5 +139,21 @@ impl ImdbRatings {
                 .map_or_else(|| "".to_string(), ToString::to_string)
                 .into(),
         ]
+    }
+
+    pub async fn update_ratings(shows: &[Self], pool: &PgPool) -> Result<(), Error> {
+        let futures = shows.iter().map(|show| {
+            let pool = pool.clone();
+            async move {
+                match ImdbRatings::get_show_by_link(show.link.as_ref(), &pool).await? {
+                    Some(_) => show.update_show(&pool).await?,
+                    None => show.insert_show(&pool).await?,
+                };
+                Ok(())
+            }
+        });
+        let results: Result<Vec<_>, Error> = try_join_all(futures).await;
+        results?;
+        Ok(())
     }
 }
