@@ -66,26 +66,6 @@ path = "src/make_queue.rs"
 doc = false
 
 [[bin]]
-name = "movie-queue-http"
-path = "src/movie_queue_http.rs"
-doc = false
-
-[[bin]]
-name = "movie-sync-http"
-path = "src/movie_sync_http.rs"
-doc = false
-
-[[bin]]
-name = "movie-trakt-http"
-path = "src/movie_trakt_http.rs"
-doc = false
-
-[[bin]]
-name = "movie-transcode-http"
-path = "src/movie_transcode_http.rs"
-doc = false
-
-[[bin]]
 name = "find-new-episodes"
 path = "src/find_new_episodes.rs"
 doc = false
