@@ -10,7 +10,7 @@ use maplit::hashmap;
 use serde::{Deserialize, Serialize};
 use stack_string::StackString;
 use std::{os::unix::fs::symlink, path, path::PathBuf};
-use tokio::{fs::remove_file, task::spawn_blocking};
+use tokio::{fs::remove_file, task::{spawn_blocking}};
 
 use movie_collection_lib::{
     imdb_episodes::ImdbEpisodes,
@@ -69,10 +69,10 @@ pub async fn find_new_episodes(
 ) -> HttpResult {
     let req = query.into_inner();
     let entries = find_new_episodes_http_worker(&state.db, req.shows, req.source).await?;
-    new_episode_worker(&entries)
+    form_http_response(new_episode_worker(&entries).into())
 }
 
-fn new_episode_worker(entries: &[StackString]) -> HttpResult {
+fn new_episode_worker(entries: &[StackString]) -> StackString {
     let previous = r#"
         <a href="javascript:updateMainArticle('/list/tvshows')">Go Back</a><br>
         <input type="button" name="list_cal" value="TVCalendar" onclick="updateMainArticle('/list/cal');"/>
@@ -81,12 +81,11 @@ fn new_episode_worker(entries: &[StackString]) -> HttpResult {
         <input type="button" name="list_cal" value="HuluCalendar" onclick="updateMainArticle('/list/cal?source=hulu');"/><br>
         <button name="remcomout" id="remcomoutput"> &nbsp; </button>
     "#;
-    let entries = format!(
+    format!(
         r#"{}<table border="0">{}</table>"#,
         previous,
         entries.join("")
-    );
-    form_http_response(entries)
+    ).into()
 }
 
 pub async fn tvshows(_: LoggedUser, state: Data<AppState>) -> HttpResult {
@@ -448,10 +447,9 @@ pub async fn trakt_watched_list(
 ) -> HttpResult {
     let (imdb_url, season) = path.into_inner();
 
-    watch_list_http_worker(&state.db, &imdb_url, season)
-        .await
-        .map_err(Into::into)
-        .and_then(|x| form_http_response(x.into()))
+    let body = watch_list_http_worker(&state.db, &imdb_url, season)
+        .await?;
+    form_http_response(body.into())
 }
 
 pub async fn trakt_watched_action(
@@ -471,7 +469,7 @@ pub async fn trakt_watched_action(
     form_http_response(body.into())
 }
 
-pub async fn movie_queue_transcode_status(_: LoggedUser, _: Data<AppState>) -> HttpResult {
+pub async fn movie_queue_transcode_status(_: LoggedUser) -> HttpResult {
     let task = spawn_blocking(move || FileLists::get_file_lists(&CONFIG));
     let status = transcode_status(&CONFIG).await?;
     let file_lists = task.await.unwrap()?;
