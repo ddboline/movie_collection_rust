@@ -9,27 +9,34 @@ use chrono::{DateTime, Utc};
 use maplit::hashmap;
 use serde::{Deserialize, Serialize};
 use stack_string::StackString;
-use std::{os::unix::fs::symlink, path};
+use std::{os::unix::fs::symlink, path, path::PathBuf};
+use tokio::{fs::remove_file, task::spawn_blocking};
 
 use movie_collection_lib::{
     imdb_episodes::ImdbEpisodes,
     imdb_ratings::ImdbRatings,
+    make_list::FileLists,
     make_queue::movie_queue_http,
     movie_collection::{find_new_episodes_http_worker, LastModifiedResponse, MovieCollection},
     movie_queue::{MovieQueueDB, MovieQueueResult},
     pgpool::PgPool,
-    trakt_utils::{get_watchlist_shows_db_map, tvshows_worker},
+    trakt_utils::{
+        get_watchlist_shows_db_map, trakt_cal_http_worker, trakt_watched_seasons_worker,
+        tvshows_worker, watch_list_http_worker, watched_action_http_worker,
+        watchlist_action_worker, watchlist_worker, TRAKT_CONN,
+    },
+    transcode_service::{transcode_status, TranscodeService, TranscodeServiceRequest},
     tv_show_source::TvShowSource,
     utils::HBR,
 };
 
 use super::{
+    app::{AppState, CONFIG},
     errors::ServiceError as Error,
     logged_user::LoggedUser,
-    movie_queue_app::AppState,
-    movie_queue_requests::{
+    requests::{
         ImdbRatingsSetSourceRequest, ImdbShowRequest, MovieCollectionUpdateRequest,
-        MovieQueueRequest, MovieQueueUpdateRequest, ParseImdbRequest,
+        MovieQueueRequest, MovieQueueUpdateRequest, ParseImdbRequest, WatchlistActionRequest,
     },
 };
 
@@ -342,4 +349,241 @@ pub async fn imdb_ratings_update(
 ) -> HttpResult {
     ImdbRatings::update_ratings(&data.shows, &state.db).await?;
     form_http_response("Success".to_string())
+}
+
+pub async fn trakt_auth_url(_: LoggedUser) -> HttpResult {
+    TRAKT_CONN.init().await;
+    let url = TRAKT_CONN.get_auth_url().await?;
+    form_http_response(url.to_string())
+}
+
+#[derive(Serialize, Deserialize)]
+pub struct TraktCallbackRequest {
+    pub code: StackString,
+    pub state: StackString,
+}
+
+pub async fn trakt_callback(query: Query<TraktCallbackRequest>, _: LoggedUser) -> HttpResult {
+    TRAKT_CONN.init().await;
+    TRAKT_CONN
+        .exchange_code_for_auth_token(query.code.as_str(), query.state.as_str())
+        .await?;
+    let body = r#"
+        <title>Trakt auth code received!</title>
+        This window can be closed.
+        <script language="JavaScript" type="text/javascript">window.close()</script>"#;
+    form_http_response(body.to_string())
+}
+
+pub async fn refresh_auth(_: LoggedUser) -> HttpResult {
+    TRAKT_CONN.init().await;
+    TRAKT_CONN.exchange_refresh_token().await?;
+    form_http_response("finished".to_string())
+}
+
+pub async fn trakt_cal(_: LoggedUser, state: Data<AppState>) -> HttpResult {
+    let entries = trakt_cal_http_worker(&state.db).await?;
+    form_http_response(trakt_cal_worker(&entries).into())
+}
+
+fn trakt_cal_worker(entries: &[StackString]) -> StackString {
+    let previous = r#"<a href="javascript:updateMainArticle('/list/tvshows')">Go Back</a><br>"#;
+    format!(
+        r#"{}<table border="0">{}</table>"#,
+        previous,
+        entries.join("")
+    )
+    .into()
+}
+
+pub async fn trakt_watchlist(_: LoggedUser, state: Data<AppState>) -> HttpResult {
+    let shows = get_watchlist_shows_db_map(&state.db).await?;
+    let entries = watchlist_worker(shows);
+    form_http_response(entries)
+}
+
+pub async fn trakt_watchlist_action(
+    path: Path<(StackString, StackString)>,
+    _: LoggedUser,
+    state: Data<AppState>,
+) -> HttpResult {
+    let (action, imdb_url) = path.into_inner();
+    let action = action.parse().expect("impossible");
+
+    let req = WatchlistActionRequest { action, imdb_url };
+    let imdb_url = req.handle(&state.db).await?;
+    let body = watchlist_action_worker(action, &imdb_url).await?;
+    form_http_response(body)
+}
+
+pub async fn trakt_watched_seasons(
+    path: Path<StackString>,
+    _: LoggedUser,
+    state: Data<AppState>,
+) -> HttpResult {
+    let imdb_url = path.into_inner();
+    let show_opt = ImdbRatings::get_show_by_link(&imdb_url, &state.db)
+        .await?
+        .map(|sh| (imdb_url, sh));
+    let empty = || ("".into(), "".into(), "".into());
+    let (imdb_url, show, link) =
+        show_opt.map_or_else(empty, |(imdb_url, t)| (imdb_url, t.show, t.link));
+
+    let entries = if &show == "" {
+        Vec::new()
+    } else {
+        MovieCollection::with_pool(&state.db)?
+            .print_imdb_all_seasons(&show)
+            .await?
+    };
+
+    let entries = trakt_watched_seasons_worker(&link, &imdb_url, &entries)?;
+    form_http_response(entries.into())
+}
+
+pub async fn trakt_watched_list(
+    path: Path<(StackString, i32)>,
+    _: LoggedUser,
+    state: Data<AppState>,
+) -> HttpResult {
+    let (imdb_url, season) = path.into_inner();
+
+    let body = watch_list_http_worker(&state.db, &imdb_url, season).await?;
+    form_http_response(body.into())
+}
+
+pub async fn trakt_watched_action(
+    path: Path<(StackString, StackString, i32, i32)>,
+    _: LoggedUser,
+    state: Data<AppState>,
+) -> HttpResult {
+    let (action, imdb_url, season, episode) = path.into_inner();
+    let body = watched_action_http_worker(
+        &state.db,
+        action.parse().expect("impossible"),
+        &imdb_url,
+        season,
+        episode,
+    )
+    .await?;
+    form_http_response(body.into())
+}
+
+pub async fn movie_queue_transcode_status(_: LoggedUser) -> HttpResult {
+    let task = spawn_blocking(move || FileLists::get_file_lists(&CONFIG));
+    let status = transcode_status(&CONFIG).await?;
+    let file_lists = task.await.unwrap()?;
+    form_http_response(status.get_html(&file_lists, &CONFIG).join(""))
+}
+
+pub async fn movie_queue_transcode_file(path: Path<StackString>, _: LoggedUser) -> HttpResult {
+    let filename = path.into_inner();
+    let transcode_service = TranscodeService::new(CONFIG.clone(), &CONFIG.transcode_queue);
+    let input_path = CONFIG
+        .home_dir
+        .join("Documents")
+        .join("movies")
+        .join(&filename);
+    let req = TranscodeServiceRequest::create_transcode_request(&CONFIG, &input_path)?;
+    transcode_service.publish_transcode_job(&req).await?;
+    form_http_response("".to_string())
+}
+
+pub async fn movie_queue_remcom_file(path: Path<StackString>, _: LoggedUser) -> HttpResult {
+    let filename = path.into_inner();
+    let transcode_service = TranscodeService::new(CONFIG.clone(), &CONFIG.remcom_queue);
+    let input_path = CONFIG
+        .home_dir
+        .join("Documents")
+        .join("movies")
+        .join(&filename);
+    let directory: Option<PathBuf> = None;
+    let req =
+        TranscodeServiceRequest::create_remcom_request(&CONFIG, &input_path, directory, false)
+            .await?;
+    transcode_service.publish_transcode_job(&req).await?;
+    form_http_response("".to_string())
+}
+
+pub async fn movie_queue_remcom_directory_file(
+    path: Path<(StackString, StackString)>,
+    _: LoggedUser,
+) -> HttpResult {
+    let (directory, filename) = path.into_inner();
+    let transcode_service = TranscodeService::new(CONFIG.clone(), &CONFIG.remcom_queue);
+    let input_path = CONFIG
+        .home_dir
+        .join("Documents")
+        .join("movies")
+        .join(&filename);
+    let req = TranscodeServiceRequest::create_remcom_request(
+        &CONFIG,
+        &input_path,
+        Some(directory),
+        false,
+    )
+    .await?;
+    transcode_service.publish_transcode_job(&req).await?;
+    form_http_response("".to_string())
+}
+
+pub async fn movie_queue_transcode_cleanup(path: Path<StackString>, _: LoggedUser) -> HttpResult {
+    let path = path.into_inner();
+    let movie_path = CONFIG.home_dir.join("Documents").join("movies").join(&path);
+    let tmp_path = CONFIG.home_dir.join("tmp_avi").join(&path);
+    if movie_path.exists() {
+        remove_file(&movie_path).await?;
+        form_http_response(format!("Removed {}", movie_path.to_string_lossy()))
+    } else if tmp_path.exists() {
+        remove_file(&tmp_path).await?;
+        form_http_response(format!("Removed {}", tmp_path.to_string_lossy()))
+    } else {
+        form_http_response(format!("File not found {}", path))
+    }
+}
+
+async fn transcode_worker(
+    directory: Option<&path::Path>,
+    entries: &[MovieQueueResult],
+) -> HttpResult {
+    let remcom_service = TranscodeService::new(CONFIG.clone(), &CONFIG.remcom_queue);
+    let mut output = Vec::new();
+    for entry in entries {
+        let payload = TranscodeServiceRequest::create_remcom_request(
+            &CONFIG,
+            &path::Path::new(entry.path.as_str()),
+            directory,
+            false,
+        )
+        .await?;
+        remcom_service.publish_transcode_job(&payload).await?;
+        output.push(format!("{:?}", payload));
+    }
+    form_http_response(output.join(""))
+}
+
+pub async fn movie_queue_transcode(
+    path: Path<StackString>,
+    _: LoggedUser,
+    state: Data<AppState>,
+) -> HttpResult {
+    let path = path.into_inner();
+    let patterns = vec![path];
+
+    let req = MovieQueueRequest { patterns };
+    let (entries, _) = req.handle(&state.db).await?;
+    transcode_worker(None, &entries).await
+}
+
+pub async fn movie_queue_transcode_directory(
+    path: Path<(StackString, StackString)>,
+    _: LoggedUser,
+    state: Data<AppState>,
+) -> HttpResult {
+    let (directory, file) = path.into_inner();
+    let patterns = vec![file];
+
+    let req = MovieQueueRequest { patterns };
+    let (entries, _) = req.handle(&state.db).await?;
+    transcode_worker(Some(&path::Path::new(directory.as_str())), &entries).await
 }

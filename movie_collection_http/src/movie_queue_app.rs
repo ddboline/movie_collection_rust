@@ -16,12 +16,8 @@ use super::{
         find_new_episodes, frontpage, imdb_episodes_route, imdb_episodes_update,
         imdb_ratings_route, imdb_ratings_set_source, imdb_ratings_update, imdb_show,
         last_modified_route, movie_collection_route, movie_collection_update, movie_queue,
-        movie_queue_delete, movie_queue_play, movie_queue_remcom_directory_file,
-        movie_queue_remcom_file, movie_queue_route, movie_queue_show, movie_queue_transcode,
-        movie_queue_transcode_cleanup, movie_queue_transcode_directory, movie_queue_transcode_file,
-        movie_queue_transcode_status, movie_queue_update, refresh_auth, trakt_auth_url, trakt_cal,
-        trakt_callback, trakt_watched_action, trakt_watched_list, trakt_watched_seasons,
-        trakt_watchlist, trakt_watchlist_action, tvshows, user,
+        movie_queue_delete, movie_queue_play, movie_queue_route, movie_queue_show,
+        movie_queue_update, tvshows, user,
     },
 };
 use movie_collection_lib::{config::Config, pgpool::PgPool};
@@ -107,59 +103,6 @@ pub async fn start_app() -> Result<(), Error> {
                         web::resource("/imdb_ratings")
                             .route(web::get().to(imdb_ratings_route))
                             .route(web::post().to(imdb_ratings_update)),
-                    )
-                    .service(web::resource("/trakt/auth_url").route(web::get().to(trakt_auth_url)))
-                    .service(web::resource("/trakt/callback").route(web::get().to(trakt_callback)))
-                    .service(
-                        web::resource("/trakt/refresh_auth").route(web::get().to(refresh_auth)),
-                    )
-                    .service(web::resource("/trakt/cal").route(web::get().to(trakt_cal)))
-                    .service(
-                        web::resource("/trakt/watchlist").route(web::get().to(trakt_watchlist)),
-                    )
-                    .service(
-                        web::resource("/trakt/watchlist/{action}/{imdb_url}")
-                            .route(web::get().to(trakt_watchlist_action)),
-                    )
-                    .service(
-                        web::resource("/trakt/watched/list/{imdb_url}")
-                            .route(web::get().to(trakt_watched_seasons)),
-                    )
-                    .service(
-                        web::resource("/trakt/watched/list/{imdb_url}/{season}")
-                            .route(web::get().to(trakt_watched_list)),
-                    )
-                    .service(
-                        web::resource("/trakt/watched/{action}/{imdb_url}/{season}/{episode}")
-                            .route(web::get().to(trakt_watched_action)),
-                    )
-                    .service(
-                        web::resource("/transcode/status")
-                            .route(web::get().to(movie_queue_transcode_status)),
-                    )
-                    .service(
-                        web::resource("/transcode/file/{file}")
-                            .route(web::get().to(movie_queue_transcode_file)),
-                    )
-                    .service(
-                        web::resource("/transcode/remcom/file/{file}")
-                            .route(web::get().to(movie_queue_remcom_file)),
-                    )
-                    .service(
-                        web::resource("/transcode/remcom/directory/{directory}/{file}")
-                            .route(web::get().to(movie_queue_remcom_directory_file)),
-                    )
-                    .service(
-                        web::resource("/transcode/queue/{file}")
-                            .route(web::get().to(movie_queue_transcode)),
-                    )
-                    .service(
-                        web::resource("/transcode/queue/{directory}/{file}")
-                            .route(web::get().to(movie_queue_transcode_directory)),
-                    )
-                    .service(
-                        web::resource("/transcode/cleanup/{file}")
-                            .route(web::get().to(movie_queue_transcode_cleanup)),
                     ),
             )
     })
