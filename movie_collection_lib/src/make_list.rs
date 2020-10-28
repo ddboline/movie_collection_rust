@@ -89,8 +89,7 @@ impl FileLists {
     }
 }
 
-pub async fn make_list(stdout: &StdoutChannel) -> Result<(), Error> {
-    let config = Config::with_config()?;
+pub async fn make_list(config: Config, stdout: &StdoutChannel) -> Result<(), Error> {
     let transcode_task = {
         let config = config.clone();
         spawn(async move { transcode_status(&config).await })

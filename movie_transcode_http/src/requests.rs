@@ -3,12 +3,14 @@ use serde::{Deserialize, Serialize};
 use stack_string::StackString;
 
 use movie_collection_lib::{
+    config::Config,
     imdb_ratings::ImdbRatings,
     movie_collection::{MovieCollection, MovieCollectionRow},
     movie_queue::{MovieQueueDB, MovieQueueResult, MovieQueueRow},
     parse_imdb::{ParseImdb, ParseImdbOptions},
     pgpool::PgPool,
-    trakt_utils::{get_watchlist_shows_db_map, TraktActions, WatchListShow, TRAKT_CONN},
+    trakt_connection::TraktConnection,
+    trakt_utils::{get_watchlist_shows_db_map, TraktActions, WatchListShow},
     tv_show_source::TvShowSource,
 };
 
@@ -21,9 +23,10 @@ impl MovieQueueRequest {
     pub async fn handle(
         self,
         pool: &PgPool,
+        config: &Config,
     ) -> Result<(Vec<MovieQueueResult>, Vec<StackString>), Error> {
         let patterns: Vec<_> = self.patterns.iter().map(StackString::as_str).collect();
-        let queue = MovieQueueDB::with_pool(pool)
+        let queue = MovieQueueDB::with_pool(config, pool)
             .print_movie_queue(&patterns)
             .await?;
         Ok((queue, self.patterns))
@@ -69,9 +72,9 @@ impl From<ImdbShowRequest> for ParseImdbOptions {
 }
 
 impl ImdbShowRequest {
-    pub async fn handle(self, pool: &PgPool) -> Result<StackString, Error> {
+    pub async fn handle(self, pool: &PgPool, config: &Config) -> Result<StackString, Error> {
         let watchlist = get_watchlist_shows_db_map(pool).await?;
-        let pi = ParseImdb::with_pool(pool)?;
+        let pi = ParseImdb::with_pool(config, pool)?;
         let body = pi.parse_imdb_http_worker(&self.into(), &watchlist).await?;
         Ok(body)
     }
@@ -104,9 +107,9 @@ pub struct MovieQueueUpdateRequest {
 }
 
 impl MovieQueueUpdateRequest {
-    pub async fn handle(&self, pool: &PgPool) -> Result<(), Error> {
-        let mq = MovieQueueDB::with_pool(pool);
-        let mc = MovieCollection::with_pool(pool)?;
+    pub async fn handle(&self, pool: &PgPool, config: &Config) -> Result<(), Error> {
+        let mq = MovieQueueDB::with_pool(config, pool);
+        let mc = MovieCollection::with_pool(config, pool)?;
         for entry in &self.queue {
             let cidx = if let Some(i) = mc.get_collection_index(entry.path.as_ref()).await? {
                 i
@@ -129,8 +132,8 @@ pub struct MovieCollectionUpdateRequest {
 }
 
 impl MovieCollectionUpdateRequest {
-    pub async fn handle(&self, pool: &PgPool) -> Result<(), Error> {
-        let mc = MovieCollection::with_pool(pool)?;
+    pub async fn handle(&self, pool: &PgPool, config: &Config) -> Result<(), Error> {
+        let mc = MovieCollection::with_pool(config, pool)?;
         for entry in &self.collection {
             if let Some(cidx) = mc.get_collection_index(entry.path.as_ref()).await? {
                 if cidx == entry.idx {
@@ -151,11 +154,15 @@ pub struct WatchlistActionRequest {
 }
 
 impl WatchlistActionRequest {
-    pub async fn handle(self, pool: &PgPool) -> Result<StackString, Error> {
+    pub async fn handle(
+        self,
+        pool: &PgPool,
+        trakt: &TraktConnection,
+    ) -> Result<StackString, Error> {
         match &self.action {
             TraktActions::Add => {
-                TRAKT_CONN.init().await;
-                if let Some(show) = TRAKT_CONN.get_watchlist_shows().await?.get(&self.imdb_url) {
+                trakt.init().await;
+                if let Some(show) = trakt.get_watchlist_shows().await?.get(&self.imdb_url) {
                     show.insert_show(pool).await?;
                 }
             }

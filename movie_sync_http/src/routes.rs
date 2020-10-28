@@ -18,13 +18,10 @@ use movie_collection_lib::{
 };
 
 use super::{
+    app::{AppState, CONFIG},
     errors::ServiceError as Error,
     logged_user::LoggedUser,
-    app::AppState,
-    requests::{
-        MovieCollectionUpdateRequest,
-        MovieQueueRequest, MovieQueueUpdateRequest,
-    },
+    requests::{MovieCollectionUpdateRequest, MovieQueueRequest, MovieQueueUpdateRequest},
 };
 
 pub type HttpResult = Result<HttpResponse, Error>;
@@ -50,7 +47,7 @@ pub async fn movie_queue_route(
     state: Data<AppState>,
 ) -> HttpResult {
     let req = query.into_inner();
-    let mq = MovieQueueDB::with_pool(&state.db);
+    let mq = MovieQueueDB::with_pool(&CONFIG, &state.db);
     let queue = mq.get_queue_after_timestamp(req.start_timestamp).await?;
     to_json(queue)
 }
@@ -62,7 +59,7 @@ pub async fn movie_queue_update(
 ) -> HttpResult {
     let queue = data.into_inner();
     let req = queue;
-    req.handle(&state.db).await?;
+    req.handle(&state.db, &CONFIG).await?;
     form_http_response("Success".to_string())
 }
 
@@ -77,7 +74,7 @@ pub async fn movie_collection_route(
     state: Data<AppState>,
 ) -> HttpResult {
     let req = query.into_inner();
-    let mc = MovieCollection::with_pool(&state.db)?;
+    let mc = MovieCollection::with_pool(&CONFIG, &state.db)?;
     let x = mc
         .get_collection_after_timestamp(req.start_timestamp)
         .await?;
@@ -92,7 +89,7 @@ pub async fn movie_collection_update(
     let collection = data.into_inner();
 
     let req = collection;
-    req.handle(&state.db).await?;
+    req.handle(&state.db, &CONFIG).await?;
     form_http_response("Success".to_string())
 }
 
@@ -105,7 +102,7 @@ pub async fn movie_queue(_: LoggedUser, state: Data<AppState>) -> HttpResult {
     let req = MovieQueueRequest {
         patterns: Vec::new(),
     };
-    let (queue, _) = req.handle(&state.db).await?;
+    let (queue, _) = req.handle(&state.db, &CONFIG).await?;
     let body = queue_body_resp(Vec::new(), queue, &state.db).await?;
     form_http_response(body.into())
 }
@@ -119,7 +116,7 @@ pub async fn movie_queue_show(
     let patterns = vec![path];
 
     let req = MovieQueueRequest { patterns };
-    let (queue, patterns) = req.handle(&state.db).await?;
+    let (queue, patterns) = req.handle(&state.db, &CONFIG).await?;
     let body = queue_body_resp(patterns, queue, &state.db).await?;
     form_http_response(body.into())
 }
@@ -129,7 +126,7 @@ async fn queue_body_resp(
     queue: Vec<MovieQueueResult>,
     pool: &PgPool,
 ) -> Result<StackString, Error> {
-    let entries = movie_queue_http(&queue, pool).await?;
+    let entries = movie_queue_http(&CONFIG, &queue, pool).await?;
     let body = movie_queue_body(&patterns, &entries);
     Ok(body)
 }
@@ -182,7 +179,6 @@ pub async fn imdb_episodes_update(
     ImdbEpisodes::update_episodes(&data.episodes, &state.db).await?;
     form_http_response("Success".to_string())
 }
-
 
 #[derive(Serialize, Deserialize, Clone, Copy)]
 pub struct ImdbRatingsSyncRequest {

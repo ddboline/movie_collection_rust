@@ -39,24 +39,28 @@ impl fmt::Display for MovieQueueResult {
 #[derive(Clone)]
 pub struct MovieQueueDB {
     pool: PgPool,
+    config: Config,
 }
 
 impl Default for MovieQueueDB {
     fn default() -> Self {
-        Self::new()
+        Self::new(Config::default())
     }
 }
 
 impl MovieQueueDB {
-    pub fn new() -> Self {
-        let config = Config::with_config().expect("Init config failed");
+    pub fn new(config: Config) -> Self {
         Self {
             pool: PgPool::new(&config.pgurl),
+            config,
         }
     }
 
-    pub fn with_pool(pool: &PgPool) -> Self {
-        Self { pool: pool.clone() }
+    pub fn with_pool(config: &Config, pool: &PgPool) -> Self {
+        Self {
+            pool: pool.clone(),
+            config: config.clone(),
+        }
     }
 
     pub async fn remove_from_queue_by_idx(&self, idx: i32) -> Result<(), Error> {
@@ -126,7 +130,7 @@ impl MovieQueueDB {
     }
 
     pub async fn remove_from_queue_by_path(&self, path: &str) -> Result<(), Error> {
-        let mc = MovieCollection::with_pool(&self.pool)?;
+        let mc = MovieCollection::with_pool(&self.config, &self.pool)?;
         if let Some(collection_idx) = mc.get_collection_index(&path).await? {
             self.remove_from_queue_by_collection_idx(collection_idx)
                 .await
@@ -139,7 +143,7 @@ impl MovieQueueDB {
         if !Path::new(&path).exists() {
             return Err(format_err!("File doesn't exist"));
         }
-        let mc = MovieCollection::with_pool(&self.pool)?;
+        let mc = MovieCollection::with_pool(&self.config, &self.pool)?;
         let collection_idx = if let Some(i) = mc.get_collection_index(&path).await? {
             i
         } else {

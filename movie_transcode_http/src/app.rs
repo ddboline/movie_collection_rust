@@ -10,7 +10,7 @@ use tokio::{
     time::interval,
 };
 
-use movie_collection_lib::{config::Config, pgpool::PgPool};
+use movie_collection_lib::{config::Config, pgpool::PgPool, trakt_connection::TraktConnection};
 
 use super::{
     logged_user::{fill_from_db, get_secrets, SECRET_KEY, TRIGGER_DB_UPDATE},
@@ -27,6 +27,7 @@ lazy_static! {
 
 pub struct AppState {
     pub db: PgPool,
+    pub trakt: TraktConnection,
 }
 
 pub async fn start_app() -> Result<(), Error> {
@@ -49,12 +50,16 @@ pub async fn start_app() -> Result<(), Error> {
     let domain = CONFIG.domain.to_string();
     let port = CONFIG.port + 2;
     let pool = PgPool::new(&CONFIG.pgurl);
+    let trakt = TraktConnection::new(CONFIG.clone());
 
     actix_rt::spawn(_update_db(pool.clone()));
 
     HttpServer::new(move || {
         App::new()
-            .data(AppState { db: pool.clone() })
+            .data(AppState {
+                db: pool.clone(),
+                trakt: trakt.clone(),
+            })
             .wrap(IdentityService::new(
                 CookieIdentityPolicy::new(&SECRET_KEY.get())
                     .name("auth")

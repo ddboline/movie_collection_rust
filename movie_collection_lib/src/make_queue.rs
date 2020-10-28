@@ -10,6 +10,7 @@ use std::{
 };
 
 use crate::{
+    config::Config,
     movie_collection::MovieCollection,
     movie_queue::{MovieQueueDB, MovieQueueResult},
     pgpool::PgPool,
@@ -48,6 +49,7 @@ impl From<&Path> for PathOrIndex {
 
 #[allow(clippy::cognitive_complexity)]
 pub async fn make_queue_worker(
+    config: &Config,
     add_files: &[PathOrIndex],
     del_files: &[PathOrIndex],
     do_time: bool,
@@ -55,8 +57,8 @@ pub async fn make_queue_worker(
     do_shows: bool,
     stdout: &StdoutChannel,
 ) -> Result<(), Error> {
-    let mc = MovieCollection::new();
-    let mq = MovieQueueDB::with_pool(&mc.pool);
+    let mc = MovieCollection::new(config);
+    let mq = MovieQueueDB::with_pool(config, &mc.pool);
 
     if do_shows {
         let shows = mc
@@ -132,10 +134,11 @@ pub async fn make_queue_worker(
 }
 
 pub async fn movie_queue_http(
+    config: &Config,
     queue: &[MovieQueueResult],
     pool: &PgPool,
 ) -> Result<Vec<StackString>, Error> {
-    let mc = Arc::new(MovieCollection::with_pool(pool)?);
+    let mc = Arc::new(MovieCollection::with_pool(config, pool)?);
 
     let button = r#"<td><button type="submit" id="ID" onclick="delete_show('SHOW');"> remove </button></td>"#;
 

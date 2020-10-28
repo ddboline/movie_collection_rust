@@ -5,8 +5,9 @@ use std::collections::HashMap;
 use structopt::StructOpt;
 
 use crate::{
-    imdb_episodes::ImdbEpisodes, imdb_ratings::ImdbRatings, imdb_utils::ImdbConnection,
-    movie_collection::MovieCollection, pgpool::PgPool, trakt_utils::WatchListMap,
+    config::Config, imdb_episodes::ImdbEpisodes, imdb_ratings::ImdbRatings,
+    imdb_utils::ImdbConnection, movie_collection::MovieCollection, pgpool::PgPool,
+    trakt_utils::WatchListMap,
 };
 
 #[derive(StructOpt, Default, Debug)]
@@ -46,9 +47,9 @@ pub struct ParseImdb {
 }
 
 impl ParseImdb {
-    pub fn with_pool(pool: &PgPool) -> Result<Self, Error> {
+    pub fn with_pool(config: &Config, pool: &PgPool) -> Result<Self, Error> {
         let p = Self {
-            mc: MovieCollection::with_pool(&pool)?,
+            mc: MovieCollection::with_pool(config, pool)?,
         };
         Ok(p)
     }

@@ -33,6 +33,7 @@ lazy_static! {
     static ref AUTH_TOKEN: RwLock<Option<Arc<AccessTokenResponse>>> = RwLock::new(None);
 }
 
+#[derive(Clone)]
 pub struct TraktConnection {
     config: Config,
     client: Client,
@@ -40,8 +41,7 @@ pub struct TraktConnection {
 
 impl Default for TraktConnection {
     fn default() -> Self {
-        let config = Config::with_config().expect("Failed to create");
-        Self::new(config)
+        Self::new(Config::default())
     }
 }
 

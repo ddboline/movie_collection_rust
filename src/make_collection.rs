@@ -6,7 +6,9 @@ use stack_string::StackString;
 use std::path::Path;
 use structopt::StructOpt;
 
-use movie_collection_lib::{movie_collection::MovieCollection, utils::get_video_runtime};
+use movie_collection_lib::{
+    config::Config, movie_collection::MovieCollection, utils::get_video_runtime,
+};
 
 #[derive(StructOpt)]
 /// Collection Query/Parser
@@ -30,8 +32,8 @@ async fn make_collection() -> Result<(), Error> {
 
     let do_parse = opts.parse;
     let do_time = opts.time;
-
-    let mc = MovieCollection::new();
+    let config = Config::with_config()?;
+    let mc = MovieCollection::new(&config);
     if do_parse {
         mc.make_collection().await?;
         mc.fix_collection_show_id().await?;

@@ -12,20 +12,17 @@ use std::{os::unix::fs::symlink, path};
 
 use movie_collection_lib::{
     movie_collection::{find_new_episodes_http_worker, MovieCollection},
-    movie_queue::{MovieQueueDB},
+    movie_queue::MovieQueueDB,
     trakt_utils::{get_watchlist_shows_db_map, tvshows_worker},
     tv_show_source::TvShowSource,
     utils::HBR,
 };
 
 use super::{
+    app::{AppState, CONFIG},
     errors::ServiceError as Error,
     logged_user::LoggedUser,
-    app::AppState,
-    requests::{
-        ImdbRatingsSetSourceRequest, ImdbShowRequest,
-        ParseImdbRequest,
-    },
+    requests::{ImdbRatingsSetSourceRequest, ImdbShowRequest, ParseImdbRequest},
 };
 
 pub type HttpResult = Result<HttpResponse, Error>;
@@ -56,7 +53,7 @@ pub async fn find_new_episodes(
     state: Data<AppState>,
 ) -> HttpResult {
     let req = query.into_inner();
-    let entries = find_new_episodes_http_worker(&state.db, req.shows, req.source).await?;
+    let entries = find_new_episodes_http_worker(&CONFIG, &state.db, req.shows, req.source).await?;
     form_http_response(new_episode_worker(&entries).into())
 }
 
@@ -78,7 +75,7 @@ fn new_episode_worker(entries: &[StackString]) -> StackString {
 }
 
 pub async fn tvshows(_: LoggedUser, state: Data<AppState>) -> HttpResult {
-    let shows = MovieCollection::with_pool(&state.db)?
+    let shows = MovieCollection::with_pool(&CONFIG, &state.db)?
         .print_tv_shows()
         .await?;
     let tvshowsmap = get_watchlist_shows_db_map(&state.db).await?;
@@ -97,7 +94,7 @@ pub async fn movie_queue_delete(
 ) -> HttpResult {
     let path = path.into_inner();
     if std::path::Path::new(path.as_str()).exists() {
-        MovieQueueDB::with_pool(&state.db)
+        MovieQueueDB::with_pool(&CONFIG, &state.db)
             .remove_from_queue_by_path(&path)
             .await?;
     }
@@ -107,7 +104,7 @@ pub async fn movie_queue_delete(
 pub async fn movie_queue_play(idx: Path<i32>, _: LoggedUser, state: Data<AppState>) -> HttpResult {
     let idx = idx.into_inner();
 
-    let movie_path = MovieCollection::with_pool(&state.db)?
+    let movie_path = MovieCollection::with_pool(&CONFIG, &state.db)?
         .get_collection_path(idx)
         .await?;
     let movie_path = std::path::Path::new(movie_path.as_str());
@@ -152,7 +149,7 @@ pub async fn imdb_show(
     let query = query.into_inner();
 
     let req = ImdbShowRequest { show, query };
-    let body = req.handle(&state.db).await?;
+    let body = req.handle(&state.db, &CONFIG).await?;
     form_http_response(body.into())
 }
 
@@ -165,4 +162,3 @@ pub async fn imdb_ratings_set_source(
     query.handle(&state.db).await?;
     form_http_response("Success".to_string())
 }
-

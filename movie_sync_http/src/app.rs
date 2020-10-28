@@ -10,16 +10,14 @@ use tokio::{
     time::interval,
 };
 
-use movie_collection_lib::{config::Config, pgpool::PgPool};
+use movie_collection_lib::{config::Config, pgpool::PgPool, trakt_connection::TraktConnection};
 
 use super::{
     logged_user::{fill_from_db, get_secrets, SECRET_KEY, TRIGGER_DB_UPDATE},
     routes::{
-        imdb_episodes_route, imdb_episodes_update,
-        imdb_ratings_route, imdb_ratings_update, 
+        imdb_episodes_route, imdb_episodes_update, imdb_ratings_route, imdb_ratings_update,
         last_modified_route, movie_collection_route, movie_collection_update, movie_queue,
-         movie_queue_route, movie_queue_show,
-        movie_queue_update,
+        movie_queue_route, movie_queue_show, movie_queue_update,
     },
 };
 
@@ -29,6 +27,7 @@ lazy_static! {
 
 pub struct AppState {
     pub db: PgPool,
+    pub trakt: TraktConnection,
 }
 
 pub async fn start_app() -> Result<(), Error> {
@@ -51,12 +50,16 @@ pub async fn start_app() -> Result<(), Error> {
     let domain = CONFIG.domain.to_string();
     let port = CONFIG.port;
     let pool = PgPool::new(&CONFIG.pgurl);
+    let trakt = TraktConnection::new(CONFIG.clone());
 
     actix_rt::spawn(_update_db(pool.clone()));
 
     HttpServer::new(move || {
         App::new()
-            .data(AppState { db: pool.clone() })
+            .data(AppState {
+                db: pool.clone(),
+                trakt: trakt.clone(),
+            })
             .wrap(IdentityService::new(
                 CookieIdentityPolicy::new(&SECRET_KEY.get())
                     .name("auth")
@@ -67,31 +70,31 @@ pub async fn start_app() -> Result<(), Error> {
             ))
             .service(
                 web::scope("/sync")
-                .service(
-                    web::resource("/movie_queue")
-                        .route(web::get().to(movie_queue_route))
-                        .route(web::post().to(movie_queue_update)),
-                )
-                .service(
-                    web::resource("/movie_collection")
-                        .route(web::get().to(movie_collection_route))
-                        .route(web::post().to(movie_collection_update)),
-                )
-                .service(
-                    web::resource("/last_modified").route(web::get().to(last_modified_route)),
-                )
-                .service(web::resource("/full_queue").route(web::get().to(movie_queue)))
-                .service(web::resource("/queue/{show}").route(web::get().to(movie_queue_show)))
-                .service(
-                    web::resource("/imdb_episodes")
-                        .route(web::get().to(imdb_episodes_route))
-                        .route(web::post().to(imdb_episodes_update)),
-                )
-                .service(
-                    web::resource("/imdb_ratings")
-                        .route(web::get().to(imdb_ratings_route))
-                        .route(web::post().to(imdb_ratings_update)),
-                ),
+                    .service(
+                        web::resource("/movie_queue")
+                            .route(web::get().to(movie_queue_route))
+                            .route(web::post().to(movie_queue_update)),
+                    )
+                    .service(
+                        web::resource("/movie_collection")
+                            .route(web::get().to(movie_collection_route))
+                            .route(web::post().to(movie_collection_update)),
+                    )
+                    .service(
+                        web::resource("/last_modified").route(web::get().to(last_modified_route)),
+                    )
+                    .service(web::resource("/full_queue").route(web::get().to(movie_queue)))
+                    .service(web::resource("/queue/{show}").route(web::get().to(movie_queue_show)))
+                    .service(
+                        web::resource("/imdb_episodes")
+                            .route(web::get().to(imdb_episodes_route))
+                            .route(web::post().to(imdb_episodes_update)),
+                    )
+                    .service(
+                        web::resource("/imdb_ratings")
+                            .route(web::get().to(imdb_ratings_route))
+                            .route(web::post().to(imdb_ratings_update)),
+                    ),
             )
     })
     .bind(&format!("127.0.0.1:{}", port))?

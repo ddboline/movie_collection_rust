@@ -13,12 +13,14 @@ use movie_collection_lib::{
     trakt_utils::{
         get_watchlist_shows_db_map, trakt_cal_http_worker, trakt_watched_seasons_worker,
         watch_list_http_worker, watched_action_http_worker, watchlist_action_worker,
-        watchlist_worker, TRAKT_CONN,
+        watchlist_worker,
     },
 };
 
 use super::{
-    app::AppState, errors::ServiceError as Error, logged_user::LoggedUser,
+    app::{AppState, CONFIG},
+    errors::ServiceError as Error,
+    logged_user::LoggedUser,
     requests::WatchlistActionRequest,
 };
 
@@ -30,9 +32,9 @@ fn form_http_response(body: String) -> HttpResult {
         .body(body))
 }
 
-pub async fn trakt_auth_url(_: LoggedUser) -> HttpResult {
-    TRAKT_CONN.init().await;
-    let url = TRAKT_CONN.get_auth_url().await?;
+pub async fn trakt_auth_url(_: LoggedUser, state: Data<AppState>) -> HttpResult {
+    state.trakt.init().await;
+    let url = state.trakt.get_auth_url().await?;
     form_http_response(url.to_string())
 }
 
@@ -42,9 +44,14 @@ pub struct TraktCallbackRequest {
     pub state: StackString,
 }
 
-pub async fn trakt_callback(query: Query<TraktCallbackRequest>, _: LoggedUser) -> HttpResult {
-    TRAKT_CONN.init().await;
-    TRAKT_CONN
+pub async fn trakt_callback(
+    query: Query<TraktCallbackRequest>,
+    _: LoggedUser,
+    state: Data<AppState>,
+) -> HttpResult {
+    state.trakt.init().await;
+    state
+        .trakt
         .exchange_code_for_auth_token(query.code.as_str(), query.state.as_str())
         .await?;
     let body = r#"
@@ -54,14 +61,14 @@ pub async fn trakt_callback(query: Query<TraktCallbackRequest>, _: LoggedUser) -
     form_http_response(body.to_string())
 }
 
-pub async fn refresh_auth(_: LoggedUser) -> HttpResult {
-    TRAKT_CONN.init().await;
-    TRAKT_CONN.exchange_refresh_token().await?;
+pub async fn refresh_auth(_: LoggedUser, state: Data<AppState>) -> HttpResult {
+    state.trakt.init().await;
+    state.trakt.exchange_refresh_token().await?;
     form_http_response("finished".to_string())
 }
 
 pub async fn trakt_cal(_: LoggedUser, state: Data<AppState>) -> HttpResult {
-    let entries = trakt_cal_http_worker(&state.db).await?;
+    let entries = trakt_cal_http_worker(&state.trakt, &state.db).await?;
     form_http_response(trakt_cal_worker(&entries).into())
 }
 
@@ -90,8 +97,8 @@ pub async fn trakt_watchlist_action(
     let action = action.parse().expect("impossible");
 
     let req = WatchlistActionRequest { action, imdb_url };
-    let imdb_url = req.handle(&state.db).await?;
-    let body = watchlist_action_worker(action, &imdb_url).await?;
+    let imdb_url = req.handle(&state.db, &state.trakt).await?;
+    let body = watchlist_action_worker(&state.trakt, action, &imdb_url).await?;
     form_http_response(body)
 }
 
@@ -111,7 +118,7 @@ pub async fn trakt_watched_seasons(
     let entries = if &show == "" {
         Vec::new()
     } else {
-        MovieCollection::with_pool(&state.db)?
+        MovieCollection::with_pool(&CONFIG, &state.db)?
             .print_imdb_all_seasons(&show)
             .await?
     };
@@ -127,7 +134,7 @@ pub async fn trakt_watched_list(
 ) -> HttpResult {
     let (imdb_url, season) = path.into_inner();
 
-    let body = watch_list_http_worker(&state.db, &imdb_url, season).await?;
+    let body = watch_list_http_worker(&CONFIG, &state.db, &imdb_url, season).await?;
     form_http_response(body.into())
 }
 
@@ -138,6 +145,8 @@ pub async fn trakt_watched_action(
 ) -> HttpResult {
     let (action, imdb_url, season, episode) = path.into_inner();
     let body = watched_action_http_worker(
+        &CONFIG,
+        &state.trakt,
         &state.db,
         action.parse().expect("impossible"),
         &imdb_url,

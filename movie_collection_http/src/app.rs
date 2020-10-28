@@ -15,11 +15,8 @@ use movie_collection_lib::{config::Config, pgpool::PgPool};
 use super::{
     logged_user::{fill_from_db, get_secrets, SECRET_KEY, TRIGGER_DB_UPDATE},
     routes::{
-        find_new_episodes, frontpage, 
-        imdb_ratings_set_source, imdb_show,
-        
-        movie_queue_delete, movie_queue_play,  
-         tvshows, user,
+        find_new_episodes, frontpage, imdb_ratings_set_source, imdb_show, movie_queue_delete,
+        movie_queue_play, tvshows, user,
     },
 };
 
@@ -67,20 +64,20 @@ pub async fn start_app() -> Result<(), Error> {
             ))
             .service(
                 web::scope("/list")
-                .service(web::resource("/index.html").route(web::get().to(frontpage)))
-                .service(web::resource("/cal").route(web::get().to(find_new_episodes)))
-                .service(web::resource("/tvshows").route(web::get().to(tvshows)))
-                .service(web::resource("/user").route(web::get().to(user)))
-                .service(
-                    web::resource("/delete/{path}").route(web::get().to(movie_queue_delete)),
-                )
-                .service(web::resource("/play/{index}").route(web::get().to(movie_queue_play)))
-                .service(web::resource("/imdb/{show}").route(web::get().to(imdb_show)))
-                .service(
-                    web::resource("/imdb_ratings/set_source")
-                        .route(web::get().to(imdb_ratings_set_source)),
-                )
-        )
+                    .service(web::resource("/index.html").route(web::get().to(frontpage)))
+                    .service(web::resource("/cal").route(web::get().to(find_new_episodes)))
+                    .service(web::resource("/tvshows").route(web::get().to(tvshows)))
+                    .service(web::resource("/user").route(web::get().to(user)))
+                    .service(
+                        web::resource("/delete/{path}").route(web::get().to(movie_queue_delete)),
+                    )
+                    .service(web::resource("/play/{index}").route(web::get().to(movie_queue_play)))
+                    .service(web::resource("/imdb/{show}").route(web::get().to(imdb_show)))
+                    .service(
+                        web::resource("/imdb_ratings/set_source")
+                            .route(web::get().to(imdb_ratings_set_source)),
+                    ),
+            )
     })
     .bind(&format!("127.0.0.1:{}", port))?
     .run()

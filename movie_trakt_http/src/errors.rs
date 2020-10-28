@@ -1,7 +1,6 @@
 use actix_threadpool::BlockingError;
 use actix_web::{error::ResponseError, HttpResponse};
 use anyhow::Error as AnyhowError;
-use auth_server_rust::static_files::login_html;
 use handlebars::RenderError;
 use stack_string::StackString;
 use std::{fmt::Debug, io::Error as IoError};
@@ -49,4 +48,10 @@ impl<T: Debug> From<BlockingError<T>> for ServiceError {
     fn from(item: BlockingError<T>) -> Self {
         Self::BlockingError(format!("{:?}", item).into())
     }
+}
+
+fn login_html() -> HttpResponse {
+    HttpResponse::Ok()
+        .content_type("text/html; charset=utf-8")
+        .body("<script>location.replace('/auth/login.html')</script>")
 }

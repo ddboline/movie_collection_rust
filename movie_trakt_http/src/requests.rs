@@ -3,7 +3,8 @@ use stack_string::StackString;
 
 use movie_collection_lib::{
     pgpool::PgPool,
-    trakt_utils::{TraktActions, WatchListShow, TRAKT_CONN},
+    trakt_connection::TraktConnection,
+    trakt_utils::{TraktActions, WatchListShow},
 };
 
 pub struct WatchlistActionRequest {
@@ -12,11 +13,15 @@ pub struct WatchlistActionRequest {
 }
 
 impl WatchlistActionRequest {
-    pub async fn handle(self, pool: &PgPool) -> Result<StackString, Error> {
+    pub async fn handle(
+        self,
+        pool: &PgPool,
+        trakt: &TraktConnection,
+    ) -> Result<StackString, Error> {
         match &self.action {
             TraktActions::Add => {
-                TRAKT_CONN.init().await;
-                if let Some(show) = TRAKT_CONN.get_watchlist_shows().await?.get(&self.imdb_url) {
+                trakt.init().await;
+                if let Some(show) = trakt.get_watchlist_shows().await?.get(&self.imdb_url) {
                     show.insert_show(pool).await?;
                 }
             }

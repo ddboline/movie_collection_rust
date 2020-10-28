@@ -167,14 +167,14 @@ pub struct MovieCollection {
 
 impl Default for MovieCollection {
     fn default() -> Self {
-        Self::new()
+        Self::new(&Config::default())
     }
 }
 
 impl MovieCollection {
-    pub fn new() -> Self {
-        let config = Config::with_config().expect("Init config failed");
+    pub fn new(config: &Config) -> Self {
         let pool = PgPool::new(&config.pgurl);
+        let config = config.clone();
         let stdout = StdoutChannel::new();
         Self {
             pool,
@@ -183,11 +183,10 @@ impl MovieCollection {
         }
     }
 
-    pub fn with_pool(pool: &PgPool) -> Result<Self, Error> {
-        let config = Config::with_config()?;
+    pub fn with_pool(config: &Config, pool: &PgPool) -> Result<Self, Error> {
         let stdout = StdoutChannel::new();
         let mc = Self {
-            config,
+            config: config.clone(),
             pool: pool.clone(),
             stdout,
         };
@@ -696,7 +695,7 @@ impl MovieCollection {
                 if let Some(v) = movie_queue.get(key) {
                     self.stdout
                         .send(format!("in queue but not disk {} {}", key, v));
-                    let mq = MovieQueueDB::with_pool(self.get_pool());
+                    let mq = MovieQueueDB::with_pool(self.get_config(), self.get_pool());
                     mq.remove_from_queue_by_path(&key).await?;
                 } else {
                     self.stdout.send(format!("not on disk {} {}", key, val));
@@ -875,7 +874,7 @@ impl MovieCollection {
         let mindate = Local::today() + Duration::days(-14);
         let maxdate = Local::today() + Duration::days(7);
 
-        let mq = MovieQueueDB::with_pool(&self.get_pool());
+        let mq = MovieQueueDB::with_pool(self.get_config(), &self.get_pool());
 
         let mut output = Vec::new();
 
@@ -930,6 +929,7 @@ impl MovieCollection {
 }
 
 pub async fn find_new_episodes_http_worker(
+    config: &Config,
     pool: &PgPool,
     shows: Option<impl AsRef<str>>,
     source: Option<TvShowSource>,
@@ -948,14 +948,14 @@ pub async fn find_new_episodes_http_worker(
         ),
     );
 
-    let mc = MovieCollection::with_pool(&pool)?;
+    let mc = MovieCollection::with_pool(config, &pool)?;
     let shows_filter: Option<HashSet<StackString>> =
         shows.map(|s| s.as_ref().split(',').map(Into::into).collect());
 
     let mindate = (Local::today() + Duration::days(-14)).naive_local();
     let maxdate = (Local::today() + Duration::days(7)).naive_local();
 
-    let mq = MovieQueueDB::with_pool(&pool);
+    let mq = MovieQueueDB::with_pool(config, &pool);
 
     let episodes = mc.get_new_episodes(mindate, maxdate, source).await?;
 

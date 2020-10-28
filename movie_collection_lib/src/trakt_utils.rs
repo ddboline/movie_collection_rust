@@ -2,7 +2,6 @@ use anyhow::{format_err, Error};
 use chrono::NaiveDate;
 use futures::future::{join_all, try_join_all};
 use itertools::Itertools;
-use lazy_static::lazy_static;
 use log::debug;
 use postgres_query::FromSqlRow;
 use serde::{Deserialize, Serialize};
@@ -28,11 +27,6 @@ use crate::{
 };
 
 use crate::{tv_show_source::TvShowSource, utils::option_string_wrapper};
-
-lazy_static! {
-    static ref CONFIG: Config = Config::with_config().unwrap();
-    pub static ref TRAKT_CONN: TraktConnection = TraktConnection::new(CONFIG.clone());
-}
 
 type TvShowsMap = HashMap<StackString, (StackString, WatchListShow, Option<TvShowSource>)>;
 
@@ -407,16 +401,14 @@ pub fn watchlist_worker(shows: TvShowsMap) -> String {
 }
 
 pub async fn watchlist_action_worker(
+    trakt: &TraktConnection,
     action: TraktActions,
     imdb_url: &str,
 ) -> Result<String, Error> {
-    TRAKT_CONN.init().await;
+    trakt.init().await;
     let body = match action {
-        TraktActions::Add => TRAKT_CONN.add_watchlist_show(&imdb_url).await?.to_string(),
-        TraktActions::Remove => TRAKT_CONN
-            .remove_watchlist_show(&imdb_url)
-            .await?
-            .to_string(),
+        TraktActions::Add => trakt.add_watchlist_show(&imdb_url).await?.to_string(),
+        TraktActions::Remove => trakt.remove_watchlist_show(&imdb_url).await?.to_string(),
         _ => "".to_string(),
     };
     Ok(body)
@@ -727,10 +719,13 @@ pub async fn get_watched_movies_db(pool: &PgPool) -> Result<Vec<WatchedMovie>, E
         .collect()
 }
 
-pub async fn sync_trakt_with_db(mc: &MovieCollection) -> Result<(), Error> {
+pub async fn sync_trakt_with_db(
+    trakt: &TraktConnection,
+    mc: &MovieCollection,
+) -> Result<(), Error> {
     let watchlist_shows_db = Arc::new(get_watchlist_shows_db(&mc.pool).await?);
-    TRAKT_CONN.init().await;
-    let watchlist_shows = TRAKT_CONN.get_watchlist_shows().await?;
+    trakt.init().await;
+    let watchlist_shows = trakt.get_watchlist_shows().await?;
     if watchlist_shows.is_empty() {
         return Ok(());
     }
@@ -755,7 +750,7 @@ pub async fn sync_trakt_with_db(mc: &MovieCollection) -> Result<(), Error> {
             .map(|s| ((s.imdb_url.clone(), s.season, s.episode), s))
             .collect();
     let watched_shows_db = Arc::new(watched_shows_db);
-    let watched_shows = TRAKT_CONN.get_watched_shows().await?;
+    let watched_shows = trakt.get_watched_shows().await?;
     if watched_shows.is_empty() {
         return Ok(());
     }
@@ -776,7 +771,7 @@ pub async fn sync_trakt_with_db(mc: &MovieCollection) -> Result<(), Error> {
     let watched_movies_db: HashSet<_> =
         get_watched_movies_db(&mc.pool).await?.into_iter().collect();
     let watched_movies_db = Arc::new(watched_movies_db);
-    let watched_movies = TRAKT_CONN.get_watched_movies().await?;
+    let watched_movies = trakt.get_watched_movies().await?;
     let watched_movies = Arc::new(watched_movies);
     if watched_movies.is_empty() {
         return Ok(());
@@ -830,9 +825,9 @@ async fn get_imdb_url_from_show(
     Ok(result)
 }
 
-async fn trakt_cal_list(mc: &MovieCollection) -> Result<(), Error> {
-    TRAKT_CONN.init().await;
-    let cal_entries = TRAKT_CONN.get_calendar().await?;
+async fn trakt_cal_list(trakt: &TraktConnection, mc: &MovieCollection) -> Result<(), Error> {
+    trakt.init().await;
+    let cal_entries = trakt.get_calendar().await?;
     for cal in cal_entries {
         let show = match ImdbRatings::get_show_by_link(&cal.link, &mc.pool).await? {
             Some(s) => s.show,
@@ -858,20 +853,20 @@ async fn trakt_cal_list(mc: &MovieCollection) -> Result<(), Error> {
     Ok(())
 }
 
-async fn watchlist_add(mc: &MovieCollection, show: Option<&str>) -> Result<(), Error> {
-    TRAKT_CONN.init().await;
+async fn watchlist_add(
+    trakt: &TraktConnection,
+    mc: &MovieCollection,
+    show: Option<&str>,
+) -> Result<(), Error> {
+    trakt.init().await;
     if let Some(imdb_url) = get_imdb_url_from_show(&mc, show).await? {
         let imdb_url_ = imdb_url.clone();
         mc.stdout.send(format!(
             "result: {}",
-            TRAKT_CONN.add_watchlist_show(&imdb_url_).await?
+            trakt.add_watchlist_show(&imdb_url_).await?
         ));
         debug!("GOT HERE");
-        if let Some(show) = TRAKT_CONN
-            .get_watchlist_shows()
-            .await?
-            .get(imdb_url.as_str())
-        {
+        if let Some(show) = trakt.get_watchlist_shows().await?.get(imdb_url.as_str()) {
             debug!("INSERT SHOW {}", show);
             show.insert_show(&mc.pool).await?;
         }
@@ -879,13 +874,17 @@ async fn watchlist_add(mc: &MovieCollection, show: Option<&str>) -> Result<(), E
     Ok(())
 }
 
-async fn watchlist_rm(mc: &MovieCollection, show: Option<&str>) -> Result<(), Error> {
+async fn watchlist_rm(
+    trakt: &TraktConnection,
+    mc: &MovieCollection,
+    show: Option<&str>,
+) -> Result<(), Error> {
     if let Some(imdb_url) = get_imdb_url_from_show(&mc, show).await? {
         let imdb_url_ = imdb_url.clone();
-        TRAKT_CONN.init().await;
+        trakt.init().await;
         mc.stdout.send(format!(
             "result: {}",
-            TRAKT_CONN.remove_watchlist_show(&imdb_url_).await?
+            trakt.remove_watchlist_show(&imdb_url_).await?
         ));
         if let Some(show) = WatchListShow::get_show_by_link(&imdb_url, &mc.pool).await? {
             show.delete_show(&mc.pool).await?;
@@ -902,18 +901,19 @@ async fn watchlist_list(mc: &MovieCollection) -> Result<(), Error> {
 }
 
 async fn watched_add(
+    trakt: &TraktConnection,
     mc: &MovieCollection,
     show: Option<&str>,
     season: i32,
     episode: &[i32],
 ) -> Result<(), Error> {
-    TRAKT_CONN.init().await;
+    trakt.init().await;
     if let Some(imdb_url) = get_imdb_url_from_show(&mc, show).await? {
         if season != -1 && !episode.is_empty() {
             for epi in episode {
                 let epi_ = *epi;
                 let imdb_url_ = imdb_url.clone();
-                TRAKT_CONN
+                trakt
                     .add_episode_to_watched(&imdb_url_, season, epi_)
                     .await?;
                 WatchedEpisode {
@@ -927,7 +927,7 @@ async fn watched_add(
             }
         } else {
             let imdb_url_ = imdb_url.clone();
-            TRAKT_CONN.add_movie_to_watched(&imdb_url_).await?;
+            trakt.add_movie_to_watched(&imdb_url_).await?;
             WatchedMovie {
                 imdb_url,
                 title: "".into(),
@@ -940,18 +940,19 @@ async fn watched_add(
 }
 
 async fn watched_rm(
+    trakt: &TraktConnection,
     mc: &MovieCollection,
     show: Option<&str>,
     season: i32,
     episode: &[i32],
 ) -> Result<(), Error> {
-    TRAKT_CONN.init().await;
+    trakt.init().await;
     if let Some(imdb_url) = get_imdb_url_from_show(&mc, show).await? {
         if season != -1 && !episode.is_empty() {
             for epi in episode {
                 let epi_ = *epi;
                 let imdb_url_ = imdb_url.clone();
-                TRAKT_CONN
+                trakt
                     .remove_episode_to_watched(&imdb_url_, season, epi_)
                     .await?;
                 if let Some(epi_) =
@@ -962,7 +963,7 @@ async fn watched_rm(
             }
         } else {
             let imdb_url_ = imdb_url.clone();
-            TRAKT_CONN.remove_movie_to_watched(&imdb_url_).await?;
+            trakt.remove_movie_to_watched(&imdb_url_).await?;
             if let Some(movie) = WatchedMovie::get_watched_movie(&mc.pool, &imdb_url).await? {
                 movie.delete_movie(&mc.pool).await?;
             }
@@ -1011,24 +1012,26 @@ async fn watched_list(mc: &MovieCollection, show: Option<&str>, season: i32) -> 
 }
 
 pub async fn trakt_app_parse(
+    config: &Config,
+    trakt: &TraktConnection,
     trakt_command: &TraktCommands,
     trakt_action: TraktActions,
     show: Option<&str>,
     season: i32,
     episode: &[i32],
 ) -> Result<(), Error> {
-    let mc = MovieCollection::new();
+    let mc = MovieCollection::new(config);
     match trakt_command {
-        TraktCommands::Calendar => trakt_cal_list(&mc).await?,
+        TraktCommands::Calendar => trakt_cal_list(trakt, &mc).await?,
         TraktCommands::WatchList => match trakt_action {
-            TraktActions::Add => watchlist_add(&mc, show).await?,
-            TraktActions::Remove => watchlist_rm(&mc, show).await?,
+            TraktActions::Add => watchlist_add(trakt, &mc, show).await?,
+            TraktActions::Remove => watchlist_rm(trakt, &mc, show).await?,
             TraktActions::List => watchlist_list(&mc).await?,
             TraktActions::None => {}
         },
         TraktCommands::Watched => match trakt_action {
-            TraktActions::Add => watched_add(&mc, show, season, episode).await?,
-            TraktActions::Remove => watched_rm(&mc, show, season, episode).await?,
+            TraktActions::Add => watched_add(trakt, &mc, show, season, episode).await?,
+            TraktActions::Remove => watched_rm(trakt, &mc, show, season, episode).await?,
             TraktActions::List => watched_list(&mc, show, season).await?,
             TraktActions::None => {}
         },
@@ -1038,6 +1041,7 @@ pub async fn trakt_app_parse(
 }
 
 pub async fn watch_list_http_worker(
+    config: &Config,
     pool: &PgPool,
     imdb_url: &str,
     season: i32,
@@ -1053,8 +1057,8 @@ pub async fn watch_list_http_worker(
         r#"onclick="watched_rm('SHOW', SEASON, EPISODE);">remove from watched</button>"#
     );
 
-    let mc = MovieCollection::with_pool(&pool)?;
-    let mq = MovieQueueDB::with_pool(&pool);
+    let mc = MovieCollection::with_pool(config, &pool)?;
+    let mq = MovieQueueDB::with_pool(config, &pool);
 
     let show = ImdbRatings::get_show_by_link(imdb_url, &pool)
         .await?
@@ -1161,25 +1165,27 @@ pub async fn watch_list_http_worker(
 }
 
 pub async fn watched_action_http_worker(
+    config: &Config,
+    trakt: &TraktConnection,
     pool: &PgPool,
     action: TraktActions,
     imdb_url: &str,
     season: i32,
     episode: i32,
 ) -> Result<StackString, Error> {
-    let mc = MovieCollection::with_pool(&pool)?;
+    let mc = MovieCollection::with_pool(config, &pool)?;
     let imdb_url = Arc::new(imdb_url.to_owned());
-    TRAKT_CONN.init().await;
+    trakt.init().await;
     let body = match action {
         TraktActions::Add => {
             let result = if season != -1 && episode != -1 {
                 let imdb_url_ = Arc::clone(&imdb_url);
-                TRAKT_CONN
+                trakt
                     .add_episode_to_watched(&imdb_url_, season, episode)
                     .await?
             } else {
                 let imdb_url_ = Arc::clone(&imdb_url);
-                TRAKT_CONN.add_movie_to_watched(&imdb_url_).await?
+                trakt.add_movie_to_watched(&imdb_url_).await?
             };
             if season != -1 && episode != -1 {
                 WatchedEpisode {
@@ -1204,11 +1210,11 @@ pub async fn watched_action_http_worker(
         TraktActions::Remove => {
             let imdb_url_ = Arc::clone(&imdb_url);
             let result = if season != -1 && episode != -1 {
-                TRAKT_CONN
+                trakt
                     .remove_episode_to_watched(&imdb_url_, season, episode)
                     .await?
             } else {
-                TRAKT_CONN.remove_movie_to_watched(&imdb_url_).await?
+                trakt.remove_movie_to_watched(&imdb_url_).await?
             };
 
             if season != -1 && episode != -1 {
@@ -1231,15 +1237,18 @@ pub async fn watched_action_http_worker(
     Ok(body)
 }
 
-pub async fn trakt_cal_http_worker(pool: &PgPool) -> Result<Vec<StackString>, Error> {
+pub async fn trakt_cal_http_worker(
+    trakt: &TraktConnection,
+    pool: &PgPool,
+) -> Result<Vec<StackString>, Error> {
     let button_add = format!(
         "{}{}",
         r#"<td><button type="submit" id="ID" "#,
         r#"onclick="imdb_update('SHOW', 'LINK', SEASON, '/list/trakt/cal');"
             >update database</button></td>"#
     );
-    TRAKT_CONN.init().await;
-    let cal_list = TRAKT_CONN.get_calendar().await?;
+    trakt.init().await;
+    let cal_list = trakt.get_calendar().await?;
     let results = cal_list
         .into_iter()
         .map(|cal| async {

@@ -4,7 +4,9 @@ use anyhow::Error;
 use stack_string::StackString;
 use structopt::StructOpt;
 
-use movie_collection_lib::{movie_collection::MovieCollection, tv_show_source::TvShowSource};
+use movie_collection_lib::{
+    config::Config, movie_collection::MovieCollection, tv_show_source::TvShowSource,
+};
 
 #[derive(StructOpt)]
 /// Query and Parse Video Collection
@@ -25,8 +27,8 @@ async fn find_new_episodes() -> Result<(), Error> {
     } else {
         Some(TvShowSource::All)
     };
-
-    let mc = MovieCollection::new();
+    let config = Config::with_config()?;
+    let mc = MovieCollection::new(&config);
 
     let output = mc.find_new_episodes(source, &opts.shows).await?;
 

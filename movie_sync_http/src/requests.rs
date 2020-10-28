@@ -1,8 +1,9 @@
-use anyhow::{Error};
+use anyhow::Error;
 use serde::{Deserialize, Serialize};
 use stack_string::StackString;
 
 use movie_collection_lib::{
+    config::Config,
     movie_collection::{MovieCollection, MovieCollectionRow},
     movie_queue::{MovieQueueDB, MovieQueueResult, MovieQueueRow},
     pgpool::PgPool,
@@ -17,9 +18,10 @@ impl MovieQueueRequest {
     pub async fn handle(
         self,
         pool: &PgPool,
+        config: &Config,
     ) -> Result<(Vec<MovieQueueResult>, Vec<StackString>), Error> {
         let patterns: Vec<_> = self.patterns.iter().map(StackString::as_str).collect();
-        let queue = MovieQueueDB::with_pool(pool)
+        let queue = MovieQueueDB::with_pool(config, pool)
             .print_movie_queue(&patterns)
             .await?;
         Ok((queue, self.patterns))
@@ -32,9 +34,9 @@ pub struct MovieQueueUpdateRequest {
 }
 
 impl MovieQueueUpdateRequest {
-    pub async fn handle(&self, pool: &PgPool) -> Result<(), Error> {
-        let mq = MovieQueueDB::with_pool(pool);
-        let mc = MovieCollection::with_pool(pool)?;
+    pub async fn handle(&self, pool: &PgPool, config: &Config) -> Result<(), Error> {
+        let mq = MovieQueueDB::with_pool(config, pool);
+        let mc = MovieCollection::with_pool(config, pool)?;
         for entry in &self.queue {
             let cidx = if let Some(i) = mc.get_collection_index(entry.path.as_ref()).await? {
                 i
@@ -57,8 +59,8 @@ pub struct MovieCollectionUpdateRequest {
 }
 
 impl MovieCollectionUpdateRequest {
-    pub async fn handle(&self, pool: &PgPool) -> Result<(), Error> {
-        let mc = MovieCollection::with_pool(pool)?;
+    pub async fn handle(&self, pool: &PgPool, config: &Config) -> Result<(), Error> {
+        let mc = MovieCollection::with_pool(config, pool)?;
         for entry in &self.collection {
             if let Some(cidx) = mc.get_collection_index(entry.path.as_ref()).await? {
                 if cidx == entry.idx {

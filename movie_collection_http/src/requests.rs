@@ -3,6 +3,7 @@ use serde::{Deserialize, Serialize};
 use stack_string::StackString;
 
 use movie_collection_lib::{
+    config::Config,
     imdb_ratings::ImdbRatings,
     parse_imdb::{ParseImdb, ParseImdbOptions},
     pgpool::PgPool,
@@ -49,9 +50,9 @@ impl From<ImdbShowRequest> for ParseImdbOptions {
 }
 
 impl ImdbShowRequest {
-    pub async fn handle(self, pool: &PgPool) -> Result<StackString, Error> {
+    pub async fn handle(self, pool: &PgPool, config: &Config) -> Result<StackString, Error> {
         let watchlist = get_watchlist_shows_db_map(pool).await?;
-        let pi = ParseImdb::with_pool(pool)?;
+        let pi = ParseImdb::with_pool(config, pool)?;
         let body = pi.parse_imdb_http_worker(&self.into(), &watchlist).await?;
         Ok(body)
     }

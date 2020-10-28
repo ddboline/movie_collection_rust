@@ -97,7 +97,7 @@ impl MovieQueueCli {
                     }
                     "movie_collection" => {
                         let rows: Vec<MovieCollectionRow> = serde_json::from_str(&data)?;
-                        let mc = MovieCollection::with_pool(&pool)?;
+                        let mc = MovieCollection::with_pool(&config, &pool)?;
                         let futures = rows.into_iter().map(|entry| {
                             let mc = mc.clone();
                             async move {
@@ -120,8 +120,8 @@ impl MovieQueueCli {
                             .await?;
                     }
                     "movie_queue" => {
-                        let mq = MovieQueueDB::with_pool(&pool);
-                        let mc = MovieCollection::with_pool(&pool)?;
+                        let mq = MovieQueueDB::with_pool(&config, &pool);
+                        let mc = MovieCollection::with_pool(&config, &pool)?;
                         let entries: Vec<MovieQueueRow> = serde_json::from_str(&data)?;
                         let futures = entries.into_iter().map(|entry| {
                             let mq = mq.clone();
@@ -185,12 +185,12 @@ impl MovieQueueCli {
                         file.write_all(&serde_json::to_vec(&episodes)?).await?;
                     }
                     "movie_collection" => {
-                        let mc = MovieCollection::with_pool(&pool)?;
+                        let mc = MovieCollection::with_pool(&config, &pool)?;
                         let entries = mc.get_collection_after_timestamp(start_timestamp).await?;
                         file.write_all(&serde_json::to_vec(&entries)?).await?;
                     }
                     "movie_queue" => {
-                        let mq = MovieQueueDB::with_pool(&pool);
+                        let mq = MovieQueueDB::with_pool(&config, &pool);
                         let entries = mq.get_queue_after_timestamp(start_timestamp).await?;
                         file.write_all(&serde_json::to_vec(&entries)?).await?;
                     }

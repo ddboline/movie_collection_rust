@@ -23,7 +23,7 @@ use movie_collection_lib::{
     trakt_utils::{
         get_watchlist_shows_db_map, trakt_cal_http_worker, trakt_watched_seasons_worker,
         tvshows_worker, watch_list_http_worker, watched_action_http_worker,
-        watchlist_action_worker, watchlist_worker, TRAKT_CONN,
+        watchlist_action_worker, watchlist_worker,
     },
     transcode_service::{transcode_status, TranscodeService, TranscodeServiceRequest},
     tv_show_source::TvShowSource,
@@ -68,7 +68,7 @@ pub async fn find_new_episodes(
     state: Data<AppState>,
 ) -> HttpResult {
     let req = query.into_inner();
-    let entries = find_new_episodes_http_worker(&state.db, req.shows, req.source).await?;
+    let entries = find_new_episodes_http_worker(&CONFIG, &state.db, req.shows, req.source).await?;
     form_http_response(new_episode_worker(&entries).into())
 }
 
@@ -90,7 +90,7 @@ fn new_episode_worker(entries: &[StackString]) -> StackString {
 }
 
 pub async fn tvshows(_: LoggedUser, state: Data<AppState>) -> HttpResult {
-    let shows = MovieCollection::with_pool(&state.db)?
+    let shows = MovieCollection::with_pool(&CONFIG, &state.db)?
         .print_tv_shows()
         .await?;
     let tvshowsmap = get_watchlist_shows_db_map(&state.db).await?;
@@ -109,7 +109,7 @@ pub async fn movie_queue_delete(
 ) -> HttpResult {
     let path = path.into_inner();
     if std::path::Path::new(path.as_str()).exists() {
-        MovieQueueDB::with_pool(&state.db)
+        MovieQueueDB::with_pool(&CONFIG, &state.db)
             .remove_from_queue_by_path(&path)
             .await?;
     }
@@ -119,7 +119,7 @@ pub async fn movie_queue_delete(
 pub async fn movie_queue_play(idx: Path<i32>, _: LoggedUser, state: Data<AppState>) -> HttpResult {
     let idx = idx.into_inner();
 
-    let movie_path = MovieCollection::with_pool(&state.db)?
+    let movie_path = MovieCollection::with_pool(&CONFIG, &state.db)?
         .get_collection_path(idx)
         .await?;
     let movie_path = std::path::Path::new(movie_path.as_str());
@@ -165,7 +165,7 @@ pub async fn movie_queue_route(
     state: Data<AppState>,
 ) -> HttpResult {
     let req = query.into_inner();
-    let mq = MovieQueueDB::with_pool(&state.db);
+    let mq = MovieQueueDB::with_pool(&CONFIG, &state.db);
     let queue = mq.get_queue_after_timestamp(req.start_timestamp).await?;
     to_json(queue)
 }
@@ -177,7 +177,7 @@ pub async fn movie_queue_update(
 ) -> HttpResult {
     let queue = data.into_inner();
     let req = queue;
-    req.handle(&state.db).await?;
+    req.handle(&state.db, &CONFIG).await?;
     form_http_response("Success".to_string())
 }
 
@@ -192,7 +192,7 @@ pub async fn movie_collection_route(
     state: Data<AppState>,
 ) -> HttpResult {
     let req = query.into_inner();
-    let mc = MovieCollection::with_pool(&state.db)?;
+    let mc = MovieCollection::with_pool(&CONFIG, &state.db)?;
     let x = mc
         .get_collection_after_timestamp(req.start_timestamp)
         .await?;
@@ -207,7 +207,7 @@ pub async fn movie_collection_update(
     let collection = data.into_inner();
 
     let req = collection;
-    req.handle(&state.db).await?;
+    req.handle(&state.db, &CONFIG).await?;
     form_http_response("Success".to_string())
 }
 
@@ -221,7 +221,7 @@ pub async fn imdb_show(
     let query = query.into_inner();
 
     let req = ImdbShowRequest { show, query };
-    let body = req.handle(&state.db).await?;
+    let body = req.handle(&state.db, &CONFIG).await?;
     form_http_response(body.into())
 }
 
@@ -234,7 +234,7 @@ pub async fn movie_queue(_: LoggedUser, state: Data<AppState>) -> HttpResult {
     let req = MovieQueueRequest {
         patterns: Vec::new(),
     };
-    let (queue, _) = req.handle(&state.db).await?;
+    let (queue, _) = req.handle(&state.db, &CONFIG).await?;
     let body = queue_body_resp(Vec::new(), queue, &state.db).await?;
     form_http_response(body.into())
 }
@@ -248,7 +248,7 @@ pub async fn movie_queue_show(
     let patterns = vec![path];
 
     let req = MovieQueueRequest { patterns };
-    let (queue, patterns) = req.handle(&state.db).await?;
+    let (queue, patterns) = req.handle(&state.db, &CONFIG).await?;
     let body = queue_body_resp(patterns, queue, &state.db).await?;
     form_http_response(body.into())
 }
@@ -258,7 +258,7 @@ async fn queue_body_resp(
     queue: Vec<MovieQueueResult>,
     pool: &PgPool,
 ) -> Result<StackString, Error> {
-    let entries = movie_queue_http(&queue, pool).await?;
+    let entries = movie_queue_http(&CONFIG, &queue, pool).await?;
     let body = movie_queue_body(&patterns, &entries);
     Ok(body)
 }
@@ -351,9 +351,9 @@ pub async fn imdb_ratings_update(
     form_http_response("Success".to_string())
 }
 
-pub async fn trakt_auth_url(_: LoggedUser) -> HttpResult {
-    TRAKT_CONN.init().await;
-    let url = TRAKT_CONN.get_auth_url().await?;
+pub async fn trakt_auth_url(_: LoggedUser, state: Data<AppState>) -> HttpResult {
+    state.trakt.init().await;
+    let url = state.trakt.get_auth_url().await?;
     form_http_response(url.to_string())
 }
 
@@ -363,9 +363,14 @@ pub struct TraktCallbackRequest {
     pub state: StackString,
 }
 
-pub async fn trakt_callback(query: Query<TraktCallbackRequest>, _: LoggedUser) -> HttpResult {
-    TRAKT_CONN.init().await;
-    TRAKT_CONN
+pub async fn trakt_callback(
+    query: Query<TraktCallbackRequest>,
+    _: LoggedUser,
+    state: Data<AppState>,
+) -> HttpResult {
+    state.trakt.init().await;
+    state
+        .trakt
         .exchange_code_for_auth_token(query.code.as_str(), query.state.as_str())
         .await?;
     let body = r#"
@@ -375,14 +380,14 @@ pub async fn trakt_callback(query: Query<TraktCallbackRequest>, _: LoggedUser) -
     form_http_response(body.to_string())
 }
 
-pub async fn refresh_auth(_: LoggedUser) -> HttpResult {
-    TRAKT_CONN.init().await;
-    TRAKT_CONN.exchange_refresh_token().await?;
+pub async fn refresh_auth(_: LoggedUser, state: Data<AppState>) -> HttpResult {
+    state.trakt.init().await;
+    state.trakt.exchange_refresh_token().await?;
     form_http_response("finished".to_string())
 }
 
 pub async fn trakt_cal(_: LoggedUser, state: Data<AppState>) -> HttpResult {
-    let entries = trakt_cal_http_worker(&state.db).await?;
+    let entries = trakt_cal_http_worker(&state.trakt, &state.db).await?;
     form_http_response(trakt_cal_worker(&entries).into())
 }
 
@@ -411,8 +416,8 @@ pub async fn trakt_watchlist_action(
     let action = action.parse().expect("impossible");
 
     let req = WatchlistActionRequest { action, imdb_url };
-    let imdb_url = req.handle(&state.db).await?;
-    let body = watchlist_action_worker(action, &imdb_url).await?;
+    let imdb_url = req.handle(&state.db, &state.trakt).await?;
+    let body = watchlist_action_worker(&state.trakt, action, &imdb_url).await?;
     form_http_response(body)
 }
 
@@ -432,7 +437,7 @@ pub async fn trakt_watched_seasons(
     let entries = if &show == "" {
         Vec::new()
     } else {
-        MovieCollection::with_pool(&state.db)?
+        MovieCollection::with_pool(&CONFIG, &state.db)?
             .print_imdb_all_seasons(&show)
             .await?
     };
@@ -448,7 +453,7 @@ pub async fn trakt_watched_list(
 ) -> HttpResult {
     let (imdb_url, season) = path.into_inner();
 
-    let body = watch_list_http_worker(&state.db, &imdb_url, season).await?;
+    let body = watch_list_http_worker(&CONFIG, &state.db, &imdb_url, season).await?;
     form_http_response(body.into())
 }
 
@@ -459,6 +464,8 @@ pub async fn trakt_watched_action(
 ) -> HttpResult {
     let (action, imdb_url, season, episode) = path.into_inner();
     let body = watched_action_http_worker(
+        &CONFIG,
+        &state.trakt,
         &state.db,
         action.parse().expect("impossible"),
         &imdb_url,
@@ -571,7 +578,7 @@ pub async fn movie_queue_transcode(
     let patterns = vec![path];
 
     let req = MovieQueueRequest { patterns };
-    let (entries, _) = req.handle(&state.db).await?;
+    let (entries, _) = req.handle(&state.db, &CONFIG).await?;
     transcode_worker(None, &entries).await
 }
 
@@ -584,6 +591,6 @@ pub async fn movie_queue_transcode_directory(
     let patterns = vec![file];
 
     let req = MovieQueueRequest { patterns };
-    let (entries, _) = req.handle(&state.db).await?;
+    let (entries, _) = req.handle(&state.db, &CONFIG).await?;
     transcode_worker(Some(&path::Path::new(directory.as_str())), &entries).await
 }
