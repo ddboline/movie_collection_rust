@@ -26,8 +26,8 @@ maplit = "1.0"
 handlebars = "3.5"
 itertools = "0.9"
 env_logger = "0.8"
-auth_server_rust = { git = "https://github.com/ddboline/auth_server_rust.git", tag="0.1.23"}
-stack-string = { git = "https://github.com/ddboline/stack-string-rs.git", tag="0.1.7", features=["postgres_types"] }
+authorized_users = { git = "https://github.com/ddboline/auth_server_rust.git", tag="0.2.3"}
+stack-string = { git = "https://github.com/ddboline/stack-string-rs.git", tag="0.1.9", features=["postgres_types"] }
 
 [[bin]]
 name = "movie-queue-http"

@@ -42,4 +42,4 @@ lapin = "1.4"
 deadqueue = "0.1"
 smallvec = "1.4"
 procfs = "0.8"
-stack-string = { git = "https://github.com/ddboline/stack-string-rs.git", tag="0.1.7", features=["postgres_types"] }
+stack-string = { git = "https://github.com/ddboline/stack-string-rs.git", tag="0.1.9", features=["postgres_types"] }

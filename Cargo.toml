@@ -23,7 +23,7 @@ structopt = "0.3"
 futures = "0.3"
 serde_json = "1.0"
 chrono = "0.4"
-stack-string = { git = "https://github.com/ddboline/stack-string-rs.git", tag="0.1.7", features=["postgres_types"] }
+stack-string = { git = "https://github.com/ddboline/stack-string-rs.git", tag="0.1.9", features=["postgres_types"] }
 
 [workspace]
 members = [
