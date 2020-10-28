@@ -33,6 +33,7 @@ lazy_static! {
     static ref AUTH_TOKEN: RwLock<Option<Arc<AccessTokenResponse>>> = RwLock::new(None);
 }
 
+#[derive(Clone)]
 pub struct TraktConnection {
     config: Config,
     client: Client,

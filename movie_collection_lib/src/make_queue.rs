@@ -10,6 +10,7 @@ use std::{
 };
 
 use crate::{
+    config::Config,
     movie_collection::MovieCollection,
     movie_queue::{MovieQueueDB, MovieQueueResult},
     pgpool::PgPool,
@@ -48,6 +49,7 @@ impl From<&Path> for PathOrIndex {
 
 #[allow(clippy::cognitive_complexity)]
 pub async fn make_queue_worker(
+    config: &Config,
     add_files: &[PathOrIndex],
     del_files: &[PathOrIndex],
     do_time: bool,
@@ -55,7 +57,7 @@ pub async fn make_queue_worker(
     do_shows: bool,
     stdout: &StdoutChannel,
 ) -> Result<(), Error> {
-    let mc = MovieCollection::new();
+    let mc = MovieCollection::new(config.clone());
     let mq = MovieQueueDB::with_pool(&mc.pool);
 
     if do_shows {

@@ -5,7 +5,9 @@ use stack_string::StackString;
 use structopt::StructOpt;
 
 use movie_collection_lib::{
+    config::Config,
     movie_collection::MovieCollection,
+    trakt_connection::TraktConnection,
     trakt_utils::{sync_trakt_with_db, trakt_app_parse, TraktActions, TraktCommands},
 };
 
@@ -36,7 +38,7 @@ struct TraktAppOpts {
 
 async fn trakt_app() -> Result<(), Error> {
     let opts = TraktAppOpts::from_args();
-
+    let config = Config::with_config()?;
     let do_parse = opts.parse;
 
     let trakt_command = opts.trakt_command.unwrap_or(TraktCommands::None);
@@ -44,12 +46,13 @@ async fn trakt_app() -> Result<(), Error> {
     let show = opts.show.as_ref().map(StackString::as_str);
     let season = opts.season.unwrap_or(-1);
 
-    let mc = MovieCollection::new();
+    let mc = MovieCollection::new(config.clone());
+    let trakt = TraktConnection::new(config.clone());
 
     let result = if do_parse {
-        sync_trakt_with_db(&mc).await
+        sync_trakt_with_db(&trakt, &mc).await
     } else {
-        trakt_app_parse(&trakt_command, trakt_action, show, season, &opts.episode).await
+        trakt_app_parse(&config, &trakt, &trakt_command, trakt_action, show, season, &opts.episode).await
     };
     mc.stdout.close().await?;
     result

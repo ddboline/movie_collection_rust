@@ -25,7 +25,8 @@ use movie_collection_lib::{
     movie_collection::{ImdbSeason, TvShowsResult},
     movie_queue::MovieQueueResult,
     pgpool::PgPool,
-    trakt_utils::{TraktActions, WatchListShow, TRAKT_CONN},
+    trakt_utils::{TraktActions, WatchListShow, trakt_cal_http_worker,},
+    trakt_connection::TraktConnection,
     transcode_service::{transcode_status, TranscodeService, TranscodeServiceRequest},
     tv_show_source::TvShowSource,
     utils::HBR,
@@ -41,7 +42,7 @@ use super::{
         ImdbRatingsUpdateRequest, ImdbSeasonsRequest, ImdbShowRequest, LastModifiedRequest,
         MovieCollectionSyncRequest, MovieCollectionUpdateRequest, MoviePathRequest,
         MovieQueueRequest, MovieQueueSyncRequest, MovieQueueUpdateRequest, ParseImdbRequest,
-        QueueDeleteRequest, TraktCalRequest, TvShowsRequest, WatchedActionRequest,
+        QueueDeleteRequest, TvShowsRequest, WatchedActionRequest,
         WatchedListRequest, WatchlistActionRequest, WatchlistShowsRequest,
     },
     HandleRequest,
@@ -579,11 +580,11 @@ pub async fn trakt_watchlist(_: LoggedUser, state: Data<AppState>) -> HttpResult
         .and_then(watchlist_worker)
 }
 
-async fn watchlist_action_worker(action: TraktActions, imdb_url: &str) -> HttpResult {
-    TRAKT_CONN.init().await;
+async fn watchlist_action_worker(trakt: &TraktConnection, action: TraktActions, imdb_url: &str) -> HttpResult {
+    trakt.init().await;
     let body = match action {
-        TraktActions::Add => TRAKT_CONN.add_watchlist_show(&imdb_url).await?.to_string(),
-        TraktActions::Remove => TRAKT_CONN
+        TraktActions::Add => trakt.add_watchlist_show(&imdb_url).await?.to_string(),
+        TraktActions::Remove => trakt
             .remove_watchlist_show(&imdb_url)
             .await?
             .to_string(),
@@ -601,8 +602,8 @@ pub async fn trakt_watchlist_action(
     let action = action.parse().expect("impossible");
 
     let req = WatchlistActionRequest { action, imdb_url };
-    let imdb_url = state.db.handle(req).await?;
-    watchlist_action_worker(action, &imdb_url).await
+    let imdb_url = req.handle(&state.db, &state.trakt).await?;
+    watchlist_action_worker(&state.trakt, action, &imdb_url).await
 }
 
 fn trakt_watched_seasons_worker(
@@ -682,8 +683,8 @@ pub async fn trakt_watched_action(
         season,
         episode,
     };
-    let x = state.db.handle(req).await?;
-    form_http_response(x.into())
+    let body = req.handle(&state.db, &state.trakt).await?;
+    form_http_response(body.into())
 }
 
 fn trakt_cal_worker(entries: &[StackString]) -> HttpResult {
@@ -697,8 +698,7 @@ fn trakt_cal_worker(entries: &[StackString]) -> HttpResult {
 }
 
 pub async fn trakt_cal(_: LoggedUser, state: Data<AppState>) -> HttpResult {
-    let req = TraktCalRequest {};
-    let entries = state.db.handle(req).await?;
+    let entries = trakt_cal_http_worker(&state.trakt, &state.db).await?;
     trakt_cal_worker(&entries)
 }
 
@@ -706,9 +706,9 @@ pub async fn user(user: LoggedUser) -> HttpResult {
     to_json(user)
 }
 
-pub async fn trakt_auth_url(_: LoggedUser, _: Data<AppState>) -> HttpResult {
-    TRAKT_CONN.init().await;
-    let url = TRAKT_CONN.get_auth_url().await?;
+pub async fn trakt_auth_url(_: LoggedUser, state: Data<AppState>) -> HttpResult {
+    state.trakt.init().await;
+    let url = state.trakt.get_auth_url().await?;
     form_http_response(url.to_string())
 }
 
@@ -721,10 +721,10 @@ pub struct TraktCallbackRequest {
 pub async fn trakt_callback(
     query: Query<TraktCallbackRequest>,
     _: LoggedUser,
-    _: Data<AppState>,
+    state: Data<AppState>,
 ) -> HttpResult {
-    TRAKT_CONN.init().await;
-    TRAKT_CONN
+    state.trakt.init().await;
+    state.trakt
         .exchange_code_for_auth_token(query.code.as_str(), query.state.as_str())
         .await?;
     let body = r#"
@@ -734,9 +734,9 @@ pub async fn trakt_callback(
     form_http_response(body.to_string())
 }
 
-pub async fn refresh_auth(_: LoggedUser, _: Data<AppState>) -> HttpResult {
-    TRAKT_CONN.init().await;
-    TRAKT_CONN.exchange_refresh_token().await?;
+pub async fn refresh_auth(_: LoggedUser, state: Data<AppState>) -> HttpResult {
+    state.trakt.init().await;
+    state.trakt.exchange_refresh_token().await?;
     form_http_response("finished".to_string())
 }
 

@@ -5,6 +5,7 @@ use stack_string::StackString;
 use structopt::StructOpt;
 
 use movie_collection_lib::{
+    config::Config,
     make_queue::{make_queue_worker, PathOrIndex},
     stdout_channel::StdoutChannel,
 };
@@ -34,10 +35,12 @@ struct MakeQueueOpts {
 
 async fn make_queue() -> Result<(), Error> {
     let opts = MakeQueueOpts::from_args();
+    let config = Config::with_config()?;
     let stdout = StdoutChannel::new();
     let patterns: Vec<_> = opts.patterns.iter().map(StackString::as_str).collect();
 
     make_queue_worker(
+        &config,
         &opts.add,
         &opts.remove,
         opts.time,

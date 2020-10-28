@@ -167,13 +167,12 @@ pub struct MovieCollection {
 
 impl Default for MovieCollection {
     fn default() -> Self {
-        Self::new()
+        Self::new(Config::default())
     }
 }
 
 impl MovieCollection {
-    pub fn new() -> Self {
-        let config = Config::with_config().expect("Init config failed");
+    pub fn new(config: Config) -> Self {
         let pool = PgPool::new(&config.pgurl);
         let stdout = StdoutChannel::new();
         Self {

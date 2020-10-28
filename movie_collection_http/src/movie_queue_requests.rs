@@ -16,10 +16,11 @@ use movie_collection_lib::{
     movie_queue::{MovieQueueDB, MovieQueueResult, MovieQueueRow},
     parse_imdb::{ParseImdb, ParseImdbOptions},
     pgpool::PgPool,
+    trakt_connection::TraktConnection,
     trakt_utils::{
-        get_watched_shows_db, get_watchlist_shows_db_map, trakt_cal_http_worker,
+        get_watched_shows_db, get_watchlist_shows_db_map,
         watch_list_http_worker, watched_action_http_worker, TraktActions, WatchListMap,
-        WatchListShow, WatchedEpisode, TRAKT_CONN,
+        WatchListShow, WatchedEpisode,
     },
     tv_show_source::TvShowSource,
 };
@@ -135,26 +136,23 @@ pub struct WatchlistActionRequest {
     pub imdb_url: StackString,
 }
 
-#[async_trait]
-impl HandleRequest<WatchlistActionRequest> for PgPool {
-    type Result = Result<StackString, Error>;
-
-    async fn handle(&self, msg: WatchlistActionRequest) -> Self::Result {
-        match msg.action {
+impl WatchlistActionRequest {
+    pub async fn handle(self, pool: &PgPool, trakt: &TraktConnection) -> Result<StackString, Error> {
+        match self.action {
             TraktActions::Add => {
-                TRAKT_CONN.init().await;
-                if let Some(show) = TRAKT_CONN.get_watchlist_shows().await?.get(&msg.imdb_url) {
-                    show.insert_show(&self).await?;
+                trakt.init().await;
+                if let Some(show) = trakt.get_watchlist_shows().await?.get(&self.imdb_url) {
+                    show.insert_show(&pool).await?;
                 }
             }
             TraktActions::Remove => {
-                if let Some(show) = WatchListShow::get_show_by_link(&msg.imdb_url, &self).await? {
-                    show.delete_show(&self).await?;
+                if let Some(show) = WatchListShow::get_show_by_link(&self.imdb_url, &pool).await? {
+                    show.delete_show(&pool).await?;
                 }
             }
             _ => {}
         }
-        Ok(msg.imdb_url)
+        Ok(self.imdb_url)
     }
 }
 
@@ -209,12 +207,9 @@ pub struct WatchedActionRequest {
     pub episode: i32,
 }
 
-#[async_trait]
-impl HandleRequest<WatchedActionRequest> for PgPool {
-    type Result = Result<StackString, Error>;
-
-    async fn handle(&self, msg: WatchedActionRequest) -> Self::Result {
-        watched_action_http_worker(&self, msg.action, &msg.imdb_url, msg.season, msg.episode).await
+impl WatchedActionRequest {
+    pub async fn handle(&self, pool: &PgPool, trakt: &TraktConnection) -> Result<StackString, Error> {
+        watched_action_http_worker(trakt, pool, self.action, &self.imdb_url, self.season, self.episode).await
     }
 }
 
@@ -265,17 +260,6 @@ impl HandleRequest<ImdbShowRequest> for PgPool {
         let pi = ParseImdb::with_pool(&self)?;
         let body = pi.parse_imdb_http_worker(&msg.into(), &watchlist).await?;
         Ok(body)
-    }
-}
-
-pub struct TraktCalRequest {}
-
-#[async_trait]
-impl HandleRequest<TraktCalRequest> for PgPool {
-    type Result = Result<Vec<StackString>, Error>;
-
-    async fn handle(&self, _: TraktCalRequest) -> Self::Result {
-        trakt_cal_http_worker(&self).await
     }
 }
 

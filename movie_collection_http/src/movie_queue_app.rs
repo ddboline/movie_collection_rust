@@ -24,7 +24,7 @@ use super::{
         trakt_watchlist, trakt_watchlist_action, tvshows, user,
     },
 };
-use movie_collection_lib::{config::Config, pgpool::PgPool};
+use movie_collection_lib::{config::Config, pgpool::PgPool, trakt_connection::TraktConnection};
 
 lazy_static! {
     pub static ref CONFIG: Config = Config::with_config().expect("Config init failed");
@@ -32,6 +32,7 @@ lazy_static! {
 
 pub struct AppState {
     pub db: PgPool,
+    pub trakt: TraktConnection,
 }
 
 pub async fn start_app() -> Result<(), Error> {
@@ -54,12 +55,13 @@ pub async fn start_app() -> Result<(), Error> {
     let domain = CONFIG.domain.to_string();
     let port = CONFIG.port;
     let pool = PgPool::new(&CONFIG.pgurl);
+    let trakt = TraktConnection::new(CONFIG.clone());
 
     actix_rt::spawn(_update_db(pool.clone()));
 
     HttpServer::new(move || {
         App::new()
-            .data(AppState { db: pool.clone() })
+            .data(AppState { db: pool.clone(), trakt: trakt.clone() })
             .wrap(IdentityService::new(
                 CookieIdentityPolicy::new(&SECRET_KEY.get())
                     .name("auth")

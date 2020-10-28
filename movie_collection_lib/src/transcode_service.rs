@@ -527,12 +527,12 @@ impl TranscodeService {
             .await?;
         fs::rename(&new_path, &output_file).await?;
         let stdout = StdoutChannel::new();
-        make_queue_worker(&[], &[output_file.into()], false, &[], false, &stdout).await?;
+        make_queue_worker(&self.config, &[], &[output_file.into()], false, &[], false, &stdout).await?;
         debug_output_file
             .write_all(format!("add {} to queue\n", output_file.to_string_lossy()).as_bytes())
             .await?;
-        make_queue_worker(&[output_file.into()], &[], false, &[], false, &stdout).await?;
-        let mc = MovieCollection::new();
+        make_queue_worker(&self.config, &[output_file.into()], &[], false, &[], false, &stdout).await?;
+        let mc = MovieCollection::new(self.config.clone());
         debug_output_file.write_all(b"update collection\n").await?;
         mc.make_collection().await?;
         mc.fix_collection_show_id().await?;

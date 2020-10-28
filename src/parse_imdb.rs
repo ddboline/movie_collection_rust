@@ -4,14 +4,15 @@ use anyhow::Error;
 use structopt::StructOpt;
 
 use movie_collection_lib::{
+    config::Config,
     movie_collection::MovieCollection,
     parse_imdb::{ParseImdb, ParseImdbOptions},
 };
 
 async fn parse_imdb_parser() -> Result<(), Error> {
     let opts = ParseImdbOptions::from_args();
-
-    let mc = MovieCollection::new();
+    let config = Config::with_config()?;
+    let mc = MovieCollection::new(config);
     let pi = ParseImdb::with_pool(&mc.pool)?;
 
     let output: Vec<_> = pi
