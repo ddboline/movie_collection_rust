@@ -13,6 +13,7 @@ use std::{
     path::Path,
     sync::Arc,
 };
+use stdout_channel::StdoutChannel;
 
 use crate::{
     config::Config,
@@ -20,7 +21,6 @@ use crate::{
     imdb_ratings::ImdbRatings,
     movie_queue::MovieQueueDB,
     pgpool::PgPool,
-    stdout_channel::StdoutChannel,
     tv_show_source::TvShowSource,
     utils::{option_string_wrapper, parse_file_stem, walk_directory},
 };

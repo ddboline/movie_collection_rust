@@ -18,9 +18,8 @@ use movie_collection_lib::{
     pgpool::PgPool,
     trakt_connection::TraktConnection,
     trakt_utils::{
-        get_watched_shows_db, get_watchlist_shows_db_map,
-        watch_list_http_worker, watched_action_http_worker, TraktActions, WatchListMap,
-        WatchListShow, WatchedEpisode,
+        get_watched_shows_db, get_watchlist_shows_db_map, watch_list_http_worker,
+        watched_action_http_worker, TraktActions, WatchListMap, WatchListShow, WatchedEpisode,
     },
     tv_show_source::TvShowSource,
 };
@@ -137,7 +136,11 @@ pub struct WatchlistActionRequest {
 }
 
 impl WatchlistActionRequest {
-    pub async fn handle(self, pool: &PgPool, trakt: &TraktConnection) -> Result<StackString, Error> {
+    pub async fn handle(
+        self,
+        pool: &PgPool,
+        trakt: &TraktConnection,
+    ) -> Result<StackString, Error> {
         match self.action {
             TraktActions::Add => {
                 trakt.init().await;
@@ -208,8 +211,20 @@ pub struct WatchedActionRequest {
 }
 
 impl WatchedActionRequest {
-    pub async fn handle(&self, pool: &PgPool, trakt: &TraktConnection) -> Result<StackString, Error> {
-        watched_action_http_worker(trakt, pool, self.action, &self.imdb_url, self.season, self.episode).await
+    pub async fn handle(
+        &self,
+        pool: &PgPool,
+        trakt: &TraktConnection,
+    ) -> Result<StackString, Error> {
+        watched_action_http_worker(
+            trakt,
+            pool,
+            self.action,
+            &self.imdb_url,
+            self.season,
+            self.episode,
+        )
+        .await
     }
 }
 

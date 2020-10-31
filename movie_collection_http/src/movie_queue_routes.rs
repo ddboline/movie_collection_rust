@@ -25,8 +25,8 @@ use movie_collection_lib::{
     movie_collection::{ImdbSeason, TvShowsResult},
     movie_queue::MovieQueueResult,
     pgpool::PgPool,
-    trakt_utils::{TraktActions, WatchListShow, trakt_cal_http_worker,},
     trakt_connection::TraktConnection,
+    trakt_utils::{trakt_cal_http_worker, TraktActions, WatchListShow},
     transcode_service::{transcode_status, TranscodeService, TranscodeServiceRequest},
     tv_show_source::TvShowSource,
     utils::HBR,
@@ -42,8 +42,8 @@ use super::{
         ImdbRatingsUpdateRequest, ImdbSeasonsRequest, ImdbShowRequest, LastModifiedRequest,
         MovieCollectionSyncRequest, MovieCollectionUpdateRequest, MoviePathRequest,
         MovieQueueRequest, MovieQueueSyncRequest, MovieQueueUpdateRequest, ParseImdbRequest,
-        QueueDeleteRequest, TvShowsRequest, WatchedActionRequest,
-        WatchedListRequest, WatchlistActionRequest, WatchlistShowsRequest,
+        QueueDeleteRequest, TvShowsRequest, WatchedActionRequest, WatchedListRequest,
+        WatchlistActionRequest, WatchlistShowsRequest,
     },
     HandleRequest,
 };
@@ -136,7 +136,9 @@ async fn transcode_worker(
             false,
         )
         .await?;
-        remcom_service.publish_transcode_job(&payload).await?;
+        remcom_service
+            .publish_transcode_job(&payload, |_| async move { Ok(()) })
+            .await?;
         output.push(format!("{:?}", payload));
     }
     form_http_response(output.join(""))
@@ -580,14 +582,15 @@ pub async fn trakt_watchlist(_: LoggedUser, state: Data<AppState>) -> HttpResult
         .and_then(watchlist_worker)
 }
 
-async fn watchlist_action_worker(trakt: &TraktConnection, action: TraktActions, imdb_url: &str) -> HttpResult {
+async fn watchlist_action_worker(
+    trakt: &TraktConnection,
+    action: TraktActions,
+    imdb_url: &str,
+) -> HttpResult {
     trakt.init().await;
     let body = match action {
         TraktActions::Add => trakt.add_watchlist_show(&imdb_url).await?.to_string(),
-        TraktActions::Remove => trakt
-            .remove_watchlist_show(&imdb_url)
-            .await?
-            .to_string(),
+        TraktActions::Remove => trakt.remove_watchlist_show(&imdb_url).await?.to_string(),
         _ => "".to_string(),
     };
     form_http_response(body)
@@ -724,7 +727,8 @@ pub async fn trakt_callback(
     state: Data<AppState>,
 ) -> HttpResult {
     state.trakt.init().await;
-    state.trakt
+    state
+        .trakt
         .exchange_code_for_auth_token(query.code.as_str(), query.state.as_str())
         .await?;
     let body = r#"
@@ -760,7 +764,9 @@ pub async fn movie_queue_transcode_file(
         .join("movies")
         .join(&filename);
     let req = TranscodeServiceRequest::create_transcode_request(&CONFIG, &input_path)?;
-    transcode_service.publish_transcode_job(&req).await?;
+    transcode_service
+        .publish_transcode_job(&req, |_| async move { Ok(()) })
+        .await?;
     form_http_response("".to_string())
 }
 
@@ -780,7 +786,9 @@ pub async fn movie_queue_remcom_file(
     let req =
         TranscodeServiceRequest::create_remcom_request(&CONFIG, &input_path, directory, false)
             .await?;
-    transcode_service.publish_transcode_job(&req).await?;
+    transcode_service
+        .publish_transcode_job(&req, |_| async move { Ok(()) })
+        .await?;
     form_http_response("".to_string())
 }
 
@@ -803,7 +811,9 @@ pub async fn movie_queue_remcom_directory_file(
         false,
     )
     .await?;
-    transcode_service.publish_transcode_job(&req).await?;
+    transcode_service
+        .publish_transcode_job(&req, |_| async move { Ok(()) })
+        .await?;
     form_http_response("".to_string())
 }
 

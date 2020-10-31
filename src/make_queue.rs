@@ -2,12 +2,12 @@
 
 use anyhow::Error;
 use stack_string::StackString;
+use stdout_channel::StdoutChannel;
 use structopt::StructOpt;
 
 use movie_collection_lib::{
     config::Config,
     make_queue::{make_queue_worker, PathOrIndex},
-    stdout_channel::StdoutChannel,
 };
 
 #[derive(StructOpt)]

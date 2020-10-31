@@ -8,13 +8,13 @@ use std::{
     path::{Path, PathBuf},
     sync::Arc,
 };
+use stdout_channel::StdoutChannel;
 
 use crate::{
     config::Config,
     movie_collection::MovieCollection,
     movie_queue::{MovieQueueDB, MovieQueueResult},
     pgpool::PgPool,
-    stdout_channel::StdoutChannel,
     utils::{get_video_runtime, parse_file_stem},
 };
 

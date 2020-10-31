@@ -1,12 +1,44 @@
 #![allow(clippy::used_underscore_binding)]
 
 use anyhow::Error;
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
+use stdout_channel::StdoutChannel;
 use structopt::StructOpt;
 
 use movie_collection_lib::{
-    config::Config, stdout_channel::StdoutChannel, transcode_service::remcom,
+    config::Config,
+    transcode_service::{TranscodeService, TranscodeServiceRequest},
 };
+use transcode_lib::transcode_channel::TranscodeChannel;
+
+pub async fn remcom(
+    files: impl IntoIterator<Item = impl AsRef<Path>>,
+    directory: Option<impl AsRef<Path>>,
+    unwatched: bool,
+    config: &Config,
+    stdout: &StdoutChannel,
+) -> Result<(), Error> {
+    let remcom_service = TranscodeService::new(config.clone(), &config.remcom_queue);
+
+    for file in files {
+        let payload = TranscodeServiceRequest::create_remcom_request(
+            &config,
+            file.as_ref(),
+            directory.as_ref(),
+            unwatched,
+        )
+        .await?;
+        remcom_service
+            .publish_transcode_job(&payload, |data| async move {
+                let remcom_channel = TranscodeChannel::open_channel().await?;
+                remcom_channel.init(&config.remcom_queue).await?;
+                remcom_channel.publish(&config.transcode_queue, data).await
+            })
+            .await?;
+        stdout.send(format!("script {:?}", payload));
+    }
+    stdout.close().await
+}
 
 #[derive(StructOpt)]
 /// Create script to copy files, push job to queue

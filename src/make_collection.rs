@@ -6,7 +6,9 @@ use stack_string::StackString;
 use std::path::Path;
 use structopt::StructOpt;
 
-use movie_collection_lib::{movie_collection::MovieCollection, utils::get_video_runtime, config::Config};
+use movie_collection_lib::{
+    config::Config, movie_collection::MovieCollection, utils::get_video_runtime,
+};
 
 #[derive(StructOpt)]
 /// Collection Query/Parser

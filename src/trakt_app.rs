@@ -52,7 +52,16 @@ async fn trakt_app() -> Result<(), Error> {
     let result = if do_parse {
         sync_trakt_with_db(&trakt, &mc).await
     } else {
-        trakt_app_parse(&config, &trakt, &trakt_command, trakt_action, show, season, &opts.episode).await
+        trakt_app_parse(
+            &config,
+            &trakt,
+            &trakt_command,
+            trakt_action,
+            show,
+            season,
+            &opts.episode,
+        )
+        .await
     };
     mc.stdout.close().await?;
     result

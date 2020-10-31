@@ -61,7 +61,10 @@ pub async fn start_app() -> Result<(), Error> {
 
     HttpServer::new(move || {
         App::new()
-            .data(AppState { db: pool.clone(), trakt: trakt.clone() })
+            .data(AppState {
+                db: pool.clone(),
+                trakt: trakt.clone(),
+            })
             .wrap(IdentityService::new(
                 CookieIdentityPolicy::new(&SECRET_KEY.get())
                     .name("auth")

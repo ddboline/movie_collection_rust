@@ -1,21 +1,12 @@
 use anyhow::{format_err, Error};
-use deadpool_lapin::Config as LapinConfig;
-use futures::{future::try_join_all, stream::StreamExt, try_join};
+use futures::{future::try_join_all, try_join};
 use itertools::Itertools;
 use jwalk::WalkDir;
-use lapin::{
-    options::{
-        BasicAckOptions, BasicConsumeOptions, BasicPublishOptions, QueueDeclareOptions,
-        QueueDeleteOptions, QueuePurgeOptions,
-    },
-    types::FieldTable,
-    BasicProperties, Channel, Queue,
-};
-use log::{debug, error};
 use procfs::process;
 use serde::{Deserialize, Serialize};
 use smallvec::{smallvec, SmallVec};
 use stack_string::StackString;
+use std::future::Future;
 use std::{
     collections::HashMap,
     ffi::OsStr,
@@ -24,6 +15,7 @@ use std::{
     process::Stdio,
     str,
 };
+use stdout_channel::StdoutChannel;
 use tokio::{
     fs::{self, File, OpenOptions},
     io::{AsyncBufReadExt, AsyncRead, AsyncWriteExt, BufReader},
@@ -33,7 +25,7 @@ use tokio::{
 
 use crate::{
     config::Config, make_list::FileLists, make_queue::make_queue_worker,
-    movie_collection::MovieCollection, stdout_channel::StdoutChannel, utils::parse_file_stem,
+    movie_collection::MovieCollection, utils::parse_file_stem,
 };
 
 #[derive(Serialize, Deserialize, Debug, PartialEq, Clone, Copy)]
@@ -213,9 +205,10 @@ impl TranscodeServiceRequest {
     }
 }
 
+#[derive(Clone)]
 pub struct TranscodeService {
-    config: Config,
-    queue: StackString,
+    pub config: Config,
+    pub queue: StackString,
 }
 
 impl TranscodeService {
@@ -226,38 +219,15 @@ impl TranscodeService {
         }
     }
 
-    pub async fn init(&self) -> Result<Queue, Error> {
-        let chan = Self::open_transcode_channel().await?;
-        let queue = chan
-            .queue_declare(
-                &self.queue,
-                QueueDeclareOptions::default(),
-                FieldTable::default(),
-            )
-            .await?;
-        Ok(queue)
-    }
-
-    pub async fn cleanup(&self) -> Result<u32, Error> {
-        let chan = Self::open_transcode_channel().await?;
-        chan.queue_purge(&self.queue, QueuePurgeOptions::default())
-            .await?;
-        chan.queue_delete(&self.queue, QueueDeleteOptions::default())
-            .await
-            .map_err(Into::into)
-    }
-
-    async fn open_transcode_channel() -> Result<Channel, Error> {
-        let cfg = LapinConfig::default();
-        let pool = cfg.create_pool();
-        let conn = pool.get().await?;
-        conn.create_channel().await.map_err(Into::into)
-    }
-
-    pub async fn publish_transcode_job(
+    pub async fn publish_transcode_job<F, T>(
         &self,
         payload: &TranscodeServiceRequest,
-    ) -> Result<(), Error> {
+        publish: F,
+    ) -> Result<(), Error>
+    where
+        F: Fn(Vec<u8>) -> T,
+        T: Future<Output = Result<(), Error>>,
+    {
         match payload.job_type {
             JobType::Transcode => {
                 let script_file = job_dir(&self.config)
@@ -272,21 +242,11 @@ impl TranscodeService {
                 fs::write(&script_file, &serde_json::to_vec(&payload)?).await?;
             }
         }
-
-        let chan = Self::open_transcode_channel().await?;
         let payload = serde_json::to_vec(&payload)?;
-        chan.basic_publish(
-            "",
-            &self.queue,
-            BasicPublishOptions::default(),
-            payload,
-            BasicProperties::default(),
-        )
-        .await?;
-        Ok(())
+        publish(payload).await
     }
 
-    async fn process_data(&self, data: &[u8]) -> Result<(), Error> {
+    pub async fn process_data(&self, data: &[u8]) -> Result<(), Error> {
         let payload: TranscodeServiceRequest = serde_json::from_slice(&data)?;
         match payload.job_type {
             JobType::Transcode => {
@@ -297,52 +257,6 @@ impl TranscodeService {
                 self.run_move(&payload.prefix, &payload.input_path, &payload.output_path)
                     .await
             }
-        }
-    }
-
-    pub async fn read_transcode_job(&self) -> Result<(), Error> {
-        let chan = Self::open_transcode_channel().await?;
-        let mut consumer = chan
-            .basic_consume(
-                &self.queue,
-                &self.queue,
-                BasicConsumeOptions::default(),
-                FieldTable::default(),
-            )
-            .await?;
-        while let Some(delivery) = consumer.next().await {
-            let (channel, delivery) = delivery?;
-            match self.process_data(&delivery.data).await {
-                Ok(_) => debug!("process_data succeeded"),
-                Err(e) => error!("process data failed {:?}", e),
-            }
-            channel
-                .basic_ack(delivery.delivery_tag, BasicAckOptions::default())
-                .await?;
-        }
-        Ok(())
-    }
-
-    #[allow(dead_code)]
-    async fn get_single_job(&self) -> Result<TranscodeServiceRequest, Error> {
-        let chan = Self::open_transcode_channel().await?;
-        let mut consumer = chan
-            .basic_consume(
-                &self.queue,
-                &self.queue,
-                BasicConsumeOptions::default(),
-                FieldTable::default(),
-            )
-            .await?;
-        if let Some(delivery) = consumer.next().await {
-            let (channel, delivery) = delivery?;
-            let payload: TranscodeServiceRequest = serde_json::from_slice(&delivery.data)?;
-            channel
-                .basic_ack(delivery.delivery_tag, BasicAckOptions::default())
-                .await?;
-            Ok(payload)
-        } else {
-            Err(format_err!("No Messages?"))
         }
     }
 
@@ -527,11 +441,29 @@ impl TranscodeService {
             .await?;
         fs::rename(&new_path, &output_file).await?;
         let stdout = StdoutChannel::new();
-        make_queue_worker(&self.config, &[], &[output_file.into()], false, &[], false, &stdout).await?;
+        make_queue_worker(
+            &self.config,
+            &[],
+            &[output_file.into()],
+            false,
+            &[],
+            false,
+            &stdout,
+        )
+        .await?;
         debug_output_file
             .write_all(format!("add {} to queue\n", output_file.to_string_lossy()).as_bytes())
             .await?;
-        make_queue_worker(&self.config, &[output_file.into()], &[], false, &[], false, &stdout).await?;
+        make_queue_worker(
+            &self.config,
+            &[output_file.into()],
+            &[],
+            false,
+            &[],
+            false,
+            &stdout,
+        )
+        .await?;
         let mc = MovieCollection::new(self.config.clone());
         debug_output_file.write_all(b"update collection\n").await?;
         mc.make_collection().await?;
@@ -548,7 +480,7 @@ impl TranscodeService {
     }
 }
 
-fn movie_dir(config: &Config) -> PathBuf {
+pub fn movie_dir(config: &Config) -> PathBuf {
     config.home_dir.join("Documents").join("movies")
 }
 fn dvdrip_dir(config: &Config) -> PathBuf {
@@ -563,7 +495,7 @@ fn log_dir(config: &Config) -> PathBuf {
     dvdrip_dir(config).join("log")
 }
 
-fn job_dir(config: &Config) -> PathBuf {
+pub fn job_dir(config: &Config) -> PathBuf {
     dvdrip_dir(config).join("jobs")
 }
 
@@ -960,57 +892,6 @@ pub async fn transcode_status(config: &Config) -> Result<TranscodeStatus, Error>
     })
 }
 
-pub async fn transcode_avi(
-    config: &Config,
-    stdout: &StdoutChannel,
-    files: impl IntoIterator<Item = impl AsRef<Path>>,
-) -> Result<(), Error> {
-    let transcode_service = TranscodeService::new(config.clone(), &config.transcode_queue);
-    transcode_service.init().await?;
-
-    for path in files {
-        let path = path.as_ref();
-        let movie_path = movie_dir(config);
-        let path = if path.exists() {
-            path.to_path_buf()
-        } else {
-            movie_path.join(path)
-        }
-        .canonicalize()?;
-
-        if !path.exists() {
-            panic!("file doesn't exist {}", path.to_string_lossy());
-        }
-        let payload = TranscodeServiceRequest::create_transcode_request(&config, &path)?;
-        transcode_service.publish_transcode_job(&payload).await?;
-        stdout.send(format!("script {:?}", payload));
-    }
-    stdout.close().await
-}
-
-pub async fn remcom(
-    files: impl IntoIterator<Item = impl AsRef<Path>>,
-    directory: Option<impl AsRef<Path>>,
-    unwatched: bool,
-    config: &Config,
-    stdout: &StdoutChannel,
-) -> Result<(), Error> {
-    let remcom_service = TranscodeService::new(config.clone(), &config.remcom_queue);
-
-    for file in files {
-        let payload = TranscodeServiceRequest::create_remcom_request(
-            &config,
-            file.as_ref(),
-            directory.as_ref(),
-            unwatched,
-        )
-        .await?;
-        remcom_service.publish_transcode_job(&payload).await?;
-        stdout.send(format!("script {:?}", payload));
-    }
-    stdout.close().await
-}
-
 pub fn movie_directories(config: &Config) -> Result<Vec<StackString>, Error> {
     let movie_dir = config.preferred_dir.join("Documents").join("movies");
     std::fs::read_dir(&movie_dir)?
@@ -1030,13 +911,12 @@ pub fn movie_directories(config: &Config) -> Result<Vec<StackString>, Error> {
 mod tests {
     use anyhow::Error;
     use std::{env::set_var, fs::create_dir_all, path::Path};
-    use tokio::{fs, task::spawn};
 
     use crate::{
         config::Config,
         transcode_service::{
-            get_current_jobs, get_last_line, get_paths, get_procs_sync, get_upcoming_jobs, job_dir,
-            transcode_status, JobType, ProcInfo, TranscodeService, TranscodeServiceRequest,
+            get_current_jobs, get_last_line, get_paths, get_procs_sync, get_upcoming_jobs,
+            transcode_status, JobType, ProcInfo, TranscodeServiceRequest,
         },
     };
 
@@ -1119,34 +999,6 @@ mod tests {
             .join("avi")
             .join(&p.with_extension("mp4"));
         assert_eq!(payload.output_path, expected);
-        Ok(())
-    }
-
-    #[tokio::test]
-    #[ignore]
-    async fn test_transcode_service() -> Result<(), Error> {
-        let config = Config::with_config()?;
-        let service = TranscodeService::new(config.clone(), "test_queue");
-        let queue = service.init().await?;
-        println!("{:?}", queue);
-        let task = spawn(async move { service.get_single_job().await });
-        let service = TranscodeService::new(config, "test_queue");
-        let req = TranscodeServiceRequest::new(
-            JobType::Transcode,
-            "test_prefix",
-            &Path::new("test_input.mkv"),
-            &Path::new("test_output.mp4"),
-        );
-        service.publish_transcode_job(&req).await?;
-        let result = task.await??;
-        assert_eq!(result, req);
-        let result = service.cleanup().await?;
-        println!("{}", result);
-        let script_file = job_dir(&service.config)
-            .join(&req.prefix)
-            .with_extension("json");
-        fs::remove_file(&script_file).await?;
-
         Ok(())
     }
 

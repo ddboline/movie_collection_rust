@@ -16,8 +16,7 @@ use std::{
 };
 
 use crate::{
-    config::Config,
-    imdb_episodes::ImdbEpisodes, imdb_ratings::ImdbRatings,
+    config::Config, imdb_episodes::ImdbEpisodes, imdb_ratings::ImdbRatings,
     movie_collection::MovieCollection, movie_queue::MovieQueueDB, pgpool::PgPool,
     trakt_connection::TraktConnection,
 };
@@ -589,7 +588,10 @@ pub async fn get_watched_movies_db(pool: &PgPool) -> Result<Vec<WatchedMovie>, E
         .collect()
 }
 
-pub async fn sync_trakt_with_db(trakt: &TraktConnection, mc: &MovieCollection) -> Result<(), Error> {
+pub async fn sync_trakt_with_db(
+    trakt: &TraktConnection,
+    mc: &MovieCollection,
+) -> Result<(), Error> {
     let watchlist_shows_db = Arc::new(get_watchlist_shows_db(&mc.pool).await?);
     trakt.init().await;
     let watchlist_shows = trakt.get_watchlist_shows().await?;
@@ -720,7 +722,11 @@ async fn trakt_cal_list(trakt: &TraktConnection, mc: &MovieCollection) -> Result
     Ok(())
 }
 
-async fn watchlist_add(trakt: &TraktConnection, mc: &MovieCollection, show: Option<&str>) -> Result<(), Error> {
+async fn watchlist_add(
+    trakt: &TraktConnection,
+    mc: &MovieCollection,
+    show: Option<&str>,
+) -> Result<(), Error> {
     trakt.init().await;
     if let Some(imdb_url) = get_imdb_url_from_show(&mc, show).await? {
         let imdb_url_ = imdb_url.clone();
@@ -729,11 +735,7 @@ async fn watchlist_add(trakt: &TraktConnection, mc: &MovieCollection, show: Opti
             trakt.add_watchlist_show(&imdb_url_).await?
         ));
         debug!("GOT HERE");
-        if let Some(show) = trakt
-            .get_watchlist_shows()
-            .await?
-            .get(imdb_url.as_str())
-        {
+        if let Some(show) = trakt.get_watchlist_shows().await?.get(imdb_url.as_str()) {
             debug!("INSERT SHOW {}", show);
             show.insert_show(&mc.pool).await?;
         }
@@ -741,7 +743,11 @@ async fn watchlist_add(trakt: &TraktConnection, mc: &MovieCollection, show: Opti
     Ok(())
 }
 
-async fn watchlist_rm(trakt: &TraktConnection, mc: &MovieCollection, show: Option<&str>) -> Result<(), Error> {
+async fn watchlist_rm(
+    trakt: &TraktConnection,
+    mc: &MovieCollection,
+    show: Option<&str>,
+) -> Result<(), Error> {
     if let Some(imdb_url) = get_imdb_url_from_show(&mc, show).await? {
         let imdb_url_ = imdb_url.clone();
         trakt.init().await;
@@ -1098,7 +1104,10 @@ pub async fn watched_action_http_worker(
     Ok(body)
 }
 
-pub async fn trakt_cal_http_worker(trakt: &TraktConnection, pool: &PgPool) -> Result<Vec<StackString>, Error> {
+pub async fn trakt_cal_http_worker(
+    trakt: &TraktConnection,
+    pool: &PgPool,
+) -> Result<Vec<StackString>, Error> {
     let button_add = format!(
         "{}{}",
         r#"<td><button type="submit" id="ID" "#,

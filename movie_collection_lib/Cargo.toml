@@ -42,3 +42,4 @@ deadqueue = "0.1"
 smallvec = "1.4"
 procfs = "0.8"
 stack-string = { git = "https://github.com/ddboline/stack-string-rs.git", tag="0.1.9", features=["postgres_types"] }
+stdout-channel = { git = "https://github.com/ddboline/stdout-channel-rs.git", branch="tokio_02" }
