@@ -13,7 +13,6 @@ use std::{
     borrow::Borrow,
     collections::{HashMap, HashSet},
     hash::{Hash, Hasher},
-    os::unix::fs::symlink,
     path,
     path::PathBuf,
 };
@@ -193,7 +192,9 @@ fn play_worker(full_path: &path::Path) -> HttpResult {
         std::fs::remove_file(&partial_path)?;
     }
 
-    symlink(&full_path, &partial_path)?;
+    #[cfg(target_family = "unix")]
+    std::os::unix::fs::symlink(&full_path, &partial_path)?;
+
     form_http_response(body)
 }
 
