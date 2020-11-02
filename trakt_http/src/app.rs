@@ -46,7 +46,7 @@ pub async fn start_app() -> Result<(), Error> {
     }
 
     let domain = CONFIG.domain.to_string();
-    let port = CONFIG.port;
+    let port = CONFIG.port + 1;
     let pool = PgPool::new(&CONFIG.pgurl);
     let trakt = TraktConnection::new(CONFIG.clone());
 
