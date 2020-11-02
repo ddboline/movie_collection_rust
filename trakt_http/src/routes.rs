@@ -130,14 +130,14 @@ async fn watchlist_action_worker(
     trakt: &TraktConnection,
     action: TraktActions,
     imdb_url: &str,
-) -> HttpResult {
+) -> Result<StackString, Error> {
     trakt.init().await;
     let body = match action {
         TraktActions::Add => trakt.add_watchlist_show(&imdb_url).await?.to_string(),
         TraktActions::Remove => trakt.remove_watchlist_show(&imdb_url).await?.to_string(),
         _ => "".to_string(),
     };
-    form_http_response(body)
+    Ok(body.into())
 }
 
 pub async fn trakt_watchlist_action(
@@ -150,7 +150,8 @@ pub async fn trakt_watchlist_action(
 
     let req = WatchlistActionRequest { action, imdb_url };
     let imdb_url = req.handle(&state.db, &state.trakt).await?;
-    watchlist_action_worker(&state.trakt, action, &imdb_url).await
+    let body = watchlist_action_worker(&state.trakt, action, &imdb_url).await?;
+    form_http_response(body.into())
 }
 
 fn trakt_watched_seasons_worker(
@@ -238,19 +239,19 @@ pub async fn trakt_watched_action(
     form_http_response(body.into())
 }
 
-fn trakt_cal_worker(entries: &[StackString]) -> HttpResult {
+fn trakt_cal_worker(entries: &[StackString]) -> StackString {
     let previous = r#"<a href="javascript:updateMainArticle('/list/tvshows')">Go Back</a><br>"#;
-    let entries = format!(
+    format!(
         r#"{}<table border="0">{}</table>"#,
         previous,
         entries.join("")
-    );
-    form_http_response(entries)
+    ).into()
 }
 
 pub async fn trakt_cal(_: LoggedUser, state: Data<AppState>) -> HttpResult {
     let entries = trakt_cal_http_worker(&state.trakt, &state.db).await?;
-    trakt_cal_worker(&entries)
+    let body = trakt_cal_worker(&entries);
+    form_http_response(body.into())
 }
 
 pub async fn user(user: LoggedUser) -> HttpResult {
