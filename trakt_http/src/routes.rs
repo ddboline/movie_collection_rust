@@ -69,7 +69,7 @@ fn watchlist_worker(
                 r#"<tr><td>{}</td><td>
                    <a href="https://www.imdb.com/title/{}" target="_blank">imdb</a> {} </tr>"#,
                 format!(
-                    r#"<a href="javascript:updateMainArticle('/list/trakt/watched/list/{}')">{}</a>"#,
+                    r#"<a href="javascript:updateMainArticle('/trakt/watched/list/{}')">{}</a>"#,
                     link, title
                 ),
                 link,
@@ -168,7 +168,7 @@ fn trakt_watched_seasons_worker(
     let button_add = r#"
         <td>
         <button type="submit" id="ID"
-            onclick="imdb_update('SHOW', 'LINK', SEASON, '/list/trakt/watched/list/LINK');"
+            onclick="imdb_update('SHOW', 'LINK', SEASON, '/trakt/watched/list/LINK');"
             >update database</button></td>"#;
 
     let entries = entries
@@ -177,7 +177,7 @@ fn trakt_watched_seasons_worker(
             format!(
                 "<tr><td>{}<td>{}<td>{}<td>{}</tr>",
                 format!(
-                    r#"<a href="javascript:updateMainArticle('/list/trakt/watched/list/{}/{}')">{}</t>"#,
+                    r#"<a href="javascript:updateMainArticle('/trakt/watched/list/{}/{}')">{}</t>"#,
                     imdb_url, s.season, s.title
                 ),
                 s.season,
@@ -191,7 +191,7 @@ fn trakt_watched_seasons_worker(
         .join("");
 
     let previous =
-        r#"<a href="javascript:updateMainArticle('/list/trakt/watchlist')">Go Back</a><br>"#;
+        r#"<a href="javascript:updateMainArticle('/trakt/watchlist')">Go Back</a><br>"#;
     let entries = format!(r#"{}<table border="0">{}</table>"#, previous, entries).into();
     Ok(entries)
 }
@@ -423,7 +423,7 @@ async fn trakt_cal_http_worker(
     let button_add = Arc::new(format!(
         "{}{}",
         r#"<td><button type="submit" id="ID" "#,
-        r#"onclick="imdb_update('SHOW', 'LINK', SEASON, '/list/trakt/cal');"
+        r#"onclick="imdb_update('SHOW', 'LINK', SEASON, '/trakt/cal');"
             >update database</button></td>"#
     ));
     trakt.init().await;
@@ -455,7 +455,7 @@ async fn trakt_cal_http_worker(
         let line = format!(
                 "<tr><td>{}</td><td>{}</td><td>{}</td><td>{}</td>{}</tr>",
                 format!(
-                    r#"<a href="javascript:updateMainArticle('/list/trakt/watched/list/{}/{}')">{}</a>"#,
+                    r#"<a href="javascript:updateMainArticle('/trakt/watched/list/{}/{}')">{}</a>"#,
                     cal.link, cal.season, cal.show,
                 ),
                 format!(
@@ -589,7 +589,7 @@ pub async fn watch_list_http_worker(
         .join("\n");
 
     let previous = format!(
-        r#"<a href="javascript:updateMainArticle('/list/trakt/watched/list/{}')">Go Back</a><br>"#,
+        r#"<a href="javascript:updateMainArticle('/trakt/watched/list/{}')">Go Back</a><br>"#,
         imdb_url
     );
     let buttons = format!(
@@ -597,7 +597,7 @@ pub async fn watch_list_http_worker(
         <button name="remcomout" id="remcomoutput"> &nbsp; </button>
         <button type="submit" id="ID"
             onclick="imdb_update('{show}', '{link}', {season},
-            '/list/trakt/watched/list/{link}/{season}');"
+            '/trakt/watched/list/{link}/{season}');"
             >update database</button><br>
     "#,
         show = show.show,

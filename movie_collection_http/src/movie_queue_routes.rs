@@ -60,9 +60,9 @@ fn movie_queue_body(patterns: &[StackString], entries: &[StackString]) -> StackS
     let previous = r#"<a href="javascript:updateMainArticle('/list/tvshows')">Go Back</a><br>"#;
 
     let watchlist_url = if patterns.is_empty() {
-        "/list/trakt/watchlist".to_string()
+        "/trakt/watchlist".to_string()
     } else {
-        format!("/list/trakt/watched/list/{}", patterns.join("_"))
+        format!("/trakt/watched/list/{}", patterns.join("_"))
     };
 
     let entries = format!(
@@ -444,7 +444,7 @@ fn tvshows_worker(res1: TvShowsMap, tvshows: Vec<TvShowsResult>) -> Result<Stack
 
     let previous = r#"
         <a href="javascript:updateMainArticle('/list/watchlist')">Go Back</a><br>
-        <a href="javascript:updateMainArticle('/list/trakt/watchlist')">Watch List</a>
+        <a href="javascript:updateMainArticle('/trakt/watchlist')">Watch List</a>
         <button name="remcomout" id="remcomoutput"> &nbsp; </button><br>
     "#;
 
@@ -495,7 +495,7 @@ fn process_shows(
                     format!(r#"<a href="javascript:updateMainArticle('/list/{}')">{}</a>"#, item.show, item.title)
                 } else {
                     format!(
-                        r#"<a href="javascript:updateMainArticle('/list/trakt/watched/list/{}')">{}</a>"#,
+                        r#"<a href="javascript:updateMainArticle('/trakt/watched/list/{}')">{}</a>"#,
                         item.link, item.title
                     )
                 },
@@ -507,7 +507,7 @@ fn process_shows(
                     _ => "",
                 },
                 if has_watchlist {
-                    format!(r#"<a href="javascript:updateMainArticle('/list/trakt/watched/list/{}')">watchlist</a>"#, item.link)
+                    format!(r#"<a href="javascript:updateMainArticle('/trakt/watched/list/{}')">watchlist</a>"#, item.link)
                 } else {
                     "".to_string()
                 },

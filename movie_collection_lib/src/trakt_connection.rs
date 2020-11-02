@@ -89,7 +89,7 @@ impl TraktConnection {
     }
 
     fn _get_auth_url(&self, state: &str) -> Result<Url, Error> {
-        let redirect_uri = format!("https://{}/list/trakt/callback", self.config.domain);
+        let redirect_uri = format!("https://{}/trakt/callback", self.config.domain);
         let parameters = &[
             ("response_type", "code"),
             ("client_id", self.config.trakt_client_id.as_str()),
@@ -112,7 +112,7 @@ impl TraktConnection {
             if state != current_state.as_str() {
                 return Err(format_err!("Incorrect state"));
             }
-            let redirect_uri = format!("https://{}/list/trakt/callback", self.config.domain);
+            let redirect_uri = format!("https://{}/trakt/callback", self.config.domain);
             let url = format!("{}/oauth/token", self.config.trakt_endpoint);
             let body = hashmap! {
                 "code" => code,
@@ -141,7 +141,7 @@ impl TraktConnection {
     async fn get_refresh_token(&self) -> Result<AccessTokenResponse, Error> {
         let current_auth_token = AUTH_TOKEN.read().await.clone();
         if let Some(current_auth_token) = current_auth_token {
-            let redirect_uri = format!("https://{}/list/trakt/callback", self.config.domain);
+            let redirect_uri = format!("https://{}/trakt/callback", self.config.domain);
             let url = format!("{}/oauth/token", self.config.trakt_endpoint);
             let body = hashmap! {
                 "refresh_token" => current_auth_token.refresh_token.as_str(),

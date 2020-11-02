@@ -990,7 +990,7 @@ pub async fn find_new_episodes_http_worker(
             format!(
                 "<tr><td>{}</td><td>{}</td><td>{}</td><td>{}</td><td>{}</td>{}</tr>",
                 format!(
-                    r#"<a href="javascript:updateMainArticle('/list/trakt/watched/list/{}/{}')">{}</a>"#,
+                    r#"<a href="javascript:updateMainArticle('/trakt/watched/list/{}/{}')">{}</a>"#,
                     epi.link, epi.season, epi.title
                 ),
                 match queue.get(&key) {

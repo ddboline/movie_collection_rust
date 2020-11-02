@@ -58,8 +58,8 @@ footer {
 <H3 align="center">
 <input type="button" name="tvshows" value="TVShows" onclick="updateMainArticle('/list/tvshows');"/>
 <input type="button" name="list_cal" value="LocalCalendar" onclick="updateMainArticle('/list/cal?source=all');"/>
-<input type="button" name="watchlist" value="WatchList" onclick="updateMainArticle('/list/trakt/watchlist');"/>
-<input type="button" name="trakt_cal" value="TraktCalendar" onclick="updateMainArticle('/list/trakt/cal');"/>
+<input type="button" name="watchlist" value="WatchList" onclick="updateMainArticle('/trakt/watchlist');"/>
+<input type="button" name="trakt_cal" value="TraktCalendar" onclick="updateMainArticle('/trakt/cal');"/>
 <input type="button" name="list" value="FullQueue" onclick="updateMainArticle('/list/full_queue');"/>
 <input type="button" name="transocde_status" value="TranscodeStatus" onclick="updateMainArticle('/list/transcode/status');"/>
 <input type="button" name="refresh" value="RefreshAuth" onclick="refreshAuth();"/>
@@ -86,11 +86,11 @@ footer {
         xmlhttp.send(null);
     }
     function watched_add(link, season, episode) {
-        let url = "/list/trakt/watched/add/" + link + "/" + season + "/" + episode;
+        let url = "/trakt/watched/add/" + link + "/" + season + "/" + episode;
         let xmlhttp = new XMLHttpRequest();
         xmlhttp.open("GET", url, true);
         xmlhttp.onload = function nothing() {
-            let url = "/list/trakt/watched/list/" + link + "/" + season;
+            let url = "/trakt/watched/list/" + link + "/" + season;
             updateMainArticle(url);
         }
         xmlhttp.send(null);
@@ -98,11 +98,11 @@ footer {
         document.getElementById("remcomoutput").innerHTML = out;
     }
     function watched_rm(link, season, episode) {
-        let url = "/list/trakt/watched/rm/" + link + "/" + season + "/" + episode
+        let url = "/trakt/watched/rm/" + link + "/" + season + "/" + episode
         let xmlhttp = new XMLHttpRequest();
         xmlhttp.open("GET", url, true);
         xmlhttp.onload = function nothing() {
-            let url = "/list/trakt/watched/list/" + link + "/" + season;
+            let url = "/trakt/watched/list/" + link + "/" + season;
             updateMainArticle(url);
         }
         xmlhttp.send(null);
@@ -118,7 +118,7 @@ footer {
         xmlhttp.send(null);
     }
     function watchlist_add(link) {
-        let url = "/list/trakt/watchlist/add/" + link
+        let url = "/trakt/watchlist/add/" + link
         let xmlhttp = new XMLHttpRequest();
         xmlhttp.open("GET", url, true);
         xmlhttp.onload = function nothing() {
@@ -130,7 +130,7 @@ footer {
         document.getElementById("remcomoutput").innerHTML = out;
     }
     function watchlist_rm(link) {
-        let url = "/list/trakt/watchlist/rm/" + link
+        let url = "/trakt/watchlist/rm/" + link
         let xmlhttp = new XMLHttpRequest();
         xmlhttp.open("GET", url, true);
         xmlhttp.onload = function nothing() {
@@ -153,7 +153,7 @@ footer {
         document.getElementById("remcomoutput").innerHTML = out;
     }
     function refreshAuth() {
-        let url = "/list/trakt/refresh_auth";
+        let url = "/trakt/refresh_auth";
         let xmlhttp = new XMLHttpRequest();
         xmlhttp.onload = function() {
             document.getElementById("main_article").innerHTML = xmlhttp.responseText;
@@ -162,7 +162,7 @@ footer {
         xmlhttp.send(null);
     }
     function traktAuth() {
-        let url = "/list/trakt/auth_url";
+        let url = "/trakt/auth_url";
         let xmlhttp = new XMLHttpRequest();
         xmlhttp.onload = function() {
             let win = window.open(xmlhttp.responseText, '_blank');
@@ -234,7 +234,7 @@ footer {
         let xmlhttp = new XMLHttpRequest();
         xmlhttp.open("GET", url, true);
         xmlhttp.onload = function nothing() {
-            updateMainArticle('/list/trakt/watchlist');
+            updateMainArticle('/trakt/watchlist');
         }
         xmlhttp.send(null);
     }
