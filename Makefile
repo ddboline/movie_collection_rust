@@ -7,7 +7,8 @@ build_type := release
 all:
 	mkdir build/ && \
 	cp Dockerfile.ubuntu18.04 build/Dockerfile && \
-	cp -a Cargo.toml templates src scripts Makefile movie_collection_lib movie_collection_http build/ && \
+	cp -a Cargo.toml templates src scripts Makefile movie_collection_lib movie_collection_http \
+		  trakt_http transcode_lib build/ && \
 	cd build/ && \
 	docker build -t movie_collection_rust/build_rust:ubuntu18.04 . && \
 	cd ../ && rm -rf build/
