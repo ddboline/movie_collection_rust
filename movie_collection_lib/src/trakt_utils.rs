@@ -880,6 +880,7 @@ async fn watched_list(mc: &MovieCollection, show: Option<&str>, season: i32) -> 
     Ok(())
 }
 
+#[allow(clippy::too_many_arguments)]
 pub async fn trakt_app_parse(
     config: &Config,
     trakt: &TraktConnection,
