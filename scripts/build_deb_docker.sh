@@ -5,7 +5,7 @@ RELEASE="$2"
 
 . ~/.cargo/env
 
-cargo build --release
+cargo build --release --workspace
 
 printf "Utilities for maintaining a collection of videos.\n" > description-pak
 checkinstall --pkgversion ${VERSION} --pkgrelease ${RELEASE} -y

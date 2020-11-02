@@ -4,9 +4,12 @@ use anyhow::Error;
 use futures::future::try_join_all;
 use stack_string::StackString;
 use std::path::Path;
+use stdout_channel::StdoutChannel;
 use structopt::StructOpt;
 
-use movie_collection_lib::{movie_collection::MovieCollection, utils::get_video_runtime};
+use movie_collection_lib::{
+    config::Config, movie_collection::MovieCollection, pgpool::PgPool, utils::get_video_runtime,
+};
 
 #[derive(StructOpt)]
 /// Collection Query/Parser
@@ -27,11 +30,13 @@ struct MakeCollectionOpts {
 
 async fn make_collection() -> Result<(), Error> {
     let opts = MakeCollectionOpts::from_args();
-
+    let config = Config::with_config()?;
     let do_parse = opts.parse;
     let do_time = opts.time;
+    let stdout = StdoutChannel::new();
+    let pool = PgPool::new(&config.pgurl);
 
-    let mc = MovieCollection::new();
+    let mc = MovieCollection::new(&config, &pool, &stdout);
     if do_parse {
         mc.make_collection().await?;
         mc.fix_collection_show_id().await?;
@@ -44,14 +49,14 @@ async fn make_collection() -> Result<(), Error> {
                 Ok(format!("{} {}", timeval, result))
             });
             let shows: Result<Vec<_>, Error> = try_join_all(futures).await;
-            mc.stdout.send(shows?.join("\n"));
+            stdout.send(shows?.join("\n"));
         } else {
             for show in shows {
-                mc.stdout.send(show.to_string());
+                stdout.send(show.to_string());
             }
         }
     }
-    mc.stdout.close().await
+    stdout.close().await
 }
 
 #[tokio::main]

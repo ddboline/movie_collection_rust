@@ -1,16 +1,72 @@
 #![allow(clippy::used_underscore_binding)]
 
 use anyhow::Error;
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
+use stdout_channel::StdoutChannel;
 use structopt::StructOpt;
+use tokio::fs;
 
 use movie_collection_lib::{
-    config::Config, stdout_channel::StdoutChannel, transcode_service::remcom,
+    config::Config,
+    pgpool::PgPool,
+    transcode_service::{TranscodeService, TranscodeServiceRequest},
 };
+use transcode_lib::transcode_channel::TranscodeChannel;
+
+async fn remcom(
+    remcom_service: &TranscodeService,
+    files: impl IntoIterator<Item = impl AsRef<Path>>,
+    directory: Option<impl AsRef<Path>>,
+    unwatched: bool,
+    config: &Config,
+    stdout: &StdoutChannel,
+) -> Result<(), Error> {
+    for file in files {
+        let payload = TranscodeServiceRequest::create_remcom_request(
+            &config,
+            file.as_ref(),
+            directory.as_ref(),
+            unwatched,
+        )
+        .await?;
+        publish_single(&remcom_service, &config, &payload).await?;
+        stdout.send(format!("script {:?}", payload));
+    }
+    stdout.close().await
+}
+
+async fn publish_single(
+    remcom_service: &TranscodeService,
+    config: &Config,
+    payload: &TranscodeServiceRequest,
+) -> Result<(), Error> {
+    remcom_service
+        .publish_transcode_job(&payload, |data| async move {
+            let remcom_channel = TranscodeChannel::open_channel().await?;
+            remcom_channel.init(&config.remcom_queue).await?;
+            remcom_channel.publish(&config.transcode_queue, data).await
+        })
+        .await?;
+    Ok(())
+}
+
+async fn remcom_single(
+    remcom_service: &TranscodeService,
+    config: &Config,
+    request_file: &Path,
+) -> Result<(), Error> {
+    let data = fs::read(request_file).await?;
+    let payload = serde_json::from_slice(&data)?;
+    publish_single(&remcom_service, &config, &payload).await?;
+    Ok(())
+}
 
 #[derive(StructOpt)]
 /// Create script to copy files, push job to queue
 struct RemcomOpts {
+    #[structopt(short = "f", long)]
+    request_file: Option<PathBuf>,
+
     /// Directory
     #[structopt(long, short)]
     directory: Option<PathBuf>,
@@ -27,8 +83,25 @@ async fn main() -> Result<(), Error> {
     let opts = RemcomOpts::from_args();
     let stdout = StdoutChannel::new();
     let config = Config::with_config()?;
+    let pool = PgPool::new(&config.pgurl);
+
+    let remcom_service = TranscodeService::new(&config, &config.remcom_queue, &pool, &stdout);
+
+    if let Some(request_file) = opts.request_file {
+        match remcom_single(&remcom_service, &config, &request_file).await {
+            Ok(_) => (),
+            Err(e) => {
+                if e.to_string().contains("Broken pipe") {
+                } else {
+                    panic!("{}", e)
+                }
+            }
+        }
+        return Ok(());
+    }
 
     match remcom(
+        &remcom_service,
         opts.files,
         opts.directory.as_deref(),
         opts.unwatched,

@@ -8,22 +8,18 @@
 #![allow(clippy::similar_names)]
 #![allow(clippy::shadow_unrelated)]
 #![allow(clippy::missing_errors_doc)]
-#![allow(clippy::struct_excessive_bools)]
 #![allow(clippy::used_underscore_binding)]
 
-pub mod config;
-pub mod imdb_episodes;
-pub mod imdb_ratings;
-pub mod imdb_utils;
-pub mod iso_8601_datetime;
-pub mod make_list;
-pub mod make_queue;
-pub mod movie_collection;
-pub mod movie_queue;
-pub mod parse_imdb;
-pub mod pgpool;
-pub mod trakt_connection;
-pub mod trakt_utils;
-pub mod transcode_service;
-pub mod tv_show_source;
-pub mod utils;
+pub mod app;
+pub mod errors;
+pub mod logged_user;
+pub mod requests;
+pub mod routes;
+
+#[cfg(test)]
+mod tests {
+    #[test]
+    fn it_works() {
+        assert_eq!(2 + 2, 4);
+    }
+}

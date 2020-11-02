@@ -7,11 +7,11 @@ use rayon::{
 };
 use stack_string::StackString;
 use std::{collections::HashMap, ffi::OsStr, path::PathBuf};
+use stdout_channel::StdoutChannel;
 use tokio::task::{spawn, spawn_blocking};
 
 use crate::{
     config::Config,
-    stdout_channel::StdoutChannel,
     transcode_service::transcode_status,
     utils::{get_video_runtime, walk_directory},
 };

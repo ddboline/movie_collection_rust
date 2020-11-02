@@ -10,3 +10,5 @@ ADD Makefile /movie_collection_rust
 ADD templates /movie_collection_rust/templates
 ADD movie_collection_lib /movie_collection_rust/movie_collection_lib
 ADD movie_collection_http /movie_collection_rust/movie_collection_http
+ADD transcode_lib /movie_collection_rust/transcode_lib
+ADD trakt_http /movie_collection_rust/trakt_http

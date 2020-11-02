@@ -3,10 +3,11 @@ use chrono::{DateTime, Duration, Utc};
 use futures::future::try_join_all;
 use stack_string::StackString;
 use std::path::PathBuf;
+use stdout_channel::StdoutChannel;
 use structopt::StructOpt;
 use tokio::{
     fs::{read_to_string, File},
-    io::{stdin, stdout, AsyncReadExt, AsyncWrite, AsyncWriteExt},
+    io::{self, stdin, AsyncReadExt, AsyncWrite, AsyncWriteExt},
 };
 
 use movie_collection_lib::{
@@ -48,6 +49,8 @@ impl MovieQueueCli {
     async fn run() -> Result<(), Error> {
         let config = Config::with_config()?;
         let pool = PgPool::new(&config.pgurl);
+        let stdout = StdoutChannel::new();
+
         match Self::from_args() {
             Self::Import { table, filepath } => {
                 let data = if let Some(filepath) = filepath {
@@ -74,9 +77,7 @@ impl MovieQueueCli {
                             }
                         });
                         let results: Result<Vec<_>, Error> = try_join_all(futures).await;
-                        stdout()
-                            .write_all(format!("imdb_ratings {}\n", results?.len()).as_bytes())
-                            .await?;
+                        stdout.send(format!("imdb_ratings {}\n", results?.len()));
                     }
                     "imdb_episodes" => {
                         let episodes: Vec<ImdbEpisodes> = serde_json::from_str(&data)?;
@@ -91,13 +92,11 @@ impl MovieQueueCli {
                             }
                         });
                         let results: Result<Vec<_>, Error> = try_join_all(futures).await;
-                        stdout()
-                            .write_all(format!("imdb_episodes {}\n", results?.len()).as_bytes())
-                            .await?;
+                        stdout.send(format!("imdb_episodes {}\n", results?.len()));
                     }
                     "movie_collection" => {
                         let rows: Vec<MovieCollectionRow> = serde_json::from_str(&data)?;
-                        let mc = MovieCollection::with_pool(&pool)?;
+                        let mc = MovieCollection::new(&config, &pool, &stdout);
                         let futures = rows.into_iter().map(|entry| {
                             let mc = mc.clone();
                             async move {
@@ -115,13 +114,11 @@ impl MovieQueueCli {
                             }
                         });
                         let results: Result<Vec<_>, Error> = try_join_all(futures).await;
-                        stdout()
-                            .write_all(format!("movie_collection {}\n", results?.len()).as_bytes())
-                            .await?;
+                        stdout.send(format!("movie_collection {}\n", results?.len()));
                     }
                     "movie_queue" => {
-                        let mq = MovieQueueDB::with_pool(&pool);
-                        let mc = MovieCollection::with_pool(&pool)?;
+                        let mq = MovieQueueDB::new(&config, &pool, &stdout);
+                        let mc = MovieCollection::new(&config, &pool, &stdout);
                         let entries: Vec<MovieQueueRow> = serde_json::from_str(&data)?;
                         let futures = entries.into_iter().map(|entry| {
                             let mq = mq.clone();
@@ -149,9 +146,7 @@ impl MovieQueueCli {
                             }
                         });
                         let results: Result<Vec<_>, Error> = try_join_all(futures).await;
-                        stdout()
-                            .write_all(format!("movie_queue {}\n", results?.len()).as_bytes())
-                            .await?;
+                        stdout.send(format!("movie_queue {}\n", results?.len()));
                     }
                     _ => {}
                 }
@@ -166,7 +161,7 @@ impl MovieQueueCli {
                 let mut file: Box<dyn AsyncWrite + Unpin> = if let Some(filepath) = filepath {
                     Box::new(File::create(&filepath).await?)
                 } else {
-                    Box::new(stdout())
+                    Box::new(io::stdout())
                 };
                 match table.as_str() {
                     "last_modified" => {
@@ -185,12 +180,12 @@ impl MovieQueueCli {
                         file.write_all(&serde_json::to_vec(&episodes)?).await?;
                     }
                     "movie_collection" => {
-                        let mc = MovieCollection::with_pool(&pool)?;
+                        let mc = MovieCollection::new(&config, &pool, &stdout);
                         let entries = mc.get_collection_after_timestamp(start_timestamp).await?;
                         file.write_all(&serde_json::to_vec(&entries)?).await?;
                     }
                     "movie_queue" => {
-                        let mq = MovieQueueDB::with_pool(&pool);
+                        let mq = MovieQueueDB::new(&config, &pool, &stdout);
                         let entries = mq.get_queue_after_timestamp(start_timestamp).await?;
                         file.write_all(&serde_json::to_vec(&entries)?).await?;
                     }

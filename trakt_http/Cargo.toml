@@ -1,8 +1,10 @@
 [package]
-name = "movie_collection_http"
+name = "trakt_http"
 version = "0.6.23"
 authors = ["Daniel Boline <ddboline@gmail.com>"]
 edition = "2018"
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
 movie_collection_lib = {path = "../movie_collection_lib"}
@@ -25,6 +27,12 @@ log = "0.4"
 maplit = "1.0"
 handlebars = "3.5"
 itertools = "0.9"
+env_logger = "0.8"
 authorized_users = { git = "https://github.com/ddboline/auth_server_rust.git", tag="0.2.5"}
 stack-string = { git = "https://github.com/ddboline/stack-string-rs.git", tag="0.1.9", features=["postgres_types"] }
 stdout-channel = { git = "https://github.com/ddboline/stdout-channel-rs.git", branch="tokio_02" }
+
+[[bin]]
+name = "trakt-http"
+path = "src/trakt_http.rs"
+doc = false

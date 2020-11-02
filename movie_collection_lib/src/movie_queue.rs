@@ -7,6 +7,7 @@ use postgres_query::FromSqlRow;
 use serde::{Deserialize, Serialize};
 use stack_string::StackString;
 use std::{fmt, path::Path};
+use stdout_channel::StdoutChannel;
 
 use crate::{config::Config, movie_collection::MovieCollection, pgpool::PgPool};
 
@@ -36,27 +37,20 @@ impl fmt::Display for MovieQueueResult {
     }
 }
 
-#[derive(Clone)]
+#[derive(Clone, Default)]
 pub struct MovieQueueDB {
-    pool: PgPool,
-}
-
-impl Default for MovieQueueDB {
-    fn default() -> Self {
-        Self::new()
-    }
+    pub config: Config,
+    pub pool: PgPool,
+    pub stdout: StdoutChannel,
 }
 
 impl MovieQueueDB {
-    pub fn new() -> Self {
-        let config = Config::with_config().expect("Init config failed");
+    pub fn new(config: &Config, pool: &PgPool, stdout: &StdoutChannel) -> Self {
         Self {
-            pool: PgPool::new(&config.pgurl),
+            config: config.clone(),
+            pool: pool.clone(),
+            stdout: stdout.clone(),
         }
-    }
-
-    pub fn with_pool(pool: &PgPool) -> Self {
-        Self { pool: pool.clone() }
     }
 
     pub async fn remove_from_queue_by_idx(&self, idx: i32) -> Result<(), Error> {
@@ -126,7 +120,7 @@ impl MovieQueueDB {
     }
 
     pub async fn remove_from_queue_by_path(&self, path: &str) -> Result<(), Error> {
-        let mc = MovieCollection::with_pool(&self.pool)?;
+        let mc = MovieCollection::new(&self.config, &self.pool, &self.stdout);
         if let Some(collection_idx) = mc.get_collection_index(&path).await? {
             self.remove_from_queue_by_collection_idx(collection_idx)
                 .await
@@ -139,7 +133,7 @@ impl MovieQueueDB {
         if !Path::new(&path).exists() {
             return Err(format_err!("File doesn't exist"));
         }
-        let mc = MovieCollection::with_pool(&self.pool)?;
+        let mc = MovieCollection::new(&self.config, &self.pool, &self.stdout);
         let collection_idx = if let Some(i) = mc.get_collection_index(&path).await? {
             i
         } else {
