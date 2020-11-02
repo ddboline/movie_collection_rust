@@ -30,7 +30,8 @@ jobs:
       run: cargo clippy -- -W clippy::pedantic
 
     - name: Build
-      run: cargo build --verbose
+      run: |
+        cargo build --workspace
 
     - name: Run tests
       run: |
@@ -43,7 +44,7 @@ jobs:
         psql $DATABASE_URL < ./scripts/trakt_watched_episodes.sql && \
         psql $DATABASE_URL < ./scripts/trakt_watched_movies.sql && \
         psql $DATABASE_URL < ./scripts/trakt_watchlist.sql && \
-        cargo test --verbose --all && \
+        cargo test --verbose --workspace && \
         cargo install cargo-tarpaulin && \
         cargo tarpaulin --verbose --all-features --workspace --out Xml
       env:
