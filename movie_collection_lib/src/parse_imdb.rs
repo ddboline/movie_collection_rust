@@ -2,11 +2,13 @@ use anyhow::Error;
 use chrono::NaiveDate;
 use stack_string::StackString;
 use std::collections::HashMap;
+use stdout_channel::StdoutChannel;
 use structopt::StructOpt;
 
 use crate::{
-    imdb_episodes::ImdbEpisodes, imdb_ratings::ImdbRatings, imdb_utils::ImdbConnection,
-    movie_collection::MovieCollection, pgpool::PgPool, trakt_utils::WatchListMap,
+    config::Config, imdb_episodes::ImdbEpisodes, imdb_ratings::ImdbRatings,
+    imdb_utils::ImdbConnection, movie_collection::MovieCollection, pgpool::PgPool,
+    trakt_utils::WatchListMap,
 };
 
 #[derive(StructOpt, Default, Debug)]
@@ -46,11 +48,10 @@ pub struct ParseImdb {
 }
 
 impl ParseImdb {
-    pub fn with_pool(pool: &PgPool) -> Result<Self, Error> {
-        let p = Self {
-            mc: MovieCollection::with_pool(&pool)?,
-        };
-        Ok(p)
+    pub fn new(config: &Config, pool: &PgPool, stdout: &StdoutChannel) -> Self {
+        Self {
+            mc: MovieCollection::new(config, pool, stdout),
+        }
     }
 
     pub async fn parse_imdb_worker(
@@ -164,7 +165,7 @@ impl ParseImdb {
                             let mut new = s.clone();
                             new.title = Some(result.title.clone());
                             new.rating = Some(result.rating);
-                            new.update_show(&self.mc.get_pool()).await?;
+                            new.update_show(&self.mc.pool).await?;
                             output.push(vec![format!(
                                 "exists {} {} {}",
                                 opts.show, s, result.rating
@@ -184,7 +185,7 @@ impl ParseImdb {
                             istv: Some(istv),
                             ..ImdbRatings::default()
                         }
-                        .insert_show(&self.mc.get_pool())
+                        .insert_show(&self.mc.pool)
                         .await?;
                     }
                 }
@@ -221,7 +222,7 @@ impl ParseImdb {
                                     new.eptitle = episode.eptitle.unwrap_or_else(|| "".into());
                                     new.rating = episode.rating.unwrap_or(-1.0);
                                     new.airdate = airdate;
-                                    new.update_episode(&self.mc.get_pool()).await?;
+                                    new.update_episode(&self.mc.pool).await?;
                                 }
                             } else {
                                 output.push(vec![
@@ -237,7 +238,7 @@ impl ParseImdb {
                                     eptitle: episode.eptitle.unwrap_or_else(|| "".into()),
                                     epurl: episode.epurl.unwrap_or_else(|| "".into()),
                                 }
-                                .insert_episode(&self.mc.get_pool())
+                                .insert_episode(&self.mc.pool)
                                 .await?;
                             }
                         }

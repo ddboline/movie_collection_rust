@@ -14,6 +14,7 @@ use std::{
     str::FromStr,
     sync::Arc,
 };
+use stdout_channel::StdoutChannel;
 
 use crate::{
     config::Config, imdb_episodes::ImdbEpisodes, imdb_ratings::ImdbRatings,
@@ -888,8 +889,10 @@ pub async fn trakt_app_parse(
     show: Option<&str>,
     season: i32,
     episode: &[i32],
+    stdout: &StdoutChannel,
+    pool: &PgPool,
 ) -> Result<(), Error> {
-    let mc = MovieCollection::new(config.clone());
+    let mc = MovieCollection::new(config, pool, stdout);
     match trakt_command {
         TraktCommands::Calendar => trakt_cal_list(trakt, &mc).await?,
         TraktCommands::WatchList => match trakt_action {
@@ -910,7 +913,9 @@ pub async fn trakt_app_parse(
 }
 
 pub async fn watch_list_http_worker(
+    config: &Config,
     pool: &PgPool,
+    stdout: &StdoutChannel,
     imdb_url: &str,
     season: i32,
 ) -> Result<StackString, Error> {
@@ -925,8 +930,8 @@ pub async fn watch_list_http_worker(
         r#"onclick="watched_rm('SHOW', SEASON, EPISODE);">remove from watched</button>"#
     );
 
-    let mc = MovieCollection::with_pool(&pool)?;
-    let mq = MovieQueueDB::with_pool(&pool);
+    let mc = MovieCollection::new(config, pool, stdout);
+    let mq = MovieQueueDB::new(config, pool, stdout);
 
     let show = ImdbRatings::get_show_by_link(imdb_url, &pool)
         .await?
@@ -1039,8 +1044,10 @@ pub async fn watched_action_http_worker(
     imdb_url: &str,
     season: i32,
     episode: i32,
+    config: &Config,
+    stdout: &StdoutChannel,
 ) -> Result<StackString, Error> {
-    let mc = MovieCollection::with_pool(&pool)?;
+    let mc = MovieCollection::new(config, pool, stdout);
     let imdb_url = Arc::new(imdb_url.to_owned());
     trakt.init().await;
     let body = match action {

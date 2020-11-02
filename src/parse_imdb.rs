@@ -1,19 +1,24 @@
 #![allow(clippy::used_underscore_binding)]
 
 use anyhow::Error;
+use stdout_channel::StdoutChannel;
 use structopt::StructOpt;
 
 use movie_collection_lib::{
     config::Config,
     movie_collection::MovieCollection,
     parse_imdb::{ParseImdb, ParseImdbOptions},
+    pgpool::PgPool,
 };
 
 async fn parse_imdb_parser() -> Result<(), Error> {
     let opts = ParseImdbOptions::from_args();
     let config = Config::with_config()?;
-    let mc = MovieCollection::new(config);
-    let pi = ParseImdb::with_pool(&mc.pool)?;
+    let pool = PgPool::new(&config.pgurl);
+    let stdout = StdoutChannel::new();
+
+    let mc = MovieCollection::new(&config, &pool, &stdout);
+    let pi = ParseImdb::new(&config, &pool, &stdout);
 
     let output: Vec<_> = pi
         .parse_imdb_worker(&opts)

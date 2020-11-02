@@ -1,19 +1,23 @@
 #![allow(clippy::used_underscore_binding)]
 
 use anyhow::Error;
+use stdout_channel::StdoutChannel;
 use tokio::task::spawn;
 use transcode_lib::transcode_channel::TranscodeChannel;
 
-use movie_collection_lib::{config::Config, transcode_service::TranscodeService};
+use movie_collection_lib::{config::Config, pgpool::PgPool, transcode_service::TranscodeService};
 
 #[tokio::main]
 async fn main() -> Result<(), Error> {
     env_logger::init();
     let config = Config::with_config().unwrap();
-    let transcode_service = TranscodeService::new(config.clone(), &config.transcode_queue);
+    let pool = PgPool::new(&config.pgurl);
+    let stdout = StdoutChannel::new();
+
+    let transcode_service = TranscodeService::new(&config, &config.transcode_queue, &pool, &stdout);
     let transcode_channel = TranscodeChannel::open_channel().await?;
     transcode_channel.init(&config.transcode_queue).await?;
-    let remcom_service = TranscodeService::new(config.clone(), &config.remcom_queue);
+    let remcom_service = TranscodeService::new(&config, &config.remcom_queue, &pool, &stdout);
     let remcom_channel = TranscodeChannel::open_channel().await?;
     remcom_channel.init(&config.remcom_queue).await?;
 

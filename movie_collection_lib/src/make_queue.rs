@@ -57,8 +57,9 @@ pub async fn make_queue_worker(
     do_shows: bool,
     stdout: &StdoutChannel,
 ) -> Result<(), Error> {
-    let mc = MovieCollection::new(config.clone());
-    let mq = MovieQueueDB::with_pool(&mc.pool);
+    let pool = PgPool::new(&config.pgurl);
+    let mc = MovieCollection::new(config, &pool, stdout);
+    let mq = MovieQueueDB::new(config, &pool, stdout);
 
     if do_shows {
         let shows = mc
@@ -136,8 +137,10 @@ pub async fn make_queue_worker(
 pub async fn movie_queue_http(
     queue: &[MovieQueueResult],
     pool: &PgPool,
+    config: &Config,
+    stdout: &StdoutChannel,
 ) -> Result<Vec<StackString>, Error> {
-    let mc = Arc::new(MovieCollection::with_pool(pool)?);
+    let mc = Arc::new(MovieCollection::new(&config, pool, &stdout));
 
     let button = r#"<td><button type="submit" id="ID" onclick="delete_show('SHOW');"> remove </button></td>"#;
 

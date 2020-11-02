@@ -104,6 +104,7 @@ impl TranscodeChannel {
 mod tests {
     use anyhow::Error;
     use std::path::Path;
+    use stdout_channel::{MockStdout, StdoutChannel};
     use tokio::{
         fs,
         task::{spawn, JoinHandle},
@@ -112,6 +113,7 @@ mod tests {
     use crate::transcode_channel::TranscodeChannel;
     use movie_collection_lib::{
         config::Config,
+        pgpool::PgPool,
         transcode_service::{job_dir, JobType, TranscodeService, TranscodeServiceRequest},
     };
 
@@ -119,6 +121,11 @@ mod tests {
     #[ignore]
     async fn test_transcode_service() -> Result<(), Error> {
         let config = Config::with_config()?;
+        let pool = PgPool::new(&config.pgurl);
+
+        let mock_stdout = MockStdout::new();
+        let stdout = StdoutChannel::with_mock_stdout(mock_stdout.clone(), mock_stdout.clone());
+
         let test_queue = "test_queue";
         let channel = TranscodeChannel::open_channel().await?;
         let queue = channel.init(test_queue).await?;
@@ -127,7 +134,7 @@ mod tests {
             let result: TranscodeServiceRequest = channel.get_single_job(test_queue).await?;
             Ok(result)
         });
-        let service = TranscodeService::new(config, test_queue);
+        let service = TranscodeService::new(&config, test_queue, &pool, &stdout);
         let req = TranscodeServiceRequest::new(
             JobType::Transcode,
             "test_prefix",

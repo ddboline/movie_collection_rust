@@ -167,38 +167,24 @@ pub struct MovieCollection {
 
 impl Default for MovieCollection {
     fn default() -> Self {
-        Self::new(Config::default())
+        Self::new(
+            &Config::default(),
+            &PgPool::default(),
+            &StdoutChannel::default(),
+        )
     }
 }
 
 impl MovieCollection {
-    pub fn new(config: Config) -> Self {
-        let pool = PgPool::new(&config.pgurl);
-        let stdout = StdoutChannel::new();
+    pub fn new(config: &Config, pool: &PgPool, stdout: &StdoutChannel) -> Self {
+        let config = config.clone();
+        let pool = pool.clone();
+        let stdout = stdout.clone();
         Self {
             pool,
             config,
             stdout,
         }
-    }
-
-    pub fn with_pool(pool: &PgPool) -> Result<Self, Error> {
-        let config = Config::with_config()?;
-        let stdout = StdoutChannel::new();
-        let mc = Self {
-            config,
-            pool: pool.clone(),
-            stdout,
-        };
-        Ok(mc)
-    }
-
-    pub fn get_pool(&self) -> &PgPool {
-        &self.pool
-    }
-
-    pub fn get_config(&self) -> &Config {
-        &self.config
     }
 
     pub async fn print_imdb_shows(
@@ -213,7 +199,7 @@ impl MovieCollection {
             query
         };
         let shows: HashSet<StackString> = self
-            .get_pool()
+            .pool
             .get()
             .await?
             .query(query.as_str(), &[])
@@ -253,7 +239,7 @@ impl MovieCollection {
             )?;
 
             let results: Result<Vec<_>, Error> = self
-                .get_pool()
+                .pool
                 .get()
                 .await?
                 .query(query.sql(), query.parameters())
@@ -304,7 +290,7 @@ impl MovieCollection {
             show = show,
         )?;
 
-        self.get_pool()
+        self.pool
             .get()
             .await?
             .query(query.sql(), query.parameters())
@@ -331,7 +317,7 @@ impl MovieCollection {
             show = show
         );
 
-        self.get_pool()
+        self.pool
             .get()
             .await?
             .query(query.sql(), query.parameters())
@@ -380,7 +366,7 @@ impl MovieCollection {
         ),)?;
 
         let results: Result<Vec<_>, Error> = self
-            .get_pool()
+            .pool
             .get()
             .await?
             .query(query.sql(), &[])
@@ -427,7 +413,7 @@ impl MovieCollection {
                 );
 
                 for row in &self
-                    .get_pool()
+                    .pool
                     .get()
                     .await?
                     .query(query.sql(), query.parameters())
@@ -454,7 +440,7 @@ impl MovieCollection {
             r#"DELETE FROM movie_collection WHERE path = $path"#,
             path = path
         );
-        self.get_pool()
+        self.pool
             .get()
             .await?
             .execute(query.sql(), query.parameters())
@@ -468,7 +454,7 @@ impl MovieCollection {
             r#"SELECT idx FROM movie_collection WHERE path = $path"#,
             path = path
         );
-        self.get_pool()
+        self.pool
             .get()
             .await?
             .query(query.sql(), query.parameters())
@@ -486,7 +472,7 @@ impl MovieCollection {
             idx = idx
         );
         let path: StackString = self
-            .get_pool()
+            .pool
             .get()
             .await?
             .query(query.sql(), query.parameters())
@@ -502,7 +488,7 @@ impl MovieCollection {
             r#"SELECT idx FROM movie_collection WHERE path like '%{}%'"#,
             path
         ))?;
-        self.get_pool()
+        self.pool
             .get()
             .await?
             .query(query.sql(), &[])
@@ -528,7 +514,7 @@ impl MovieCollection {
             path = path,
             show = show
         );
-        self.get_pool()
+        self.pool
             .get()
             .await?
             .execute(query.sql(), query.parameters())
@@ -549,7 +535,7 @@ impl MovieCollection {
             path = path,
             show = show
         );
-        self.get_pool()
+        self.pool
             .get()
             .await?
             .execute(query.sql(), query.parameters())
@@ -571,17 +557,17 @@ impl MovieCollection {
                 last_modified=now()
             WHERE idx in (SELECT a.idx FROM a)
         "#;
-        let rows = self.get_pool().get().await?.execute(query, &[]).await?;
+        let rows = self.pool.get().await?.execute(query, &[]).await?;
         Ok(rows)
     }
 
     pub async fn make_collection(&self) -> Result<(), Error> {
         let file_list: Result<Vec<_>, Error> = self
-            .get_config()
+            .config
             .movie_dirs
             .par_iter()
             .filter(|d| d.exists())
-            .map(|d| walk_directory(&d, &self.get_config().suffixes))
+            .map(|d| walk_directory(&d, &self.config.suffixes))
             .collect();
         let file_list = file_list?;
 
@@ -622,7 +608,7 @@ impl MovieCollection {
             JOIN movie_collection b ON a.collection_idx=b.idx
         "#;
         let movie_queue: Result<HashMap<StackString, i32>, Error> = self
-            .get_pool()
+            .pool
             .get()
             .await?
             .query(query, &[])
@@ -638,7 +624,7 @@ impl MovieCollection {
 
         let query = "SELECT path, show FROM movie_collection";
         let collection_map: Result<HashMap<StackString, StackString>, Error> = self
-            .get_pool()
+            .pool
             .get()
             .await?
             .query(query, &[])
@@ -654,7 +640,7 @@ impl MovieCollection {
 
         let query = "SELECT show, season, episode from imdb_episodes";
         let episodes_set: Result<HashSet<(StackString, i32, i32)>, Error> = self
-            .get_pool()
+            .pool
             .get()
             .await?
             .query(query, &[])
@@ -679,7 +665,7 @@ impl MovieCollection {
                         .ok_or_else(|| format_err!("extension fail"))?
                         .to_string()
                         .into();
-                    if self.get_config().suffixes.contains(&ext) {
+                    if self.config.suffixes.contains(&ext) {
                         self.stdout.send(format!("not in collection {}", f));
                         self.insert_into_collection(f).await?;
                     }
@@ -695,7 +681,7 @@ impl MovieCollection {
                 if let Some(v) = movie_queue.get(key) {
                     self.stdout
                         .send(format!("in queue but not disk {} {}", key, v));
-                    let mq = MovieQueueDB::with_pool(self.get_pool());
+                    let mq = MovieQueueDB::new(&self.config, &self.pool, &self.stdout);
                     mq.remove_from_queue_by_path(&key).await?;
                 } else {
                     self.stdout.send(format!("not on disk {} {}", key, val));
@@ -757,7 +743,7 @@ impl MovieCollection {
             WHERE link IS NOT null AND rating IS NOT null
         "#;
 
-        self.get_pool()
+        self.pool
             .get()
             .await?
             .query(query, &[])
@@ -797,7 +783,7 @@ impl MovieCollection {
             GROUP BY 1,2,3,4
             ORDER BY 1,2,3,4
         "#;
-        self.get_pool()
+        self.pool
             .get()
             .await?
             .query(query, &[])
@@ -856,7 +842,7 @@ impl MovieCollection {
             mindate = mindate,
             maxdate = maxdate
         )?;
-        self.get_pool()
+        self.pool
             .get()
             .await?
             .query(query.sql(), query.parameters())
@@ -874,7 +860,7 @@ impl MovieCollection {
         let mindate = Local::today() + Duration::days(-14);
         let maxdate = Local::today() + Duration::days(7);
 
-        let mq = MovieQueueDB::with_pool(&self.get_pool());
+        let mq = MovieQueueDB::new(&self.config, &self.pool, &self.stdout);
 
         let mut output = Vec::new();
 
@@ -917,7 +903,7 @@ impl MovieCollection {
             "#,
             timestamp = timestamp
         );
-        self.get_pool()
+        self.pool
             .get()
             .await?
             .query(query.sql(), query.parameters())
@@ -929,7 +915,9 @@ impl MovieCollection {
 }
 
 pub async fn find_new_episodes_http_worker(
+    config: &Config,
     pool: &PgPool,
+    stdout: &StdoutChannel,
     shows: Option<impl AsRef<str>>,
     source: Option<TvShowSource>,
 ) -> Result<Vec<StackString>, Error> {
@@ -947,14 +935,14 @@ pub async fn find_new_episodes_http_worker(
         ),
     );
 
-    let mc = MovieCollection::with_pool(&pool)?;
+    let mc = MovieCollection::new(config, &pool, stdout);
     let shows_filter: Option<HashSet<StackString>> =
         shows.map(|s| s.as_ref().split(',').map(Into::into).collect());
 
     let mindate = (Local::today() + Duration::days(-14)).naive_local();
     let maxdate = (Local::today() + Duration::days(7)).naive_local();
 
-    let mq = MovieQueueDB::with_pool(&pool);
+    let mq = MovieQueueDB::new(config, &pool, &stdout);
 
     let episodes = mc.get_new_episodes(mindate, maxdate, source).await?;
 

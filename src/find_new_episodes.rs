@@ -2,10 +2,11 @@
 
 use anyhow::Error;
 use stack_string::StackString;
+use stdout_channel::StdoutChannel;
 use structopt::StructOpt;
 
 use movie_collection_lib::{
-    config::Config, movie_collection::MovieCollection, tv_show_source::TvShowSource,
+    config::Config, movie_collection::MovieCollection, pgpool::PgPool, tv_show_source::TvShowSource,
 };
 
 #[derive(StructOpt)]
@@ -22,6 +23,8 @@ struct FindNewEpisodesOpt {
 async fn find_new_episodes() -> Result<(), Error> {
     let opts = FindNewEpisodesOpt::from_args();
     let config = Config::with_config()?;
+    let pool = PgPool::new(&config.pgurl);
+    let stdout = StdoutChannel::new();
 
     let source = if opts.shows.is_empty() {
         opts.source
@@ -29,14 +32,14 @@ async fn find_new_episodes() -> Result<(), Error> {
         Some(TvShowSource::All)
     };
 
-    let mc = MovieCollection::new(config);
+    let mc = MovieCollection::new(&config, &pool, &stdout);
 
     let output = mc.find_new_episodes(source, &opts.shows).await?;
 
     for epi in output {
-        mc.stdout.send(epi.to_string());
+        stdout.send(epi.to_string());
     }
-    mc.stdout.close().await
+    stdout.close().await
 }
 
 #[tokio::main]

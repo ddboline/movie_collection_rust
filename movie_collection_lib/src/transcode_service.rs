@@ -6,11 +6,11 @@ use procfs::process;
 use serde::{Deserialize, Serialize};
 use smallvec::{smallvec, SmallVec};
 use stack_string::StackString;
-use std::future::Future;
 use std::{
     collections::HashMap,
     ffi::OsStr,
     fmt,
+    future::Future,
     path::{Path, PathBuf},
     process::Stdio,
     str,
@@ -25,7 +25,7 @@ use tokio::{
 
 use crate::{
     config::Config, make_list::FileLists, make_queue::make_queue_worker,
-    movie_collection::MovieCollection, utils::parse_file_stem,
+    movie_collection::MovieCollection, pgpool::PgPool, utils::parse_file_stem,
 };
 
 #[derive(Serialize, Deserialize, Debug, PartialEq, Clone, Copy)]
@@ -203,18 +203,52 @@ impl TranscodeServiceRequest {
         );
         output
     }
+
+    pub fn get_cmd_path(&self) -> PathBuf {
+        match self.job_type {
+            JobType::Transcode => Path::new("/usr/bin/transcode-avi").to_path_buf(),
+            JobType::Move => Path::new("/usr/bin/remcom").to_path_buf(),
+        }
+    }
+
+    pub fn get_json_path(&self, config: &Config) -> PathBuf {
+        match self.job_type {
+            JobType::Transcode => job_dir(config).join(&self.prefix).with_extension("json"),
+            JobType::Move => job_dir(config)
+                .join(&format!("{}_copy", self.prefix))
+                .with_extension("json"),
+        }
+    }
+
+    pub async fn publish_to_cli(&self, config: &Config) -> Result<StackString, Error> {
+        let cmd_path = self.get_cmd_path();
+        let json_path = self.get_json_path(&config);
+        if cmd_path.exists() {
+            let output = Command::new(&cmd_path)
+                .args(&["-f", json_path.to_string_lossy().as_ref()])
+                .output()
+                .await?;
+            StackString::from_utf8(output.stdout).map_err(Into::into)
+        } else {
+            Err(format_err!("{:?} does not exist", cmd_path))
+        }
+    }
 }
 
 #[derive(Clone)]
 pub struct TranscodeService {
     pub config: Config,
+    pub pool: PgPool,
+    pub stdout: StdoutChannel,
     pub queue: StackString,
 }
 
 impl TranscodeService {
-    pub fn new(config: Config, queue: &str) -> Self {
+    pub fn new(config: &Config, queue: &str, pool: &PgPool, stdout: &StdoutChannel) -> Self {
         Self {
-            config,
+            config: config.clone(),
+            pool: pool.clone(),
+            stdout: stdout.clone(),
             queue: queue.into(),
         }
     }
@@ -228,20 +262,11 @@ impl TranscodeService {
         F: Fn(Vec<u8>) -> T,
         T: Future<Output = Result<(), Error>>,
     {
-        match payload.job_type {
-            JobType::Transcode => {
-                let script_file = job_dir(&self.config)
-                    .join(&payload.prefix)
-                    .with_extension("json");
-                fs::write(&script_file, &serde_json::to_vec(&payload)?).await?;
-            }
-            JobType::Move => {
-                let script_file = job_dir(&self.config)
-                    .join(&format!("{}_copy", payload.prefix))
-                    .with_extension("json");
-                fs::write(&script_file, &serde_json::to_vec(&payload)?).await?;
-            }
-        }
+        fs::write(
+            &payload.get_json_path(&self.config),
+            &serde_json::to_vec(&payload)?,
+        )
+        .await?;
         let payload = serde_json::to_vec(&payload)?;
         publish(payload).await
     }
@@ -440,7 +465,6 @@ impl TranscodeService {
             )
             .await?;
         fs::rename(&new_path, &output_file).await?;
-        let stdout = StdoutChannel::new();
         make_queue_worker(
             &self.config,
             &[],
@@ -448,7 +472,7 @@ impl TranscodeService {
             false,
             &[],
             false,
-            &stdout,
+            &self.stdout,
         )
         .await?;
         debug_output_file
@@ -461,10 +485,10 @@ impl TranscodeService {
             false,
             &[],
             false,
-            &stdout,
+            &self.stdout,
         )
         .await?;
-        let mc = MovieCollection::new(self.config.clone());
+        let mc = MovieCollection::new(&self.config, &self.pool, &self.stdout);
         debug_output_file.write_all(b"update collection\n").await?;
         mc.make_collection().await?;
         mc.fix_collection_show_id().await?;

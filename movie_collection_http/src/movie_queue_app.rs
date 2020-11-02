@@ -19,9 +19,7 @@ use super::{
         movie_queue_delete, movie_queue_play, movie_queue_remcom_directory_file,
         movie_queue_remcom_file, movie_queue_route, movie_queue_show, movie_queue_transcode,
         movie_queue_transcode_cleanup, movie_queue_transcode_directory, movie_queue_transcode_file,
-        movie_queue_transcode_status, movie_queue_update, refresh_auth, trakt_auth_url, trakt_cal,
-        trakt_callback, trakt_watched_action, trakt_watched_list, trakt_watched_seasons,
-        trakt_watchlist, trakt_watchlist_action, tvshows, user,
+        movie_queue_transcode_status, movie_queue_update, tvshows, user,
     },
 };
 use movie_collection_lib::{config::Config, pgpool::PgPool, trakt_connection::TraktConnection};
@@ -82,59 +80,37 @@ pub async fn start_app() -> Result<(), Error> {
                         web::resource("/delete/{path}").route(web::get().to(movie_queue_delete)),
                     )
                     .service(
-                        web::resource("/transcode/status")
-                            .route(web::get().to(movie_queue_transcode_status)),
-                    )
-                    .service(
-                        web::resource("/transcode/file/{file}")
-                            .route(web::get().to(movie_queue_transcode_file)),
-                    )
-                    .service(
-                        web::resource("/transcode/remcom/file/{file}")
-                            .route(web::get().to(movie_queue_remcom_file)),
-                    )
-                    .service(
-                        web::resource("/transcode/remcom/directory/{directory}/{file}")
-                            .route(web::get().to(movie_queue_remcom_directory_file)),
-                    )
-                    .service(
-                        web::resource("/transcode/queue/{file}")
-                            .route(web::get().to(movie_queue_transcode)),
-                    )
-                    .service(
-                        web::resource("/transcode/queue/{directory}/{file}")
-                            .route(web::get().to(movie_queue_transcode_directory)),
-                    )
-                    .service(
-                        web::resource("/transcode/cleanup/{file}")
-                            .route(web::get().to(movie_queue_transcode_cleanup)),
+                        web::scope("/transcode")
+                            .service(
+                                web::resource("/status")
+                                    .route(web::get().to(movie_queue_transcode_status)),
+                            )
+                            .service(
+                                web::resource("/file/{file}")
+                                    .route(web::get().to(movie_queue_transcode_file)),
+                            )
+                            .service(
+                                web::resource("/remcom/file/{file}")
+                                    .route(web::get().to(movie_queue_remcom_file)),
+                            )
+                            .service(
+                                web::resource("/remcom/directory/{directory}/{file}")
+                                    .route(web::get().to(movie_queue_remcom_directory_file)),
+                            )
+                            .service(
+                                web::resource("/queue/{file}")
+                                    .route(web::get().to(movie_queue_transcode)),
+                            )
+                            .service(
+                                web::resource("/queue/{directory}/{file}")
+                                    .route(web::get().to(movie_queue_transcode_directory)),
+                            )
+                            .service(
+                                web::resource("/cleanup/{file}")
+                                    .route(web::get().to(movie_queue_transcode_cleanup)),
+                            ),
                     )
                     .service(web::resource("/play/{index}").route(web::get().to(movie_queue_play)))
-                    .service(web::resource("/trakt/auth_url").route(web::get().to(trakt_auth_url)))
-                    .service(web::resource("/trakt/callback").route(web::get().to(trakt_callback)))
-                    .service(
-                        web::resource("/trakt/refresh_auth").route(web::get().to(refresh_auth)),
-                    )
-                    .service(web::resource("/trakt/cal").route(web::get().to(trakt_cal)))
-                    .service(
-                        web::resource("/trakt/watchlist").route(web::get().to(trakt_watchlist)),
-                    )
-                    .service(
-                        web::resource("/trakt/watchlist/{action}/{imdb_url}")
-                            .route(web::get().to(trakt_watchlist_action)),
-                    )
-                    .service(
-                        web::resource("/trakt/watched/list/{imdb_url}")
-                            .route(web::get().to(trakt_watched_seasons)),
-                    )
-                    .service(
-                        web::resource("/trakt/watched/list/{imdb_url}/{season}")
-                            .route(web::get().to(trakt_watched_list)),
-                    )
-                    .service(
-                        web::resource("/trakt/watched/{action}/{imdb_url}/{season}/{episode}")
-                            .route(web::get().to(trakt_watched_action)),
-                    )
                     .service(
                         web::resource("/imdb_episodes")
                             .route(web::get().to(imdb_episodes_route))
@@ -165,7 +141,7 @@ pub async fn start_app() -> Result<(), Error> {
                     )
                     .service(web::resource("/user").route(web::get().to(user)))
                     .service(web::resource("/full_queue").route(web::get().to(movie_queue)))
-                    .service(web::resource("/{show}").route(web::get().to(movie_queue_show))),
+                    .service(web::resource("/{show}").route(web::get().to(movie_queue_show)))
             )
     })
     .bind(&format!("127.0.0.1:{}", port))
