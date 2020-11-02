@@ -13,9 +13,8 @@ use tokio::{
 use super::{
     logged_user::{fill_from_db, get_secrets, SECRET_KEY, TRIGGER_DB_UPDATE},
     routes::{
-        refresh_auth, trakt_auth_url, trakt_cal,
-        trakt_callback, trakt_watched_action, trakt_watched_list, trakt_watched_seasons,
-        trakt_watchlist, trakt_watchlist_action,
+        refresh_auth, trakt_auth_url, trakt_cal, trakt_callback, trakt_watched_action,
+        trakt_watched_list, trakt_watched_seasons, trakt_watchlist, trakt_watchlist_action,
     },
 };
 use movie_collection_lib::{config::Config, pgpool::PgPool, trakt_connection::TraktConnection};
@@ -68,32 +67,28 @@ pub async fn start_app() -> Result<(), Error> {
                     .secure(false), // this can only be true if you have https
             ))
             .service(
-                    web::scope("/trakt")
-                        .service(web::resource("/auth_url").route(web::get().to(trakt_auth_url)))
-                        .service(web::resource("/callback").route(web::get().to(trakt_callback)))
-                        .service(
-                            web::resource("/refresh_auth").route(web::get().to(refresh_auth)),
-                        )
-                        .service(web::resource("/cal").route(web::get().to(trakt_cal)))
-                        .service(
-                            web::resource("/watchlist").route(web::get().to(trakt_watchlist)),
-                        )
-                        .service(
-                            web::resource("/watchlist/{action}/{imdb_url}")
-                                .route(web::get().to(trakt_watchlist_action)),
-                        )
-                        .service(
-                            web::resource("/watched/list/{imdb_url}")
-                                .route(web::get().to(trakt_watched_seasons)),
-                        )
-                        .service(
-                            web::resource("/watched/list/{imdb_url}/{season}")
-                                .route(web::get().to(trakt_watched_list)),
-                        )
-                        .service(
-                            web::resource("/watched/{action}/{imdb_url}/{season}/{episode}")
-                                .route(web::get().to(trakt_watched_action)),
-                        )
+                web::scope("/trakt")
+                    .service(web::resource("/auth_url").route(web::get().to(trakt_auth_url)))
+                    .service(web::resource("/callback").route(web::get().to(trakt_callback)))
+                    .service(web::resource("/refresh_auth").route(web::get().to(refresh_auth)))
+                    .service(web::resource("/cal").route(web::get().to(trakt_cal)))
+                    .service(web::resource("/watchlist").route(web::get().to(trakt_watchlist)))
+                    .service(
+                        web::resource("/watchlist/{action}/{imdb_url}")
+                            .route(web::get().to(trakt_watchlist_action)),
+                    )
+                    .service(
+                        web::resource("/watched/list/{imdb_url}")
+                            .route(web::get().to(trakt_watched_seasons)),
+                    )
+                    .service(
+                        web::resource("/watched/list/{imdb_url}/{season}")
+                            .route(web::get().to(trakt_watched_list)),
+                    )
+                    .service(
+                        web::resource("/watched/{action}/{imdb_url}/{season}/{episode}")
+                            .route(web::get().to(trakt_watched_action)),
+                    ),
             )
     })
     .bind(&format!("127.0.0.1:{}", port))

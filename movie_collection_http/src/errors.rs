@@ -53,12 +53,14 @@ impl<T: Debug> From<BlockingError<T>> for ServiceError {
 fn login_html() -> HttpResponse {
     HttpResponse::Ok()
         .content_type("text/html; charset=utf-8")
-        .body("
+        .body(
+            "
             <script>
                 !function() {
                     let final_url = location.href;
                     location.replace('/auth/login.html?final_url=' + final_url);
                 }()
             </script>
-        ")
+        ",
+        )
 }

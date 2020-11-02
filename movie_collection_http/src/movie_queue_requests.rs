@@ -18,8 +18,8 @@ use movie_collection_lib::{
     pgpool::PgPool,
     trakt_connection::TraktConnection,
     trakt_utils::{
-        get_watched_shows_db, get_watchlist_shows_db_map, watch_list_http_worker,
-        watched_action_http_worker, TraktActions, WatchListMap, WatchListShow, WatchedEpisode,
+        get_watched_shows_db, get_watchlist_shows_db_map, TraktActions, WatchListMap,
+        WatchListShow, WatchedEpisode,
     },
     tv_show_source::TvShowSource,
 };
@@ -172,53 +172,6 @@ impl HandleRequest<ImdbEpisodesRequest> for PgPool {
         MovieCollection::new(&CONFIG, &self, &stdout)
             .print_imdb_episodes(&msg.show, msg.season)
             .await
-    }
-}
-
-pub struct WatchedListRequest {
-    pub imdb_url: StackString,
-    pub season: i32,
-}
-
-#[async_trait]
-impl HandleRequest<WatchedListRequest> for PgPool {
-    type Result = Result<StackString, Error>;
-
-    async fn handle(&self, msg: WatchedListRequest) -> Self::Result {
-        let mock_stdout = MockStdout::new();
-        let stdout = StdoutChannel::with_mock_stdout(mock_stdout.clone(), mock_stdout.clone());
-
-        watch_list_http_worker(&CONFIG, &self, &stdout, &msg.imdb_url, msg.season).await
-    }
-}
-
-pub struct WatchedActionRequest {
-    pub action: TraktActions,
-    pub imdb_url: StackString,
-    pub season: i32,
-    pub episode: i32,
-}
-
-impl WatchedActionRequest {
-    pub async fn handle(
-        &self,
-        pool: &PgPool,
-        trakt: &TraktConnection,
-    ) -> Result<StackString, Error> {
-        let mock_stdout = MockStdout::new();
-        let stdout = StdoutChannel::with_mock_stdout(mock_stdout.clone(), mock_stdout.clone());
-
-        watched_action_http_worker(
-            trakt,
-            pool,
-            self.action,
-            &self.imdb_url,
-            self.season,
-            self.episode,
-            &CONFIG,
-            &stdout,
-        )
-        .await
     }
 }
 

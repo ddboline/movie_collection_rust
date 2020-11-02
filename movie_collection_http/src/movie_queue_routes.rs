@@ -6,7 +6,7 @@ use actix_web::{
 };
 use anyhow::format_err;
 use maplit::hashmap;
-use serde::{Serialize};
+use serde::Serialize;
 use stack_string::StackString;
 use std::{
     borrow::Borrow,
@@ -36,10 +36,10 @@ use super::{
     movie_queue_app::{AppState, CONFIG},
     movie_queue_requests::{
         FindNewEpisodeRequest, ImdbEpisodesSyncRequest, ImdbEpisodesUpdateRequest,
-        ImdbRatingsSetSourceRequest, ImdbRatingsSyncRequest,
-        ImdbRatingsUpdateRequest, ImdbShowRequest, LastModifiedRequest,
-        MovieCollectionSyncRequest, MovieCollectionUpdateRequest, MoviePathRequest,
-        MovieQueueRequest, MovieQueueSyncRequest, MovieQueueUpdateRequest, ParseImdbRequest,
+        ImdbRatingsSetSourceRequest, ImdbRatingsSyncRequest, ImdbRatingsUpdateRequest,
+        ImdbShowRequest, LastModifiedRequest, MovieCollectionSyncRequest,
+        MovieCollectionUpdateRequest, MoviePathRequest, MovieQueueRequest, MovieQueueSyncRequest,
+        MovieQueueUpdateRequest, ParseImdbRequest,
     },
     HandleRequest,
 };

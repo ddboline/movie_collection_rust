@@ -1,17 +1,12 @@
-use anyhow::{Error};
+use anyhow::Error;
 use stack_string::StackString;
 use stdout_channel::{MockStdout, StdoutChannel};
 
 use movie_collection_lib::{
-    movie_collection::{
-        ImdbSeason,  MovieCollection,
-    },
+    movie_collection::{ImdbSeason, MovieCollection},
     pgpool::PgPool,
     trakt_connection::TraktConnection,
-    trakt_utils::{
-        watch_list_http_worker,
-        watched_action_http_worker, TraktActions, WatchListShow, 
-    },
+    trakt_utils::{TraktActions, WatchListShow},
 };
 
 use super::app::CONFIG;
@@ -61,49 +56,5 @@ impl WatchlistActionRequest {
             _ => {}
         }
         Ok(self.imdb_url)
-    }
-}
-
-pub struct WatchedListRequest {
-    pub imdb_url: StackString,
-    pub season: i32,
-}
-
-impl WatchedListRequest {
-    pub async fn handle(&self, pool: &PgPool) -> Result<StackString, Error> {
-        let mock_stdout = MockStdout::new();
-        let stdout = StdoutChannel::with_mock_stdout(mock_stdout.clone(), mock_stdout.clone());
-
-        watch_list_http_worker(&CONFIG, pool, &stdout, &self.imdb_url, self.season).await
-    }
-}
-
-pub struct WatchedActionRequest {
-    pub action: TraktActions,
-    pub imdb_url: StackString,
-    pub season: i32,
-    pub episode: i32,
-}
-
-impl WatchedActionRequest {
-    pub async fn handle(
-        &self,
-        pool: &PgPool,
-        trakt: &TraktConnection,
-    ) -> Result<StackString, Error> {
-        let mock_stdout = MockStdout::new();
-        let stdout = StdoutChannel::with_mock_stdout(mock_stdout.clone(), mock_stdout.clone());
-
-        watched_action_http_worker(
-            trakt,
-            pool,
-            self.action,
-            &self.imdb_url,
-            self.season,
-            self.episode,
-            &CONFIG,
-            &stdout,
-        )
-        .await
     }
 }

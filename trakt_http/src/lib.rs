@@ -10,12 +10,11 @@
 #![allow(clippy::missing_errors_doc)]
 #![allow(clippy::used_underscore_binding)]
 
+pub mod app;
 pub mod errors;
 pub mod logged_user;
-pub mod app;
 pub mod requests;
 pub mod routes;
-
 
 #[cfg(test)]
 mod tests {
