@@ -2,6 +2,7 @@ use actix_threadpool::BlockingError;
 use actix_web::{error::ResponseError, HttpResponse};
 use anyhow::Error as AnyhowError;
 use handlebars::RenderError;
+use reqwest::Error as ReqwestError;
 use stack_string::StackString;
 use std::{fmt::Debug, io::Error as IoError};
 use thiserror::Error;
@@ -31,11 +32,24 @@ pub enum ServiceError {
 // with appropriate data
 impl ResponseError for ServiceError {
     fn error_response(&self) -> HttpResponse {
-        match *self {
-            Self::BadRequest(ref message) => HttpResponse::BadRequest().json(message),
+        match self {
+            Self::BadRequest(message) => HttpResponse::BadRequest().json(message),
             Self::Unauthorized => {
                 TRIGGER_DB_UPDATE.set();
                 login_html()
+            }
+            Self::AnyhowError(e) => {
+                if let Some(err) = e.downcast_ref::<ReqwestError>() {
+                    if let Some(status) = err.status() {
+                        let url = err.url().map_or("", |u| u.as_str());
+                        return HttpResponse::InternalServerError().json(format!(
+                            "Status code {} for {}",
+                            status.as_str(),
+                            url
+                        ));
+                    }
+                }
+                HttpResponse::InternalServerError().json("Internal Server Error, Please try later")
             }
             _ => {
                 HttpResponse::InternalServerError().json("Internal Server Error, Please try later")
