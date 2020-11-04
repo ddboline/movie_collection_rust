@@ -710,7 +710,7 @@ mod tests {
         let url = conn._get_auth_url(test_state.as_str())?;
         println!("url {}", url);
         let expected = format!(
-            "https://trakt.tv/oauth/authorize?{a}{client_id}{b}{domain}%2Flist%2Ftrakt%2Fcallback&state={state}",
+            "https://trakt.tv/oauth/authorize?{a}{client_id}{b}{domain}%2Ftrakt%2Fcallback&state={state}",
             a="response_type=code&client_id=",
             client_id=conn.config.trakt_client_id,
             b="&redirect_uri=https%3A%2F%2F",
