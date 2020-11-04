@@ -535,7 +535,7 @@ pub async fn movie_queue_transcode_status(_: LoggedUser, _: Data<AppState>) -> H
     let status = transcode_status(&CONFIG).await?;
     let file_lists = task
         .await
-        .map_or_else(|_| Ok(FileLists::default()), |task| task.unwrap())?;
+        .map_or_else(|_| Ok(FileLists::default()), Result::unwrap)?;
     form_http_response(status.get_html(&file_lists, &CONFIG).join(""))
 }
 
