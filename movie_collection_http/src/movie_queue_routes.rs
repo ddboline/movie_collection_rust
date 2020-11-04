@@ -14,9 +14,10 @@ use std::{
     hash::{Hash, Hasher},
     path,
     path::PathBuf,
+    time::Duration,
 };
 use stdout_channel::{MockStdout, StdoutChannel};
-use tokio::{fs::remove_file, task::spawn_blocking};
+use tokio::{fs::remove_file, task::spawn_blocking, time::timeout};
 
 use movie_collection_lib::{
     make_list::FileLists,
@@ -527,9 +528,14 @@ pub async fn user(user: LoggedUser) -> HttpResult {
 }
 
 pub async fn movie_queue_transcode_status(_: LoggedUser, _: Data<AppState>) -> HttpResult {
-    let task = spawn_blocking(move || FileLists::get_file_lists(&CONFIG));
+    let task = timeout(
+        Duration::from_secs(10),
+        spawn_blocking(move || FileLists::get_file_lists(&CONFIG)),
+    );
     let status = transcode_status(&CONFIG).await?;
-    let file_lists = task.await.unwrap()?;
+    let file_lists = task
+        .await
+        .map_or_else(|_| Ok(FileLists::default()), |task| task.unwrap())?;
     form_http_response(status.get_html(&file_lists, &CONFIG).join(""))
 }
 
