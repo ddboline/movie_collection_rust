@@ -1011,7 +1011,8 @@ pub async fn find_new_episodes_http_worker(
                     .replace("SHOW", &epi.show)
                     .replace("LINK", &epi.link)
                     .replace("SEASON", &epi.season.to_string()),
-            ).into()
+            )
+            .into()
         })
         .collect();
 

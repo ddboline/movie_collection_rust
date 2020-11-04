@@ -190,8 +190,7 @@ fn trakt_watched_seasons_worker(
         })
         .join("");
 
-    let previous =
-        r#"<a href="javascript:updateMainArticle('/trakt/watchlist')">Go Back</a><br>"#;
+    let previous = r#"<a href="javascript:updateMainArticle('/trakt/watchlist')">Go Back</a><br>"#;
     let entries = format!(r#"{}<table border="0">{}</table>"#, previous, entries).into();
     Ok(entries)
 }
@@ -453,36 +452,39 @@ async fn trakt_cal_http_worker(
             }
         };
         let line = format!(
-                "<tr><td>{}</td><td>{}</td><td>{}</td><td>{}</td>{}</tr>",
+            "<tr><td>{}</td><td>{}</td><td>{}</td><td>{}</td>{}</tr>",
+            format!(
+                r#"<a href="javascript:updateMainArticle('/trakt/watched/list/{}/{}')">{}</a>"#,
+                cal.link, cal.season, cal.show,
+            ),
+            format!(
+                r#"<a href="https://www.imdb.com/title/{}" target="_blank">imdb</a>"#,
+                cal.link
+            ),
+            if let Some(link) = cal.ep_link {
                 format!(
-                    r#"<a href="javascript:updateMainArticle('/trakt/watched/list/{}/{}')">{}</a>"#,
-                    cal.link, cal.season, cal.show,
-                ),
+                    r#"<a href="https://www.imdb.com/title/{}" target="_blank">{} {}</a>"#,
+                    link, cal.season, cal.episode,
+                )
+            } else if let Some(link) = exists.as_ref() {
                 format!(
-                    r#"<a href="https://www.imdb.com/title/{}" target="_blank">imdb</a>"#,
-                    cal.link
-                ),
-                if let Some(link) = cal.ep_link {
-                    format!(
-                        r#"<a href="https://www.imdb.com/title/{}" target="_blank">{} {}</a>"#,
-                        link, cal.season, cal.episode,
-                    )
-                } else if let Some(link) = exists.as_ref() {
-                    format!(
-                        r#"<a href="https://www.imdb.com/title/{}" target="_blank">{} {}</a>"#,
-                        link, cal.season, cal.episode,
-                    )
-                } else {
-                    format!("{} {}", cal.season, cal.episode,)
-                },
-                cal.airdate,
-                if exists.is_some() {"".to_string()} else {
-                    button_add
-                        .replace("SHOW", &show)
-                        .replace("LINK", &cal.link)
-                        .replace("SEASON", &cal.season.to_string())
-                },
-            ).into();
+                    r#"<a href="https://www.imdb.com/title/{}" target="_blank">{} {}</a>"#,
+                    link, cal.season, cal.episode,
+                )
+            } else {
+                format!("{} {}", cal.season, cal.episode,)
+            },
+            cal.airdate,
+            if exists.is_some() {
+                "".to_string()
+            } else {
+                button_add
+                    .replace("SHOW", &show)
+                    .replace("LINK", &cal.link)
+                    .replace("SEASON", &cal.season.to_string())
+            },
+        )
+        .into();
         lines.push(line);
     }
     Ok(lines)
