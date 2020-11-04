@@ -25,7 +25,6 @@ use crate::{
     trakt_utils::{
         TraktCalEntry, TraktCalEntryList, TraktResult, WatchListShow, WatchedEpisode, WatchedMovie,
     },
-    utils::ExponentialRetry,
 };
 
 lazy_static! {
@@ -43,12 +42,6 @@ impl Default for TraktConnection {
     fn default() -> Self {
         let config = Config::with_config().expect("Failed to create");
         Self::new(config)
-    }
-}
-
-impl ExponentialRetry for TraktConnection {
-    fn get_client(&self) -> &Client {
-        &self.client
     }
 }
 
