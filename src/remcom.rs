@@ -44,7 +44,7 @@ async fn publish_single(
         .publish_transcode_job(&payload, |data| async move {
             let remcom_channel = TranscodeChannel::open_channel().await?;
             remcom_channel.init(&config.remcom_queue).await?;
-            remcom_channel.publish(&config.transcode_queue, data).await
+            remcom_channel.publish(&config.remcom_queue, data).await
         })
         .await?;
     Ok(())
