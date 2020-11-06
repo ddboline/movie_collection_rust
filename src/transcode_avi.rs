@@ -33,7 +33,7 @@ async fn transcode_avi(
             panic!("file doesn't exist {}", path.to_string_lossy());
         }
         let payload = TranscodeServiceRequest::create_transcode_request(&config, &path)?;
-        publish_single(&transcode_service, &config, &payload).await?;
+        publish_single(&transcode_service, &payload).await?;
         stdout.send(format!("script {:?}", payload));
     }
     stdout.close().await
@@ -41,15 +41,14 @@ async fn transcode_avi(
 
 async fn publish_single(
     transcode_service: &TranscodeService,
-    config: &Config,
     payload: &TranscodeServiceRequest,
 ) -> Result<(), Error> {
     transcode_service
         .publish_transcode_job(&payload, |data| async move {
             let transcode_channel = TranscodeChannel::open_channel().await?;
-            transcode_channel.init(&config.transcode_queue).await?;
+            transcode_channel.init(&transcode_service.queue).await?;
             transcode_channel
-                .publish(&config.transcode_queue, data)
+                .publish(&transcode_service.queue, data)
                 .await
         })
         .await?;
@@ -58,12 +57,11 @@ async fn publish_single(
 
 async fn transcode_single(
     transcode_service: &TranscodeService,
-    config: &Config,
     request_file: &Path,
 ) -> Result<(), Error> {
     let data = fs::read(request_file).await?;
     let payload = serde_json::from_slice(&data)?;
-    publish_single(&transcode_service, &config, &payload).await?;
+    publish_single(&transcode_service, &payload).await?;
     Ok(())
 }
 
@@ -86,7 +84,7 @@ async fn main() -> Result<(), Error> {
     let transcode_service = TranscodeService::new(&config, &config.transcode_queue, &pool, &stdout);
 
     if let Some(request_file) = &opts.request_file {
-        match transcode_single(&transcode_service, &config, &request_file).await {
+        match transcode_single(&transcode_service, &request_file).await {
             Ok(_) => (),
             Err(e) => {
                 if e.to_string().contains("Broken pipe") {
