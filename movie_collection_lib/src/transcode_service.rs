@@ -933,6 +933,7 @@ pub fn movie_directories(config: &Config) -> Result<Vec<StackString>, Error> {
 
 #[cfg(test)]
 mod tests {
+    use std::collections::HashSet;
     use anyhow::Error;
     use std::{env::set_var, fs::create_dir_all, path::Path};
 
@@ -1105,8 +1106,9 @@ mod tests {
     async fn test_get_upcoming_jobs() -> Result<(), Error> {
         let results = get_upcoming_jobs("../tests/data").await?;
         println!("{:?}", results);
+        let prefixes: HashSet<_> = results.iter().map(|r| r.prefix.clone()).collect();
         assert_eq!(results.len(), 2);
-        assert_eq!(results[0].prefix, "fargo_2014_s04_ep02");
+        assert!(prefixes.contains("fargo_2014_s04_ep02"));
         Ok(())
     }
 }
