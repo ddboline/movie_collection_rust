@@ -4,6 +4,9 @@ version = "0.6.27"
 authors = ["Daniel Boline <ddboline@gmail.com>"]
 edition = "2018"
 
+[package.metadata.deb]
+name = "movie-collection-rust"
+
 [dependencies]
 movie_collection_lib = {path = "movie_collection_lib"}
 movie_collection_http = {path = "movie_collection_http"}
