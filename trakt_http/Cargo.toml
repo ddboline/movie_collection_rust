@@ -1,6 +1,6 @@
 [package]
 name = "trakt_http"
-version = "0.6.27"
+version = "0.6.28"
 authors = ["Daniel Boline <ddboline@gmail.com>"]
 edition = "2018"
 

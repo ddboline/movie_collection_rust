@@ -933,9 +933,8 @@ pub fn movie_directories(config: &Config) -> Result<Vec<StackString>, Error> {
 
 #[cfg(test)]
 mod tests {
-    use std::collections::HashSet;
     use anyhow::Error;
-    use std::{env::set_var, fs::create_dir_all, path::Path};
+    use std::{collections::HashSet, env::set_var, fs::create_dir_all, path::Path};
 
     use crate::{
         config::Config,
@@ -1086,7 +1085,11 @@ mod tests {
 
     #[tokio::test]
     async fn test_get_current_jobs() -> Result<(), Error> {
-        let result = get_current_jobs("../tests/data").await?;
+        let result: Vec<_> = get_current_jobs("../tests/data")
+            .await?
+            .into_iter()
+            .filter(|(p, _)| p.to_string_lossy().contains("fargo_2014_s04_ep02_mp4"))
+            .collect();
         assert_eq!(
             result[0].1,
             "Encoding: task 1 of 1, 22.61 % (76.06 fps, avg 94.82 fps, ETA 00h12m06s)"

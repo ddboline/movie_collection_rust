@@ -1,11 +1,16 @@
 [package]
 name = "movie_collection_rust"
-version = "0.6.27"
+version = "0.6.28"
 authors = ["Daniel Boline <ddboline@gmail.com>"]
 edition = "2018"
 
 [package.metadata.deb]
 name = "movie-collection-rust"
+priority = "optional"
+section = "rust"
+provides = "movie-collection-rust"
+extended-description = """\
+Utilities for maintaining a collection of videos."""
 
 [dependencies]
 movie_collection_lib = {path = "movie_collection_lib"}
@@ -24,8 +29,8 @@ structopt = "0.3"
 futures = "0.3"
 serde_json = "1.0"
 chrono = "0.4"
-stack-string = { git = "https://github.com/ddboline/stack-string-rs.git", tag="0.1.9", features=["postgres_types"] }
-stdout-channel = { git = "https://github.com/ddboline/stdout-channel-rs.git", branch="tokio_02" }
+stack-string = { git = "https://github.com/ddboline/stack-string-rs.git", tag="0.1.10", features=["postgres_types"] }
+stdout-channel = { git = "https://github.com/ddboline/stdout-channel-rs.git", tag="0.1.4" }
 
 [workspace]
 members = [
