@@ -16,6 +16,7 @@ Utilities for maintaining a collection of videos."""
 movie_collection_lib = {path = "movie_collection_lib"}
 movie_collection_http = {path = "movie_collection_http"}
 transcode_lib = {path = "transcode_lib"}
+trakt_http = {path = "trakt_http"}
 rayon = "1.5"
 clap = "2.33"
 log = "0.4"
@@ -90,4 +91,9 @@ doc = false
 [[bin]]
 name = "movie-queue-cli"
 path = "src/movie_queue_cli.rs"
+doc = false
+
+[[bin]]
+name = "trakt-http"
+path = "src/trakt_http.rs"
 doc = false
