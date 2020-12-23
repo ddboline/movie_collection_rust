@@ -615,6 +615,7 @@ pub async fn watch_list_http_worker(
     Ok(entries)
 }
 
+#[allow(clippy::too_many_arguments)]
 pub async fn watched_action_http_worker(
     trakt: &TraktConnection,
     pool: &PgPool,
