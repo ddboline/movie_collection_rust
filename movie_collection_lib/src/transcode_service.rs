@@ -357,9 +357,7 @@ impl TranscodeService {
         let stderr_task: JoinHandle<Result<(), Error>> =
             spawn(async move { Self::output_to_file(reader, &stderr_path, b'\n').await });
 
-        let transcode_task = spawn(async move { p.await });
-
-        let status = transcode_task.await??;
+        let status = p.wait().await?;
         println!("Handbrake exited with {}", status);
         stdout_task.await??;
         stderr_task.await??;
