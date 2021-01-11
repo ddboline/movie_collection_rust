@@ -8,27 +8,26 @@ edition = "2018"
 
 [dependencies]
 movie_collection_lib = {path = "../movie_collection_lib"}
-actix-web = "3.3"
-actix-rt = "1.1"
-actix-identity = "0.3"
+actix-web = "4.0.0-beta.1"
+actix-rt = "2.0.0-beta.1"
+actix-identity = {git="https://github.com/ddboline/actix-extras", branch="update-dependencies"}
 futures = "0.3"
 serde = "1.0"
 serde_derive = "1.0"
 serde_json = "1.0"
 chrono = "0.4"
-tokio = {version="0.2", features=["full"]}
+tokio = {version="1.0", features=["full"]}
 parking_lot = "0.11"
 lazy_static = "1.4"
 anyhow = "1.0"
 thiserror = "1.0"
-actix-threadpool = "0.3"
 async-trait = "0.1"
 log = "0.4"
 maplit = "1.0"
 handlebars = "3.5"
-itertools = "0.9"
+itertools = "0.10"
 env_logger = "0.8"
-reqwest = {version="0.10", features=["cookies", "json", "rustls-tls"]}
-authorized_users = { git = "https://github.com/ddboline/auth_server_rust.git", tag="0.2.9"}
-stack-string = { git = "https://github.com/ddboline/stack-string-rs.git", tag="0.1.10", features=["postgres_types"] }
-stdout-channel = { git = "https://github.com/ddboline/stdout-channel-rs.git", tag="0.1.4" }
+reqwest = {version="0.11", features=["cookies", "json", "rustls-tls"]}
+authorized_users = { git = "https://github.com/ddboline/auth_server_rust.git", tag="0.3.0"}
+stack-string = { git = "https://github.com/ddboline/stack-string-rs.git", tag="0.2.0", features=["postgres_types"] }
+stdout-channel = { git = "https://github.com/ddboline/stdout-channel-rs.git", tag="0.3.0" }

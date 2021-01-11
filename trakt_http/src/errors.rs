@@ -1,4 +1,3 @@
-use actix_threadpool::BlockingError;
 use actix_web::{error::ResponseError, HttpResponse};
 use anyhow::Error as AnyhowError;
 use handlebars::RenderError;
@@ -20,8 +19,6 @@ pub enum ServiceError {
     Unauthorized,
     #[error("Anyhow error {0}")]
     AnyhowError(#[from] AnyhowError),
-    #[error("blocking error {0}")]
-    BlockingError(StackString),
     #[error("Template Parse Error {0}")]
     RenderError(#[from] RenderError),
     #[error("IoError {0}")]
@@ -55,12 +52,6 @@ impl ResponseError for ServiceError {
                 HttpResponse::InternalServerError().json("Internal Server Error, Please try later")
             }
         }
-    }
-}
-
-impl<T: Debug> From<BlockingError<T>> for ServiceError {
-    fn from(item: BlockingError<T>) -> Self {
-        Self::BlockingError(format!("{:?}", item).into())
     }
 }
 
