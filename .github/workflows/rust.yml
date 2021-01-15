@@ -31,19 +31,13 @@ jobs:
 
     - name: Build
       run: |
-        cargo build --workspace
+        cargo build --workspace && \
+        ./target/debug/movie-queue-cli run-migrations
+      env:
+        DATABASE_URL: postgresql://postgres:2UtcMAAvNuBHPqK9@localhost:5432/movie_queue
 
     - name: Run tests
       run: |
-        psql $DATABASE_URL < ./scripts/authorized_users.sql && \
-        psql $DATABASE_URL < ./scripts/imdb_ratings.sql && \
-        psql $DATABASE_URL < ./scripts/imdb_episodes.sql && \
-        psql $DATABASE_URL < ./scripts/movie_collection_on_dvd.sql && \
-        psql $DATABASE_URL < ./scripts/movie_collection.sql && \
-        psql $DATABASE_URL < ./scripts/movie_queue.sql && \
-        psql $DATABASE_URL < ./scripts/trakt_watched_episodes.sql && \
-        psql $DATABASE_URL < ./scripts/trakt_watched_movies.sql && \
-        psql $DATABASE_URL < ./scripts/trakt_watchlist.sql && \
         cargo test --verbose --workspace && \
         cargo install cargo-tarpaulin && \
         cargo tarpaulin --verbose --all-features --workspace --out Xml

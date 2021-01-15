@@ -9,6 +9,7 @@ use tokio::{
     fs::{read_to_string, File},
     io::{self, stdin, AsyncReadExt, AsyncWrite, AsyncWriteExt},
 };
+use refinery::embed_migrations;
 
 use movie_collection_lib::{
     config::Config,
@@ -19,6 +20,8 @@ use movie_collection_lib::{
     pgpool::PgPool,
     transcode_service::transcode_status,
 };
+
+embed_migrations!("../migrations");
 
 #[derive(StructOpt)]
 enum MovieQueueCli {
@@ -42,6 +45,8 @@ enum MovieQueueCli {
         start_timestamp: Option<DateTime<Utc>>,
     },
     Status,
+    /// Run refinery migrations
+    RunMigrations,
 }
 
 impl MovieQueueCli {
@@ -195,6 +200,10 @@ impl MovieQueueCli {
             Self::Status => {
                 let status = transcode_status(&config).await?;
                 println!("{}", status);
+            }
+            Self::RunMigrations => {
+                let conn = pool.get().await?;
+                migrations::runner().run_async(conn.deref_mut().deref_mut()).await?;
             }
         }
 
