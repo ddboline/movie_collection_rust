@@ -35,6 +35,7 @@ jobs:
         ./target/debug/movie-queue-cli run-migrations
       env:
         PGURL: postgresql://postgres:2UtcMAAvNuBHPqK9@localhost:5432/movie_queue
+        MOVIE_DIRS: /tmp
 
     - name: Run tests
       run: |
@@ -43,6 +44,7 @@ jobs:
         cargo tarpaulin --verbose --all-features --workspace --out Xml
       env:
         PGURL: postgresql://postgres:2UtcMAAvNuBHPqK9@localhost:5432/movie_queue
+        MOVIE_DIRS: /tmp
 
     - name: Upload to codecov.io
       uses: codecov/codecov-action@v1.0.2
