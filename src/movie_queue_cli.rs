@@ -10,6 +10,7 @@ use tokio::{
     io::{self, stdin, AsyncReadExt, AsyncWrite, AsyncWriteExt},
 };
 use refinery::embed_migrations;
+use std::ops::DerefMut;
 
 use movie_collection_lib::{
     config::Config,
