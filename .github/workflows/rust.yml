@@ -34,7 +34,7 @@ jobs:
         cargo build --workspace && \
         ./target/debug/movie-queue-cli run-migrations
       env:
-        DATABASE_URL: postgresql://postgres:2UtcMAAvNuBHPqK9@localhost:5432/movie_queue
+        PGURL: postgresql://postgres:2UtcMAAvNuBHPqK9@localhost:5432/movie_queue
 
     - name: Run tests
       run: |
@@ -42,7 +42,7 @@ jobs:
         cargo install cargo-tarpaulin && \
         cargo tarpaulin --verbose --all-features --workspace --out Xml
       env:
-        DATABASE_URL: postgresql://postgres:2UtcMAAvNuBHPqK9@localhost:5432/movie_queue
+        PGURL: postgresql://postgres:2UtcMAAvNuBHPqK9@localhost:5432/movie_queue
 
     - name: Upload to codecov.io
       uses: codecov/codecov-action@v1.0.2
