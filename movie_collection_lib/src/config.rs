@@ -38,7 +38,9 @@ pub struct ConfigInner {
     pub remcom_queue: StackString,
     #[serde(default = "default_trakt_endpoint")]
     pub trakt_endpoint: StackString,
+    #[serde(default = "default_trakt_endpoint")]
     pub trakt_client_id: StackString,
+    #[serde(default = "default_trakt_endpoint")]
     pub trakt_client_secret: StackString,
     #[serde(default = "default_secret_path")]
     pub secret_path: PathBuf,

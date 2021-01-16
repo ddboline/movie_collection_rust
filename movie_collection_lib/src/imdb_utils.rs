@@ -198,8 +198,10 @@ impl ImdbConnection {
         for div in Document::from(body.as_str()).find(Name("div")) {
             if let Some("info") = div.attr("class") {
                 if let Some("episodes") = div.attr("itemprop") {
-                    let mut result = ImdbEpisodeResult::default();
-                    result.season = season;
+                    let mut result = ImdbEpisodeResult {
+                        season,
+                        ..ImdbEpisodeResult::default()
+                    };
                     for meta in div.find(Name("meta")) {
                         if let Some("episodeNumber") = meta.attr("itemprop") {
                             if let Some(episode) = meta.attr("content") {
