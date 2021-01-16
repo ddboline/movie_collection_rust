@@ -203,7 +203,7 @@ impl MovieQueueCli {
                 println!("{}", status);
             }
             Self::RunMigrations => {
-                let conn = pool.get().await?;
+                let mut conn = pool.get().await?;
                 migrations::runner().run_async(conn.deref_mut().deref_mut()).await?;
             }
         }
