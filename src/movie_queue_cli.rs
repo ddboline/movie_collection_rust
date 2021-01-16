@@ -21,7 +21,7 @@ use movie_collection_lib::{
     transcode_service::transcode_status,
 };
 
-embed_migrations!("../migrations");
+embed_migrations!("migrations");
 
 #[derive(StructOpt)]
 enum MovieQueueCli {
