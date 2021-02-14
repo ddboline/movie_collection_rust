@@ -3,7 +3,7 @@
 
 use movie_collection_http::movie_queue_app::start_app;
 
-#[actix_rt::main]
+#[tokio::main]
 async fn main() {
     env_logger::init();
 

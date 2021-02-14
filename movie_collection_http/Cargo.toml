@@ -1,15 +1,14 @@
 [package]
 name = "movie_collection_http"
-version = "0.7.0"
+version = "0.8.0"
 authors = ["Daniel Boline <ddboline@gmail.com>"]
 edition = "2018"
 
 [dependencies]
 movie_collection_lib = {path = "../movie_collection_lib"}
-actix-web = "4.0.0-beta.1"
-actix-rt = "2.0.0-beta.1"
-actix-identity = {git="https://github.com/ddboline/actix-extras", branch="update-dependencies"}
 futures = "0.3"
+warp = "0.3"
+http = "0.2"
 serde = "1.0"
 serde_derive = "1.0"
 serde_json = "1.0"
@@ -24,6 +23,6 @@ log = "0.4"
 maplit = "1.0"
 handlebars = "3.5"
 itertools = "0.10"
-authorized_users = { git = "https://github.com/ddboline/auth_server_rust.git", tag="0.3.0"}
+authorized_users = { git = "https://github.com/ddboline/auth_server_rust.git", tag="0.4.0"}
 stack-string = { git = "https://github.com/ddboline/stack-string-rs.git", tag="0.2.0", features=["postgres_types"] }
 stdout-channel = { git = "https://github.com/ddboline/stdout-channel-rs.git", tag="0.3.0" }

@@ -1,12 +1,11 @@
-use anyhow::{format_err, Error};
-use async_trait::async_trait;
+use anyhow::format_err;
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 use stack_string::StackString;
 use stdout_channel::{MockStdout, StdoutChannel};
 
-use super::HandleRequest;
 use movie_collection_lib::{
+    config::Config,
     imdb_episodes::ImdbEpisodes,
     imdb_ratings::ImdbRatings,
     movie_collection::{
@@ -24,16 +23,13 @@ use movie_collection_lib::{
     tv_show_source::TvShowSource,
 };
 
-use super::movie_queue_app::CONFIG;
+use crate::errors::ServiceError as Error;
 
 pub struct WatchlistShowsRequest {}
 
-#[async_trait]
-impl HandleRequest<WatchlistShowsRequest> for PgPool {
-    type Result = Result<WatchListMap, Error>;
-
-    async fn handle(&self, _: WatchlistShowsRequest) -> Self::Result {
-        get_watchlist_shows_db_map(&self).await
+impl WatchlistShowsRequest {
+    pub async fn handle(&self, pool: &PgPool) -> Result<WatchListMap, Error> {
+        get_watchlist_shows_db_map(&pool).await.map_err(Into::into)
     }
 }
 
@@ -42,19 +38,20 @@ pub struct MovieQueueRequest {
     pub patterns: Vec<StackString>,
 }
 
-#[async_trait]
-impl HandleRequest<MovieQueueRequest> for PgPool {
-    type Result = Result<(Vec<MovieQueueResult>, Vec<StackString>), Error>;
-
-    async fn handle(&self, msg: MovieQueueRequest) -> Self::Result {
+impl MovieQueueRequest {
+    pub async fn handle(
+        self,
+        pool: &PgPool,
+        config: &Config,
+    ) -> Result<(Vec<MovieQueueResult>, Vec<StackString>), Error> {
         let mock_stdout = MockStdout::new();
         let stdout = StdoutChannel::with_mock_stdout(mock_stdout.clone(), mock_stdout.clone());
 
-        let patterns: Vec<_> = msg.patterns.iter().map(StackString::as_str).collect();
-        let queue = MovieQueueDB::new(&CONFIG, &self, &stdout)
+        let patterns: Vec<_> = self.patterns.iter().map(StackString::as_str).collect();
+        let queue = MovieQueueDB::new(&config, &pool, &stdout)
             .print_movie_queue(&patterns)
             .await?;
-        Ok((queue, msg.patterns))
+        Ok((queue, self.patterns))
     }
 }
 
@@ -62,17 +59,15 @@ pub struct MoviePathRequest {
     pub idx: i32,
 }
 
-#[async_trait]
-impl HandleRequest<MoviePathRequest> for PgPool {
-    type Result = Result<StackString, Error>;
-
-    async fn handle(&self, msg: MoviePathRequest) -> Self::Result {
+impl MoviePathRequest {
+    pub async fn handle(&self, pool: &PgPool, config: &Config) -> Result<StackString, Error> {
         let mock_stdout = MockStdout::new();
         let stdout = StdoutChannel::with_mock_stdout(mock_stdout.clone(), mock_stdout.clone());
 
-        MovieCollection::new(&CONFIG, &self, &stdout)
-            .get_collection_path(msg.idx)
+        MovieCollection::new(&config, &pool, &stdout)
+            .get_collection_path(self.idx)
             .await
+            .map_err(Into::into)
     }
 }
 
@@ -80,14 +75,12 @@ pub struct ImdbRatingsRequest {
     pub imdb_url: StackString,
 }
 
-#[async_trait]
-impl HandleRequest<ImdbRatingsRequest> for PgPool {
-    type Result = Result<Option<(StackString, ImdbRatings)>, Error>;
-
-    async fn handle(&self, msg: ImdbRatingsRequest) -> Self::Result {
-        ImdbRatings::get_show_by_link(&msg.imdb_url, &self)
+impl ImdbRatingsRequest {
+    pub async fn handle(self, pool: &PgPool) -> Result<Option<(StackString, ImdbRatings)>, Error> {
+        ImdbRatings::get_show_by_link(&self.imdb_url, &pool)
             .await
-            .map(|s| s.map(|sh| (msg.imdb_url, sh)))
+            .map(|s| s.map(|sh| (self.imdb_url, sh)))
+            .map_err(Into::into)
     }
 }
 
@@ -95,20 +88,18 @@ pub struct ImdbSeasonsRequest {
     pub show: StackString,
 }
 
-#[async_trait]
-impl HandleRequest<ImdbSeasonsRequest> for PgPool {
-    type Result = Result<Vec<ImdbSeason>, Error>;
-
-    async fn handle(&self, msg: ImdbSeasonsRequest) -> Self::Result {
+impl ImdbSeasonsRequest {
+    pub async fn handle(&self, pool: &PgPool, config: &Config) -> Result<Vec<ImdbSeason>, Error> {
         let mock_stdout = MockStdout::new();
         let stdout = StdoutChannel::with_mock_stdout(mock_stdout.clone(), mock_stdout.clone());
 
-        if &msg.show == "" {
+        if &self.show == "" {
             Ok(Vec::new())
         } else {
-            MovieCollection::new(&CONFIG, &self, &stdout)
-                .print_imdb_all_seasons(&msg.show)
+            MovieCollection::new(&config, pool, &stdout)
+                .print_imdb_all_seasons(&self.show)
                 .await
+                .map_err(Into::into)
         }
     }
 }
@@ -147,12 +138,11 @@ pub struct WatchedShowsRequest {
     pub season: i32,
 }
 
-#[async_trait]
-impl HandleRequest<WatchedShowsRequest> for PgPool {
-    type Result = Result<Vec<WatchedEpisode>, Error>;
-
-    async fn handle(&self, msg: WatchedShowsRequest) -> Self::Result {
-        get_watched_shows_db(&self, &msg.show, Some(msg.season)).await
+impl WatchedShowsRequest {
+    pub async fn handle(&self, pool: &PgPool) -> Result<Vec<WatchedEpisode>, Error> {
+        get_watched_shows_db(&pool, &self.show, Some(self.season))
+            .await
+            .map_err(Into::into)
     }
 }
 
@@ -161,17 +151,15 @@ pub struct ImdbEpisodesRequest {
     pub season: Option<i32>,
 }
 
-#[async_trait]
-impl HandleRequest<ImdbEpisodesRequest> for PgPool {
-    type Result = Result<Vec<ImdbEpisodes>, Error>;
-
-    async fn handle(&self, msg: ImdbEpisodesRequest) -> Self::Result {
+impl ImdbEpisodesRequest {
+    pub async fn handle(&self, pool: &PgPool, config: &Config) -> Result<Vec<ImdbEpisodes>, Error> {
         let mock_stdout = MockStdout::new();
         let stdout = StdoutChannel::with_mock_stdout(mock_stdout.clone(), mock_stdout.clone());
 
-        MovieCollection::new(&CONFIG, &self, &stdout)
-            .print_imdb_episodes(&msg.show, msg.season)
+        MovieCollection::new(&config, &pool, &stdout)
+            .print_imdb_episodes(&self.show, self.season)
             .await
+            .map_err(Into::into)
     }
 }
 
@@ -213,17 +201,14 @@ impl From<ImdbShowRequest> for ParseImdbOptions {
     }
 }
 
-#[async_trait]
-impl HandleRequest<ImdbShowRequest> for PgPool {
-    type Result = Result<StackString, Error>;
-
-    async fn handle(&self, msg: ImdbShowRequest) -> Self::Result {
+impl ImdbShowRequest {
+    pub async fn handle(self, pool: &PgPool, config: &Config) -> Result<StackString, Error> {
         let mock_stdout = MockStdout::new();
         let stdout = StdoutChannel::with_mock_stdout(mock_stdout.clone(), mock_stdout.clone());
 
-        let watchlist = get_watchlist_shows_db_map(&self).await?;
-        let pi = ParseImdb::new(&CONFIG, self, &stdout);
-        let body = pi.parse_imdb_http_worker(&msg.into(), &watchlist).await?;
+        let watchlist = get_watchlist_shows_db_map(&pool).await?;
+        let pi = ParseImdb::new(&config, pool, &stdout);
+        let body = pi.parse_imdb_http_worker(&self.into(), &watchlist).await?;
         Ok(body)
     }
 }
@@ -234,15 +219,14 @@ pub struct FindNewEpisodeRequest {
     pub shows: Option<StackString>,
 }
 
-#[async_trait]
-impl HandleRequest<FindNewEpisodeRequest> for PgPool {
-    type Result = Result<Vec<StackString>, Error>;
-
-    async fn handle(&self, msg: FindNewEpisodeRequest) -> Self::Result {
+impl FindNewEpisodeRequest {
+    pub async fn handle(self, pool: &PgPool, config: &Config) -> Result<Vec<StackString>, Error> {
         let mock_stdout = MockStdout::new();
         let stdout = StdoutChannel::with_mock_stdout(mock_stdout.clone(), mock_stdout.clone());
 
-        find_new_episodes_http_worker(&CONFIG, &self, &stdout, msg.shows, msg.source).await
+        find_new_episodes_http_worker(config, pool, &stdout, self.shows, self.source)
+            .await
+            .map_err(Into::into)
     }
 }
 
@@ -251,12 +235,11 @@ pub struct ImdbEpisodesSyncRequest {
     pub start_timestamp: DateTime<Utc>,
 }
 
-#[async_trait]
-impl HandleRequest<ImdbEpisodesSyncRequest> for PgPool {
-    type Result = Result<Vec<ImdbEpisodes>, Error>;
-
-    async fn handle(&self, msg: ImdbEpisodesSyncRequest) -> Self::Result {
-        ImdbEpisodes::get_episodes_after_timestamp(msg.start_timestamp, &self).await
+impl ImdbEpisodesSyncRequest {
+    pub async fn handle(&self, pool: &PgPool) -> Result<Vec<ImdbEpisodes>, Error> {
+        ImdbEpisodes::get_episodes_after_timestamp(self.start_timestamp, pool)
+            .await
+            .map_err(Into::into)
     }
 }
 
@@ -265,12 +248,11 @@ pub struct ImdbRatingsSyncRequest {
     pub start_timestamp: DateTime<Utc>,
 }
 
-#[async_trait]
-impl HandleRequest<ImdbRatingsSyncRequest> for PgPool {
-    type Result = Result<Vec<ImdbRatings>, Error>;
-
-    async fn handle(&self, msg: ImdbRatingsSyncRequest) -> Self::Result {
-        ImdbRatings::get_shows_after_timestamp(msg.start_timestamp, &self).await
+impl ImdbRatingsSyncRequest {
+    pub async fn handle(&self, pool: &PgPool) -> Result<Vec<ImdbRatings>, Error> {
+        ImdbRatings::get_shows_after_timestamp(self.start_timestamp, pool)
+            .await
+            .map_err(Into::into)
     }
 }
 
@@ -279,16 +261,19 @@ pub struct MovieQueueSyncRequest {
     pub start_timestamp: DateTime<Utc>,
 }
 
-#[async_trait]
-impl HandleRequest<MovieQueueSyncRequest> for PgPool {
-    type Result = Result<Vec<MovieQueueRow>, Error>;
-
-    async fn handle(&self, msg: MovieQueueSyncRequest) -> Self::Result {
+impl MovieQueueSyncRequest {
+    pub async fn handle(
+        &self,
+        pool: &PgPool,
+        config: &Config,
+    ) -> Result<Vec<MovieQueueRow>, Error> {
         let mock_stdout = MockStdout::new();
         let stdout = StdoutChannel::with_mock_stdout(mock_stdout.clone(), mock_stdout.clone());
 
-        let mq = MovieQueueDB::new(&CONFIG, self, &stdout);
-        mq.get_queue_after_timestamp(msg.start_timestamp).await
+        let mq = MovieQueueDB::new(&config, pool, &stdout);
+        mq.get_queue_after_timestamp(self.start_timestamp)
+            .await
+            .map_err(Into::into)
     }
 }
 
@@ -297,16 +282,19 @@ pub struct MovieCollectionSyncRequest {
     pub start_timestamp: DateTime<Utc>,
 }
 
-#[async_trait]
-impl HandleRequest<MovieCollectionSyncRequest> for PgPool {
-    type Result = Result<Vec<MovieCollectionRow>, Error>;
-
-    async fn handle(&self, msg: MovieCollectionSyncRequest) -> Self::Result {
+impl MovieCollectionSyncRequest {
+    pub async fn handle(
+        &self,
+        pool: &PgPool,
+        config: &Config,
+    ) -> Result<Vec<MovieCollectionRow>, Error> {
         let mock_stdout = MockStdout::new();
         let stdout = StdoutChannel::with_mock_stdout(mock_stdout.clone(), mock_stdout.clone());
 
-        let mc = MovieCollection::new(&CONFIG, self, &stdout);
-        mc.get_collection_after_timestamp(msg.start_timestamp).await
+        let mc = MovieCollection::new(&config, pool, &stdout);
+        mc.get_collection_after_timestamp(self.start_timestamp)
+            .await
+            .map_err(Into::into)
     }
 }
 
@@ -315,15 +303,12 @@ pub struct ImdbEpisodesUpdateRequest {
     pub episodes: Vec<ImdbEpisodes>,
 }
 
-#[async_trait]
-impl HandleRequest<ImdbEpisodesUpdateRequest> for PgPool {
-    type Result = Result<(), Error>;
-
-    async fn handle(&self, msg: ImdbEpisodesUpdateRequest) -> Self::Result {
-        for episode in msg.episodes {
-            match episode.get_index(&self).await? {
-                Some(_) => episode.update_episode(&self).await?,
-                None => episode.insert_episode(&self).await?,
+impl ImdbEpisodesUpdateRequest {
+    pub async fn handle(&self, pool: &PgPool) -> Result<(), Error> {
+        for episode in &self.episodes {
+            match episode.get_index(&pool).await? {
+                Some(_) => episode.update_episode(&pool).await?,
+                None => episode.insert_episode(&pool).await?,
             }
         }
         Ok(())
@@ -335,15 +320,12 @@ pub struct ImdbRatingsUpdateRequest {
     pub shows: Vec<ImdbRatings>,
 }
 
-#[async_trait]
-impl HandleRequest<ImdbRatingsUpdateRequest> for PgPool {
-    type Result = Result<(), Error>;
-
-    async fn handle(&self, msg: ImdbRatingsUpdateRequest) -> Self::Result {
-        for show in msg.shows {
-            match ImdbRatings::get_show_by_link(show.link.as_ref(), &self).await? {
-                Some(_) => show.update_show(&self).await?,
-                None => show.insert_show(&self).await?,
+impl ImdbRatingsUpdateRequest {
+    pub async fn handle(&self, pool: &PgPool) -> Result<(), Error> {
+        for show in &self.shows {
+            match ImdbRatings::get_show_by_link(show.link.as_ref(), &pool).await? {
+                Some(_) => show.update_show(&pool).await?,
+                None => show.insert_show(&pool).await?,
             }
         }
         Ok(())
@@ -356,19 +338,17 @@ pub struct ImdbRatingsSetSourceRequest {
     pub source: TvShowSource,
 }
 
-#[async_trait]
-impl HandleRequest<ImdbRatingsSetSourceRequest> for PgPool {
-    type Result = Result<(), Error>;
-    async fn handle(&self, msg: ImdbRatingsSetSourceRequest) -> Self::Result {
-        let mut imdb = ImdbRatings::get_show_by_link(msg.link.as_ref(), self)
+impl ImdbRatingsSetSourceRequest {
+    pub async fn handle(&self, pool: &PgPool) -> Result<(), Error> {
+        let mut imdb = ImdbRatings::get_show_by_link(self.link.as_ref(), pool)
             .await?
-            .ok_or_else(|| format_err!("No show found for {}", msg.link))?;
-        imdb.source = if msg.source == TvShowSource::All {
+            .ok_or_else(|| format_err!("No show found for {}", self.link))?;
+        imdb.source = if self.source == TvShowSource::All {
             None
         } else {
-            Some(msg.source)
+            Some(self.source)
         };
-        imdb.update_show(self).await?;
+        imdb.update_show(pool).await?;
         Ok(())
     }
 }
@@ -378,21 +358,18 @@ pub struct MovieQueueUpdateRequest {
     pub queue: Vec<MovieQueueRow>,
 }
 
-#[async_trait]
-impl HandleRequest<MovieQueueUpdateRequest> for PgPool {
-    type Result = Result<(), Error>;
-
-    async fn handle(&self, msg: MovieQueueUpdateRequest) -> Self::Result {
+impl MovieQueueUpdateRequest {
+    pub async fn handle(&self, pool: &PgPool, config: &Config) -> Result<(), Error> {
         let mock_stdout = MockStdout::new();
         let stdout = StdoutChannel::with_mock_stdout(mock_stdout.clone(), mock_stdout.clone());
 
-        let mq = MovieQueueDB::new(&CONFIG, self, &stdout);
-        let mc = MovieCollection::new(&CONFIG, self, &stdout);
-        for entry in msg.queue {
+        let mq = MovieQueueDB::new(&config, pool, &stdout);
+        let mc = MovieCollection::new(&config, pool, &stdout);
+        for entry in &self.queue {
             let cidx = if let Some(i) = mc.get_collection_index(entry.path.as_ref()).await? {
                 i
             } else {
-                mc.insert_into_collection_by_idx(entry.collection_idx, entry.path.as_ref())
+                mc.insert_into_collection(entry.path.as_ref())
                     .await?;
                 entry.collection_idx
             };
@@ -409,23 +386,20 @@ pub struct MovieCollectionUpdateRequest {
     pub collection: Vec<MovieCollectionRow>,
 }
 
-#[async_trait]
-impl HandleRequest<MovieCollectionUpdateRequest> for PgPool {
-    type Result = Result<(), Error>;
-
-    async fn handle(&self, msg: MovieCollectionUpdateRequest) -> Self::Result {
+impl MovieCollectionUpdateRequest {
+    pub async fn handle(&self, pool: &PgPool, config: &Config) -> Result<(), Error> {
         let mock_stdout = MockStdout::new();
         let stdout = StdoutChannel::with_mock_stdout(mock_stdout.clone(), mock_stdout.clone());
 
-        let mc = MovieCollection::new(&CONFIG, self, &stdout);
-        for entry in msg.collection {
+        let mc = MovieCollection::new(&config, pool, &stdout);
+        for entry in &self.collection {
             if let Some(cidx) = mc.get_collection_index(entry.path.as_ref()).await? {
                 if cidx == entry.idx {
                     continue;
                 }
                 mc.remove_from_collection(entry.path.as_ref()).await?;
             };
-            mc.insert_into_collection_by_idx(entry.idx, entry.path.as_ref())
+            mc.insert_into_collection(entry.path.as_ref())
                 .await?;
         }
         Ok(())
@@ -434,11 +408,10 @@ impl HandleRequest<MovieCollectionUpdateRequest> for PgPool {
 
 pub struct LastModifiedRequest {}
 
-#[async_trait]
-impl HandleRequest<LastModifiedRequest> for PgPool {
-    type Result = Result<Vec<LastModifiedResponse>, Error>;
-
-    async fn handle(&self, _: LastModifiedRequest) -> Self::Result {
-        LastModifiedResponse::get_last_modified(self).await
+impl LastModifiedRequest {
+    pub async fn handle(&self, pool: &PgPool) -> Result<Vec<LastModifiedResponse>, Error> {
+        LastModifiedResponse::get_last_modified(pool)
+            .await
+            .map_err(Into::into)
     }
 }

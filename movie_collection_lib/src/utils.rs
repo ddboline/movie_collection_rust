@@ -17,6 +17,8 @@ use tokio::{
     time::{sleep, Duration},
 };
 
+use crate::pgpool::PgPool;
+
 lazy_static! {
     pub static ref HBR: Handlebars<'static> = get_templates().expect("Failed to parse templates");
 }
@@ -155,4 +157,18 @@ pub trait ExponentialRetry {
             }
         }
     }
+}
+
+pub async fn get_authorized_users(pool: &PgPool) -> Result<Vec<StackString>, Error> {
+    let query = "SELECT email FROM authorized_users";
+    pool.get()
+        .await?
+        .query(query, &[])
+        .await?
+        .into_iter()
+        .map(|row| {
+            let email: StackString = row.try_get(0)?;
+            Ok(email)
+        })
+        .collect()
 }

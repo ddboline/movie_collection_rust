@@ -1,6 +1,6 @@
 [package]
 name = "movie_collection_rust"
-version = "0.7.0"
+version = "0.8.0"
 authors = ["Daniel Boline <ddboline@gmail.com>"]
 edition = "2018"
 
@@ -16,12 +16,10 @@ Utilities for maintaining a collection of videos."""
 movie_collection_lib = {path = "movie_collection_lib"}
 movie_collection_http = {path = "movie_collection_http"}
 transcode_lib = {path = "transcode_lib"}
-trakt_http = {path = "trakt_http"}
 rayon = "1.5"
 clap = "2.33"
 log = "0.4"
 env_logger = "0.8"
-actix-rt = "2.0.0-beta.1"
 crossbeam-utils = "0.8"
 anyhow = "1.0"
 thiserror = "1.0"
@@ -30,13 +28,14 @@ structopt = "0.3"
 futures = "0.3"
 serde_json = "1.0"
 chrono = "0.4"
+funty = "=1.1.0"
 refinery = {version="0.5", features=["tokio-postgres"]}
 stack-string = { git = "https://github.com/ddboline/stack-string-rs.git", tag="0.2.0", features=["postgres_types"] }
 stdout-channel = { git = "https://github.com/ddboline/stdout-channel-rs.git", tag="0.3.0" }
 
 [workspace]
 members = [
-    "movie_collection_lib", "movie_collection_http", "transcode_lib", "trakt_http",
+    "movie_collection_lib", "movie_collection_http", "transcode_lib",
 ]
 
 [[bin]]
@@ -92,9 +91,4 @@ doc = false
 [[bin]]
 name = "movie-queue-cli"
 path = "src/movie_queue_cli.rs"
-doc = false
-
-[[bin]]
-name = "trakt-http"
-path = "src/trakt_http.rs"
 doc = false
