@@ -20,6 +20,8 @@ use super::{
         movie_queue_remcom_file, movie_queue_route, movie_queue_show, movie_queue_transcode,
         movie_queue_transcode_cleanup, movie_queue_transcode_directory, movie_queue_transcode_file,
         movie_queue_transcode_status, movie_queue_update, tvshows, user,
+        refresh_auth, trakt_auth_url, trakt_cal, trakt_callback, trakt_watched_action,
+        trakt_watched_list, trakt_watched_seasons, trakt_watchlist, trakt_watchlist_action,
     },
 };
 use movie_collection_lib::{config::Config, pgpool::PgPool, trakt_connection::TraktConnection};
@@ -142,6 +144,30 @@ pub async fn start_app() -> Result<(), Error> {
                     .service(web::resource("/user").route(web::get().to(user)))
                     .service(web::resource("/full_queue").route(web::get().to(movie_queue)))
                     .service(web::resource("/{show}").route(web::get().to(movie_queue_show))),
+            )
+            .service(
+                web::scope("/trakt")
+                    .service(web::resource("/auth_url").route(web::get().to(trakt_auth_url)))
+                    .service(web::resource("/callback").route(web::get().to(trakt_callback)))
+                    .service(web::resource("/refresh_auth").route(web::get().to(refresh_auth)))
+                    .service(web::resource("/cal").route(web::get().to(trakt_cal)))
+                    .service(web::resource("/watchlist").route(web::get().to(trakt_watchlist)))
+                    .service(
+                        web::resource("/watchlist/{action}/{imdb_url}")
+                            .route(web::get().to(trakt_watchlist_action)),
+                    )
+                    .service(
+                        web::resource("/watched/list/{imdb_url}")
+                            .route(web::get().to(trakt_watched_seasons)),
+                    )
+                    .service(
+                        web::resource("/watched/list/{imdb_url}/{season}")
+                            .route(web::get().to(trakt_watched_list)),
+                    )
+                    .service(
+                        web::resource("/watched/{action}/{imdb_url}/{season}/{episode}")
+                            .route(web::get().to(trakt_watched_action)),
+                    )
             )
     })
     .bind(&format!("127.0.0.1:{}", port))

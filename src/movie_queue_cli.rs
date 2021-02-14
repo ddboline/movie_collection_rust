@@ -1,7 +1,9 @@
 use anyhow::Error;
 use chrono::{DateTime, Duration, Utc};
 use futures::future::try_join_all;
+use refinery::embed_migrations;
 use stack_string::StackString;
+use std::ops::DerefMut;
 use std::path::PathBuf;
 use stdout_channel::StdoutChannel;
 use structopt::StructOpt;
@@ -9,8 +11,6 @@ use tokio::{
     fs::{read_to_string, File},
     io::{self, stdin, AsyncReadExt, AsyncWrite, AsyncWriteExt},
 };
-use refinery::embed_migrations;
-use std::ops::DerefMut;
 
 use movie_collection_lib::{
     config::Config,
@@ -204,7 +204,9 @@ impl MovieQueueCli {
             }
             Self::RunMigrations => {
                 let mut conn = pool.get().await?;
-                migrations::runner().run_async(conn.deref_mut().deref_mut()).await?;
+                migrations::runner()
+                    .run_async(conn.deref_mut().deref_mut())
+                    .await?;
             }
         }
 

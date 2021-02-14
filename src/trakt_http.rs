@@ -3,7 +3,7 @@
 
 use trakt_http::app::start_app;
 
-#[actix_rt::main]
+#[tokio::main]
 async fn main() {
     env_logger::init();
 
