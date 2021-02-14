@@ -352,7 +352,7 @@ impl MovieCollection {
                 COALESCE(b.istv, FALSE) as istv
                 FROM movie_collection a
                 LEFT JOIN imdb_ratings b ON a.show_id = b.index
-                {}
+                WHERE a.is_deleted = false {}
             "#,
             if search_strs.is_empty() {
                 "".to_string()
@@ -361,7 +361,7 @@ impl MovieCollection {
                     .iter()
                     .map(|s| format!("a.path like '%{}%'", s.as_ref()))
                     .join(" OR ");
-                format!("WHERE {}", search_strs)
+                format!("AND ({})", search_strs)
             },
         ),)?;
 
@@ -437,7 +437,7 @@ impl MovieCollection {
 
     pub async fn remove_from_collection(&self, path: &str) -> Result<(), Error> {
         let query = postgres_query::query!(
-            r#"DELETE FROM movie_collection WHERE path = $path"#,
+            r#"UPDATE movie_collection SET is_deleted=true WHERE path = $path"#,
             path = path
         );
         self.pool
@@ -483,65 +483,39 @@ impl MovieCollection {
         Ok(path)
     }
 
-    pub async fn get_collection_index_match(&self, path: &str) -> Result<Option<i32>, Error> {
-        let query = postgres_query::query_dyn!(&format!(
-            r#"SELECT idx FROM movie_collection WHERE path like '%{}%'"#,
-            path
-        ))?;
-        self.pool
-            .get()
-            .await?
-            .query(query.sql(), &[])
-            .await?
-            .iter()
-            .map(|row| row.try_get("idx"))
-            .next()
-            .transpose()
-            .map_err(Into::into)
-    }
-
     pub async fn insert_into_collection(&self, path: &str) -> Result<(), Error> {
         if !Path::new(&path).exists() {
             return Err(format_err!("No such file"));
         }
-        let file_stem = Path::new(&path).file_stem().unwrap().to_string_lossy();
-        let (show, _, _) = parse_file_stem(&file_stem);
-        let query = postgres_query::query!(
-            r#"
-                INSERT INTO movie_collection (idx, path, show, last_modified)
-                VALUES ((SELECT max(idx)+1 FROM movie_collection), $path, $show, now())
-            "#,
-            path = path,
-            show = show
-        );
-        self.pool
-            .get()
-            .await?
-            .execute(query.sql(), query.parameters())
-            .await
-            .map(|_| ())
-            .map_err(Into::into)
-    }
-
-    pub async fn insert_into_collection_by_idx(&self, idx: i32, path: &str) -> Result<(), Error> {
-        let file_stem = Path::new(&path).file_stem().unwrap().to_string_lossy();
-        let (show, _, _) = parse_file_stem(&file_stem);
-        let query = postgres_query::query!(
-            r#"
-                INSERT INTO movie_collection (idx, path, show, last_modified)
-                VALUES ($idx, $path, $show, now())
-            "#,
-            idx = idx,
-            path = path,
-            show = show
-        );
-        self.pool
-            .get()
-            .await?
-            .execute(query.sql(), query.parameters())
-            .await
-            .map(|_| ())
-            .map_err(Into::into)
+        if let Some(idx) = self.get_collection_index(path).await? {
+            let query = postgres_query::query!(
+                "UPDATE movie_collection SET is_deleted=false WHERE idx=$idx",
+                idx = idx
+            );
+            self.pool
+                .get()
+                .await?
+                .execute(query.sql(), query.parameters())
+                .await
+        } else {
+            let file_stem = Path::new(&path).file_stem().unwrap().to_string_lossy();
+            let (show, _, _) = parse_file_stem(&file_stem);
+            let query = postgres_query::query!(
+                r#"
+                    INSERT INTO movie_collection (path, show, last_modified)
+                    VALUES ($path, $show, now())
+                "#,
+                path = path,
+                show = show
+            );
+            self.pool
+                .get()
+                .await?
+                .execute(query.sql(), query.parameters())
+                .await
+        }
+        .map(|_| ())
+        .map_err(Into::into)
     }
 
     pub async fn fix_collection_show_id(&self) -> Result<u64, Error> {

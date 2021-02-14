@@ -113,7 +113,7 @@ impl MovieQueueCli {
                                     }
                                     mc.remove_from_collection(entry.path.as_ref()).await?;
                                 };
-                                mc.insert_into_collection_by_idx(entry.idx, entry.path.as_ref())
+                                mc.insert_into_collection(entry.path.as_ref())
                                     .await?;
                                 Ok(())
                             }
@@ -134,8 +134,7 @@ impl MovieQueueCli {
                                 {
                                     i
                                 } else {
-                                    mc.insert_into_collection_by_idx(
-                                        entry.collection_idx,
+                                    mc.insert_into_collection(
                                         entry.path.as_ref(),
                                     )
                                     .await?;
