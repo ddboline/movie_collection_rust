@@ -1,8 +1,15 @@
 use anyhow::Error as AnyhowError;
 use handlebars::RenderError;
+use http::StatusCode;
+use log::error;
+use serde::Serialize;
 use stack_string::StackString;
-use std::{fmt::Debug, io::Error as IoError};
+use std::{convert::Infallible, fmt::Debug, io::Error as IoError};
 use thiserror::Error;
+use warp::{
+    reject::{MissingCookie, Reject},
+    Rejection, Reply,
+};
 
 use crate::logged_user::TRIGGER_DB_UPDATE;
 

@@ -11,7 +11,7 @@ use std::{
     str::FromStr,
 };
 
-use movie_collection_lib::pgpool::PgPool;
+use movie_collection_lib::{pgpool::PgPool, utils::get_authorized_users};
 
 use crate::errors::ServiceError as Error;
 

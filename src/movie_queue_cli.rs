@@ -3,8 +3,7 @@ use chrono::{DateTime, Duration, Utc};
 use futures::future::try_join_all;
 use refinery::embed_migrations;
 use stack_string::StackString;
-use std::ops::DerefMut;
-use std::path::PathBuf;
+use std::{ops::DerefMut, path::PathBuf};
 use stdout_channel::StdoutChannel;
 use structopt::StructOpt;
 use tokio::{
