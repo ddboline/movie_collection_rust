@@ -23,6 +23,6 @@ log = "0.4"
 maplit = "1.0"
 handlebars = "3.5"
 itertools = "0.10"
-authorized_users = { git = "https://github.com/ddboline/auth_server_rust.git", branch="replace_actix_with_warp"}
+authorized_users = { git = "https://github.com/ddboline/auth_server_rust.git", tag="0.4.0"}
 stack-string = { git = "https://github.com/ddboline/stack-string-rs.git", tag="0.2.0", features=["postgres_types"] }
 stdout-channel = { git = "https://github.com/ddboline/stdout-channel-rs.git", tag="0.3.0" }
