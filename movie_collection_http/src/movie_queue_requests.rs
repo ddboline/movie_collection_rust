@@ -369,7 +369,7 @@ impl MovieQueueUpdateRequest {
             let cidx = if let Some(i) = mc.get_collection_index(entry.path.as_ref()).await? {
                 i
             } else {
-                mc.insert_into_collection(entry.path.as_ref())
+                mc.insert_into_collection(entry.path.as_ref(), false)
                     .await?;
                 entry.collection_idx
             };
@@ -399,7 +399,7 @@ impl MovieCollectionUpdateRequest {
                 }
                 mc.remove_from_collection(entry.path.as_ref()).await?;
             };
-            mc.insert_into_collection(entry.path.as_ref())
+            mc.insert_into_collection(entry.path.as_ref(), false)
                 .await?;
         }
         Ok(())

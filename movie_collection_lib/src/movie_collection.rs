@@ -483,8 +483,8 @@ impl MovieCollection {
         Ok(path)
     }
 
-    pub async fn insert_into_collection(&self, path: &str) -> Result<(), Error> {
-        if !Path::new(&path).exists() {
+    pub async fn insert_into_collection(&self, path: &str, check_path: bool) -> Result<(), Error> {
+        if check_path && !Path::new(&path).exists() {
             return Err(format_err!("No such file"));
         }
         if let Some(idx) = self.get_collection_index(path).await? {
@@ -641,7 +641,7 @@ impl MovieCollection {
                         .into();
                     if self.config.suffixes.contains(&ext) {
                         self.stdout.send(format!("not in collection {}", f));
-                        self.insert_into_collection(f).await?;
+                        self.insert_into_collection(f, true).await?;
                     }
                 }
                 Ok(())

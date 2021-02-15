@@ -113,7 +113,7 @@ impl MovieQueueCli {
                                     }
                                     mc.remove_from_collection(entry.path.as_ref()).await?;
                                 };
-                                mc.insert_into_collection(entry.path.as_ref())
+                                mc.insert_into_collection(entry.path.as_ref(), false)
                                     .await?;
                                 Ok(())
                             }
@@ -134,10 +134,8 @@ impl MovieQueueCli {
                                 {
                                     i
                                 } else {
-                                    mc.insert_into_collection(
-                                        entry.path.as_ref(),
-                                    )
-                                    .await?;
+                                    mc.insert_into_collection(entry.path.as_ref(), false)
+                                        .await?;
                                     entry.collection_idx
                                 };
                                 assert_eq!(cidx, entry.collection_idx);

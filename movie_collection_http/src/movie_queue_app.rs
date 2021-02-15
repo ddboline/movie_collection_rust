@@ -228,6 +228,7 @@ async fn run_app(config: Config, pool: PgPool, trakt: TraktConnection) -> Result
         .and(data.clone())
         .and_then(movie_collection_route);
     let movie_collection_post = warp::post()
+        .and(warp::path::end())
         .and(warp::body::json())
         .and(warp::cookie("jwt"))
         .and(data.clone())

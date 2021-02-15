@@ -137,7 +137,7 @@ impl MovieQueueDB {
         let collection_idx = if let Some(i) = mc.get_collection_index(&path).await? {
             i
         } else {
-            mc.insert_into_collection(&path).await?;
+            mc.insert_into_collection(&path, true).await?;
             mc.get_collection_index(&path)
                 .await?
                 .ok_or_else(|| format_err!("Path not found"))?
