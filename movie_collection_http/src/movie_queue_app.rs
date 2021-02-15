@@ -103,7 +103,7 @@ async fn run_app(config: Config, pool: PgPool, trakt: TraktConnection) -> Result
         .boxed();
     //                 .service(
     //                     web::scope("/transcode")
-    let movie_queue_transcode_status_path = warp::path("transcode")
+    let movie_queue_transcode_status_path = warp::path("status")
         .and(warp::path::end())
         .and(warp::get())
         .and(warp::cookie("jwt"))
