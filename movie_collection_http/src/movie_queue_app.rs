@@ -232,7 +232,7 @@ async fn run_app(config: Config, pool: PgPool, trakt: TraktConnection) -> Result
         .and(warp::cookie("jwt"))
         .and(data.clone())
         .and_then(movie_collection_update);
-    let movie_collection_path = warp::path("imdb_ratings")
+    let movie_collection_path = warp::path("movie_collection")
         .and(movie_collection_get.or(movie_collection_post))
         .boxed();
     let imdb_show_path = warp::path!("imdb" / StackString)
