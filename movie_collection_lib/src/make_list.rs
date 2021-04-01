@@ -8,7 +8,10 @@ use rayon::{
 use stack_string::StackString;
 use std::{collections::HashMap, ffi::OsStr, path::PathBuf};
 use stdout_channel::StdoutChannel;
-use tokio::task::{spawn, spawn_blocking};
+use tokio::task::{spawn};
+use tokio::fs;
+use tokio_stream::wrappers::ReadDirStream;
+use tokio_stream::StreamExt;
 
 use crate::{
     config::Config,
@@ -23,12 +26,10 @@ pub struct FileLists {
 }
 
 impl FileLists {
-    pub fn get_file_lists(config: &Config) -> Result<Self, Error> {
-        use std::fs;
-
+    pub async fn get_file_lists(config: &Config) -> Result<Self, Error> {
         let movies_dir = config.home_dir.join("Documents").join("movies");
 
-        let mut local_file_list: Vec<StackString> = fs::read_dir(movies_dir)?
+        let mut local_file_list: Vec<StackString> = ReadDirStream::new(fs::read_dir(movies_dir).await?)
             .filter_map(|f| {
                 let fname = f.ok()?;
                 let file_name = fname.file_name().to_string_lossy().into_owned();
@@ -39,7 +40,7 @@ impl FileLists {
                 }
                 None
             })
-            .collect();
+            .collect().await;
 
         if local_file_list.is_empty() {
             return Ok(Self::default());
@@ -96,7 +97,7 @@ pub async fn make_list(stdout: &StdoutChannel) -> Result<(), Error> {
         spawn(async move { transcode_status(&config).await })
     };
 
-    let file_lists = spawn_blocking(move || FileLists::get_file_lists(&config)).await??;
+    let file_lists = FileLists::get_file_lists(&config).await?;
     let file_map = file_lists.get_file_map();
 
     if file_lists.local_file_list.is_empty() {

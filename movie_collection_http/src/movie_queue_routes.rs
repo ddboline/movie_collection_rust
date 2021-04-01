@@ -15,7 +15,7 @@ use std::{
     time::Duration,
 };
 use stdout_channel::{MockStdout, StdoutChannel};
-use tokio::{fs::remove_file, task::spawn_blocking, time::timeout};
+use tokio::{fs::remove_file, time::timeout};
 use warp::{Rejection, Reply};
 
 use movie_collection_lib::{
@@ -522,15 +522,14 @@ pub async fn movie_queue_transcode_status(
     let config = state.config.clone();
     let task = timeout(
         Duration::from_secs(10),
-        spawn_blocking(move || FileLists::get_file_lists(&config)),
+        FileLists::get_file_lists(&config),
     );
     let status = transcode_status(&state.config)
         .await
         .map_err(Into::<Error>::into)?;
     let file_lists = task
         .await
-        .map_or_else(|_| Ok(FileLists::default()), Result::unwrap)
-        .map_err(Into::<Error>::into)?;
+        .map_or_else(|_| FileLists::default(), Result::unwrap);
     let body = status.get_html(&file_lists, &state.config).join("");
     Ok(warp::reply::html(body))
 }

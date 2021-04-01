@@ -794,7 +794,7 @@ impl fmt::Display for TranscodeStatus {
     }
 }
 
-fn get_procs_sync() -> Result<Vec<ProcInfo>, Error> {
+fn get_procs() -> Result<Vec<ProcInfo>, Error> {
     let accept_paths = &[
         Path::new("/usr/bin/run-encoding"),
         Path::new("/usr/bin/HandBrakeCLI"),
@@ -824,10 +824,6 @@ fn get_procs_sync() -> Result<Vec<ProcInfo>, Error> {
         })
         .collect();
     Ok(procs)
-}
-
-async fn get_procs() -> Result<Vec<ProcInfo>, Error> {
-    spawn_blocking(get_procs_sync).await?
 }
 
 fn get_paths_sync(dir: impl AsRef<Path>, ext: &str) -> Vec<PathBuf> {
@@ -899,8 +895,8 @@ async fn get_current_jobs(p: impl AsRef<Path>) -> Result<Vec<(PathBuf, StackStri
 }
 
 pub async fn transcode_status(config: &Config) -> Result<TranscodeStatus, Error> {
-    let (procs, upcoming_jobs, current_jobs, finished_jobs) = try_join!(
-        get_procs(),
+    let procs = get_procs()?;
+    let (upcoming_jobs, current_jobs, finished_jobs) = try_join!(
         get_upcoming_jobs(job_dir(config)),
         get_current_jobs(log_dir(config)),
         get_paths(tmp_dir(config), "out")
@@ -937,7 +933,7 @@ mod tests {
     use crate::{
         config::Config,
         transcode_service::{
-            get_current_jobs, get_last_line, get_paths, get_procs_sync, get_upcoming_jobs,
+            get_current_jobs, get_last_line, get_paths, get_procs, get_upcoming_jobs,
             transcode_status, JobType, ProcInfo, TranscodeServiceRequest,
         },
     };
@@ -1037,8 +1033,8 @@ mod tests {
 
     #[test]
     #[ignore]
-    fn test_get_procs_sync() -> Result<(), Error> {
-        let procs = get_procs_sync()?;
+    fn test_get_procs() -> Result<(), Error> {
+        let procs = get_procs()?;
         assert!(procs.len() > 0);
         Ok(())
     }

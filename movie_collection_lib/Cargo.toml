@@ -25,6 +25,7 @@ anyhow = "1.0"
 thiserror = "1.0"
 dirs = "3.0"
 tokio = {version="1.0", features=["full"]}
+tokio-stream = {version="0.1", features=["fs"]}
 async-trait = "0.1"
 derive_more = "0.99"
 structopt = "0.3"
