@@ -242,7 +242,7 @@ pub async fn imdb_show(
     Ok(warp::reply::html(body))
 }
 
-fn new_episode_worker(entries: &[StackString]) -> HttpResult<String> {
+fn new_episode_worker(entries: &[StackString]) -> String {
     let previous = r#"
         <a href="javascript:updateMainArticle('/list/tvshows')">Go Back</a><br>
         <input type="button" name="list_cal" value="TVCalendar" onclick="updateMainArticle('/list/cal');"/>
@@ -251,12 +251,11 @@ fn new_episode_worker(entries: &[StackString]) -> HttpResult<String> {
         <input type="button" name="list_cal" value="HuluCalendar" onclick="updateMainArticle('/list/cal?source=hulu');"/><br>
         <button name="remcomout" id="remcomoutput"> &nbsp; </button>
     "#;
-    let body = format!(
+    format!(
         r#"{}<table border="0">{}</table>"#,
         previous,
         entries.join("")
-    );
-    Ok(body)
+    )
 }
 
 pub async fn find_new_episodes(
@@ -265,7 +264,7 @@ pub async fn find_new_episodes(
     state: AppState,
 ) -> WarpResult<impl Reply> {
     let entries = query.handle(&state.db, &state.config).await?;
-    let body = new_episode_worker(&entries)?;
+    let body = new_episode_worker(&entries);
     Ok(warp::reply::html(body))
 }
 
@@ -427,7 +426,7 @@ fn tvshows_worker(res1: TvShowsMap, tvshows: Vec<TvShowsResult>) -> HttpResult<S
         })
         .collect();
 
-    let shows = process_shows(tvshows, watchlist)?;
+    let shows = process_shows(tvshows, watchlist);
 
     let previous = r#"
         <a href="javascript:updateMainArticle('/list/watchlist')">Go Back</a><br>
@@ -461,7 +460,7 @@ pub async fn tvshows(_: LoggedUser, state: AppState) -> WarpResult<impl Reply> {
 fn process_shows(
     tvshows: HashSet<ProcessShowItem>,
     watchlist: HashSet<ProcessShowItem>,
-) -> Result<Vec<StackString>, Error> {
+) -> Vec<StackString> {
     let watchlist_shows: Vec<_> = watchlist
         .iter()
         .filter(|item| tvshows.get(item.link.as_str()).is_none())
@@ -473,7 +472,7 @@ fn process_shows(
     let button_add = r#"<td><button type="submit" id="ID" onclick="watchlist_add('SHOW');">add to watchlist</button></td>"#;
     let button_rm = r#"<td><button type="submit" id="ID" onclick="watchlist_rm('SHOW');">remove from watchlist</button></td>"#;
 
-    let shows: Vec<_> = shows
+    shows
         .into_iter()
         .map(|item| {
             let has_watchlist = watchlist.contains(item.link.as_str());
@@ -507,8 +506,7 @@ fn process_shows(
                 },
             ).into()
         })
-        .collect();
-    Ok(shows)
+        .collect()
 }
 
 pub async fn user(user: LoggedUser) -> WarpResult<impl Reply> {
@@ -520,10 +518,7 @@ pub async fn movie_queue_transcode_status(
     state: AppState,
 ) -> WarpResult<impl Reply> {
     let config = state.config.clone();
-    let task = timeout(
-        Duration::from_secs(10),
-        FileLists::get_file_lists(&config),
-    );
+    let task = timeout(Duration::from_secs(10), FileLists::get_file_lists(&config));
     let status = transcode_status(&state.config)
         .await
         .map_err(Into::<Error>::into)?;
@@ -678,7 +673,7 @@ pub async fn movie_queue_transcode_cleanup(
 
 fn watchlist_worker(
     shows: HashMap<StackString, (StackString, WatchListShow, Option<TvShowSource>)>,
-) -> HttpResult<StackString> {
+) -> StackString {
     let mut shows: Vec<_> = shows
         .into_iter()
         .map(|(_, (_, s, source))| (s.title, s.link, source))
@@ -745,16 +740,14 @@ fn watchlist_worker(
         .join("");
 
     let previous = r#"<a href="javascript:updateMainArticle('/list/tvshows')">Go Back</a><br>"#;
-    let entries = format!(r#"{}<table border="0">{}</table>"#, previous, shows).into();
-
-    Ok(entries)
+    format!(r#"{}<table border="0">{}</table>"#, previous, shows).into()
 }
 
 pub async fn trakt_watchlist(_: LoggedUser, state: AppState) -> WarpResult<impl Reply> {
     let shows = get_watchlist_shows_db_map(&state.db)
         .await
         .map_err(Into::<Error>::into)?;
-    let body: String = watchlist_worker(shows)?.into();
+    let body: String = watchlist_worker(shows).into();
     Ok(warp::reply::html(body))
 }
 
@@ -786,11 +779,7 @@ pub async fn trakt_watchlist_action(
     Ok(warp::reply::html(body))
 }
 
-fn trakt_watched_seasons_worker(
-    link: &str,
-    imdb_url: &str,
-    entries: &[ImdbSeason],
-) -> HttpResult<StackString> {
+fn trakt_watched_seasons_worker(link: &str, imdb_url: &str, entries: &[ImdbSeason]) -> StackString {
     let button_add = r#"
         <td>
         <button type="submit" id="ID"
@@ -817,8 +806,7 @@ fn trakt_watched_seasons_worker(
         .join("");
 
     let previous = r#"<a href="javascript:updateMainArticle('/trakt/watchlist')">Go Back</a><br>"#;
-    let entries = format!(r#"{}<table border="0">{}</table>"#, previous, entries).into();
-    Ok(entries)
+    format!(r#"{}<table border="0">{}</table>"#, previous, entries).into()
 }
 
 pub async fn trakt_watched_seasons(
@@ -836,7 +824,7 @@ pub async fn trakt_watched_seasons(
         show_opt.map_or_else(empty, |(imdb_url, t)| (imdb_url, t.show, t.link));
     let req = ImdbSeasonsRequest { show };
     let entries = req.handle(&state.db, &state.config).await?;
-    let body: String = trakt_watched_seasons_worker(&link, &imdb_url, &entries)?.into();
+    let body: String = trakt_watched_seasons_worker(&link, &imdb_url, &entries).into();
     Ok(warp::reply::html(body))
 }
 

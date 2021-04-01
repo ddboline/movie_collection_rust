@@ -151,7 +151,11 @@ impl TranscodeServiceRequest {
                 let (show, season, episode) = parse_file_stem(&file_stem);
 
                 if season == -1 || episode == -1 {
-                    panic!("Failed to parse show season {} episode {}", season, episode);
+                    return Err(format_err!(
+                        "Failed to parse show season {} episode {}",
+                        season,
+                        episode
+                    ));
                 }
 
                 let d = config
@@ -182,26 +186,22 @@ impl TranscodeServiceRequest {
     }
 
     pub fn get_html(&self) -> Vec<StackString> {
-        let mut output = Vec::new();
-        output.push(self.job_type.to_string().into());
-        output.push(self.prefix.clone());
-        output.push(
+        vec![
+            self.job_type.to_string().into(),
+            self.prefix.clone(),
             self.input_path
                 .file_name()
                 .unwrap_or_else(|| OsStr::new(""))
                 .to_string_lossy()
                 .to_string()
                 .into(),
-        );
-        output.push(
             self.output_path
                 .file_name()
                 .unwrap_or_else(|| OsStr::new(""))
                 .to_string_lossy()
                 .to_string()
                 .into(),
-        );
-        output
+        ]
     }
 
     pub fn get_cmd_path(&self) -> PathBuf {
@@ -539,12 +539,12 @@ impl ProcInfo {
     }
 
     pub fn get_html(&self) -> Vec<StackString> {
-        let mut output = Vec::new();
-        output.push(self.pid.to_string().into());
-        output.push(self.name.clone());
-        output.push(self.exe.to_string_lossy().to_string().into());
-        output.push(self.cmdline.join(" ").into());
-        output
+        vec![
+            self.pid.to_string().into(),
+            self.name.clone(),
+            self.exe.to_string_lossy().to_string().into(),
+            self.cmdline.join(" ").into(),
+        ]
     }
 }
 
@@ -624,8 +624,8 @@ impl TranscodeStatus {
     }
 
     pub fn get_html(&self, flists: &FileLists, config: &Config) -> Vec<StackString> {
-        let mut output: Vec<StackString> = Vec::new();
-        output.push(r#"<button name="remcomout" id="remcomoutput"> &nbsp; </button><br>"#.into());
+        let mut output: Vec<StackString> =
+            vec![r#"<button name="remcomout" id="remcomoutput"> &nbsp; </button><br>"#.into()];
         if !flists.local_file_list.is_empty() {
             let file_map = flists.get_file_map();
             let proc_map = self.get_proc_map();

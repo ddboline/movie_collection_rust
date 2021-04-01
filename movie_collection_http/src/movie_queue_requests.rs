@@ -373,7 +373,9 @@ impl MovieQueueUpdateRequest {
                     .await?;
                 entry.collection_idx
             };
-            assert_eq!(cidx, entry.collection_idx);
+            if cidx != entry.collection_idx {
+                return Err(format_err!("{} != {}", cidx, entry.collection_idx).into());
+            }
             mq.insert_into_queue_by_collection_idx(entry.idx, entry.collection_idx)
                 .await?;
         }

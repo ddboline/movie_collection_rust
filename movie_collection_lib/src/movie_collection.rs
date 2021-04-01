@@ -389,7 +389,7 @@ impl MovieCollection {
         let futures = results?.into_iter().map(|mut result| async {
             let file_stem = Path::new(result.path.as_str())
                 .file_stem()
-                .unwrap()
+                .ok_or_else(|| format_err!("No file stem"))?
                 .to_string_lossy();
             let (show, season, episode) = parse_file_stem(&file_stem);
 
@@ -498,7 +498,10 @@ impl MovieCollection {
                 .execute(query.sql(), query.parameters())
                 .await
         } else {
-            let file_stem = Path::new(&path).file_stem().unwrap().to_string_lossy();
+            let file_stem = Path::new(&path)
+                .file_stem()
+                .ok_or_else(|| format_err!("No file stem"))?
+                .to_string_lossy();
             let (show, _, _) = parse_file_stem(&file_stem);
             let query = postgres_query::query!(
                 r#"

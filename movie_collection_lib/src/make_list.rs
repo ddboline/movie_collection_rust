@@ -8,10 +8,8 @@ use rayon::{
 use stack_string::StackString;
 use std::{collections::HashMap, ffi::OsStr, path::PathBuf};
 use stdout_channel::StdoutChannel;
-use tokio::task::{spawn};
-use tokio::fs;
-use tokio_stream::wrappers::ReadDirStream;
-use tokio_stream::StreamExt;
+use tokio::{fs, task::spawn};
+use tokio_stream::{wrappers::ReadDirStream, StreamExt};
 
 use crate::{
     config::Config,
@@ -29,18 +27,20 @@ impl FileLists {
     pub async fn get_file_lists(config: &Config) -> Result<Self, Error> {
         let movies_dir = config.home_dir.join("Documents").join("movies");
 
-        let mut local_file_list: Vec<StackString> = ReadDirStream::new(fs::read_dir(movies_dir).await?)
-            .filter_map(|f| {
-                let fname = f.ok()?;
-                let file_name = fname.file_name().to_string_lossy().into_owned();
-                for suffix in &config.suffixes {
-                    if file_name.ends_with(suffix.as_str()) {
-                        return Some(file_name.into());
+        let mut local_file_list: Vec<StackString> =
+            ReadDirStream::new(fs::read_dir(movies_dir).await?)
+                .filter_map(|f| {
+                    let fname = f.ok()?;
+                    let file_name = fname.file_name().to_string_lossy().into_owned();
+                    for suffix in &config.suffixes {
+                        if file_name.ends_with(suffix.as_str()) {
+                            return Some(file_name.into());
+                        }
                     }
-                }
-                None
-            })
-            .collect().await;
+                    None
+                })
+                .collect()
+                .await;
 
         if local_file_list.is_empty() {
             return Ok(Self::default());

@@ -281,7 +281,7 @@ impl MovieQueueDB {
             if result.istv {
                 let file_stem = Path::new(result.path.as_str())
                     .file_stem()
-                    .unwrap()
+                    .ok_or_else(|| format_err!("No file stem"))?
                     .to_string_lossy();
                 let (show, season, episode) = parse_file_stem(&file_stem);
                 let query = postgres_query::query!(

@@ -98,7 +98,7 @@ pub async fn make_queue_worker(
             mq.insert_into_queue(max_idx + 1, &path.to_string_lossy())
                 .await?;
         } else {
-            panic!("No file specified");
+            return Err(format_err!("No file specified"));
         }
     } else if add_files.len() == 2 {
         if let PathOrIndex::Index(idx) = &add_files[0] {
@@ -106,7 +106,7 @@ pub async fn make_queue_worker(
             if let PathOrIndex::Path(path) = &add_files[1] {
                 mq.insert_into_queue(*idx, &path.to_string_lossy()).await?;
             } else {
-                panic!("{} is not a path", add_files[1]);
+                return Err(format_err!("{} is not a path", add_files[1]));
             }
         } else {
             for file in add_files {
@@ -115,7 +115,7 @@ pub async fn make_queue_worker(
                     mq.insert_into_queue(max_idx + 1, &path.to_string_lossy())
                         .await?;
                 } else {
-                    panic!("{} is not a path", file);
+                    return Err(format_err!("{} is not a path", file));
                 }
             }
         }
@@ -126,7 +126,7 @@ pub async fn make_queue_worker(
                 mq.insert_into_queue(max_idx + 1, &path.to_string_lossy())
                     .await?;
             } else {
-                panic!("{} is not a path", file);
+                return Err(format_err!("{} is not a path", file));
             }
         }
     }
