@@ -404,7 +404,7 @@ impl From<TvShowsResult> for ProcessShowItem {
     }
 }
 
-fn tvshows_worker(res1: TvShowsMap, tvshows: Vec<TvShowsResult>) -> HttpResult<StackString> {
+fn tvshows_worker(res1: TvShowsMap, tvshows: Vec<TvShowsResult>) -> StackString {
     let tvshows: HashSet<_> = tvshows
         .into_iter()
         .map(|s| {
@@ -434,14 +434,12 @@ fn tvshows_worker(res1: TvShowsMap, tvshows: Vec<TvShowsResult>) -> HttpResult<S
         <button name="remcomout" id="remcomoutput"> &nbsp; </button><br>
     "#;
 
-    let entries = format!(
+    format!(
         r#"{}<table border="0">{}</table>"#,
         previous,
         shows.join("")
     )
-    .into();
-
-    Ok(entries)
+    .into()
 }
 
 pub async fn tvshows(_: LoggedUser, state: AppState) -> WarpResult<impl Reply> {
