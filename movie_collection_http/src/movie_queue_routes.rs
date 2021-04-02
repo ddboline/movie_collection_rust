@@ -451,7 +451,7 @@ pub async fn tvshows(_: LoggedUser, state: AppState) -> WarpResult<impl Reply> {
     let show_map = get_watchlist_shows_db_map(&state.db)
         .await
         .map_err(Into::<Error>::into)?;
-    let body: String = tvshows_worker(show_map, shows)?.into();
+    let body: String = tvshows_worker(show_map, shows).into();
     Ok(warp::reply::html(body))
 }
 
