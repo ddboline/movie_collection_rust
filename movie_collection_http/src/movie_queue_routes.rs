@@ -194,40 +194,45 @@ pub async fn movie_queue_transcode_directory(
     Ok(warp::reply::html(body))
 }
 
-fn play_worker(full_path: &path::Path) -> HttpResult<String> {
+fn play_worker(config: &Config, full_path: &path::Path) -> HttpResult<String> {
     let file_name = full_path
         .file_name()
         .ok_or_else(|| format_err!("Invalid path"))?
         .to_string_lossy();
-    let url = format!("/videos/partial/{}", file_name);
 
-    let body = format!(
-        r#"
-        {}<br>
-        <video width="720" controls>
-        <source src="{}" type="video/mp4">
-        Your browser does not support HTML5 video.
-        </video>
-    "#,
-        file_name, url
-    );
+    if let Some(partial_path) = &config.video_playback_path {
+        let url = format!("/videos/partial/{}", file_name);
 
-    let partial_path = path::Path::new("/var/www/html/videos/partial").join(file_name.as_ref());
-    if partial_path.exists() {
-        std::fs::remove_file(&partial_path)?;
+        let body = format!(
+            r#"
+            {}<br>
+            <video width="720" controls>
+            <source src="{}" type="video/mp4">
+            Your browser does not support HTML5 video.
+            </video>
+        "#,
+            file_name, url
+        );
+
+        let partial_path = partial_path.join("videos").join("partial");
+        let partial_path = partial_path.join(file_name.as_ref());
+        if partial_path.exists() {
+            std::fs::remove_file(&partial_path)?;
+        }
+
+        #[cfg(target_family = "unix")]
+        std::os::unix::fs::symlink(&full_path, &partial_path).map_err(Into::<Error>::into)?;
+        Ok(body)
+    } else {
+        Err(format_err!("video playback path does not exist").into())
     }
-
-    #[cfg(target_family = "unix")]
-    std::os::unix::fs::symlink(&full_path, &partial_path).map_err(Into::<Error>::into)?;
-
-    Ok(body)
 }
 
 pub async fn movie_queue_play(idx: i32, _: LoggedUser, state: AppState) -> WarpResult<impl Reply> {
     let req = MoviePathRequest { idx };
     let movie_path = req.handle(&state.db, &state.config).await?;
     let movie_path = path::Path::new(movie_path.as_str());
-    let body = play_worker(&movie_path)?;
+    let body = play_worker(&state.config, &movie_path)?;
     Ok(warp::reply::html(body))
 }
 

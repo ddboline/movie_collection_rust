@@ -48,10 +48,12 @@ pub async fn start_app() -> Result<(), Error> {
     let config = Config::with_config()?;
     get_secrets(&config.secret_path, &config.jwt_secret_path).await?;
 
-    let partial_path = Path::new("/var/www/html/videos/partial");
-    if partial_path.exists() {
-        remove_dir_all(&partial_path).await?;
-        create_dir(&partial_path).await?;
+    if let Some(partial_path) = &config.video_playback_path {
+        let partial_path = partial_path.join("videos").join("partial");
+        if partial_path.exists() {
+            remove_dir_all(&partial_path).await?;
+            create_dir(&partial_path).await?;
+        }
     }
 
     let pool = PgPool::new(&config.pgurl);

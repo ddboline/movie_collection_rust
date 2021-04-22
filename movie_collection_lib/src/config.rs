@@ -46,6 +46,7 @@ pub struct ConfigInner {
     pub secret_path: PathBuf,
     #[serde(default = "default_secret_path")]
     pub jwt_secret_path: PathBuf,
+    pub video_playback_path: Option<PathBuf>,
 }
 
 fn default_suffixes() -> Vec<StackString> {
