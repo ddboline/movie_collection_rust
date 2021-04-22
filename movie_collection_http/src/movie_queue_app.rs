@@ -2,7 +2,7 @@
 
 use anyhow::Error;
 use stack_string::StackString;
-use std::{net::SocketAddr, path::Path, time::Duration};
+use std::{net::SocketAddr, time::Duration};
 use tokio::{
     fs::{create_dir, remove_dir_all},
     time::interval,
