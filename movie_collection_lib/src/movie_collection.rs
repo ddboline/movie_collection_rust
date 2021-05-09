@@ -1024,7 +1024,7 @@ impl LastModifiedResponse {
             }
         });
         let results: Result<Vec<_>, Error> = try_join_all(futures).await;
-        let results: Vec<_> = results?.into_iter().filter_map(|x| x).collect();
+        let results: Vec<_> = results?.into_iter().flatten().collect();
         Ok(results)
     }
 }

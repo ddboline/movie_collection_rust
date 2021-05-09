@@ -891,11 +891,7 @@ async fn get_current_jobs(p: impl AsRef<Path>) -> Result<Vec<(PathBuf, StackStri
     let futures = get_paths(p, "out")
         .await?
         .into_iter()
-        .map(|fpath| async move {
-            get_last_line(&fpath)
-                .await
-                .map(|p| (fpath.to_path_buf(), p))
-        });
+        .map(|fpath| async move { get_last_line(&fpath).await.map(|p| (fpath.clone(), p)) });
     try_join_all(futures).await
 }
 

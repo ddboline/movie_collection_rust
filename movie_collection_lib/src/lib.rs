@@ -11,6 +11,7 @@
 #![allow(clippy::struct_excessive_bools)]
 #![allow(clippy::used_underscore_binding)]
 #![allow(clippy::upper_case_acronyms)]
+#![allow(clippy::inconsistent_struct_constructor)]
 
 pub mod config;
 pub mod imdb_episodes;
