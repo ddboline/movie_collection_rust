@@ -1045,9 +1045,10 @@ pub async fn watch_list_http_worker(
         .into_iter()
         .filter_map(|s| match &s.show {
             Some(show) => match s.season {
-                Some(season) => s
-                    .episode
-                    .map(|episode| ((show.clone(), season, episode), s)),
+                Some(season) => match s.episode {
+                    Some(episode) => Some(((show.clone(), season, episode), s)),
+                    None => None,
+                },
                 None => None,
             },
             None => None,
