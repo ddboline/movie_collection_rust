@@ -1,6 +1,7 @@
 #![allow(clippy::used_underscore_binding)]
 
 use anyhow::Error;
+use stack_string::StackString;
 use std::path::{Path, PathBuf};
 use stdout_channel::StdoutChannel;
 use structopt::StructOpt;
@@ -16,7 +17,7 @@ use transcode_lib::transcode_channel::TranscodeChannel;
 async fn transcode_avi(
     transcode_service: &TranscodeService,
     config: &Config,
-    stdout: &StdoutChannel,
+    stdout: &StdoutChannel<StackString>,
     files: impl IntoIterator<Item = impl AsRef<Path>>,
 ) -> Result<(), Error> {
     for path in files {

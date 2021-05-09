@@ -162,7 +162,7 @@ impl ImdbSeason {
 pub struct MovieCollection {
     pub config: Config,
     pub pool: PgPool,
-    pub stdout: StdoutChannel,
+    pub stdout: StdoutChannel<StackString>,
 }
 
 impl Default for MovieCollection {
@@ -176,7 +176,7 @@ impl Default for MovieCollection {
 }
 
 impl MovieCollection {
-    pub fn new(config: &Config, pool: &PgPool, stdout: &StdoutChannel) -> Self {
+    pub fn new(config: &Config, pool: &PgPool, stdout: &StdoutChannel<StackString>) -> Self {
         let config = config.clone();
         let pool = pool.clone();
         let stdout = stdout.clone();
@@ -894,7 +894,7 @@ impl MovieCollection {
 pub async fn find_new_episodes_http_worker(
     config: &Config,
     pool: &PgPool,
-    stdout: &StdoutChannel,
+    stdout: &StdoutChannel<StackString>,
     shows: Option<impl AsRef<str>>,
     source: Option<TvShowSource>,
 ) -> Result<Vec<StackString>, Error> {

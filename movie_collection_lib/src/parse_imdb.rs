@@ -48,7 +48,7 @@ pub struct ParseImdb {
 }
 
 impl ParseImdb {
-    pub fn new(config: &Config, pool: &PgPool, stdout: &StdoutChannel) -> Self {
+    pub fn new(config: &Config, pool: &PgPool, stdout: &StdoutChannel<StackString>) -> Self {
         Self {
             mc: MovieCollection::new(config, pool, stdout),
         }

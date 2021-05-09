@@ -41,11 +41,11 @@ impl fmt::Display for MovieQueueResult {
 pub struct MovieQueueDB {
     pub config: Config,
     pub pool: PgPool,
-    pub stdout: StdoutChannel,
+    pub stdout: StdoutChannel<StackString>,
 }
 
 impl MovieQueueDB {
-    pub fn new(config: &Config, pool: &PgPool, stdout: &StdoutChannel) -> Self {
+    pub fn new(config: &Config, pool: &PgPool, stdout: &StdoutChannel<StackString>) -> Self {
         Self {
             config: config.clone(),
             pool: pool.clone(),

@@ -239,12 +239,17 @@ impl TranscodeServiceRequest {
 pub struct TranscodeService {
     pub config: Config,
     pub pool: PgPool,
-    pub stdout: StdoutChannel,
+    pub stdout: StdoutChannel<StackString>,
     pub queue: StackString,
 }
 
 impl TranscodeService {
-    pub fn new(config: &Config, queue: &str, pool: &PgPool, stdout: &StdoutChannel) -> Self {
+    pub fn new(
+        config: &Config,
+        queue: &str,
+        pool: &PgPool,
+        stdout: &StdoutChannel<StackString>,
+    ) -> Self {
         Self {
             config: config.clone(),
             pool: pool.clone(),

@@ -889,7 +889,7 @@ pub async fn trakt_app_parse(
     show: Option<&str>,
     season: i32,
     episode: &[i32],
-    stdout: &StdoutChannel,
+    stdout: &StdoutChannel<StackString>,
     pool: &PgPool,
 ) -> Result<(), Error> {
     let mc = MovieCollection::new(config, pool, stdout);

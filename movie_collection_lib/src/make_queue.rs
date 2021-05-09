@@ -55,7 +55,7 @@ pub async fn make_queue_worker(
     do_time: bool,
     patterns: &[&str],
     do_shows: bool,
-    stdout: &StdoutChannel,
+    stdout: &StdoutChannel<StackString>,
 ) -> Result<(), Error> {
     let pool = PgPool::new(&config.pgurl);
     let mc = MovieCollection::new(config, &pool, stdout);
@@ -138,7 +138,7 @@ pub async fn movie_queue_http(
     queue: &[MovieQueueResult],
     pool: &PgPool,
     config: &Config,
-    stdout: &StdoutChannel,
+    stdout: &StdoutChannel<StackString>,
 ) -> Result<Vec<StackString>, Error> {
     let mc = Arc::new(MovieCollection::new(&config, pool, &stdout));
 

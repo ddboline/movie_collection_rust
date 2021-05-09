@@ -1,6 +1,7 @@
 #![allow(clippy::used_underscore_binding)]
 
 use anyhow::Error;
+use stack_string::StackString;
 use std::path::{Path, PathBuf};
 use stdout_channel::StdoutChannel;
 use structopt::StructOpt;
@@ -19,7 +20,7 @@ async fn remcom(
     directory: Option<impl AsRef<Path>>,
     unwatched: bool,
     config: &Config,
-    stdout: &StdoutChannel,
+    stdout: &StdoutChannel<StackString>,
 ) -> Result<(), Error> {
     for file in files {
         let payload = TranscodeServiceRequest::create_remcom_request(

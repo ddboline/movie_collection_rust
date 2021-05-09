@@ -1010,7 +1010,7 @@ async fn trakt_cal_http_worker(
 pub async fn watch_list_http_worker(
     config: &Config,
     pool: &PgPool,
-    stdout: &StdoutChannel,
+    stdout: &StdoutChannel<StackString>,
     imdb_url: &str,
     season: i32,
 ) -> HttpResult<StackString> {
@@ -1141,7 +1141,7 @@ pub async fn watched_action_http_worker(
     season: i32,
     episode: i32,
     config: &Config,
-    stdout: &StdoutChannel,
+    stdout: &StdoutChannel<StackString>,
 ) -> HttpResult<StackString> {
     let mc = MovieCollection::new(config, pool, stdout);
     let imdb_url = Arc::new(imdb_url.to_owned());
