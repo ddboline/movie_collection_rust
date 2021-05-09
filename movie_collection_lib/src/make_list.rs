@@ -2,9 +2,7 @@ use anyhow::Error;
 use futures::future::join_all;
 use itertools::Itertools;
 use log::debug;
-use rayon::{
-    iter::{IntoParallelRefIterator, ParallelIterator},
-};
+use rayon::iter::{IntoParallelRefIterator, ParallelIterator};
 use stack_string::StackString;
 use std::{collections::HashMap, ffi::OsStr, path::PathBuf};
 use stdout_channel::StdoutChannel;
