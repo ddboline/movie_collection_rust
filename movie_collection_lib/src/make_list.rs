@@ -1,14 +1,17 @@
 use anyhow::Error;
 use futures::future::join_all;
+use itertools::Itertools;
 use log::debug;
 use rayon::{
     iter::{IntoParallelRefIterator, ParallelIterator},
-    slice::ParallelSliceMut,
 };
 use stack_string::StackString;
 use std::{collections::HashMap, ffi::OsStr, path::PathBuf};
 use stdout_channel::StdoutChannel;
-use tokio::{fs, task::spawn};
+use tokio::{
+    fs,
+    task::{spawn, spawn_blocking},
+};
 use tokio_stream::{wrappers::ReadDirStream, StreamExt};
 
 use crate::{
@@ -57,16 +60,18 @@ impl FileLists {
             })
             .collect();
 
-        let file_list: Result<Vec<_>, Error> = config
-            .movie_dirs
-            .par_iter()
-            .filter(|d| d.exists())
-            .map(|d| walk_directory(&d, &patterns))
-            .collect();
-
-        let mut file_list: Vec<_> = file_list?.into_iter().flatten().collect();
-
-        file_list.par_sort();
+        let config = config.clone();
+        let file_list: Result<Vec<_>, Error> = spawn_blocking(move || {
+            config
+                .movie_dirs
+                .par_iter()
+                .filter(|d| d.exists())
+                .map(|d| walk_directory(&d, &patterns))
+                .collect::<Result<Vec<_>, Error>>()
+                .map(|x| x.into_iter().flatten().sorted().collect())
+        })
+        .await?;
+        let file_list = file_list?;
 
         Ok(Self {
             local_file_list,
