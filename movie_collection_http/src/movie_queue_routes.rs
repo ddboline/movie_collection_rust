@@ -890,12 +890,13 @@ pub async fn trakt_cal(_: LoggedUser, state: AppState) -> WarpResult<impl Reply>
 
 pub async fn trakt_auth_url(_: LoggedUser, state: AppState) -> WarpResult<impl Reply> {
     state.trakt.init().await;
-    let url = state
+    let url: String = state
         .trakt
         .get_auth_url()
         .await
+        .map(Into::into)
         .map_err(Into::<Error>::into)?;
-    Ok(warp::reply::html(url.into_string()))
+    Ok(warp::reply::html(url))
 }
 
 #[derive(Serialize, Deserialize)]
