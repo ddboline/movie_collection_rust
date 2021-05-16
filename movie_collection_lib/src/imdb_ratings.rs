@@ -2,13 +2,14 @@ use anyhow::Error;
 use chrono::{DateTime, Utc};
 use log::debug;
 use postgres_query::{FromSqlRow, Parameter};
+use rweb::Schema;
 use serde::{Deserialize, Serialize};
 use stack_string::StackString;
 use std::fmt;
 
 use crate::{pgpool::PgPool, tv_show_source::TvShowSource, utils::option_string_wrapper};
 
-#[derive(Default, Clone, Debug, Serialize, Deserialize, FromSqlRow)]
+#[derive(Default, Clone, Debug, Serialize, Deserialize, FromSqlRow, Schema)]
 pub struct ImdbRatings {
     pub index: i32,
     pub show: StackString,

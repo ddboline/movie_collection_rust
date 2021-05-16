@@ -1,15 +1,17 @@
 use anyhow::Error as AnyhowError;
 use handlebars::RenderError;
 use http::StatusCode;
+use indexmap::IndexMap;
 use log::error;
-use serde::Serialize;
-use stack_string::StackString;
-use std::{convert::Infallible, fmt::Debug, io::Error as IoError};
-use thiserror::Error;
-use warp::{
+use rweb::{
+    openapi::{Entity, Response, ResponseEntity, Responses, Schema},
     reject::{InvalidHeader, MissingCookie, Reject},
     Rejection, Reply,
 };
+use serde::Serialize;
+use stack_string::StackString;
+use std::{borrow::Cow, convert::Infallible, fmt::Debug, io::Error as IoError};
+use thiserror::Error;
 
 use crate::logged_user::TRIGGER_DB_UPDATE;
 
@@ -71,7 +73,7 @@ pub async fn error_response(err: Rejection) -> Result<Box<dyn Reply>, Infallible
                 message = "Internal Server Error, Please try again later";
             }
         }
-    } else if err.find::<warp::reject::MethodNotAllowed>().is_some() {
+    } else if err.find::<rweb::reject::MethodNotAllowed>().is_some() {
         code = StatusCode::METHOD_NOT_ALLOWED;
         message = "METHOD NOT ALLOWED";
     } else {
@@ -80,17 +82,17 @@ pub async fn error_response(err: Rejection) -> Result<Box<dyn Reply>, Infallible
         message = "Internal Server Error, Please try again later";
     };
 
-    let reply = warp::reply::json(&ErrorMessage {
+    let reply = rweb::reply::json(&ErrorMessage {
         code: code.as_u16(),
         message: message.to_string(),
     });
-    let reply = warp::reply::with_status(reply, code);
+    let reply = rweb::reply::with_status(reply, code);
 
     Ok(Box::new(reply))
 }
 
 fn login_html() -> impl Reply {
-    warp::reply::html(
+    rweb::reply::html(
         "
             <script>
                 !function() {
@@ -102,10 +104,41 @@ fn login_html() -> impl Reply {
     )
 }
 
+impl Entity for ServiceError {
+    fn describe() -> Schema {
+        rweb::http::Error::describe()
+    }
+}
+
+impl ResponseEntity for ServiceError {
+    fn describe_responses() -> Responses {
+        let mut map = IndexMap::new();
+
+        let error_responses = [
+            (StatusCode::NOT_FOUND, "Not Found"),
+            (StatusCode::INTERNAL_SERVER_ERROR, "Internal Server Error"),
+            (StatusCode::BAD_REQUEST, "Bad Request"),
+            (StatusCode::METHOD_NOT_ALLOWED, "Method not allowed"),
+        ];
+
+        for (code, msg) in &error_responses {
+            map.insert(
+                Cow::Owned(code.as_str().into()),
+                Response {
+                    description: Cow::Borrowed(*msg),
+                    ..Response::default()
+                },
+            );
+        }
+
+        map
+    }
+}
+
 #[cfg(test)]
 mod test {
     use anyhow::Error;
-    use warp::Reply;
+    use rweb::Reply;
 
     use crate::errors::{error_response, ServiceError};
 

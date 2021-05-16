@@ -1,16 +1,16 @@
 #![allow(clippy::needless_pass_by_value)]
 
 use anyhow::Error;
-use stack_string::StackString;
-use std::{net::SocketAddr, time::Duration};
+use handlebars::Handlebars;
+use rweb::Filter;
+use std::{net::SocketAddr, sync::Arc, time::Duration};
 use tokio::{
     fs::{create_dir, remove_dir_all},
     time::interval,
 };
-use warp::Filter;
 
 use movie_collection_lib::{
-    config::Config, pgpool::PgPool, trakt_connection::TraktConnection, trakt_utils::TraktActions,
+    config::Config, pgpool::PgPool, trakt_connection::TraktConnection, utils::get_templates,
 };
 
 use super::{
@@ -34,6 +34,7 @@ pub struct AppState {
     pub config: Config,
     pub db: PgPool,
     pub trakt: TraktConnection,
+    pub hbr: Arc<Handlebars<'static>>,
 }
 
 pub async fn start_app() -> Result<(), Error> {
@@ -66,316 +67,92 @@ pub async fn start_app() -> Result<(), Error> {
 
 async fn run_app(config: Config, pool: PgPool, trakt: TraktConnection) -> Result<(), Error> {
     let port = config.port;
-    let data = AppState {
+    let app = AppState {
         config,
         db: pool,
         trakt,
+        hbr: Arc::new(get_templates()?),
     };
 
-    let data = warp::any().map(move || data.clone());
-
-    let frontpage_path = warp::path("index.html")
-        .and(warp::path::end())
-        .and(warp::get())
-        .and(warp::cookie("jwt"))
-        .and(data.clone())
-        .and_then(frontpage)
-        .boxed();
-    let find_new_episodes_path = warp::path("cal")
-        .and(warp::path::end())
-        .and(warp::get())
-        .and(warp::query())
-        .and(warp::cookie("jwt"))
-        .and(data.clone())
-        .and_then(find_new_episodes)
-        .boxed();
-    let tvshows_path = warp::path("tvshows")
-        .and(warp::path::end())
-        .and(warp::get())
-        .and(warp::cookie("jwt"))
-        .and(data.clone())
-        .and_then(tvshows)
-        .boxed();
-    let movie_queue_delete_path = warp::path!("delete" / StackString)
-        .and(warp::path::end())
-        .and(warp::get())
-        .and(warp::cookie("jwt"))
-        .and(data.clone())
-        .and_then(movie_queue_delete)
-        .boxed();
-    //                 .service(
-    //                     web::scope("/transcode")
-    let movie_queue_transcode_status_path = warp::path("status")
-        .and(warp::path::end())
-        .and(warp::get())
-        .and(warp::cookie("jwt"))
-        .and(data.clone())
-        .and_then(movie_queue_transcode_status)
-        .boxed();
-    let movie_queue_transcode_file_path = warp::path!("file" / StackString)
-        .and(warp::path::end())
-        .and(warp::get())
-        .and(warp::cookie("jwt"))
-        .and(data.clone())
-        .and_then(movie_queue_transcode_file)
-        .boxed();
-    let movie_queue_remcom_file_path = warp::path!("remcom" / "file" / StackString)
-        .and(warp::path::end())
-        .and(warp::get())
-        .and(warp::cookie("jwt"))
-        .and(data.clone())
-        .and_then(movie_queue_remcom_file)
-        .boxed();
+    let frontpage_path = frontpage().boxed();
+    let find_new_episodes_path = find_new_episodes(app.clone()).boxed();
+    let tvshows_path = tvshows(app.clone()).boxed();
+    let movie_queue_delete_path = movie_queue_delete(app.clone()).boxed();
+    let movie_queue_transcode_status_path = movie_queue_transcode_status(app.clone()).boxed();
+    let movie_queue_transcode_file_path = movie_queue_transcode_file(app.clone()).boxed();
+    let movie_queue_remcom_file_path = movie_queue_remcom_file(app.clone()).boxed();
     let movie_queue_remcom_directory_file_path =
-        warp::path!("remcom" / "directory" / StackString / StackString)
-            .and(warp::path::end())
-            .and(warp::get())
-            .and(warp::cookie("jwt"))
-            .and(data.clone())
-            .and_then(movie_queue_remcom_directory_file)
-            .boxed();
-    let movie_queue_transcode_path = warp::path!("queue" / StackString)
-        .and(warp::path::end())
-        .and(warp::get())
-        .and(warp::cookie("jwt"))
-        .and(data.clone())
-        .and_then(movie_queue_transcode)
+        movie_queue_remcom_directory_file(app.clone()).boxed();
+    let movie_queue_transcode_path = movie_queue_transcode(app.clone()).boxed();
+    let movie_queue_transcode_directory_path = movie_queue_transcode_directory(app.clone()).boxed();
+    let movie_queue_transcode_cleanup_path = movie_queue_transcode_cleanup(app.clone()).boxed();
+    let transcode_path = movie_queue_transcode_status_path
+        .or(movie_queue_transcode_file_path)
+        .or(movie_queue_remcom_file_path)
+        .or(movie_queue_remcom_directory_file_path)
+        .or(movie_queue_transcode_path)
+        .or(movie_queue_transcode_directory_path)
+        .or(movie_queue_transcode_cleanup_path)
         .boxed();
-    let movie_queue_transcode_directory_path = warp::path!("queue" / StackString / StackString)
-        .and(warp::path::end())
-        .and(warp::get())
-        .and(warp::cookie("jwt"))
-        .and(data.clone())
-        .and_then(movie_queue_transcode_directory)
-        .boxed();
-    let movie_queue_transcode_cleanup_path = warp::path!("cleanup" / StackString)
-        .and(warp::path::end())
-        .and(warp::get())
-        .and(warp::cookie("jwt"))
-        .and(data.clone())
-        .and_then(movie_queue_transcode_cleanup)
-        .boxed();
-    let transcode_path = warp::path("transcode")
-        .and(
-            movie_queue_transcode_status_path
-                .or(movie_queue_transcode_file_path)
-                .or(movie_queue_remcom_file_path)
-                .or(movie_queue_remcom_directory_file_path)
-                .or(movie_queue_transcode_path)
-                .or(movie_queue_transcode_directory_path)
-                .or(movie_queue_transcode_cleanup_path),
-        )
-        .boxed();
-    let movie_queue_play_path = warp::path!("play" / i32)
-        .and(warp::path::end())
-        .and(warp::get())
-        .and(warp::cookie("jwt"))
-        .and(data.clone())
-        .and_then(movie_queue_play)
-        .boxed();
-    let imdb_episodes_get = warp::get()
-        .and(warp::path::end())
-        .and(warp::query())
-        .and(warp::cookie("jwt"))
-        .and(data.clone())
-        .and_then(imdb_episodes_route);
-    let imdb_episodes_post = warp::post()
-        .and(warp::body::json())
-        .and(warp::cookie("jwt"))
-        .and(data.clone())
-        .and_then(imdb_episodes_update);
-    let imdb_episodes_path = warp::path("imdb_episodes")
-        .and(imdb_episodes_get.or(imdb_episodes_post))
-        .boxed();
-    let imdb_ratings_set_source_path = warp::path!("imdb_ratings" / "set_source")
-        .and(warp::path::end())
-        .and(warp::get())
-        .and(warp::query())
-        .and(warp::cookie("jwt"))
-        .and(data.clone())
-        .and_then(imdb_ratings_set_source)
-        .boxed();
-    let imdb_ratings_get = warp::get()
-        .and(warp::path::end())
-        .and(warp::query())
-        .and(warp::cookie("jwt"))
-        .and(data.clone())
-        .and_then(imdb_ratings_route);
-    let imdb_ratings_post = warp::post()
-        .and(warp::body::json())
-        .and(warp::cookie("jwt"))
-        .and(data.clone())
-        .and_then(imdb_ratings_update);
-    let imdb_ratings_path = warp::path("imdb_ratings")
-        .and(imdb_ratings_get.or(imdb_ratings_post))
-        .boxed();
-    let movie_queue_get = warp::get()
-        .and(warp::path::end())
-        .and(warp::query())
-        .and(warp::cookie("jwt"))
-        .and(data.clone())
-        .and_then(movie_queue_route);
-    let movie_queue_post = warp::post()
-        .and(warp::body::json())
-        .and(warp::cookie("jwt"))
-        .and(data.clone())
-        .and_then(movie_queue_update);
-    let movie_queue_path = warp::path("imdb_ratings")
-        .and(movie_queue_get.or(movie_queue_post))
-        .boxed();
-    let movie_collection_get = warp::get()
-        .and(warp::path::end())
-        .and(warp::query())
-        .and(warp::cookie("jwt"))
-        .and(data.clone())
-        .and_then(movie_collection_route);
-    let movie_collection_post = warp::post()
-        .and(warp::path::end())
-        .and(warp::body::json())
-        .and(warp::cookie("jwt"))
-        .and(data.clone())
-        .and_then(movie_collection_update);
-    let movie_collection_path = warp::path("movie_collection")
-        .and(movie_collection_get.or(movie_collection_post))
-        .boxed();
-    let imdb_show_path = warp::path!("imdb" / StackString)
-        .and(warp::path::end())
-        .and(warp::get())
-        .and(warp::query())
-        .and(warp::cookie("jwt"))
-        .and(data.clone())
-        .and_then(imdb_show)
-        .boxed();
-    let last_modified_path = warp::path("last_modified")
-        .and(warp::path::end())
-        .and(warp::get())
-        .and(warp::cookie("jwt"))
-        .and(data.clone())
-        .and_then(last_modified_route)
-        .boxed();
-    let user_path = warp::path("user")
-        .and(warp::path::end())
-        .and(warp::get())
-        .and(warp::cookie("jwt"))
-        .and_then(user)
-        .boxed();
-    let full_queue_path = warp::path("full_queue")
-        .and(warp::path::end())
-        .and(warp::get())
-        .and(warp::cookie("jwt"))
-        .and(data.clone())
-        .and_then(movie_queue)
-        .boxed();
-    let movie_queue_show_path = warp::path!(StackString)
-        .and(warp::path::end())
-        .and(warp::get())
-        .and(warp::cookie("jwt"))
-        .and(data.clone())
-        .and_then(movie_queue_show)
-        .boxed();
-    let list_path = warp::path("list").and(
-        frontpage_path
-            .or(find_new_episodes_path)
-            .or(tvshows_path)
-            .or(movie_queue_delete_path)
-            .or(transcode_path)
-            .or(movie_queue_play_path)
-            .or(imdb_episodes_path)
-            .or(imdb_ratings_set_source_path)
-            .or(imdb_ratings_path)
-            .or(movie_queue_path)
-            .or(movie_collection_path)
-            .or(imdb_show_path)
-            .or(last_modified_path)
-            .or(user_path)
-            .or(full_queue_path)
-            .or(movie_queue_show_path),
-    );
-    //         .service(
-    //             web::scope("/trakt")
-    let auth_url_path = warp::path("auth_url")
-        .and(warp::path::end())
-        .and(warp::get())
-        .and(warp::cookie("jwt"))
-        .and(data.clone())
-        .and_then(trakt_auth_url)
-        .boxed();
-    // .service(web::resource("/callback").route(web::get().to(trakt_callback)))
-    let trakt_callback_path = warp::path("callback")
-        .and(warp::path::end())
-        .and(warp::get())
-        .and(warp::query())
-        .and(warp::cookie("jwt"))
-        .and(data.clone())
-        .and_then(trakt_callback)
-        .boxed();
-    let refresh_auth_path = warp::path("refresh_auth")
-        .and(warp::path::end())
-        .and(warp::get())
-        .and(warp::cookie("jwt"))
-        .and(data.clone())
-        .and_then(refresh_auth)
-        .boxed();
-    let trakt_cal_path = warp::path("cal")
-        .and(warp::path::end())
-        .and(warp::get())
-        .and(warp::cookie("jwt"))
-        .and(data.clone())
-        .and_then(trakt_cal)
-        .boxed();
-    let trakt_watchlist_path = warp::path("watchlist")
-        .and(warp::path::end())
-        .and(warp::get())
-        .and(warp::cookie("jwt"))
-        .and(data.clone())
-        .and_then(trakt_watchlist)
-        .boxed();
-    let trakt_watchlist_action_path = warp::path!("watchlist" / TraktActions / StackString)
-        .and(warp::path::end())
-        .and(warp::get())
-        .and(warp::cookie("jwt"))
-        .and(data.clone())
-        .and_then(trakt_watchlist_action)
-        .boxed();
-    let trakt_watched_seasons_path = warp::path!("watched" / "list" / StackString)
-        .and(warp::path::end())
-        .and(warp::get())
-        .and(warp::cookie("jwt"))
-        .and(data.clone())
-        .and_then(trakt_watched_seasons)
-        .boxed();
-    let trakt_watched_list_path = warp::path!("watched" / "list" / StackString / i32)
-        .and(warp::path::end())
-        .and(warp::get())
-        .and(warp::cookie("jwt"))
-        .and(data.clone())
-        .and_then(trakt_watched_list)
-        .boxed();
-    let trakt_watched_action_path = warp::path!("watched" / TraktActions / StackString / i32 / i32)
-        .and(warp::path::end())
-        .and(warp::get())
-        .and(warp::cookie("jwt"))
-        .and(data.clone())
-        .and_then(trakt_watched_action)
-        .boxed();
-    let trakt_path = warp::path("trakt")
-        .and(
-            auth_url_path
-                .or(trakt_callback_path)
-                .or(refresh_auth_path)
-                .or(trakt_cal_path)
-                .or(trakt_watchlist_path)
-                .or(trakt_watchlist_action_path)
-                .or(trakt_watched_seasons_path)
-                .or(trakt_watched_list_path)
-                .or(trakt_watched_action_path),
-        )
+    let movie_queue_play_path = movie_queue_play(app.clone()).boxed();
+    let imdb_episodes_get = imdb_episodes_route(app.clone());
+    let imdb_episodes_post = imdb_episodes_update(app.clone());
+    let imdb_episodes_path = imdb_episodes_get.or(imdb_episodes_post).boxed();
+    let imdb_ratings_set_source_path = imdb_ratings_set_source(app.clone()).boxed();
+    let imdb_ratings_get = imdb_ratings_route(app.clone());
+    let imdb_ratings_post = imdb_ratings_update(app.clone());
+    let imdb_ratings_path = imdb_ratings_get.or(imdb_ratings_post).boxed();
+    let movie_queue_get = movie_queue_route(app.clone());
+    let movie_queue_post = movie_queue_update(app.clone());
+    let movie_queue_path = movie_queue_get.or(movie_queue_post).boxed();
+    let movie_collection_get = movie_collection_route(app.clone());
+    let movie_collection_post = movie_collection_update(app.clone());
+    let movie_collection_path = movie_collection_get.or(movie_collection_post).boxed();
+    let imdb_show_path = imdb_show(app.clone()).boxed();
+    let last_modified_path = last_modified_route(app.clone()).boxed();
+    let user_path = user().boxed();
+    let full_queue_path = movie_queue(app.clone()).boxed();
+    let movie_queue_show_path = movie_queue_show(app.clone()).boxed();
+    let list_path = frontpage_path
+        .or(find_new_episodes_path)
+        .or(tvshows_path)
+        .or(movie_queue_delete_path)
+        .or(transcode_path)
+        .or(movie_queue_play_path)
+        .or(imdb_episodes_path)
+        .or(imdb_ratings_set_source_path)
+        .or(imdb_ratings_path)
+        .or(movie_queue_path)
+        .or(movie_collection_path)
+        .or(imdb_show_path)
+        .or(last_modified_path)
+        .or(user_path)
+        .or(full_queue_path)
+        .or(movie_queue_show_path);
+    let auth_url_path = trakt_auth_url(app.clone()).boxed();
+    let trakt_callback_path = trakt_callback(app.clone()).boxed();
+    let refresh_auth_path = refresh_auth(app.clone()).boxed();
+    let trakt_cal_path = trakt_cal(app.clone()).boxed();
+    let trakt_watchlist_path = trakt_watchlist(app.clone()).boxed();
+    let trakt_watchlist_action_path = trakt_watchlist_action(app.clone()).boxed();
+    let trakt_watched_seasons_path = trakt_watched_seasons(app.clone()).boxed();
+    let trakt_watched_list_path = trakt_watched_list(app.clone()).boxed();
+    let trakt_watched_action_path = trakt_watched_action(app.clone()).boxed();
+    let trakt_path = auth_url_path
+        .or(trakt_callback_path)
+        .or(refresh_auth_path)
+        .or(trakt_cal_path)
+        .or(trakt_watchlist_path)
+        .or(trakt_watchlist_action_path)
+        .or(trakt_watched_seasons_path)
+        .or(trakt_watched_list_path)
+        .or(trakt_watched_action_path)
         .boxed();
 
     let full_path = list_path.or(trakt_path);
 
     let routes = full_path.recover(error_response);
     let addr: SocketAddr = format!("127.0.0.1:{}", port).parse()?;
-    warp::serve(routes).bind(addr).await;
+    rweb::serve(routes).bind(addr).await;
     Ok(())
 }

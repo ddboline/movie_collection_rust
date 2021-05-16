@@ -4,6 +4,7 @@ use futures::future::try_join_all;
 use itertools::Itertools;
 use log::debug;
 use postgres_query::FromSqlRow;
+use rweb::Schema;
 use serde::{Deserialize, Serialize};
 use stack_string::StackString;
 use std::{fmt, path::Path};
@@ -342,7 +343,7 @@ impl MovieQueueDB {
     }
 }
 
-#[derive(Default, Debug, Serialize, Deserialize, FromSqlRow)]
+#[derive(Default, Debug, Serialize, Deserialize, FromSqlRow, Schema)]
 pub struct MovieQueueRow {
     pub idx: i32,
     pub collection_idx: i32,

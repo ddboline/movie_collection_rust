@@ -3,6 +3,7 @@
 use anyhow::format_err;
 use itertools::Itertools;
 use maplit::hashmap;
+use rweb::{get, post, Json, Query, Rejection, Reply, Schema};
 use serde::{Deserialize, Serialize};
 use stack_string::StackString;
 use std::{
@@ -16,7 +17,6 @@ use std::{
 };
 use stdout_channel::{MockStdout, StdoutChannel};
 use tokio::{fs::remove_file, time::timeout};
-use warp::{Rejection, Reply};
 
 use movie_collection_lib::{
     config::Config,
@@ -86,7 +86,11 @@ async fn queue_body_resp(
     Ok(body)
 }
 
-pub async fn movie_queue(_: LoggedUser, state: AppState) -> WarpResult<impl Reply> {
+#[get("/list/full_queue")]
+pub async fn movie_queue(
+    #[cookie = "jwt"] _: LoggedUser,
+    #[data] state: AppState,
+) -> WarpResult<impl Reply> {
     let req = MovieQueueRequest {
         patterns: Vec::new(),
     };
@@ -94,13 +98,14 @@ pub async fn movie_queue(_: LoggedUser, state: AppState) -> WarpResult<impl Repl
     let body: String = queue_body_resp(&state.config, Vec::new(), queue, &state.db)
         .await?
         .into();
-    Ok(warp::reply::html(body))
+    Ok(rweb::reply::html(body))
 }
 
+#[get("/list/{path}")]
 pub async fn movie_queue_show(
     path: StackString,
-    _: LoggedUser,
-    state: AppState,
+    #[cookie = "jwt"] _: LoggedUser,
+    #[data] state: AppState,
 ) -> WarpResult<impl Reply> {
     let patterns = vec![path];
 
@@ -109,13 +114,14 @@ pub async fn movie_queue_show(
     let body: String = queue_body_resp(&state.config, patterns, queue, &state.db)
         .await?
         .into();
-    Ok(warp::reply::html(body))
+    Ok(rweb::reply::html(body))
 }
 
+#[get("/list/delete/{path}")]
 pub async fn movie_queue_delete(
     path: StackString,
-    _: LoggedUser,
-    state: AppState,
+    #[cookie = "jwt"] _: LoggedUser,
+    #[data] state: AppState,
 ) -> WarpResult<impl Reply> {
     let mock_stdout = MockStdout::new();
     let stdout = StdoutChannel::with_mock_stdout(mock_stdout.clone(), mock_stdout.clone());
@@ -127,7 +133,7 @@ pub async fn movie_queue_delete(
             .map_err(Into::<Error>::into)?;
     }
     let body: String = path.into();
-    Ok(warp::reply::html(body))
+    Ok(rweb::reply::html(body))
 }
 
 async fn transcode_worker(
@@ -158,10 +164,11 @@ async fn transcode_worker(
     Ok(output.join("").into())
 }
 
+#[get("/list/transcode/queue/{path}")]
 pub async fn movie_queue_transcode(
     path: StackString,
-    _: LoggedUser,
-    state: AppState,
+    #[cookie = "jwt"] _: LoggedUser,
+    #[data] state: AppState,
 ) -> WarpResult<impl Reply> {
     let patterns = vec![path];
 
@@ -170,14 +177,15 @@ pub async fn movie_queue_transcode(
     let body: String = transcode_worker(&state.config, None, &entries, &state.db)
         .await?
         .into();
-    Ok(warp::reply::html(body))
+    Ok(rweb::reply::html(body))
 }
 
+#[get("/list/transcode/queue/{directory}/{file}")]
 pub async fn movie_queue_transcode_directory(
     directory: StackString,
     file: StackString,
-    _: LoggedUser,
-    state: AppState,
+    #[cookie = "jwt"] _: LoggedUser,
+    #[data] state: AppState,
 ) -> WarpResult<impl Reply> {
     let patterns = vec![file];
 
@@ -191,7 +199,7 @@ pub async fn movie_queue_transcode_directory(
     )
     .await?
     .into();
-    Ok(warp::reply::html(body))
+    Ok(rweb::reply::html(body))
 }
 
 fn play_worker(config: &Config, full_path: &path::Path) -> HttpResult<String> {
@@ -228,23 +236,30 @@ fn play_worker(config: &Config, full_path: &path::Path) -> HttpResult<String> {
     }
 }
 
-pub async fn movie_queue_play(idx: i32, _: LoggedUser, state: AppState) -> WarpResult<impl Reply> {
+#[get("/list/play/{idx}")]
+pub async fn movie_queue_play(
+    idx: i32,
+    #[cookie = "jwt"] _: LoggedUser,
+    #[data] state: AppState,
+) -> WarpResult<impl Reply> {
     let req = MoviePathRequest { idx };
     let movie_path = req.handle(&state.db, &state.config).await?;
     let movie_path = path::Path::new(movie_path.as_str());
     let body = play_worker(&state.config, &movie_path)?;
-    Ok(warp::reply::html(body))
+    Ok(rweb::reply::html(body))
 }
 
+#[get("/list/imdb/{show}")]
 pub async fn imdb_show(
     show: StackString,
-    query: ParseImdbRequest,
-    _: LoggedUser,
-    state: AppState,
+    query: Query<ParseImdbRequest>,
+    #[cookie = "jwt"] _: LoggedUser,
+    #[data] state: AppState,
 ) -> WarpResult<impl Reply> {
+    let query = query.into_inner();
     let req = ImdbShowRequest { show, query };
     let body: String = req.handle(&state.db, &state.config).await?.into();
-    Ok(warp::reply::html(body))
+    Ok(rweb::reply::html(body))
 }
 
 fn new_episode_worker(entries: &[StackString]) -> String {
@@ -263,108 +278,126 @@ fn new_episode_worker(entries: &[StackString]) -> String {
     )
 }
 
+#[get("/list/cal")]
 pub async fn find_new_episodes(
-    query: FindNewEpisodeRequest,
-    _: LoggedUser,
-    state: AppState,
+    query: Query<FindNewEpisodeRequest>,
+    #[cookie = "jwt"] _: LoggedUser,
+    #[data] state: AppState,
 ) -> WarpResult<impl Reply> {
-    let entries = query.handle(&state.db, &state.config).await?;
+    let entries = query.into_inner().handle(&state.db, &state.config).await?;
     let body = new_episode_worker(&entries);
-    Ok(warp::reply::html(body))
+    Ok(rweb::reply::html(body))
 }
 
+#[get("/list/imdb_episodes")]
 pub async fn imdb_episodes_route(
-    query: ImdbEpisodesSyncRequest,
-    _: LoggedUser,
-    state: AppState,
+    query: Query<ImdbEpisodesSyncRequest>,
+    #[cookie = "jwt"] _: LoggedUser,
+    #[data] state: AppState,
 ) -> WarpResult<impl Reply> {
-    let x = query.handle(&state.db).await?;
-    Ok(warp::reply::json(&x))
+    let x = query.into_inner().handle(&state.db).await?;
+    Ok(rweb::reply::json(&x))
 }
 
+#[post("/list/imdb_episodes")]
 pub async fn imdb_episodes_update(
-    episodes: ImdbEpisodesUpdateRequest,
-    _: LoggedUser,
-    state: AppState,
+    episodes: Json<ImdbEpisodesUpdateRequest>,
+    #[cookie = "jwt"] _: LoggedUser,
+    #[data] state: AppState,
 ) -> WarpResult<impl Reply> {
-    episodes.handle(&state.db).await?;
-    Ok(warp::reply::html("Success"))
+    episodes.into_inner().handle(&state.db).await?;
+    Ok(rweb::reply::html("Success"))
 }
 
+#[get("/list/imdb_ratings")]
 pub async fn imdb_ratings_route(
-    query: ImdbRatingsSyncRequest,
-    _: LoggedUser,
-    state: AppState,
+    query: Query<ImdbRatingsSyncRequest>,
+    #[cookie = "jwt"] _: LoggedUser,
+    #[data] state: AppState,
 ) -> WarpResult<impl Reply> {
-    let x = query.handle(&state.db).await?;
-    Ok(warp::reply::json(&x))
+    let x = query.into_inner().handle(&state.db).await?;
+    Ok(rweb::reply::json(&x))
 }
 
+#[post("/list/imdb_ratings")]
 pub async fn imdb_ratings_update(
-    shows: ImdbRatingsUpdateRequest,
-    _: LoggedUser,
-    state: AppState,
+    shows: Json<ImdbRatingsUpdateRequest>,
+    #[cookie = "jwt"] _: LoggedUser,
+    #[data] state: AppState,
 ) -> WarpResult<impl Reply> {
-    shows.handle(&state.db).await?;
-    Ok(warp::reply::html("Success"))
+    shows.into_inner().handle(&state.db).await?;
+    Ok(rweb::reply::html("Success"))
 }
 
+#[get("/list/imdb_ratings/set_source")]
 pub async fn imdb_ratings_set_source(
-    query: ImdbRatingsSetSourceRequest,
-    _: LoggedUser,
-    state: AppState,
+    query: Query<ImdbRatingsSetSourceRequest>,
+    #[cookie = "jwt"] _: LoggedUser,
+    #[data] state: AppState,
 ) -> WarpResult<impl Reply> {
-    query.handle(&state.db).await?;
-    Ok(warp::reply::html("Success"))
+    query.into_inner().handle(&state.db).await?;
+    Ok(rweb::reply::html("Success"))
 }
 
+#[get("/list/movie_queue")]
 pub async fn movie_queue_route(
-    query: MovieQueueSyncRequest,
-    _: LoggedUser,
-    state: AppState,
+    query: Query<MovieQueueSyncRequest>,
+    #[cookie = "jwt"] _: LoggedUser,
+    #[data] state: AppState,
 ) -> WarpResult<impl Reply> {
-    let x = query.handle(&state.db, &state.config).await?;
-    Ok(warp::reply::json(&x))
+    let x = query.into_inner().handle(&state.db, &state.config).await?;
+    Ok(rweb::reply::json(&x))
 }
 
+#[post("/list/movie_queue")]
 pub async fn movie_queue_update(
-    queue: MovieQueueUpdateRequest,
-    _: LoggedUser,
-    state: AppState,
+    queue: Json<MovieQueueUpdateRequest>,
+    #[cookie = "jwt"] _: LoggedUser,
+    #[data] state: AppState,
 ) -> WarpResult<impl Reply> {
-    queue.handle(&state.db, &state.config).await?;
-    Ok(warp::reply::html("Success"))
+    queue.into_inner().handle(&state.db, &state.config).await?;
+    Ok(rweb::reply::html("Success"))
 }
 
+#[get("/list/movie_collection")]
 pub async fn movie_collection_route(
-    query: MovieCollectionSyncRequest,
-    _: LoggedUser,
-    state: AppState,
+    query: Query<MovieCollectionSyncRequest>,
+    #[cookie = "jwt"] _: LoggedUser,
+    #[data] state: AppState,
 ) -> WarpResult<impl Reply> {
-    let x = query.handle(&state.db, &state.config).await?;
-    Ok(warp::reply::json(&x))
+    let x = query.into_inner().handle(&state.db, &state.config).await?;
+    Ok(rweb::reply::json(&x))
 }
 
+#[post("/list/movie_collection")]
 pub async fn movie_collection_update(
-    collection: MovieCollectionUpdateRequest,
-    _: LoggedUser,
-    state: AppState,
+    collection: Json<MovieCollectionUpdateRequest>,
+    #[cookie = "jwt"] _: LoggedUser,
+    #[data] state: AppState,
 ) -> WarpResult<impl Reply> {
-    collection.handle(&state.db, &state.config).await?;
-    Ok(warp::reply::html("Success"))
+    collection
+        .into_inner()
+        .handle(&state.db, &state.config)
+        .await?;
+    Ok(rweb::reply::html("Success"))
 }
 
-pub async fn last_modified_route(_: LoggedUser, state: AppState) -> WarpResult<impl Reply> {
+#[get("/list/last_modified")]
+pub async fn last_modified_route(
+    #[cookie = "jwt"] _: LoggedUser,
+    #[data] state: AppState,
+) -> WarpResult<impl Reply> {
     let req = LastModifiedRequest {};
     let x = req.handle(&state.db).await?;
-    Ok(warp::reply::json(&x))
+    Ok(rweb::reply::json(&x))
 }
 
-pub async fn frontpage(_: LoggedUser, _: AppState) -> WarpResult<impl Reply> {
+#[get("/list/index.html")]
+pub async fn frontpage(#[cookie = "jwt"] _: LoggedUser) -> WarpResult<impl Reply> {
     let body = HBR
         .render("index.html", &hashmap! {"BODY" => ""})
         .map_err(Into::<Error>::into)?;
-    Ok(warp::reply::html(body))
+    Ok(rweb::reply::html(body))
 }
 
 type TvShowsMap = HashMap<StackString, (StackString, WatchListShow, Option<TvShowSource>)>;
@@ -447,7 +480,11 @@ fn tvshows_worker(res1: TvShowsMap, tvshows: Vec<TvShowsResult>) -> StackString 
     .into()
 }
 
-pub async fn tvshows(_: LoggedUser, state: AppState) -> WarpResult<impl Reply> {
+#[get("/list/tvshows")]
+pub async fn tvshows(
+    #[cookie = "jwt"] _: LoggedUser,
+    #[data] state: AppState,
+) -> WarpResult<impl Reply> {
     let mock_stdout = MockStdout::new();
     let stdout = StdoutChannel::with_mock_stdout(mock_stdout.clone(), mock_stdout.clone());
 
@@ -457,7 +494,7 @@ pub async fn tvshows(_: LoggedUser, state: AppState) -> WarpResult<impl Reply> {
         .await
         .map_err(Into::<Error>::into)?;
     let body: String = tvshows_worker(show_map, shows).into();
-    Ok(warp::reply::html(body))
+    Ok(rweb::reply::html(body))
 }
 
 fn process_shows(
@@ -512,13 +549,15 @@ fn process_shows(
         .collect()
 }
 
-pub async fn user(user: LoggedUser) -> WarpResult<impl Reply> {
-    Ok(warp::reply::json(&user))
+#[get("/list/user")]
+pub async fn user(#[cookie = "jwt"] user: LoggedUser) -> WarpResult<impl Reply> {
+    Ok(rweb::reply::json(&user))
 }
 
+#[get("/list/transcode/status")]
 pub async fn movie_queue_transcode_status(
-    _: LoggedUser,
-    state: AppState,
+    #[cookie = "jwt"] _: LoggedUser,
+    #[data] state: AppState,
 ) -> WarpResult<impl Reply> {
     let config = state.config.clone();
     let task = timeout(Duration::from_secs(10), FileLists::get_file_lists(&config));
@@ -529,13 +568,14 @@ pub async fn movie_queue_transcode_status(
         .await
         .map_or_else(|_| FileLists::default(), Result::unwrap);
     let body = status.get_html(&file_lists, &state.config).join("");
-    Ok(warp::reply::html(body))
+    Ok(rweb::reply::html(body))
 }
 
+#[get("/list/transcode/file/{filename}")]
 pub async fn movie_queue_transcode_file(
     filename: StackString,
-    _: LoggedUser,
-    state: AppState,
+    #[cookie = "jwt"] _: LoggedUser,
+    #[data] state: AppState,
 ) -> WarpResult<impl Reply> {
     let mock_stdout = MockStdout::new();
     let stdout = StdoutChannel::with_mock_stdout(mock_stdout.clone(), mock_stdout.clone());
@@ -563,13 +603,14 @@ pub async fn movie_queue_transcode_file(
         .await
         .map_err(Into::<Error>::into)?
         .into();
-    Ok(warp::reply::html(body))
+    Ok(rweb::reply::html(body))
 }
 
+#[get("/list/transcode/remcom/file/{filename}")]
 pub async fn movie_queue_remcom_file(
     filename: StackString,
-    _: LoggedUser,
-    state: AppState,
+    #[cookie = "jwt"] _: LoggedUser,
+    #[data] state: AppState,
 ) -> WarpResult<impl Reply> {
     let mock_stdout = MockStdout::new();
     let stdout = StdoutChannel::with_mock_stdout(mock_stdout.clone(), mock_stdout.clone());
@@ -604,14 +645,15 @@ pub async fn movie_queue_remcom_file(
         .await
         .map_err(Into::<Error>::into)?
         .into();
-    Ok(warp::reply::html(body))
+    Ok(rweb::reply::html(body))
 }
 
+#[get("/list/transcode/remcom/directory/{directory}/{filename}")]
 pub async fn movie_queue_remcom_directory_file(
     directory: StackString,
     filename: StackString,
-    _: LoggedUser,
-    state: AppState,
+    #[cookie = "jwt"] _: LoggedUser,
+    #[data] state: AppState,
 ) -> WarpResult<impl Reply> {
     let mock_stdout = MockStdout::new();
     let stdout = StdoutChannel::with_mock_stdout(mock_stdout.clone(), mock_stdout.clone());
@@ -645,13 +687,14 @@ pub async fn movie_queue_remcom_directory_file(
         .await
         .map_err(Into::<Error>::into)?
         .into();
-    Ok(warp::reply::html(body))
+    Ok(rweb::reply::html(body))
 }
 
+#[get("/list/transcode/cleanup/{path}")]
 pub async fn movie_queue_transcode_cleanup(
     path: StackString,
-    _: LoggedUser,
-    state: AppState,
+    #[cookie = "jwt"] _: LoggedUser,
+    #[data] state: AppState,
 ) -> WarpResult<impl Reply> {
     let movie_path = state
         .config
@@ -671,7 +714,7 @@ pub async fn movie_queue_transcode_cleanup(
     } else {
         format!("File not found {}", path)
     };
-    Ok(warp::reply::html(body))
+    Ok(rweb::reply::html(body))
 }
 
 fn watchlist_worker(
@@ -746,12 +789,16 @@ fn watchlist_worker(
     format!(r#"{}<table border="0">{}</table>"#, previous, shows).into()
 }
 
-pub async fn trakt_watchlist(_: LoggedUser, state: AppState) -> WarpResult<impl Reply> {
+#[get("/trakt/watchlist")]
+pub async fn trakt_watchlist(
+    #[cookie = "jwt"] _: LoggedUser,
+    #[data] state: AppState,
+) -> WarpResult<impl Reply> {
     let shows = get_watchlist_shows_db_map(&state.db)
         .await
         .map_err(Into::<Error>::into)?;
     let body: String = watchlist_worker(shows).into();
-    Ok(warp::reply::html(body))
+    Ok(rweb::reply::html(body))
 }
 
 async fn watchlist_action_worker(
@@ -768,18 +815,19 @@ async fn watchlist_action_worker(
     Ok(body.into())
 }
 
+#[get("/trakt/watchlist/{action}/{imdb_url}")]
 pub async fn trakt_watchlist_action(
     action: TraktActions,
     imdb_url: StackString,
-    _: LoggedUser,
-    state: AppState,
+    #[cookie = "jwt"] _: LoggedUser,
+    #[data] state: AppState,
 ) -> WarpResult<impl Reply> {
     let req = WatchlistActionRequest { action, imdb_url };
     let imdb_url = req.handle(&state.db, &state.trakt).await?;
     let body: String = watchlist_action_worker(&state.trakt, action, &imdb_url)
         .await?
         .into();
-    Ok(warp::reply::html(body))
+    Ok(rweb::reply::html(body))
 }
 
 fn trakt_watched_seasons_worker(link: &str, imdb_url: &str, entries: &[ImdbSeason]) -> StackString {
@@ -812,10 +860,11 @@ fn trakt_watched_seasons_worker(link: &str, imdb_url: &str, entries: &[ImdbSeaso
     format!(r#"{}<table border="0">{}</table>"#, previous, entries).into()
 }
 
+#[get("/trakt/watched/list/{imdb_url}")]
 pub async fn trakt_watched_seasons(
     imdb_url: StackString,
-    _: LoggedUser,
-    state: AppState,
+    #[cookie = "jwt"] _: LoggedUser,
+    #[data] state: AppState,
 ) -> WarpResult<impl Reply> {
     let show_opt = ImdbRatings::get_show_by_link(&imdb_url, &state.db)
         .await
@@ -828,14 +877,15 @@ pub async fn trakt_watched_seasons(
     let req = ImdbSeasonsRequest { show };
     let entries = req.handle(&state.db, &state.config).await?;
     let body: String = trakt_watched_seasons_worker(&link, &imdb_url, &entries).into();
-    Ok(warp::reply::html(body))
+    Ok(rweb::reply::html(body))
 }
 
+#[get("/trakt/watched/list/{imdb_url}/{season}")]
 pub async fn trakt_watched_list(
     imdb_url: StackString,
     season: i32,
-    _: LoggedUser,
-    state: AppState,
+    #[cookie = "jwt"] _: LoggedUser,
+    #[data] state: AppState,
 ) -> WarpResult<impl Reply> {
     let mock_stdout = MockStdout::new();
     let stdout = StdoutChannel::with_mock_stdout(mock_stdout.clone(), mock_stdout.clone());
@@ -843,16 +893,17 @@ pub async fn trakt_watched_list(
     let body: String = watch_list_http_worker(&state.config, &state.db, &stdout, &imdb_url, season)
         .await?
         .into();
-    Ok(warp::reply::html(body))
+    Ok(rweb::reply::html(body))
 }
 
+#[get("/trakt/watched/{action}/{imdb_url}/{season}/{episode}")]
 pub async fn trakt_watched_action(
     action: TraktActions,
     imdb_url: StackString,
     season: i32,
     episode: i32,
-    _: LoggedUser,
-    state: AppState,
+    #[cookie = "jwt"] _: LoggedUser,
+    #[data] state: AppState,
 ) -> WarpResult<impl Reply> {
     let mock_stdout = MockStdout::new();
     let stdout = StdoutChannel::with_mock_stdout(mock_stdout.clone(), mock_stdout.clone());
@@ -869,7 +920,7 @@ pub async fn trakt_watched_action(
     )
     .await?
     .into();
-    Ok(warp::reply::html(body))
+    Ok(rweb::reply::html(body))
 }
 
 fn trakt_cal_worker(entries: &[StackString]) -> StackString {
@@ -882,13 +933,21 @@ fn trakt_cal_worker(entries: &[StackString]) -> StackString {
     .into()
 }
 
-pub async fn trakt_cal(_: LoggedUser, state: AppState) -> WarpResult<impl Reply> {
+#[get("/trakt/cal")]
+pub async fn trakt_cal(
+    #[cookie = "jwt"] _: LoggedUser,
+    #[data] state: AppState,
+) -> WarpResult<impl Reply> {
     let entries = trakt_cal_http_worker(&state.trakt, &state.db).await?;
     let body: String = trakt_cal_worker(&entries).into();
-    Ok(warp::reply::html(body))
+    Ok(rweb::reply::html(body))
 }
 
-pub async fn trakt_auth_url(_: LoggedUser, state: AppState) -> WarpResult<impl Reply> {
+#[get("/trakt/auth_url")]
+pub async fn trakt_auth_url(
+    #[cookie = "jwt"] _: LoggedUser,
+    #[data] state: AppState,
+) -> WarpResult<impl Reply> {
     state.trakt.init().await;
     let url: String = state
         .trakt
@@ -896,21 +955,23 @@ pub async fn trakt_auth_url(_: LoggedUser, state: AppState) -> WarpResult<impl R
         .await
         .map(Into::into)
         .map_err(Into::<Error>::into)?;
-    Ok(warp::reply::html(url))
+    Ok(rweb::reply::html(url))
 }
 
-#[derive(Serialize, Deserialize)]
+#[derive(Serialize, Deserialize, Schema)]
 pub struct TraktCallbackRequest {
     pub code: StackString,
     pub state: StackString,
 }
 
+#[get("/trakt/callback")]
 pub async fn trakt_callback(
-    query: TraktCallbackRequest,
-    _: LoggedUser,
-    state: AppState,
+    query: Query<TraktCallbackRequest>,
+    #[cookie = "jwt"] _: LoggedUser,
+    #[data] state: AppState,
 ) -> WarpResult<impl Reply> {
     state.trakt.init().await;
+    let query = query.into_inner();
     state
         .trakt
         .exchange_code_for_auth_token(query.code.as_str(), query.state.as_str())
@@ -920,17 +981,21 @@ pub async fn trakt_callback(
         <title>Trakt auth code received!</title>
         This window can be closed.
         <script language="JavaScript" type="text/javascript">window.close()</script>"#;
-    Ok(warp::reply::html(body))
+    Ok(rweb::reply::html(body))
 }
 
-pub async fn refresh_auth(_: LoggedUser, state: AppState) -> WarpResult<impl Reply> {
+#[get("/trakt/refresh_auth")]
+pub async fn refresh_auth(
+    #[cookie = "jwt"] _: LoggedUser,
+    #[data] state: AppState,
+) -> WarpResult<impl Reply> {
     state.trakt.init().await;
     state
         .trakt
         .exchange_refresh_token()
         .await
         .map_err(Into::<Error>::into)?;
-    Ok(warp::reply::html("finished"))
+    Ok(rweb::reply::html("finished"))
 }
 
 async fn trakt_cal_http_worker(

@@ -14,6 +14,7 @@
 #![allow(clippy::inconsistent_struct_constructor)]
 
 pub mod config;
+pub mod datetime_wrapper;
 pub mod imdb_episodes;
 pub mod imdb_ratings;
 pub mod imdb_utils;
@@ -22,6 +23,7 @@ pub mod make_list;
 pub mod make_queue;
 pub mod movie_collection;
 pub mod movie_queue;
+pub mod naivedate_wrapper;
 pub mod parse_imdb;
 pub mod pgpool;
 pub mod trakt_connection;

@@ -23,7 +23,7 @@ lazy_static! {
     pub static ref HBR: Handlebars<'static> = get_templates().expect("Failed to parse templates");
 }
 
-fn get_templates() -> Result<Handlebars<'static>, Error> {
+pub fn get_templates() -> Result<Handlebars<'static>, Error> {
     let mut h = Handlebars::new();
     h.register_template_string("index.html", include_str!("../../templates/index.html"))?;
     Ok(h)
