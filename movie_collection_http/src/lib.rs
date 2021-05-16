@@ -10,6 +10,7 @@
 #![allow(clippy::missing_errors_doc)]
 #![allow(clippy::used_underscore_binding)]
 #![allow(clippy::manual_map)]
+#![allow(clippy::default_trait_access)]
 
 pub mod errors;
 pub mod logged_user;

@@ -12,6 +12,7 @@
 #![allow(clippy::used_underscore_binding)]
 #![allow(clippy::upper_case_acronyms)]
 #![allow(clippy::inconsistent_struct_constructor)]
+#![allow(clippy::default_trait_access)]
 
 pub mod config;
 pub mod datetime_wrapper;
