@@ -1,13 +1,13 @@
 [package]
 name = "movie_collection_http"
-version = "0.8.5"
+version = "0.8.6"
 authors = ["Daniel Boline <ddboline@gmail.com>"]
 edition = "2018"
 
 [dependencies]
 movie_collection_lib = {path = "../movie_collection_lib"}
 futures = "0.3"
-warp = "0.3"
+rweb = {version="0.12", features=["openapi"]}
 http = "0.2"
 serde = "1.0"
 serde_derive = "1.0"
@@ -23,6 +23,7 @@ log = "0.4"
 maplit = "1.0"
 handlebars = "3.5"
 itertools = "0.10"
-authorized_users = { git = "https://github.com/ddboline/auth_server_rust.git", tag="0.4.11"}
-stack-string = { version="0.2", features=["postgres_types"] }
+indexmap = "1.6"
+authorized_users = { git = "https://github.com/ddboline/auth_server_rust.git", tag="0.5.0"}
+stack-string = { version="0.2", features=["postgres_types", "rweb-openapi"] }
 stdout-channel = "0.4"

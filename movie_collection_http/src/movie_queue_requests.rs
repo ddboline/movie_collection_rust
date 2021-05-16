@@ -1,11 +1,12 @@
 use anyhow::format_err;
-use chrono::{DateTime, Utc};
+use rweb::Schema;
 use serde::{Deserialize, Serialize};
 use stack_string::StackString;
 use stdout_channel::{MockStdout, StdoutChannel};
 
 use movie_collection_lib::{
     config::Config,
+    datetime_wrapper::DateTimeWrapper,
     imdb_episodes::ImdbEpisodes,
     imdb_ratings::ImdbRatings,
     movie_collection::{
@@ -163,7 +164,7 @@ impl ImdbEpisodesRequest {
     }
 }
 
-#[derive(Deserialize, Default)]
+#[derive(Deserialize, Default, Schema)]
 pub struct ParseImdbRequest {
     pub all: Option<bool>,
     pub database: Option<bool>,
@@ -213,7 +214,7 @@ impl ImdbShowRequest {
     }
 }
 
-#[derive(Serialize, Deserialize)]
+#[derive(Serialize, Deserialize, Schema)]
 pub struct FindNewEpisodeRequest {
     pub source: Option<TvShowSource>,
     pub shows: Option<StackString>,
@@ -230,35 +231,35 @@ impl FindNewEpisodeRequest {
     }
 }
 
-#[derive(Serialize, Deserialize, Debug)]
+#[derive(Serialize, Deserialize, Debug, Schema)]
 pub struct ImdbEpisodesSyncRequest {
-    pub start_timestamp: DateTime<Utc>,
+    pub start_timestamp: DateTimeWrapper,
 }
 
 impl ImdbEpisodesSyncRequest {
     pub async fn handle(&self, pool: &PgPool) -> Result<Vec<ImdbEpisodes>, Error> {
-        ImdbEpisodes::get_episodes_after_timestamp(self.start_timestamp, pool)
+        ImdbEpisodes::get_episodes_after_timestamp(self.start_timestamp.into(), pool)
             .await
             .map_err(Into::into)
     }
 }
 
-#[derive(Serialize, Deserialize)]
+#[derive(Serialize, Deserialize, Schema)]
 pub struct ImdbRatingsSyncRequest {
-    pub start_timestamp: DateTime<Utc>,
+    pub start_timestamp: DateTimeWrapper,
 }
 
 impl ImdbRatingsSyncRequest {
     pub async fn handle(&self, pool: &PgPool) -> Result<Vec<ImdbRatings>, Error> {
-        ImdbRatings::get_shows_after_timestamp(self.start_timestamp, pool)
+        ImdbRatings::get_shows_after_timestamp(self.start_timestamp.into(), pool)
             .await
             .map_err(Into::into)
     }
 }
 
-#[derive(Serialize, Deserialize)]
+#[derive(Serialize, Deserialize, Schema)]
 pub struct MovieQueueSyncRequest {
-    pub start_timestamp: DateTime<Utc>,
+    pub start_timestamp: DateTimeWrapper,
 }
 
 impl MovieQueueSyncRequest {
@@ -271,15 +272,15 @@ impl MovieQueueSyncRequest {
         let stdout = StdoutChannel::with_mock_stdout(mock_stdout.clone(), mock_stdout.clone());
 
         let mq = MovieQueueDB::new(&config, pool, &stdout);
-        mq.get_queue_after_timestamp(self.start_timestamp)
+        mq.get_queue_after_timestamp(self.start_timestamp.into())
             .await
             .map_err(Into::into)
     }
 }
 
-#[derive(Serialize, Deserialize)]
+#[derive(Serialize, Deserialize, Schema)]
 pub struct MovieCollectionSyncRequest {
-    pub start_timestamp: DateTime<Utc>,
+    pub start_timestamp: DateTimeWrapper,
 }
 
 impl MovieCollectionSyncRequest {
@@ -292,13 +293,13 @@ impl MovieCollectionSyncRequest {
         let stdout = StdoutChannel::with_mock_stdout(mock_stdout.clone(), mock_stdout.clone());
 
         let mc = MovieCollection::new(&config, pool, &stdout);
-        mc.get_collection_after_timestamp(self.start_timestamp)
+        mc.get_collection_after_timestamp(self.start_timestamp.into())
             .await
             .map_err(Into::into)
     }
 }
 
-#[derive(Serialize, Deserialize)]
+#[derive(Serialize, Deserialize, Schema)]
 pub struct ImdbEpisodesUpdateRequest {
     pub episodes: Vec<ImdbEpisodes>,
 }
@@ -315,7 +316,7 @@ impl ImdbEpisodesUpdateRequest {
     }
 }
 
-#[derive(Serialize, Deserialize)]
+#[derive(Serialize, Deserialize, Schema)]
 pub struct ImdbRatingsUpdateRequest {
     pub shows: Vec<ImdbRatings>,
 }
@@ -332,7 +333,7 @@ impl ImdbRatingsUpdateRequest {
     }
 }
 
-#[derive(Serialize, Deserialize)]
+#[derive(Serialize, Deserialize, Schema)]
 pub struct ImdbRatingsSetSourceRequest {
     pub link: StackString,
     pub source: TvShowSource,
@@ -353,7 +354,7 @@ impl ImdbRatingsSetSourceRequest {
     }
 }
 
-#[derive(Serialize, Deserialize)]
+#[derive(Serialize, Deserialize, Schema)]
 pub struct MovieQueueUpdateRequest {
     pub queue: Vec<MovieQueueRow>,
 }
@@ -383,7 +384,7 @@ impl MovieQueueUpdateRequest {
     }
 }
 
-#[derive(Serialize, Deserialize)]
+#[derive(Serialize, Deserialize, Schema)]
 pub struct MovieCollectionUpdateRequest {
     pub collection: Vec<MovieCollectionRow>,
 }

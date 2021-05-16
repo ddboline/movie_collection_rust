@@ -208,7 +208,7 @@ impl ParseImdb {
 
                             if let Some(e) = episodes.get(&key) {
                                 if (e.rating - episode.rating.unwrap_or(-1.0)).abs() > 0.1
-                                    || e.airdate != airdate
+                                    || e.airdate != airdate.into()
                                     || Some(&e.eptitle) != episode.eptitle.as_ref()
                                 {
                                     output.push(vec![format!(
@@ -219,7 +219,7 @@ impl ParseImdb {
                                     let mut new = e.clone();
                                     new.eptitle = episode.eptitle.unwrap_or_else(|| "".into());
                                     new.rating = episode.rating.unwrap_or(-1.0);
-                                    new.airdate = airdate;
+                                    new.airdate = airdate.into();
                                     new.update_episode(&self.mc.pool).await?;
                                 }
                             } else {
@@ -231,7 +231,7 @@ impl ParseImdb {
                                     title: result.title.clone().unwrap_or_else(|| "".into()),
                                     season: episode.season,
                                     episode: episode.episode,
-                                    airdate,
+                                    airdate: airdate.into(),
                                     rating: episode.rating.unwrap_or(-1.0),
                                     eptitle: episode.eptitle.unwrap_or_else(|| "".into()),
                                     epurl: episode.epurl.unwrap_or_else(|| "".into()),
