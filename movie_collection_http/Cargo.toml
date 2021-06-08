@@ -1,6 +1,6 @@
 [package]
 name = "movie_collection_http"
-version = "0.8.6"
+version = "0.8.7"
 authors = ["Daniel Boline <ddboline@gmail.com>"]
 edition = "2018"
 
@@ -21,9 +21,11 @@ thiserror = "1.0"
 async-trait = "0.1"
 log = "0.4"
 maplit = "1.0"
-handlebars = "3.5"
+handlebars = "4.0"
 itertools = "0.10"
 indexmap = "1.6"
-authorized_users = { git = "https://github.com/ddboline/auth_server_rust.git", tag="0.5.0"}
+serde_yaml = "0.8"
+rweb_helper = { git = "https://github.com/ddboline/rweb_helper.git", tag="0.2.2" }
+authorized_users = { git = "https://github.com/ddboline/auth_server_rust.git", tag="0.5.4"}
 stack-string = { version="0.2", features=["postgres_types", "rweb-openapi"] }
 stdout-channel = "0.4"

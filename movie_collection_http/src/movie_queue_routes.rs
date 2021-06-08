@@ -3,7 +3,10 @@
 use anyhow::format_err;
 use itertools::Itertools;
 use maplit::hashmap;
-use rweb::{get, post, Json, Query, Rejection, Reply, Schema};
+use rweb::{get, post, Json, Query, Rejection, Schema};
+use rweb_helper::{
+    html_response::HtmlResponse as HtmlBase, json_response::JsonResponse as JsonBase, RwebResponse,
+};
 use serde::{Deserialize, Serialize};
 use stack_string::StackString;
 use std::{
@@ -24,8 +27,10 @@ use movie_collection_lib::{
     imdb_ratings::ImdbRatings,
     make_list::FileLists,
     make_queue::movie_queue_http,
-    movie_collection::{ImdbSeason, MovieCollection, TvShowsResult},
-    movie_queue::{MovieQueueDB, MovieQueueResult},
+    movie_collection::{
+        ImdbSeason, LastModifiedResponse, MovieCollection, MovieCollectionRow, TvShowsResult,
+    },
+    movie_queue::{MovieQueueDB, MovieQueueResult, MovieQueueRow},
     pgpool::PgPool,
     trakt_connection::TraktConnection,
     trakt_utils::{
@@ -86,11 +91,15 @@ async fn queue_body_resp(
     Ok(body)
 }
 
+#[derive(RwebResponse)]
+#[response(description = "Movie Queue", content = "html")]
+struct MovieQueueResponse(HtmlBase<String, Error>);
+
 #[get("/list/full_queue")]
 pub async fn movie_queue(
     #[cookie = "jwt"] _: LoggedUser,
     #[data] state: AppState,
-) -> WarpResult<impl Reply> {
+) -> WarpResult<MovieQueueResponse> {
     let req = MovieQueueRequest {
         patterns: Vec::new(),
     };
@@ -98,7 +107,7 @@ pub async fn movie_queue(
     let body: String = queue_body_resp(&state.config, Vec::new(), queue, &state.db)
         .await?
         .into();
-    Ok(rweb::reply::html(body))
+    Ok(HtmlBase::new(body).into())
 }
 
 #[get("/list/{path}")]
@@ -106,7 +115,7 @@ pub async fn movie_queue_show(
     path: StackString,
     #[cookie = "jwt"] _: LoggedUser,
     #[data] state: AppState,
-) -> WarpResult<impl Reply> {
+) -> WarpResult<MovieQueueResponse> {
     let patterns = vec![path];
 
     let req = MovieQueueRequest { patterns };
@@ -114,15 +123,19 @@ pub async fn movie_queue_show(
     let body: String = queue_body_resp(&state.config, patterns, queue, &state.db)
         .await?
         .into();
-    Ok(rweb::reply::html(body))
+    Ok(HtmlBase::new(body).into())
 }
+
+#[derive(RwebResponse)]
+#[response(description = "Delete Queue Entry", content = "html")]
+struct DeleteMovieQueueResponse(HtmlBase<String, Error>);
 
 #[get("/list/delete/{path}")]
 pub async fn movie_queue_delete(
     path: StackString,
     #[cookie = "jwt"] _: LoggedUser,
     #[data] state: AppState,
-) -> WarpResult<impl Reply> {
+) -> WarpResult<DeleteMovieQueueResponse> {
     let mock_stdout = MockStdout::new();
     let stdout = StdoutChannel::with_mock_stdout(mock_stdout.clone(), mock_stdout.clone());
 
@@ -133,7 +146,7 @@ pub async fn movie_queue_delete(
             .map_err(Into::<Error>::into)?;
     }
     let body: String = path.into();
-    Ok(rweb::reply::html(body))
+    Ok(HtmlBase::new(body).into())
 }
 
 async fn transcode_worker(
@@ -164,12 +177,16 @@ async fn transcode_worker(
     Ok(output.join("").into())
 }
 
+#[derive(RwebResponse)]
+#[response(description = "Transcode Queue Item", content = "html")]
+struct TranscodeQueueResponse(HtmlBase<String, Error>);
+
 #[get("/list/transcode/queue/{path}")]
 pub async fn movie_queue_transcode(
     path: StackString,
     #[cookie = "jwt"] _: LoggedUser,
     #[data] state: AppState,
-) -> WarpResult<impl Reply> {
+) -> WarpResult<TranscodeQueueResponse> {
     let patterns = vec![path];
 
     let req = MovieQueueRequest { patterns };
@@ -177,7 +194,7 @@ pub async fn movie_queue_transcode(
     let body: String = transcode_worker(&state.config, None, &entries, &state.db)
         .await?
         .into();
-    Ok(rweb::reply::html(body))
+    Ok(HtmlBase::new(body).into())
 }
 
 #[get("/list/transcode/queue/{directory}/{file}")]
@@ -186,7 +203,7 @@ pub async fn movie_queue_transcode_directory(
     file: StackString,
     #[cookie = "jwt"] _: LoggedUser,
     #[data] state: AppState,
-) -> WarpResult<impl Reply> {
+) -> WarpResult<TranscodeQueueResponse> {
     let patterns = vec![file];
 
     let req = MovieQueueRequest { patterns };
@@ -199,7 +216,7 @@ pub async fn movie_queue_transcode_directory(
     )
     .await?
     .into();
-    Ok(rweb::reply::html(body))
+    Ok(HtmlBase::new(body).into())
 }
 
 fn play_worker(config: &Config, full_path: &path::Path) -> HttpResult<String> {
@@ -236,18 +253,26 @@ fn play_worker(config: &Config, full_path: &path::Path) -> HttpResult<String> {
     }
 }
 
+#[derive(RwebResponse)]
+#[response(description = "Play Queue Item", content = "html")]
+struct PlayQueueResponse(HtmlBase<String, Error>);
+
 #[get("/list/play/{idx}")]
 pub async fn movie_queue_play(
     idx: i32,
     #[cookie = "jwt"] _: LoggedUser,
     #[data] state: AppState,
-) -> WarpResult<impl Reply> {
+) -> WarpResult<PlayQueueResponse> {
     let req = MoviePathRequest { idx };
     let movie_path = req.handle(&state.db, &state.config).await?;
     let movie_path = path::Path::new(movie_path.as_str());
     let body = play_worker(&state.config, &movie_path)?;
-    Ok(rweb::reply::html(body))
+    Ok(HtmlBase::new(body).into())
 }
+
+#[derive(RwebResponse)]
+#[response(description = "List Imdb Show", content = "html")]
+struct ListImdbResponse(HtmlBase<String, Error>);
 
 #[get("/list/imdb/{show}")]
 pub async fn imdb_show(
@@ -255,11 +280,11 @@ pub async fn imdb_show(
     query: Query<ParseImdbRequest>,
     #[cookie = "jwt"] _: LoggedUser,
     #[data] state: AppState,
-) -> WarpResult<impl Reply> {
+) -> WarpResult<ListImdbResponse> {
     let query = query.into_inner();
     let req = ImdbShowRequest { show, query };
     let body: String = req.handle(&state.db, &state.config).await?.into();
-    Ok(rweb::reply::html(body))
+    Ok(HtmlBase::new(body).into())
 }
 
 fn new_episode_worker(entries: &[StackString]) -> String {
@@ -278,126 +303,190 @@ fn new_episode_worker(entries: &[StackString]) -> String {
     )
 }
 
+#[derive(RwebResponse)]
+#[response(description = "List Calendar", content = "html")]
+struct ListCalendarResponse(HtmlBase<String, Error>);
+
 #[get("/list/cal")]
 pub async fn find_new_episodes(
     query: Query<FindNewEpisodeRequest>,
     #[cookie = "jwt"] _: LoggedUser,
     #[data] state: AppState,
-) -> WarpResult<impl Reply> {
+) -> WarpResult<ListCalendarResponse> {
     let entries = query.into_inner().handle(&state.db, &state.config).await?;
     let body = new_episode_worker(&entries);
-    Ok(rweb::reply::html(body))
+    Ok(HtmlBase::new(body).into())
 }
+
+#[derive(RwebResponse)]
+#[response(description = "List Imdb Episodes")]
+struct ListImdbEpisodesResponse(JsonBase<Vec<ImdbEpisodes>, Error>);
 
 #[get("/list/imdb_episodes")]
 pub async fn imdb_episodes_route(
     query: Query<ImdbEpisodesSyncRequest>,
     #[cookie = "jwt"] _: LoggedUser,
     #[data] state: AppState,
-) -> WarpResult<impl Reply> {
+) -> WarpResult<ListImdbEpisodesResponse> {
     let x = query.into_inner().handle(&state.db).await?;
-    Ok(rweb::reply::json(&x))
+    Ok(JsonBase::new(x).into())
 }
+
+#[derive(RwebResponse)]
+#[response(
+    description = "Imdb Episodes Update",
+    content = "html",
+    status = "CREATED"
+)]
+struct ImdbEpisodesUpdateResponse(HtmlBase<&'static str, Error>);
 
 #[post("/list/imdb_episodes")]
 pub async fn imdb_episodes_update(
     episodes: Json<ImdbEpisodesUpdateRequest>,
     #[cookie = "jwt"] _: LoggedUser,
     #[data] state: AppState,
-) -> WarpResult<impl Reply> {
+) -> WarpResult<ImdbEpisodesUpdateResponse> {
     episodes.into_inner().handle(&state.db).await?;
-    Ok(rweb::reply::html("Success"))
+    Ok(HtmlBase::new("Success").into())
 }
+
+#[derive(RwebResponse)]
+#[response(description = "List Imdb Shows")]
+struct ListImdbShowsResponse(JsonBase<Vec<ImdbRatings>, Error>);
 
 #[get("/list/imdb_ratings")]
 pub async fn imdb_ratings_route(
     query: Query<ImdbRatingsSyncRequest>,
     #[cookie = "jwt"] _: LoggedUser,
     #[data] state: AppState,
-) -> WarpResult<impl Reply> {
+) -> WarpResult<ListImdbShowsResponse> {
     let x = query.into_inner().handle(&state.db).await?;
-    Ok(rweb::reply::json(&x))
+    Ok(JsonBase::new(x).into())
 }
+
+#[derive(RwebResponse)]
+#[response(
+    description = "Update Imdb Shows",
+    content = "html",
+    status = "CREATED"
+)]
+struct UpdateImdbShowsResponse(HtmlBase<&'static str, Error>);
 
 #[post("/list/imdb_ratings")]
 pub async fn imdb_ratings_update(
     shows: Json<ImdbRatingsUpdateRequest>,
     #[cookie = "jwt"] _: LoggedUser,
     #[data] state: AppState,
-) -> WarpResult<impl Reply> {
+) -> WarpResult<UpdateImdbShowsResponse> {
     shows.into_inner().handle(&state.db).await?;
-    Ok(rweb::reply::html("Success"))
+    Ok(HtmlBase::new("Success").into())
 }
+
+#[derive(RwebResponse)]
+#[response(description = "Imdb Show Set Source", content = "html")]
+struct ImdbSetSourceResponse(HtmlBase<&'static str, Error>);
 
 #[get("/list/imdb_ratings/set_source")]
 pub async fn imdb_ratings_set_source(
     query: Query<ImdbRatingsSetSourceRequest>,
     #[cookie = "jwt"] _: LoggedUser,
     #[data] state: AppState,
-) -> WarpResult<impl Reply> {
+) -> WarpResult<ImdbSetSourceResponse> {
     query.into_inner().handle(&state.db).await?;
-    Ok(rweb::reply::html("Success"))
+    Ok(HtmlBase::new("Success").into())
 }
+
+#[derive(RwebResponse)]
+#[response(description = "List Movie Queue Entries")]
+struct ListMovieQueueResponse(JsonBase<Vec<MovieQueueRow>, Error>);
 
 #[get("/list/movie_queue")]
 pub async fn movie_queue_route(
     query: Query<MovieQueueSyncRequest>,
     #[cookie = "jwt"] _: LoggedUser,
     #[data] state: AppState,
-) -> WarpResult<impl Reply> {
+) -> WarpResult<ListMovieQueueResponse> {
     let x = query.into_inner().handle(&state.db, &state.config).await?;
-    Ok(rweb::reply::json(&x))
+    Ok(JsonBase::new(x).into())
 }
+
+#[derive(RwebResponse)]
+#[response(
+    description = "Update Movie Queue Entries",
+    content = "html",
+    status = "CREATED"
+)]
+struct UpdateMovieQueueResponse(HtmlBase<&'static str, Error>);
 
 #[post("/list/movie_queue")]
 pub async fn movie_queue_update(
     queue: Json<MovieQueueUpdateRequest>,
     #[cookie = "jwt"] _: LoggedUser,
     #[data] state: AppState,
-) -> WarpResult<impl Reply> {
+) -> WarpResult<UpdateMovieQueueResponse> {
     queue.into_inner().handle(&state.db, &state.config).await?;
-    Ok(rweb::reply::html("Success"))
+    Ok(HtmlBase::new("Success").into())
 }
+
+#[derive(RwebResponse)]
+#[response(description = "List Movie Collection Entries")]
+struct ListMovieCollectionResponse(JsonBase<Vec<MovieCollectionRow>, Error>);
 
 #[get("/list/movie_collection")]
 pub async fn movie_collection_route(
     query: Query<MovieCollectionSyncRequest>,
     #[cookie = "jwt"] _: LoggedUser,
     #[data] state: AppState,
-) -> WarpResult<impl Reply> {
+) -> WarpResult<ListMovieCollectionResponse> {
     let x = query.into_inner().handle(&state.db, &state.config).await?;
-    Ok(rweb::reply::json(&x))
+    Ok(JsonBase::new(x).into())
 }
+
+#[derive(RwebResponse)]
+#[response(
+    description = "Update Movie Collection Entries",
+    content = "html",
+    status = "CREATED"
+)]
+struct UpdateMovieCollectionResponse(HtmlBase<&'static str, Error>);
 
 #[post("/list/movie_collection")]
 pub async fn movie_collection_update(
     collection: Json<MovieCollectionUpdateRequest>,
     #[cookie = "jwt"] _: LoggedUser,
     #[data] state: AppState,
-) -> WarpResult<impl Reply> {
+) -> WarpResult<UpdateMovieCollectionResponse> {
     collection
         .into_inner()
         .handle(&state.db, &state.config)
         .await?;
-    Ok(rweb::reply::html("Success"))
+    Ok(HtmlBase::new("Success").into())
 }
+
+#[derive(RwebResponse)]
+#[response(description = "Database Entries Last Modified Time")]
+struct ListLastModifiedResponse(JsonBase<Vec<LastModifiedResponse>, Error>);
 
 #[get("/list/last_modified")]
 pub async fn last_modified_route(
     #[cookie = "jwt"] _: LoggedUser,
     #[data] state: AppState,
-) -> WarpResult<impl Reply> {
+) -> WarpResult<ListLastModifiedResponse> {
     let req = LastModifiedRequest {};
     let x = req.handle(&state.db).await?;
-    Ok(rweb::reply::json(&x))
+    Ok(JsonBase::new(x).into())
 }
 
+#[derive(RwebResponse)]
+#[response(description = "Frontpage", content = "html")]
+struct FrontpageResponse(HtmlBase<String, Error>);
+
 #[get("/list/index.html")]
-pub async fn frontpage(#[cookie = "jwt"] _: LoggedUser) -> WarpResult<impl Reply> {
+pub async fn frontpage(#[cookie = "jwt"] _: LoggedUser) -> WarpResult<FrontpageResponse> {
     let body = HBR
         .render("index.html", &hashmap! {"BODY" => ""})
         .map_err(Into::<Error>::into)?;
-    Ok(rweb::reply::html(body))
+    Ok(HtmlBase::new(body).into())
 }
 
 type TvShowsMap = HashMap<StackString, (StackString, WatchListShow, Option<TvShowSource>)>;
@@ -480,11 +569,15 @@ fn tvshows_worker(res1: TvShowsMap, tvshows: Vec<TvShowsResult>) -> StackString 
     .into()
 }
 
+#[derive(RwebResponse)]
+#[response(description = "List TvShows", content = "html")]
+struct ListTvShowsResponse(HtmlBase<String, Error>);
+
 #[get("/list/tvshows")]
 pub async fn tvshows(
     #[cookie = "jwt"] _: LoggedUser,
     #[data] state: AppState,
-) -> WarpResult<impl Reply> {
+) -> WarpResult<ListTvShowsResponse> {
     let mock_stdout = MockStdout::new();
     let stdout = StdoutChannel::with_mock_stdout(mock_stdout.clone(), mock_stdout.clone());
 
@@ -494,7 +587,7 @@ pub async fn tvshows(
         .await
         .map_err(Into::<Error>::into)?;
     let body: String = tvshows_worker(show_map, shows).into();
-    Ok(rweb::reply::html(body))
+    Ok(HtmlBase::new(body).into())
 }
 
 fn process_shows(
@@ -549,16 +642,24 @@ fn process_shows(
         .collect()
 }
 
+#[derive(RwebResponse)]
+#[response(description = "Logged in User")]
+struct UserResponse(JsonBase<LoggedUser, Error>);
+
 #[get("/list/user")]
-pub async fn user(#[cookie = "jwt"] user: LoggedUser) -> WarpResult<impl Reply> {
-    Ok(rweb::reply::json(&user))
+pub async fn user(#[cookie = "jwt"] user: LoggedUser) -> WarpResult<UserResponse> {
+    Ok(JsonBase::new(user).into())
 }
+
+#[derive(RwebResponse)]
+#[response(description = "Transcode Status", content = "html")]
+struct TranscodeStatusResponse(HtmlBase<String, Error>);
 
 #[get("/list/transcode/status")]
 pub async fn movie_queue_transcode_status(
     #[cookie = "jwt"] _: LoggedUser,
     #[data] state: AppState,
-) -> WarpResult<impl Reply> {
+) -> WarpResult<TranscodeStatusResponse> {
     let config = state.config.clone();
     let task = timeout(Duration::from_secs(10), FileLists::get_file_lists(&config));
     let status = transcode_status(&state.config)
@@ -568,15 +669,19 @@ pub async fn movie_queue_transcode_status(
         .await
         .map_or_else(|_| FileLists::default(), Result::unwrap);
     let body = status.get_html(&file_lists, &state.config).join("");
-    Ok(rweb::reply::html(body))
+    Ok(HtmlBase::new(body).into())
 }
+
+#[derive(RwebResponse)]
+#[response(description = "Transcode File", content = "html")]
+struct TranscodeFileResponse(HtmlBase<String, Error>);
 
 #[get("/list/transcode/file/{filename}")]
 pub async fn movie_queue_transcode_file(
     filename: StackString,
     #[cookie = "jwt"] _: LoggedUser,
     #[data] state: AppState,
-) -> WarpResult<impl Reply> {
+) -> WarpResult<TranscodeFileResponse> {
     let mock_stdout = MockStdout::new();
     let stdout = StdoutChannel::with_mock_stdout(mock_stdout.clone(), mock_stdout.clone());
 
@@ -603,7 +708,7 @@ pub async fn movie_queue_transcode_file(
         .await
         .map_err(Into::<Error>::into)?
         .into();
-    Ok(rweb::reply::html(body))
+    Ok(HtmlBase::new(body).into())
 }
 
 #[get("/list/transcode/remcom/file/{filename}")]
@@ -611,7 +716,7 @@ pub async fn movie_queue_remcom_file(
     filename: StackString,
     #[cookie = "jwt"] _: LoggedUser,
     #[data] state: AppState,
-) -> WarpResult<impl Reply> {
+) -> WarpResult<TranscodeFileResponse> {
     let mock_stdout = MockStdout::new();
     let stdout = StdoutChannel::with_mock_stdout(mock_stdout.clone(), mock_stdout.clone());
 
@@ -645,7 +750,7 @@ pub async fn movie_queue_remcom_file(
         .await
         .map_err(Into::<Error>::into)?
         .into();
-    Ok(rweb::reply::html(body))
+    Ok(HtmlBase::new(body).into())
 }
 
 #[get("/list/transcode/remcom/directory/{directory}/{filename}")]
@@ -654,7 +759,7 @@ pub async fn movie_queue_remcom_directory_file(
     filename: StackString,
     #[cookie = "jwt"] _: LoggedUser,
     #[data] state: AppState,
-) -> WarpResult<impl Reply> {
+) -> WarpResult<TranscodeFileResponse> {
     let mock_stdout = MockStdout::new();
     let stdout = StdoutChannel::with_mock_stdout(mock_stdout.clone(), mock_stdout.clone());
 
@@ -687,15 +792,19 @@ pub async fn movie_queue_remcom_directory_file(
         .await
         .map_err(Into::<Error>::into)?
         .into();
-    Ok(rweb::reply::html(body))
+    Ok(HtmlBase::new(body).into())
 }
+
+#[derive(RwebResponse)]
+#[response(description = "Cleanup Transcode File", content = "html")]
+struct CleanupTranscodeFileResponse(HtmlBase<String, Error>);
 
 #[get("/list/transcode/cleanup/{path}")]
 pub async fn movie_queue_transcode_cleanup(
     path: StackString,
     #[cookie = "jwt"] _: LoggedUser,
     #[data] state: AppState,
-) -> WarpResult<impl Reply> {
+) -> WarpResult<CleanupTranscodeFileResponse> {
     let movie_path = state
         .config
         .home_dir
@@ -714,7 +823,7 @@ pub async fn movie_queue_transcode_cleanup(
     } else {
         format!("File not found {}", path)
     };
-    Ok(rweb::reply::html(body))
+    Ok(HtmlBase::new(body).into())
 }
 
 fn watchlist_worker(
@@ -789,16 +898,20 @@ fn watchlist_worker(
     format!(r#"{}<table border="0">{}</table>"#, previous, shows).into()
 }
 
+#[derive(RwebResponse)]
+#[response(description = "Trakt Watchlist", content = "html")]
+struct TraktWatchlistResponse(HtmlBase<String, Error>);
+
 #[get("/trakt/watchlist")]
 pub async fn trakt_watchlist(
     #[cookie = "jwt"] _: LoggedUser,
     #[data] state: AppState,
-) -> WarpResult<impl Reply> {
+) -> WarpResult<TraktWatchlistResponse> {
     let shows = get_watchlist_shows_db_map(&state.db)
         .await
         .map_err(Into::<Error>::into)?;
     let body: String = watchlist_worker(shows).into();
-    Ok(rweb::reply::html(body))
+    Ok(HtmlBase::new(body).into())
 }
 
 async fn watchlist_action_worker(
@@ -815,19 +928,23 @@ async fn watchlist_action_worker(
     Ok(body.into())
 }
 
+#[derive(RwebResponse)]
+#[response(description = "Trakt Watchlist Action", content = "html")]
+struct TraktWatchlistActionResponse(HtmlBase<String, Error>);
+
 #[get("/trakt/watchlist/{action}/{imdb_url}")]
 pub async fn trakt_watchlist_action(
     action: TraktActions,
     imdb_url: StackString,
     #[cookie = "jwt"] _: LoggedUser,
     #[data] state: AppState,
-) -> WarpResult<impl Reply> {
+) -> WarpResult<TraktWatchlistActionResponse> {
     let req = WatchlistActionRequest { action, imdb_url };
     let imdb_url = req.handle(&state.db, &state.trakt).await?;
     let body: String = watchlist_action_worker(&state.trakt, action, &imdb_url)
         .await?
         .into();
-    Ok(rweb::reply::html(body))
+    Ok(HtmlBase::new(body).into())
 }
 
 fn trakt_watched_seasons_worker(link: &str, imdb_url: &str, entries: &[ImdbSeason]) -> StackString {
@@ -860,12 +977,16 @@ fn trakt_watched_seasons_worker(link: &str, imdb_url: &str, entries: &[ImdbSeaso
     format!(r#"{}<table border="0">{}</table>"#, previous, entries).into()
 }
 
+#[derive(RwebResponse)]
+#[response(description = "Trakt Watchlist Show List", content = "html")]
+struct TraktWatchlistShowListResponse(HtmlBase<String, Error>);
+
 #[get("/trakt/watched/list/{imdb_url}")]
 pub async fn trakt_watched_seasons(
     imdb_url: StackString,
     #[cookie = "jwt"] _: LoggedUser,
     #[data] state: AppState,
-) -> WarpResult<impl Reply> {
+) -> WarpResult<TraktWatchlistShowListResponse> {
     let show_opt = ImdbRatings::get_show_by_link(&imdb_url, &state.db)
         .await
         .map(|s| s.map(|sh| (imdb_url, sh)))
@@ -877,8 +998,12 @@ pub async fn trakt_watched_seasons(
     let req = ImdbSeasonsRequest { show };
     let entries = req.handle(&state.db, &state.config).await?;
     let body: String = trakt_watched_seasons_worker(&link, &imdb_url, &entries).into();
-    Ok(rweb::reply::html(body))
+    Ok(HtmlBase::new(body).into())
 }
+
+#[derive(RwebResponse)]
+#[response(description = "Trakt Watchlist Show Season", content = "html")]
+struct TraktWatchlistShowSeasonResponse(HtmlBase<String, Error>);
 
 #[get("/trakt/watched/list/{imdb_url}/{season}")]
 pub async fn trakt_watched_list(
@@ -886,15 +1011,19 @@ pub async fn trakt_watched_list(
     season: i32,
     #[cookie = "jwt"] _: LoggedUser,
     #[data] state: AppState,
-) -> WarpResult<impl Reply> {
+) -> WarpResult<TraktWatchlistShowSeasonResponse> {
     let mock_stdout = MockStdout::new();
     let stdout = StdoutChannel::with_mock_stdout(mock_stdout.clone(), mock_stdout.clone());
 
     let body: String = watch_list_http_worker(&state.config, &state.db, &stdout, &imdb_url, season)
         .await?
         .into();
-    Ok(rweb::reply::html(body))
+    Ok(HtmlBase::new(body).into())
 }
+
+#[derive(RwebResponse)]
+#[response(description = "Trakt Watchlist Episode Action", content = "html")]
+struct TraktWatchlistEpisodeActionResponse(HtmlBase<String, Error>);
 
 #[get("/trakt/watched/{action}/{imdb_url}/{season}/{episode}")]
 pub async fn trakt_watched_action(
@@ -904,7 +1033,7 @@ pub async fn trakt_watched_action(
     episode: i32,
     #[cookie = "jwt"] _: LoggedUser,
     #[data] state: AppState,
-) -> WarpResult<impl Reply> {
+) -> WarpResult<TraktWatchlistEpisodeActionResponse> {
     let mock_stdout = MockStdout::new();
     let stdout = StdoutChannel::with_mock_stdout(mock_stdout.clone(), mock_stdout.clone());
 
@@ -920,7 +1049,7 @@ pub async fn trakt_watched_action(
     )
     .await?
     .into();
-    Ok(rweb::reply::html(body))
+    Ok(HtmlBase::new(body).into())
 }
 
 fn trakt_cal_worker(entries: &[StackString]) -> StackString {
@@ -933,21 +1062,29 @@ fn trakt_cal_worker(entries: &[StackString]) -> StackString {
     .into()
 }
 
+#[derive(RwebResponse)]
+#[response(description = "Trakt Calendar", content = "html")]
+struct TraktCalendarResponse(HtmlBase<String, Error>);
+
 #[get("/trakt/cal")]
 pub async fn trakt_cal(
     #[cookie = "jwt"] _: LoggedUser,
     #[data] state: AppState,
-) -> WarpResult<impl Reply> {
+) -> WarpResult<TraktCalendarResponse> {
     let entries = trakt_cal_http_worker(&state.trakt, &state.db).await?;
     let body: String = trakt_cal_worker(&entries).into();
-    Ok(rweb::reply::html(body))
+    Ok(HtmlBase::new(body).into())
 }
+
+#[derive(RwebResponse)]
+#[response(description = "Trakt Auth Url", content = "html")]
+struct TraktAuthUrlResponse(HtmlBase<String, Error>);
 
 #[get("/trakt/auth_url")]
 pub async fn trakt_auth_url(
     #[cookie = "jwt"] _: LoggedUser,
     #[data] state: AppState,
-) -> WarpResult<impl Reply> {
+) -> WarpResult<TraktAuthUrlResponse> {
     state.trakt.init().await;
     let url: String = state
         .trakt
@@ -955,7 +1092,7 @@ pub async fn trakt_auth_url(
         .await
         .map(Into::into)
         .map_err(Into::<Error>::into)?;
-    Ok(rweb::reply::html(url))
+    Ok(HtmlBase::new(url).into())
 }
 
 #[derive(Serialize, Deserialize, Schema)]
@@ -964,12 +1101,16 @@ pub struct TraktCallbackRequest {
     pub state: StackString,
 }
 
+#[derive(RwebResponse)]
+#[response(description = "Trakt Callback", content = "html")]
+struct TraktCallbackResponse(HtmlBase<&'static str, Error>);
+
 #[get("/trakt/callback")]
 pub async fn trakt_callback(
     query: Query<TraktCallbackRequest>,
     #[cookie = "jwt"] _: LoggedUser,
     #[data] state: AppState,
-) -> WarpResult<impl Reply> {
+) -> WarpResult<TraktCallbackResponse> {
     state.trakt.init().await;
     let query = query.into_inner();
     state
@@ -981,21 +1122,25 @@ pub async fn trakt_callback(
         <title>Trakt auth code received!</title>
         This window can be closed.
         <script language="JavaScript" type="text/javascript">window.close()</script>"#;
-    Ok(rweb::reply::html(body))
+    Ok(HtmlBase::new(body).into())
 }
+
+#[derive(RwebResponse)]
+#[response(description = "Trakt Refresh Auth", content = "html")]
+struct TraktRefreshAuthResponse(HtmlBase<&'static str, Error>);
 
 #[get("/trakt/refresh_auth")]
 pub async fn refresh_auth(
     #[cookie = "jwt"] _: LoggedUser,
     #[data] state: AppState,
-) -> WarpResult<impl Reply> {
+) -> WarpResult<TraktRefreshAuthResponse> {
     state.trakt.init().await;
     state
         .trakt
         .exchange_refresh_token()
         .await
         .map_err(Into::<Error>::into)?;
-    Ok(rweb::reply::html("finished"))
+    Ok(HtmlBase::new("Finished").into())
 }
 
 async fn trakt_cal_http_worker(

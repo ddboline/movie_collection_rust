@@ -2,7 +2,12 @@
 
 use anyhow::Error;
 use handlebars::Handlebars;
-use rweb::Filter;
+use rweb::{
+    filters::BoxedFilter,
+    http::header::CONTENT_TYPE,
+    openapi::{self, Info},
+    Filter, Reply,
+};
 use std::{net::SocketAddr, sync::Arc, time::Duration};
 use tokio::{
     fs::{create_dir, remove_dir_all},
@@ -65,15 +70,7 @@ pub async fn start_app() -> Result<(), Error> {
     run_app(config, pool, trakt).await
 }
 
-async fn run_app(config: Config, pool: PgPool, trakt: TraktConnection) -> Result<(), Error> {
-    let port = config.port;
-    let app = AppState {
-        config,
-        db: pool,
-        trakt,
-        hbr: Arc::new(get_templates()?),
-    };
-
+fn get_full_path(app: &AppState) -> BoxedFilter<(impl Reply,)> {
     let frontpage_path = frontpage().boxed();
     let find_new_episodes_path = find_new_episodes(app.clone()).boxed();
     let tvshows_path = tvshows(app.clone()).boxed();
@@ -149,9 +146,46 @@ async fn run_app(config: Config, pool: PgPool, trakt: TraktConnection) -> Result
         .or(trakt_watched_action_path)
         .boxed();
 
-    let full_path = list_path.or(trakt_path);
+    list_path.or(trakt_path).boxed()
+}
 
-    let routes = full_path.recover(error_response);
+async fn run_app(config: Config, pool: PgPool, trakt: TraktConnection) -> Result<(), Error> {
+    let port = config.port;
+    let app = AppState {
+        config,
+        db: pool,
+        trakt,
+        hbr: Arc::new(get_templates()?),
+    };
+
+    let (spec, full_path) = openapi::spec()
+        .info(Info {
+            title: "Movie Queue WebApp".into(),
+            description: "Web Frontend for Movie Queue".into(),
+            version: env!("CARGO_PKG_VERSION").into(),
+            ..Info::default()
+        })
+        .build(|| get_full_path(&app));
+    let spec = Arc::new(spec);
+    let spec_json_path = rweb::path!("list" / "openapi" / "json")
+        .and(rweb::path::end())
+        .map({
+            let spec = spec.clone();
+            move || rweb::reply::json(spec.as_ref())
+        });
+
+    let spec_yaml = serde_yaml::to_string(spec.as_ref())?;
+    let spec_yaml_path = rweb::path!("list" / "openapi" / "yaml")
+        .and(rweb::path::end())
+        .map(move || {
+            let reply = rweb::reply::html(spec_yaml.clone());
+            rweb::reply::with_header(reply, CONTENT_TYPE, "text/yaml")
+        });
+
+    let routes = full_path
+        .or(spec_json_path)
+        .or(spec_yaml_path)
+        .recover(error_response);
     let addr: SocketAddr = format!("127.0.0.1:{}", port).parse()?;
     rweb::serve(routes).bind(addr).await;
     Ok(())

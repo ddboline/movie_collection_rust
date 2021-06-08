@@ -1,0 +1,1056 @@
+---
+openapi: 3.0.1
+info:
+  title: Movie Queue WebApp
+  description: Web Frontend for Movie Queue
+  version: 0.8.6
+paths:
+  /list/index.html:
+    get:
+      responses:
+        "200":
+          description: Frontpage
+          content:
+            text/html:
+              schema:
+                type: string
+        "400":
+          description: Bad Request
+        "404":
+          description: Not Found
+        "405":
+          description: Method not allowed
+        "500":
+          description: Internal Server Error
+  /list/cal:
+    get:
+      parameters:
+        - name: source
+          in: query
+          schema:
+            nullable: true
+            type: string
+            enum:
+              - all
+              - amazon
+              - hulu
+              - netflix
+        - name: shows
+          in: query
+          schema:
+            nullable: true
+            type: string
+      responses:
+        "200":
+          description: List Calendar
+          content:
+            text/html:
+              schema:
+                type: string
+        "400":
+          description: Bad Request
+        "404":
+          description: Not Found
+        "405":
+          description: Method not allowed
+        "500":
+          description: Internal Server Error
+  /list/tvshows:
+    get:
+      responses:
+        "200":
+          description: List TvShows
+          content:
+            text/html:
+              schema:
+                type: string
+        "400":
+          description: Bad Request
+        "404":
+          description: Not Found
+        "405":
+          description: Method not allowed
+        "500":
+          description: Internal Server Error
+  "/list/delete/{path}":
+    get:
+      parameters:
+        - name: path
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Delete Queue Entry
+          content:
+            text/html:
+              schema:
+                type: string
+        "400":
+          description: Bad Request
+        "404":
+          description: Not Found
+        "405":
+          description: Method not allowed
+        "500":
+          description: Internal Server Error
+  /list/transcode/status:
+    get:
+      responses:
+        "200":
+          description: Transcode Status
+          content:
+            text/html:
+              schema:
+                type: string
+        "400":
+          description: Bad Request
+        "404":
+          description: Not Found
+        "405":
+          description: Method not allowed
+        "500":
+          description: Internal Server Error
+  "/list/transcode/file/{filename}":
+    get:
+      parameters:
+        - name: filename
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Transcode File
+          content:
+            text/html:
+              schema:
+                type: string
+        "400":
+          description: Bad Request
+        "404":
+          description: Not Found
+        "405":
+          description: Method not allowed
+        "500":
+          description: Internal Server Error
+  "/list/transcode/remcom/file/{filename}":
+    get:
+      parameters:
+        - name: filename
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Transcode File
+          content:
+            text/html:
+              schema:
+                type: string
+        "400":
+          description: Bad Request
+        "404":
+          description: Not Found
+        "405":
+          description: Method not allowed
+        "500":
+          description: Internal Server Error
+  "/list/transcode/remcom/directory/{directory}/{filename}":
+    get:
+      parameters:
+        - name: directory
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: filename
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Transcode File
+          content:
+            text/html:
+              schema:
+                type: string
+        "400":
+          description: Bad Request
+        "404":
+          description: Not Found
+        "405":
+          description: Method not allowed
+        "500":
+          description: Internal Server Error
+  "/list/transcode/queue/{path}":
+    get:
+      parameters:
+        - name: path
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Transcode Queue Item
+          content:
+            text/html:
+              schema:
+                type: string
+        "400":
+          description: Bad Request
+        "404":
+          description: Not Found
+        "405":
+          description: Method not allowed
+        "500":
+          description: Internal Server Error
+  "/list/transcode/queue/{directory}/{file}":
+    get:
+      parameters:
+        - name: directory
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: file
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Transcode Queue Item
+          content:
+            text/html:
+              schema:
+                type: string
+        "400":
+          description: Bad Request
+        "404":
+          description: Not Found
+        "405":
+          description: Method not allowed
+        "500":
+          description: Internal Server Error
+  "/list/transcode/cleanup/{path}":
+    get:
+      parameters:
+        - name: path
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Cleanup Transcode File
+          content:
+            text/html:
+              schema:
+                type: string
+        "400":
+          description: Bad Request
+        "404":
+          description: Not Found
+        "405":
+          description: Method not allowed
+        "500":
+          description: Internal Server Error
+  "/list/play/{idx}":
+    get:
+      parameters:
+        - name: idx
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Play Queue Item
+          content:
+            text/html:
+              schema:
+                type: string
+        "400":
+          description: Bad Request
+        "404":
+          description: Not Found
+        "405":
+          description: Method not allowed
+        "500":
+          description: Internal Server Error
+  /list/imdb_episodes:
+    get:
+      parameters:
+        - name: start_timestamp
+          in: query
+          schema:
+            format: datetime
+            type: string
+      responses:
+        "200":
+          description: List Imdb Episodes
+          content:
+            application/json:
+              schema:
+                items:
+                  properties:
+                    show:
+                      type: string
+                    title:
+                      type: string
+                    season:
+                      type: integer
+                    episode:
+                      type: integer
+                    airdate:
+                      format: naivedate
+                      type: string
+                    rating:
+                      type: number
+                    eptitle:
+                      type: string
+                    epurl:
+                      type: string
+                  type: object
+                  required:
+                    - show
+                    - title
+                    - season
+                    - episode
+                    - airdate
+                    - rating
+                    - eptitle
+                    - epurl
+                type: array
+        "400":
+          description: Bad Request
+        "404":
+          description: Not Found
+        "405":
+          description: Method not allowed
+        "500":
+          description: Internal Server Error
+    post:
+      requestBody:
+        content:
+          application/json:
+            schema:
+              properties:
+                episodes:
+                  items:
+                    properties:
+                      show:
+                        type: string
+                      title:
+                        type: string
+                      season:
+                        type: integer
+                      episode:
+                        type: integer
+                      airdate:
+                        format: naivedate
+                        type: string
+                      rating:
+                        type: number
+                      eptitle:
+                        type: string
+                      epurl:
+                        type: string
+                    type: object
+                    required:
+                      - show
+                      - title
+                      - season
+                      - episode
+                      - airdate
+                      - rating
+                      - eptitle
+                      - epurl
+                  type: array
+              type: object
+              required:
+                - episodes
+        required: true
+      responses:
+        "201":
+          description: Imdb Episodes Update
+          content:
+            text/html:
+              schema:
+                type: string
+        "400":
+          description: Bad Request
+        "404":
+          description: Not Found
+        "405":
+          description: Method not allowed
+        "500":
+          description: Internal Server Error
+  /list/imdb_ratings/set_source:
+    get:
+      parameters:
+        - name: link
+          in: query
+          schema:
+            type: string
+        - name: source
+          in: query
+          schema:
+            type: string
+            enum:
+              - all
+              - amazon
+              - hulu
+              - netflix
+      responses:
+        "200":
+          description: Imdb Show Set Source
+          content:
+            text/html:
+              schema:
+                type: string
+        "400":
+          description: Bad Request
+        "404":
+          description: Not Found
+        "405":
+          description: Method not allowed
+        "500":
+          description: Internal Server Error
+  /list/imdb_ratings:
+    get:
+      parameters:
+        - name: start_timestamp
+          in: query
+          schema:
+            format: datetime
+            type: string
+      responses:
+        "200":
+          description: List Imdb Shows
+          content:
+            application/json:
+              schema:
+                items:
+                  properties:
+                    index:
+                      type: integer
+                    show:
+                      type: string
+                    title:
+                      nullable: true
+                      type: string
+                    link:
+                      type: string
+                    rating:
+                      nullable: true
+                      type: number
+                    istv:
+                      nullable: true
+                      type: boolean
+                    source:
+                      nullable: true
+                      type: string
+                      enum:
+                        - all
+                        - amazon
+                        - hulu
+                        - netflix
+                  type: object
+                  required:
+                    - index
+                    - show
+                    - link
+                type: array
+        "400":
+          description: Bad Request
+        "404":
+          description: Not Found
+        "405":
+          description: Method not allowed
+        "500":
+          description: Internal Server Error
+    post:
+      requestBody:
+        content:
+          application/json:
+            schema:
+              properties:
+                shows:
+                  items:
+                    properties:
+                      index:
+                        type: integer
+                      show:
+                        type: string
+                      title:
+                        nullable: true
+                        type: string
+                      link:
+                        type: string
+                      rating:
+                        nullable: true
+                        type: number
+                      istv:
+                        nullable: true
+                        type: boolean
+                      source:
+                        nullable: true
+                        type: string
+                        enum:
+                          - all
+                          - amazon
+                          - hulu
+                          - netflix
+                    type: object
+                    required:
+                      - index
+                      - show
+                      - link
+                  type: array
+              type: object
+              required:
+                - shows
+        required: true
+      responses:
+        "201":
+          description: Update Imdb Shows
+          content:
+            text/html:
+              schema:
+                type: string
+        "400":
+          description: Bad Request
+        "404":
+          description: Not Found
+        "405":
+          description: Method not allowed
+        "500":
+          description: Internal Server Error
+  /list/movie_queue:
+    get:
+      parameters:
+        - name: start_timestamp
+          in: query
+          schema:
+            format: datetime
+            type: string
+      responses:
+        "200":
+          description: List Movie Queue Entries
+          content:
+            application/json:
+              schema:
+                items:
+                  properties:
+                    idx:
+                      type: integer
+                    collection_idx:
+                      type: integer
+                    path:
+                      type: string
+                    show:
+                      type: string
+                  type: object
+                  required:
+                    - idx
+                    - collection_idx
+                    - path
+                    - show
+                type: array
+        "400":
+          description: Bad Request
+        "404":
+          description: Not Found
+        "405":
+          description: Method not allowed
+        "500":
+          description: Internal Server Error
+    post:
+      requestBody:
+        content:
+          application/json:
+            schema:
+              properties:
+                queue:
+                  items:
+                    properties:
+                      idx:
+                        type: integer
+                      collection_idx:
+                        type: integer
+                      path:
+                        type: string
+                      show:
+                        type: string
+                    type: object
+                    required:
+                      - idx
+                      - collection_idx
+                      - path
+                      - show
+                  type: array
+              type: object
+              required:
+                - queue
+        required: true
+      responses:
+        "201":
+          description: Update Movie Queue Entries
+          content:
+            text/html:
+              schema:
+                type: string
+        "400":
+          description: Bad Request
+        "404":
+          description: Not Found
+        "405":
+          description: Method not allowed
+        "500":
+          description: Internal Server Error
+  /list/movie_collection:
+    get:
+      parameters:
+        - name: start_timestamp
+          in: query
+          schema:
+            format: datetime
+            type: string
+      responses:
+        "200":
+          description: List Movie Collection Entries
+          content:
+            application/json:
+              schema:
+                items:
+                  properties:
+                    idx:
+                      type: integer
+                    path:
+                      type: string
+                    show:
+                      type: string
+                  type: object
+                  required:
+                    - idx
+                    - path
+                    - show
+                type: array
+        "400":
+          description: Bad Request
+        "404":
+          description: Not Found
+        "405":
+          description: Method not allowed
+        "500":
+          description: Internal Server Error
+    post:
+      requestBody:
+        content:
+          application/json:
+            schema:
+              properties:
+                collection:
+                  items:
+                    properties:
+                      idx:
+                        type: integer
+                      path:
+                        type: string
+                      show:
+                        type: string
+                    type: object
+                    required:
+                      - idx
+                      - path
+                      - show
+                  type: array
+              type: object
+              required:
+                - collection
+        required: true
+      responses:
+        "201":
+          description: Update Movie Collection Entries
+          content:
+            text/html:
+              schema:
+                type: string
+        "400":
+          description: Bad Request
+        "404":
+          description: Not Found
+        "405":
+          description: Method not allowed
+        "500":
+          description: Internal Server Error
+  "/list/imdb/{show}":
+    get:
+      parameters:
+        - name: show
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: all
+          in: query
+          schema:
+            nullable: true
+            type: boolean
+        - name: database
+          in: query
+          schema:
+            nullable: true
+            type: boolean
+        - name: tv
+          in: query
+          schema:
+            nullable: true
+            type: boolean
+        - name: update
+          in: query
+          schema:
+            nullable: true
+            type: boolean
+        - name: link
+          in: query
+          schema:
+            nullable: true
+            type: string
+        - name: season
+          in: query
+          schema:
+            nullable: true
+            type: integer
+      responses:
+        "200":
+          description: List Imdb Show
+          content:
+            text/html:
+              schema:
+                type: string
+        "400":
+          description: Bad Request
+        "404":
+          description: Not Found
+        "405":
+          description: Method not allowed
+        "500":
+          description: Internal Server Error
+  /list/last_modified:
+    get:
+      responses:
+        "200":
+          description: Database Entries Last Modified Time
+          content:
+            application/json:
+              schema:
+                items:
+                  properties:
+                    table:
+                      type: string
+                    last_modified:
+                      format: datetime
+                      type: string
+                  type: object
+                  required:
+                    - table
+                    - last_modified
+                type: array
+        "400":
+          description: Bad Request
+        "404":
+          description: Not Found
+        "405":
+          description: Method not allowed
+        "500":
+          description: Internal Server Error
+  /list/user:
+    get:
+      responses:
+        "200":
+          description: Logged in User
+          content:
+            application/json:
+              schema:
+                properties:
+                  email:
+                    type: string
+                type: object
+                required:
+                  - email
+        "400":
+          description: Bad Request
+        "404":
+          description: Not Found
+        "405":
+          description: Method not allowed
+        "500":
+          description: Internal Server Error
+  /list/full_queue:
+    get:
+      responses:
+        "200":
+          description: Movie Queue
+          content:
+            text/html:
+              schema:
+                type: string
+        "400":
+          description: Bad Request
+        "404":
+          description: Not Found
+        "405":
+          description: Method not allowed
+        "500":
+          description: Internal Server Error
+  "/list/{path}":
+    get:
+      parameters:
+        - name: path
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Movie Queue
+          content:
+            text/html:
+              schema:
+                type: string
+        "400":
+          description: Bad Request
+        "404":
+          description: Not Found
+        "405":
+          description: Method not allowed
+        "500":
+          description: Internal Server Error
+  /trakt/auth_url:
+    get:
+      responses:
+        "200":
+          description: Trakt Auth Url
+          content:
+            text/html:
+              schema:
+                type: string
+        "400":
+          description: Bad Request
+        "404":
+          description: Not Found
+        "405":
+          description: Method not allowed
+        "500":
+          description: Internal Server Error
+  /trakt/callback:
+    get:
+      parameters:
+        - name: code
+          in: query
+          schema:
+            type: string
+        - name: state
+          in: query
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Trakt Callback
+          content:
+            text/html:
+              schema:
+                type: string
+        "400":
+          description: Bad Request
+        "404":
+          description: Not Found
+        "405":
+          description: Method not allowed
+        "500":
+          description: Internal Server Error
+  /trakt/refresh_auth:
+    get:
+      responses:
+        "200":
+          description: Trakt Refresh Auth
+          content:
+            text/html:
+              schema:
+                type: string
+        "400":
+          description: Bad Request
+        "404":
+          description: Not Found
+        "405":
+          description: Method not allowed
+        "500":
+          description: Internal Server Error
+  /trakt/cal:
+    get:
+      responses:
+        "200":
+          description: Trakt Calendar
+          content:
+            text/html:
+              schema:
+                type: string
+        "400":
+          description: Bad Request
+        "404":
+          description: Not Found
+        "405":
+          description: Method not allowed
+        "500":
+          description: Internal Server Error
+  /trakt/watchlist:
+    get:
+      responses:
+        "200":
+          description: Trakt Watchlist
+          content:
+            text/html:
+              schema:
+                type: string
+        "400":
+          description: Bad Request
+        "404":
+          description: Not Found
+        "405":
+          description: Method not allowed
+        "500":
+          description: Internal Server Error
+  "/trakt/watchlist/{action}/{imdb_url}":
+    get:
+      parameters:
+        - name: action
+          in: path
+          required: true
+          schema:
+            type: string
+            enum:
+              - None
+              - List
+              - Add
+              - Remove
+        - name: imdb_url
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Trakt Watchlist Action
+          content:
+            text/html:
+              schema:
+                type: string
+        "400":
+          description: Bad Request
+        "404":
+          description: Not Found
+        "405":
+          description: Method not allowed
+        "500":
+          description: Internal Server Error
+  "/trakt/watched/list/{imdb_url}":
+    get:
+      parameters:
+        - name: imdb_url
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Trakt Watchlist Show List
+          content:
+            text/html:
+              schema:
+                type: string
+        "400":
+          description: Bad Request
+        "404":
+          description: Not Found
+        "405":
+          description: Method not allowed
+        "500":
+          description: Internal Server Error
+  "/trakt/watched/list/{imdb_url}/{season}":
+    get:
+      parameters:
+        - name: imdb_url
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: season
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Trakt Watchlist Show Season
+          content:
+            text/html:
+              schema:
+                type: string
+        "400":
+          description: Bad Request
+        "404":
+          description: Not Found
+        "405":
+          description: Method not allowed
+        "500":
+          description: Internal Server Error
+  "/trakt/watched/{action}/{imdb_url}/{season}/{episode}":
+    get:
+      parameters:
+        - name: action
+          in: path
+          required: true
+          schema:
+            type: string
+            enum:
+              - None
+              - List
+              - Add
+              - Remove
+        - name: imdb_url
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: season
+          in: path
+          required: true
+          schema:
+            type: integer
+        - name: episode
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Trakt Watchlist Episode Action
+          content:
+            text/html:
+              schema:
+                type: string
+        "400":
+          description: Bad Request
+        "404":
+          description: Not Found
+        "405":
+          description: Method not allowed
+        "500":
+          description: Internal Server Error

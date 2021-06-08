@@ -18,6 +18,7 @@ use stdout_channel::StdoutChannel;
 
 use crate::{
     config::Config,
+    datetime_wrapper::DateTimeWrapper,
     imdb_episodes::ImdbEpisodes,
     imdb_ratings::ImdbRatings,
     movie_queue::MovieQueueDB,
@@ -997,10 +998,10 @@ pub async fn find_new_episodes_http_worker(
     Ok(output)
 }
 
-#[derive(Serialize, Deserialize)]
+#[derive(Serialize, Deserialize, Schema)]
 pub struct LastModifiedResponse {
     pub table: StackString,
-    pub last_modified: DateTime<Utc>,
+    pub last_modified: DateTimeWrapper,
 }
 
 impl LastModifiedResponse {
@@ -1018,7 +1019,7 @@ impl LastModifiedResponse {
                 let last_modified: DateTime<Utc> = row.try_get(0)?;
                 Ok(Some(LastModifiedResponse {
                     table: (*table).into(),
-                    last_modified,
+                    last_modified: last_modified.into(),
                 }))
             } else {
                 Ok(None)
