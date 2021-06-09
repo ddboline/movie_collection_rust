@@ -11,7 +11,7 @@ use std::fmt;
 
 use crate::utils::{option_string_wrapper, ExponentialRetry};
 
-#[derive(Default)]
+#[derive(Default, Debug)]
 pub struct ImdbTuple {
     pub title: StackString,
     pub link: StackString,
