@@ -3,7 +3,7 @@ use chrono::NaiveDate;
 use futures::future::try_join_all;
 use itertools::Itertools;
 use log::debug;
-use postgres_query::FromSqlRow;
+use postgres_query::{query, query_dyn, FromSqlRow};
 use rweb::Schema;
 use serde::{Deserialize, Serialize};
 use stack_string::StackString;
@@ -149,19 +149,18 @@ impl fmt::Display for WatchListShow {
 
 impl WatchListShow {
     pub async fn get_show_by_link(link: &str, pool: &PgPool) -> Result<Option<Self>, Error> {
-        let query = postgres_query::query!(
+        #[derive(FromSqlRow)]
+        struct TitleYear {
+            title: StackString,
+            year: i32,
+        }
+        let query = query!(
             "SELECT title, year FROM trakt_watchlist WHERE link = $link",
             link = link
         );
-        if let Some(row) = pool
-            .get()
-            .await?
-            .query(query.sql(), query.parameters())
-            .await?
-            .get(0)
-        {
-            let title: StackString = row.try_get("title")?;
-            let year: i32 = row.try_get("year")?;
+        let conn = pool.get().await?;
+        if let Some(row) = query.fetch_opt(&conn).await? {
+            let TitleYear { title, year } = row;
             Ok(Some(Self {
                 link: link.into(),
                 title,
@@ -173,68 +172,46 @@ impl WatchListShow {
     }
 
     pub async fn get_index(&self, pool: &PgPool) -> Result<Option<i32>, Error> {
-        let query = postgres_query::query!(
+        let query = query!(
             "SELECT id FROM trakt_watchlist WHERE link = $link",
             link = self.link
         );
-        if let Some(row) = pool
-            .get()
-            .await?
-            .query(query.sql(), query.parameters())
-            .await?
-            .get(0)
-        {
-            let id: i32 = row.try_get("id")?;
-            Ok(Some(id))
-        } else {
-            Ok(None)
-        }
+        let conn = pool.get().await?;
+        let id = query.fetch_opt(&conn).await?;
+        Ok(id.map(|(x,)| x))
     }
 
     pub async fn insert_show(&self, pool: &PgPool) -> Result<(), Error> {
-        let query = postgres_query::query!(
+        let query = query!(
             "INSERT INTO trakt_watchlist (link, title, year) VALUES ($link, $title, $year)",
             link = self.link,
             title = self.title,
             year = self.year
         );
-        pool.get()
-            .await?
-            .execute(query.sql(), query.parameters())
-            .await
-            .map(|_| ())
-            .map_err(Into::into)
+        let conn = pool.get().await?;
+        query.execute(&conn).await.map(|_| ()).map_err(Into::into)
     }
 
     pub async fn delete_show(&self, pool: &PgPool) -> Result<(), Error> {
-        let query = postgres_query::query!(
+        let query = query!(
             "DELETE FROM trakt_watchlist WHERE link=$link",
             link = self.link
         );
-        pool.get()
-            .await?
-            .execute(query.sql(), query.parameters())
-            .await
-            .map(|_| ())
-            .map_err(Into::into)
+        let conn = pool.get().await?;
+        query.execute(&conn).await.map(|_| ()).map_err(Into::into)
     }
 }
 
 pub async fn get_watchlist_shows_db(pool: &PgPool) -> Result<HashSet<WatchListShow>, Error> {
-    let query = r#"
+    let query = query!(
+        r#"
         SELECT a.link, a.title, a.year
         FROM trakt_watchlist a
-    "#;
-    pool.get()
-        .await?
-        .query(query, &[])
-        .await?
-        .iter()
-        .map(|row| {
-            let val = WatchListShow::from_row(row)?;
-            Ok(val)
-        })
-        .collect()
+    "#
+    );
+    let conn = pool.get().await?;
+    let shows = query.fetch(&conn).await?.into_iter().collect();
+    Ok(shows)
 }
 
 pub type WatchListMap = HashMap<StackString, (StackString, WatchListShow, Option<TvShowSource>)>;
@@ -248,13 +225,11 @@ pub async fn get_watchlist_shows_db_map(pool: &PgPool) -> Result<WatchListMap, E
         year: i32,
         source: Option<StackString>,
     }
-
     let query = r#"
         SELECT b.show, a.link, a.title, a.year, b.source
         FROM trakt_watchlist a
         JOIN imdb_ratings b ON a.link=b.link
     "#;
-
     pool.get()
         .await?
         .query(query, &[])
@@ -284,7 +259,7 @@ pub async fn get_watchlist_shows_db_map(pool: &PgPool) -> Result<WatchListMap, E
         .collect()
 }
 
-#[derive(Serialize, Deserialize, Debug, Default, PartialEq, Eq, Hash)]
+#[derive(Serialize, Deserialize, Debug, Default, PartialEq, Eq, Hash, FromSqlRow)]
 pub struct WatchedEpisode {
     pub title: StackString,
     pub imdb_url: StackString,
@@ -304,7 +279,7 @@ impl fmt::Display for WatchedEpisode {
 
 impl WatchedEpisode {
     pub async fn get_index(&self, pool: &PgPool) -> Result<Option<i32>, Error> {
-        let query = postgres_query::query!(
+        let query = query!(
             r#"
                 SELECT id
                 FROM trakt_watched_episodes
@@ -314,18 +289,9 @@ impl WatchedEpisode {
             season = self.season,
             episode = self.episode
         );
-        if let Some(row) = pool
-            .get()
-            .await?
-            .query(query.sql(), query.parameters())
-            .await?
-            .get(0)
-        {
-            let id: i32 = row.try_get("id")?;
-            Ok(Some(id))
-        } else {
-            Ok(None)
-        }
+        let conn = pool.get().await?;
+        let id = query.fetch_opt(&conn).await?;
+        Ok(id.map(|(x,)| x))
     }
 
     pub async fn get_watched_episode(
@@ -334,9 +300,12 @@ impl WatchedEpisode {
         season: i32,
         episode: i32,
     ) -> Result<Option<Self>, Error> {
-        let query = postgres_query::query!(
+        let query = query!(
             r#"
-                SELECT a.link, b.title
+                SELECT a.link as imdb_url,
+                       b.title,
+                       a.season,
+                       a.episode
                 FROM trakt_watched_episodes a
                 JOIN imdb_ratings b ON a.link = b.link
                 WHERE a.link = $link AND a.season = $season AND a.episode = $episode
@@ -345,28 +314,12 @@ impl WatchedEpisode {
             season = season,
             episode = episode
         );
-        if let Some(row) = pool
-            .get()
-            .await?
-            .query(query.sql(), query.parameters())
-            .await?
-            .get(0)
-        {
-            let imdb_url: StackString = row.try_get("link")?;
-            let title: StackString = row.try_get("title")?;
-            Ok(Some(Self {
-                title,
-                imdb_url,
-                season,
-                episode,
-            }))
-        } else {
-            Ok(None)
-        }
+        let conn = pool.get().await?;
+        query.fetch_opt(&conn).await.map_err(Into::into)
     }
 
     pub async fn insert_episode(&self, pool: &PgPool) -> Result<(), Error> {
-        let query = postgres_query::query!(
+        let query = query!(
             r#"
                 INSERT INTO trakt_watched_episodes (link, season, episode)
                 VALUES ($link, $season, $episode)
@@ -375,16 +328,12 @@ impl WatchedEpisode {
             season = self.season,
             episode = self.episode
         );
-        pool.get()
-            .await?
-            .execute(query.sql(), query.parameters())
-            .await
-            .map(|_| ())
-            .map_err(Into::into)
+        let conn = pool.get().await?;
+        query.execute(&conn).await.map(|_| ()).map_err(Into::into)
     }
 
     pub async fn delete_episode(&self, pool: &PgPool) -> Result<(), Error> {
-        let query = postgres_query::query!(
+        let query = query!(
             r#"
             DELETE FROM trakt_watched_episodes
             WHERE link=$link AND season=$season AND episode=$episode
@@ -393,12 +342,8 @@ impl WatchedEpisode {
             season = self.season,
             episode = self.episode
         );
-        pool.get()
-            .await?
-            .execute(query.sql(), query.parameters())
-            .await
-            .map(|_| ())
-            .map_err(Into::into)
+        let conn = pool.get().await?;
+        query.execute(&conn).await.map(|_| ()).map_err(Into::into)
     }
 }
 
@@ -421,9 +366,12 @@ pub async fn get_watched_shows_db(
         format!("WHERE {}", where_vec.join(" AND "))
     };
 
-    let query = postgres_query::query_dyn!(&format!(
+    let query = query_dyn!(&format!(
         r#"
-            SELECT a.link, b.title, a.season, a.episode
+            SELECT a.link as imdb_url,
+                   b.title,
+                   a.season,
+                   a.episode
             FROM trakt_watched_episodes a
             JOIN imdb_ratings b ON a.link = b.link
             {}
@@ -431,28 +379,11 @@ pub async fn get_watched_shows_db(
         "#,
         where_str
     ))?;
-
-    pool.get()
-        .await?
-        .query(query.sql(), &[])
-        .await?
-        .iter()
-        .map(|row| {
-            let imdb_url: StackString = row.try_get("link")?;
-            let title: StackString = row.try_get("title")?;
-            let season: i32 = row.try_get("season")?;
-            let episode: i32 = row.try_get("episode")?;
-            Ok(WatchedEpisode {
-                title,
-                imdb_url,
-                season,
-                episode,
-            })
-        })
-        .collect()
+    let conn = pool.get().await?;
+    query.fetch(&conn).await.map_err(Into::into)
 }
 
-#[derive(Serialize, Deserialize, Debug, Default, Eq)]
+#[derive(Serialize, Deserialize, Debug, Default, Eq, FromSqlRow)]
 pub struct WatchedMovie {
     pub title: StackString,
     pub imdb_url: StackString,
@@ -487,7 +418,7 @@ impl fmt::Display for WatchedMovie {
 
 impl WatchedMovie {
     pub async fn get_index(&self, pool: &PgPool) -> Result<Option<i32>, Error> {
-        let query = postgres_query::query!(
+        let query = query!(
             r#"
                 SELECT id
                 FROM trakt_watched_movies
@@ -495,98 +426,62 @@ impl WatchedMovie {
             "#,
             link = self.imdb_url
         );
-        if let Some(row) = pool
-            .get()
-            .await?
-            .query(query.sql(), query.parameters())
-            .await?
-            .get(0)
-        {
-            let id: i32 = row.try_get("id")?;
-            Ok(Some(id))
-        } else {
-            Ok(None)
-        }
+        let conn = pool.get().await?;
+        let id = query.fetch_opt(&conn).await?;
+        Ok(id.map(|(x,)| x))
     }
 
     pub async fn get_watched_movie(pool: &PgPool, link: &str) -> Result<Option<Self>, Error> {
-        let query = postgres_query::query!(
+        let query = query!(
             r#"
-                SELECT a.link, b.title
+                SELECT a.link as imdb_url,
+                       b.title
                 FROM trakt_watched_movies a
                 JOIN imdb_ratings b ON a.link = b.link
                 WHERE a.link = $link
             "#,
             link = link
         );
-        if let Some(row) = pool
-            .get()
-            .await?
-            .query(query.sql(), query.parameters())
-            .await?
-            .get(0)
-        {
-            let imdb_url: StackString = row.try_get("link")?;
-            let title: StackString = row.try_get("title")?;
-            Ok(Some(Self { title, imdb_url }))
-        } else {
-            Ok(None)
-        }
+        let conn = pool.get().await?;
+        query.fetch_opt(&conn).await.map_err(Into::into)
     }
 
     pub async fn insert_movie(&self, pool: &PgPool) -> Result<(), Error> {
-        let query = postgres_query::query!(
+        let query = query!(
             r#"
                 INSERT INTO trakt_watched_movies (link)
                 VALUES ($link)
             "#,
             link = self.imdb_url
         );
-        pool.get()
-            .await?
-            .execute(query.sql(), query.parameters())
-            .await
-            .map(|_| ())
-            .map_err(Into::into)
+        let conn = pool.get().await?;
+        query.execute(&conn).await.map(|_| ()).map_err(Into::into)
     }
 
     pub async fn delete_movie(&self, pool: &PgPool) -> Result<(), Error> {
-        let query = postgres_query::query!(
+        let query = query!(
             r#"
                 DELETE FROM trakt_watched_movies
                 WHERE link=$link
             "#,
             link = self.imdb_url
         );
-        pool.get()
-            .await?
-            .execute(query.sql(), query.parameters())
-            .await
-            .map(|_| ())
-            .map_err(Into::into)
+        let conn = pool.get().await?;
+        query.execute(&conn).await.map(|_| ()).map_err(Into::into)
     }
 }
 
 pub async fn get_watched_movies_db(pool: &PgPool) -> Result<Vec<WatchedMovie>, Error> {
-    let query = postgres_query::query!(
+    let query = query!(
         r#"
-            SELECT a.link, b.title
+            SELECT a.link as imdb_url, b.title
             FROM trakt_watched_movies a
             JOIN imdb_ratings b ON a.link = b.link
             ORDER BY b.show
         "#
     );
-    pool.get()
-        .await?
-        .query(query.sql(), &[])
-        .await?
-        .iter()
-        .map(|row| {
-            let imdb_url: StackString = row.try_get("link")?;
-            let title: StackString = row.try_get("title")?;
-            Ok(WatchedMovie { title, imdb_url })
-        })
-        .collect()
+    let conn = pool.get().await?;
+    query.fetch(&conn).await.map_err(Into::into)
 }
 
 pub async fn sync_trakt_with_db(

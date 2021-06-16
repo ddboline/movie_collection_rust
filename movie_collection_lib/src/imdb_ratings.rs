@@ -1,7 +1,7 @@
 use anyhow::Error;
 use chrono::{DateTime, Utc};
 use log::debug;
-use postgres_query::{FromSqlRow, Parameter};
+use postgres_query::{query, query_dyn, FromSqlRow, Parameter};
 use rweb::Schema;
 use serde::{Deserialize, Serialize};
 use stack_string::StackString;
@@ -40,7 +40,7 @@ impl fmt::Display for ImdbRatings {
 impl ImdbRatings {
     pub async fn insert_show(&self, pool: &PgPool) -> Result<(), Error> {
         let source = self.source.as_ref().map(ToString::to_string);
-        let query = postgres_query::query!(
+        let query = query!(
             r#"
                 INSERT INTO imdb_ratings
                 (show, title, link, rating, istv, source, last_modified)
@@ -55,12 +55,8 @@ impl ImdbRatings {
             source = source
         );
         debug!("{:?}", self);
-        pool.get()
-            .await?
-            .execute(query.sql(), query.parameters())
-            .await
-            .map(|_| ())
-            .map_err(Into::into)
+        let conn = pool.get().await?;
+        query.execute(&conn).await.map(|_| ()).map_err(Into::into)
     }
 
     pub async fn update_show(&self, pool: &PgPool) -> Result<(), Error> {
@@ -88,17 +84,13 @@ impl ImdbRatings {
                 ",source=$source"
             }),
         );
-        let query = postgres_query::query_dyn!(&query, show = self.show, ..bindings)?;
-        pool.get()
-            .await?
-            .execute(query.sql(), query.parameters())
-            .await
-            .map(|_| ())
-            .map_err(Into::into)
+        let query = query_dyn!(&query, show = self.show, ..bindings)?;
+        let conn = pool.get().await?;
+        query.execute(&conn).await.map(|_| ()).map_err(Into::into)
     }
 
     pub async fn get_show_by_link(link: &str, pool: &PgPool) -> Result<Option<Self>, Error> {
-        let query = postgres_query::query!(
+        let query = query!(
             r#"
                 SELECT index, show, title, link, rating, istv, source
                 FROM imdb_ratings
@@ -106,24 +98,15 @@ impl ImdbRatings {
             "#,
             link = link
         );
-        if let Some(row) = pool
-            .get()
-            .await?
-            .query(query.sql(), query.parameters())
-            .await?
-            .get(0)
-        {
-            Ok(Some(Self::from_row(row)?))
-        } else {
-            Ok(None)
-        }
+        let conn = pool.get().await?;
+        query.fetch_opt(&conn).await.map_err(Into::into)
     }
 
     pub async fn get_shows_after_timestamp(
         timestamp: DateTime<Utc>,
         pool: &PgPool,
     ) -> Result<Vec<Self>, Error> {
-        let query = postgres_query::query!(
+        let query = query!(
             r#"
                 SELECT index, show, title, link, rating, istv, source
                 FROM imdb_ratings
@@ -131,13 +114,8 @@ impl ImdbRatings {
             "#,
             timestamp = timestamp
         );
-        pool.get()
-            .await?
-            .query(query.sql(), query.parameters())
-            .await?
-            .iter()
-            .map(|row| Ok(Self::from_row(row)?))
-            .collect()
+        let conn = pool.get().await?;
+        query.fetch(&conn).await.map_err(Into::into)
     }
 
     pub fn get_string_vec(&self) -> Vec<StackString> {

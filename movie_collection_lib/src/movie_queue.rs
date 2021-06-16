@@ -3,7 +3,7 @@ use chrono::{DateTime, Utc};
 use futures::future::try_join_all;
 use itertools::Itertools;
 use log::debug;
-use postgres_query::FromSqlRow;
+use postgres_query::{query, query_dyn, FromSqlRow};
 use rweb::Schema;
 use serde::{Deserialize, Serialize};
 use stack_string::StackString;
@@ -69,11 +69,10 @@ impl MovieQueueDB {
         }
         let diff = max_idx - idx;
 
-        let query =
-            postgres_query::query!(r#"DELETE FROM movie_queue WHERE idx = $idx"#, idx = idx);
+        let query = query!(r#"DELETE FROM movie_queue WHERE idx = $idx"#, idx = idx);
         tran.execute(query.sql(), query.parameters()).await?;
 
-        let query = postgres_query::query!(
+        let query = query!(
             r#"
                 UPDATE movie_queue
                 SET idx = idx + $diff, last_modified = now()
@@ -84,7 +83,7 @@ impl MovieQueueDB {
         );
         tran.execute(query.sql(), query.parameters()).await?;
 
-        let query = postgres_query::query!(
+        let query = query!(
             r#"
                 UPDATE movie_queue
                 SET idx = idx - $diff - 1, last_modified = now()
@@ -102,19 +101,12 @@ impl MovieQueueDB {
         &self,
         collection_idx: i32,
     ) -> Result<(), Error> {
-        let query = postgres_query::query!(
+        let query = query!(
             r#"SELECT idx FROM movie_queue WHERE collection_idx=$idx"#,
             idx = collection_idx
         );
-        if let Some(row) = self
-            .pool
-            .get()
-            .await?
-            .query(query.sql(), query.parameters())
-            .await?
-            .get(0)
-        {
-            let idx = row.try_get("idx")?;
+        let conn = self.pool.get().await?;
+        if let Some((idx,)) = query.fetch_opt(&conn).await? {
             self.remove_from_queue_by_idx(idx).await?;
         }
         Ok(())
@@ -153,20 +145,12 @@ impl MovieQueueDB {
         idx: i32,
         collection_idx: i32,
     ) -> Result<(), Error> {
-        let query = postgres_query::query!(
+        let query = query!(
             r#"SELECT idx FROM movie_queue WHERE collection_idx = $idx"#,
             idx = collection_idx
         );
-
-        if let Some(current_idx) = self
-            .pool
-            .get()
-            .await?
-            .query_opt(query.sql(), query.parameters())
-            .await?
-            .map(|row| row.try_get("idx"))
-            .transpose()?
-        {
+        let conn = self.pool.get().await?;
+        if let Some((current_idx,)) = query.fetch_opt(&conn).await? {
             self.remove_from_queue_by_idx(current_idx).await?;
         }
 
@@ -182,7 +166,7 @@ impl MovieQueueDB {
         let diff = max_idx - idx + 2;
         debug!("{} {} {}", max_idx, idx, diff);
 
-        let query = postgres_query::query!(
+        let query = query!(
             r#"
                 UPDATE movie_queue
                 SET idx = idx + $diff, last_modified = now()
@@ -193,7 +177,7 @@ impl MovieQueueDB {
         );
         tran.execute(query.sql(), query.parameters()).await?;
 
-        let query = postgres_query::query!(
+        let query = query!(
             r#"
                 INSERT INTO movie_queue (idx, collection_idx, last_modified)
                 VALUES ($idx, $collection_idx, now())
@@ -203,7 +187,7 @@ impl MovieQueueDB {
         );
         tran.execute(query.sql(), query.parameters()).await?;
 
-        let query = postgres_query::query!(
+        let query = query!(
             r#"
                 UPDATE movie_queue
                 SET idx = idx - $diff + 1, last_modified = now()
@@ -243,7 +227,7 @@ impl MovieQueueDB {
             .map(|p| format!("b.path like '%{}%'", p))
             .join(" OR ");
 
-        let query = postgres_query::query_dyn!(&format!(
+        let query = query_dyn!(&format!(
             r#"
                 SELECT a.idx, b.path, c.link, c.istv
                 FROM movie_queue a
@@ -258,34 +242,25 @@ impl MovieQueueDB {
                 format!("WHERE {}", constraints)
             }
         ),)?;
+        let conn = self.pool.get().await?;
+        let results: Vec<PrintMovieQueue> = query.fetch(&conn).await?;
 
-        let results: Result<Vec<_>, Error> = self
-            .pool
-            .get()
-            .await?
-            .query(query.sql(), &[])
-            .await?
-            .iter()
-            .map(|row| {
-                let row = PrintMovieQueue::from_row(row)?;
-                Ok(MovieQueueResult {
-                    idx: row.idx,
-                    path: row.path,
-                    link: row.link,
-                    istv: row.istv.unwrap_or(false),
-                    ..MovieQueueResult::default()
-                })
-            })
-            .collect();
+        let futures = results.into_iter().map(|row| async {
+            let mut result = MovieQueueResult {
+                idx: row.idx,
+                path: row.path,
+                link: row.link,
+                istv: row.istv.unwrap_or(false),
+                ..MovieQueueResult::default()
+            };
 
-        let futures = results?.into_iter().map(|mut result| async {
             if result.istv {
                 let file_stem = Path::new(result.path.as_str())
                     .file_stem()
                     .ok_or_else(|| format_err!("No file stem"))?
                     .to_string_lossy();
                 let (show, season, episode) = parse_file_stem(&file_stem);
-                let query = postgres_query::query!(
+                let query = query!(
                     r#"
                             SELECT epurl
                             FROM imdb_episodes
@@ -295,15 +270,9 @@ impl MovieQueueDB {
                     season = season,
                     episode = episode
                 );
-                if let Some(row) = self
-                    .pool
-                    .get()
-                    .await?
-                    .query(query.sql(), query.parameters())
-                    .await?
-                    .get(0)
-                {
-                    let epurl: String = row.try_get("epurl")?;
+                let conn = self.pool.get().await?;
+                if let Some((epurl,)) = query.fetch_opt(&conn).await? {
+                    let epurl: String = epurl;
                     result.eplink = Some(epurl.into());
                     result.show = Some(show.to_string().into());
                     result.season = Some(season);
@@ -323,7 +292,7 @@ impl MovieQueueDB {
         &self,
         timestamp: DateTime<Utc>,
     ) -> Result<Vec<MovieQueueRow>, Error> {
-        let query = postgres_query::query!(
+        let query = query!(
             r#"
                 SELECT a.idx, a.collection_idx, b.path, b.show
                 FROM movie_queue a
@@ -332,14 +301,8 @@ impl MovieQueueDB {
             "#,
             timestamp = timestamp
         );
-        self.pool
-            .get()
-            .await?
-            .query(query.sql(), query.parameters())
-            .await?
-            .iter()
-            .map(|row| MovieQueueRow::from_row(row).map_err(Into::into))
-            .collect()
+        let conn = self.pool.get().await?;
+        query.fetch(&conn).await.map_err(Into::into)
     }
 }
 
