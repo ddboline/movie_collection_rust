@@ -251,3 +251,17 @@ impl ImdbConnection {
         try_join_all(futures).await
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use anyhow::Error;
+    use crate::imdb_utils::ImdbConnection;
+
+    #[tokio::test]
+    async fn test_parse_imdb_rating() -> Result<(), Error> {
+        let conn = ImdbConnection::default();
+        let rating = conn.parse_imdb_rating("tt14120078").await?;
+        assert!(rating.rating.is_some());
+        Ok(())
+    }
+}
