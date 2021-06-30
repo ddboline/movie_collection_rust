@@ -159,17 +159,19 @@ impl ParseImdb {
             if opts.update_database {
                 if let Some(result) = results.get(0) {
                     if let Some(s) = shows.get(&result.link) {
-                        if (result.rating - s.rating.unwrap_or(-1.0)).abs() > 0.1 {
-                            let mut new = s.clone();
+                        let mut new = s.clone();
+                        if !result.title.is_empty() {
                             new.title = Some(result.title.clone());
-                            new.rating = Some(result.rating);
-                            new.update_show(&self.mc.pool).await?;
-                            output.push(vec![format!(
-                                "exists {} {} {}",
-                                opts.show, s, result.rating
-                            )
-                            .into()]);
                         }
+                        if result.rating >= 0.0 {
+                            new.rating = Some(result.rating);
+                        }
+                        new.update_show(&self.mc.pool).await?;
+                        output.push(vec![format!(
+                            "exists {} {} {}",
+                            opts.show, s, result.rating
+                        )
+                        .into()]);
                     } else {
                         output.push(vec![format!("not exists {} {}", opts.show, result).into()]);
                         let istv = result.title.contains("TV Series")
@@ -204,24 +206,27 @@ impl ParseImdb {
                         if let Some(episodes) = &episodes {
                             let airdate = episode
                                 .airdate
-                                .unwrap_or_else(|| NaiveDate::from_ymd(1970, 1, 1));
+                                .unwrap_or_else(|| NaiveDate::from_ymd(1970, 1, 1))
+                                .into();
 
                             if let Some(e) = episodes.get(&key) {
-                                if (e.rating - episode.rating.unwrap_or(-1.0)).abs() > 0.1
-                                    || e.airdate != airdate.into()
-                                    || Some(&e.eptitle) != episode.eptitle.as_ref()
-                                {
-                                    output.push(vec![format!(
-                                        "exists {} {} {}",
-                                        result, episode, e.rating
-                                    )
-                                    .into()]);
-                                    let mut new = e.clone();
-                                    new.eptitle = episode.eptitle.unwrap_or_else(|| "".into());
-                                    new.rating = episode.rating.unwrap_or(-1.0);
-                                    new.airdate = airdate.into();
-                                    new.update_episode(&self.mc.pool).await?;
+                                let mut new = e.clone();
+                                if episode.eptitle.is_some() {
+                                    new.eptitle =
+                                        episode.eptitle.clone().unwrap_or_else(|| "".into());
                                 }
+                                if let Some(rating) = &episode.rating {
+                                    new.rating = *rating;
+                                }
+                                if new.airdate != airdate {
+                                    new.airdate = airdate;
+                                }
+                                output.push(vec![format!(
+                                    "exists {} {} {}",
+                                    result, episode, e.rating
+                                )
+                                .into()]);
+                                new.update_episode(&self.mc.pool).await?;
                             } else {
                                 output.push(vec![
                                     format!("not exists {} {}", result, episode).into()
