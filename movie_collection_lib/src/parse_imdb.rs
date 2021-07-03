@@ -236,7 +236,7 @@ impl ParseImdb {
                                     title: result.title.clone().unwrap_or_else(|| "".into()),
                                     season: episode.season,
                                     episode: episode.episode,
-                                    airdate: airdate.into(),
+                                    airdate,
                                     rating: episode.rating.unwrap_or(-1.0),
                                     eptitle: episode.eptitle.unwrap_or_else(|| "".into()),
                                     epurl: episode.epurl.unwrap_or_else(|| "".into()),

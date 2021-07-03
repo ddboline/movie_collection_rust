@@ -1364,13 +1364,11 @@ pub async fn watched_action_http_worker(
     let body = match action {
         TraktActions::Add => {
             let result = if season != -1 && episode != -1 {
-                let imdb_url_ = Arc::clone(&imdb_url);
                 trakt
-                    .add_episode_to_watched(&imdb_url_, season, episode)
+                    .add_episode_to_watched(&imdb_url, season, episode)
                     .await?
             } else {
-                let imdb_url_ = Arc::clone(&imdb_url);
-                trakt.add_movie_to_watched(&imdb_url_).await?
+                trakt.add_movie_to_watched(&imdb_url).await?
             };
             if season != -1 && episode != -1 {
                 WatchedEpisode {

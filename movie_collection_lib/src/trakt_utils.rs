@@ -159,16 +159,14 @@ impl WatchListShow {
             link = link
         );
         let conn = pool.get().await?;
-        if let Some(row) = query.fetch_opt(&conn).await? {
+        Ok(query.fetch_opt(&conn).await?.map(|row| {
             let TitleYear { title, year } = row;
-            Ok(Some(Self {
+            Self {
                 link: link.into(),
                 title,
                 year,
-            }))
-        } else {
-            Ok(None)
-        }
+            }
+        }))
     }
 
     pub async fn get_index(&self, pool: &PgPool) -> Result<Option<i32>, Error> {
@@ -803,7 +801,7 @@ pub async fn trakt_app_parse(
             TraktActions::List => watched_list(&mc, show, season).await?,
             TraktActions::None => {}
         },
-        _ => {}
+        TraktCommands::None => {}
     }
     mc.stdout.close().await
 }

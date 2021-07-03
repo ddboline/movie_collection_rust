@@ -3,7 +3,7 @@ use chrono::{DateTime, Duration, Utc};
 use futures::future::try_join_all;
 use refinery::embed_migrations;
 use stack_string::StackString;
-use std::{ops::DerefMut, path::PathBuf};
+use std::path::PathBuf;
 use stdout_channel::StdoutChannel;
 use structopt::StructOpt;
 use tokio::{
@@ -200,9 +200,7 @@ impl MovieQueueCli {
             }
             Self::RunMigrations => {
                 let mut conn = pool.get().await?;
-                migrations::runner()
-                    .run_async(conn.deref_mut().deref_mut())
-                    .await?;
+                migrations::runner().run_async(&mut **conn).await?;
             }
         }
 

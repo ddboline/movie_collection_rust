@@ -381,7 +381,7 @@ impl TraktConnection {
             .json()
             .await?;
 
-        #[allow(clippy::filter_map)]
+        #[allow(clippy::manual_filter_map)]
         let episode_map = watched_episodes
             .into_iter()
             .filter(|show_entry| show_entry.show.ids.imdb.is_some())
