@@ -1,11 +1,13 @@
 use anyhow::Error;
 use chrono::NaiveDate;
 use futures::future::try_join_all;
+use log::debug;
 use reqwest::{Client, Url};
 use select::{
     document::Document,
     predicate::{Class, Name},
 };
+use serde::Deserialize;
 use stack_string::StackString;
 use std::fmt;
 
@@ -24,7 +26,7 @@ impl fmt::Display for ImdbTuple {
     }
 }
 
-#[derive(Debug)]
+#[derive(Debug, Default)]
 pub struct RatingOutput {
     pub rating: Option<f64>,
     pub count: Option<u64>,
@@ -117,28 +119,46 @@ impl ImdbConnection {
     }
 
     pub async fn parse_imdb_rating(&self, title: &str) -> Result<RatingOutput, Error> {
-        let mut output = RatingOutput {
-            rating: None,
-            count: None,
-        };
-
         if !title.starts_with("tt") {
-            return Ok(output);
+            return Ok(RatingOutput::default());
         };
 
         let url = Url::parse("http://www.imdb.com/title/")?.join(title)?;
+        debug!("{:?}", url);
         let body = self.get(&url).await?.text().await?;
+        Self::parse_imdb_rating_body(&body)
+    }
 
-        let document = Document::from(body.as_str());
-        for span in document.find(Name("span")) {
-            if let Some("ratingValue") = span.attr("itemprop") {
-                output.rating = Some(span.text().parse()?);
+    fn parse_imdb_rating_body(body: &str) -> Result<RatingOutput, Error> {
+        let document = Document::from(body);
+        for item in document.find(Name("script")) {
+            #[derive(Deserialize, Debug)]
+            struct InnerRatingStruct {
+                #[serde(rename = "ratingValue")]
+                rating_value: f64,
+                #[serde(rename = "ratingCount")]
+                rating_count: u64,
             }
-            if let Some("ratingCount") = span.attr("itemprop") {
-                output.count = Some(span.text().replace(",", "").parse()?);
+            #[derive(Deserialize, Debug)]
+            struct RatingStruct {
+                #[serde(rename = "aggregateRating")]
+                aggregate_rating: InnerRatingStruct,
             }
+            if item.attr("type") != Some("application/ld+json") {
+                continue;
+            }
+            let rating_str = item.text();
+            if !rating_str.contains("aggregateRating") {
+                continue;
+            }
+            let rating: RatingStruct = serde_json::from_str(&rating_str)?;
+            debug!("{}", rating_str);
+            return Ok(RatingOutput {
+                rating: Some(rating.aggregate_rating.rating_value),
+                count: Some(rating.aggregate_rating.rating_count),
+            });
         }
-        Ok(output)
+        Ok(RatingOutput::default())
     }
 
     pub async fn parse_imdb_episode_list(
@@ -257,10 +277,20 @@ mod tests {
     use crate::imdb_utils::ImdbConnection;
     use anyhow::Error;
 
+    #[test]
+    fn test_parse_imdb_rating_body() -> Result<(), Error> {
+        let body = include_str!("../../tests/data/imdb_rating_body.html");
+        let rating = ImdbConnection::parse_imdb_rating_body(body)?;
+        println!("{:?}", rating);
+        assert_eq!(rating.rating, Some(7.5));
+        Ok(())
+    }
+
     #[tokio::test]
     async fn test_parse_imdb_rating() -> Result<(), Error> {
         let conn = ImdbConnection::default();
-        let rating = conn.parse_imdb_rating("tt14120078").await?;
+        let rating = conn.parse_imdb_rating("tt14418068").await?;
+        println!("{:?}", rating);
         assert!(rating.rating.is_some());
         Ok(())
     }
