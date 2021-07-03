@@ -110,7 +110,7 @@ pub async fn movie_queue(
     Ok(HtmlBase::new(body).into())
 }
 
-#[get("/list/{path}")]
+#[get("/list/queue/{path}")]
 pub async fn movie_queue_show(
     path: StackString,
     #[cookie = "jwt"] _: LoggedUser,
@@ -613,7 +613,7 @@ fn process_shows(
                 r#"<tr><td>{}</td>
                 <td><a href="https://www.imdb.com/title/{}" target="_blank">imdb</a></td><td>{}</td><td>{}</td><td>{}</td></tr>"#,
                 if tvshows.contains(item.link.as_str()) {
-                    format!(r#"<a href="javascript:updateMainArticle('/list/{}')">{}</a>"#, item.show, item.title)
+                    format!(r#"<a href="javascript:updateMainArticle('/list/queue/{}')">{}</a>"#, item.show, item.title)
                 } else {
                     format!(
                         r#"<a href="javascript:updateMainArticle('/trakt/watched/list/{}')">{}</a>"#,
@@ -948,15 +948,22 @@ pub async fn trakt_watchlist_action(
 }
 
 fn trakt_watched_seasons_worker(link: &str, imdb_url: &str, entries: &[ImdbSeason]) -> StackString {
-    let button_add = r#"
-        <td>
-        <button type="submit" id="ID"
-            onclick="imdb_update('SHOW', 'LINK', SEASON, '/trakt/watched/list/LINK');"
-            >update database</button></td>"#;
-
     let entries = entries
         .iter()
         .map(|s| {
+            let id = format!("watched_seasons_id_{}_{}_{}", &s.show, &link, &s.season);
+            let button_add = format!(
+                r#"
+            <td>
+            <button type="submit" id="{id}"
+                onclick="imdb_update('{show}', '{link}', {season}, '/trakt/watched/list/{link}');"
+                >update database</button></td>"#,
+                id = id,
+                show = s.show,
+                link = link,
+                season = s.season,
+            );
+
             format!(
                 "<tr><td>{}<td>{}<td>{}<td>{}</tr>",
                 format!(
@@ -966,9 +973,6 @@ fn trakt_watched_seasons_worker(link: &str, imdb_url: &str, entries: &[ImdbSeaso
                 s.season,
                 s.nepisodes,
                 button_add
-                    .replace("SHOW", &s.show)
-                    .replace("LINK", &link)
-                    .replace("SEASON", &s.season.to_string())
             )
         })
         .join("");

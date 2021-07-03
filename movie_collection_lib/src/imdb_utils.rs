@@ -254,8 +254,8 @@ impl ImdbConnection {
 
 #[cfg(test)]
 mod tests {
-    use anyhow::Error;
     use crate::imdb_utils::ImdbConnection;
+    use anyhow::Error;
 
     #[tokio::test]
     async fn test_parse_imdb_rating() -> Result<(), Error> {
