@@ -1460,7 +1460,13 @@ async fn get_payload(mut form: FormData) -> Result<WebhookPayload, anyhow::Error
             buf.extend_from_slice(&chunk?.chunk());
         }
     }
-    serde_json::from_slice(&buf).map_err(Into::into)
+    if let Ok(payload) = serde_json::from_slice(&buf) {
+        Ok(payload)
+    } else {
+        let buf = std::str::from_utf8(&buf)?;
+        error!("failed deserialize {}", buf);
+        Err(format_err!("failed deserialize {}", buf))
+    }
 }
 
 #[derive(Deserialize, Debug)]

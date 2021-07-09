@@ -1,0 +1,15 @@
+ALTER TABLE imdb_ratings ALTER COLUMN title ADD NOT NULL;
+ALTER TABLE imdb_episodes ALTER COLUMN season ADD NOT NULL;
+ALTER TABLE imdb_episodes ALTER COLUMN episode ADD NOT NULL;
+ALTER TABLE imdb_episodes ALTER COLUMN epurl ADD NOT NULL;
+ALTER TABLE imdb_episodes ALTER COLUMN rating ADD NOT NULL;
+ALTER TABLE imdb_episodes ALTER COLUMN eptitle ADD NOT NULL;
+ALTER TABLE imdb_episodes ALTER COLUMN last_modified ADD NOT NULL;
+ALTER TABLE movie_collection ALTER COLUMN path ADD NOT NULL;
+ALTER TABLE movie_collection ALTER COLUMN show path ADD NOT NULL;
+ALTER TABLE movie_collection ALTER COLUMN last_modified ADD NOT NULL;
+ALTER TABLE movie_collection ALTER COLUMN last_modified ADD DEFAULT now();
+ALTER TABLE movie_queue ALTER COLUMN last_modified ADD NOT NULL;
+ALTER TABLE movie_queue ALTER COLUMN last_modified ADD DEFAULT now();
+ALTER TABLE trakt_watchlist ALTER COLUMN title ADD NOT NULL;
+ALTER TABLE trakt_watchlist ALTER COLUMN year ADD NOT NULL;
