@@ -39,6 +39,7 @@ itertools = "0.10"
 handlebars = "4.0"
 smallvec = "1.6"
 procfs = "0.9"
+uuid = "0.8"
 rweb = {version="0.12", features=["openapi"]}
 stack-string = { version="0.2", features=["postgres_types", "rweb-openapi"] }
 stdout-channel = "0.4"
