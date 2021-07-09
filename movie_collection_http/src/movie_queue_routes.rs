@@ -27,7 +27,6 @@ use log::error;
 use tokio_stream::StreamExt;
 use bytes::Buf;
 use std::net::Ipv4Addr;
-use serde_json::Value;
 
 use movie_collection_lib::{
     config::Config,
@@ -1448,7 +1447,7 @@ pub async fn plex_webhook(
         error!("Incorrect webhook key");
     } else {
         let buf = get_payload(form).await.map_err(Into::<Error>::into)?;
-        error!("buf: {:?}", buf);
+        error!("buf: {:#?}", buf);
     }
     Ok(HtmlBase::new("").into())
 }
@@ -1486,13 +1485,14 @@ struct Player {
     uuid: StackString,
 }
 
-// #[derive(Deserialize)]
-// struct Metadata {
-//     #[serde(rename = "librarySectionType")]
-//     library_section_type: StackString,
-//     #[serde(rename = "type")]
-//     event_type: StackString,
-// }
+#[derive(Deserialize, Debug)]
+struct Metadata {
+    #[serde(rename = "type")]
+    metadata_type: Option<StackString>,
+    title: Option<StackString>,
+    summary: Option<StackString>,
+    rating: Option<f64>,
+}
 
 #[derive(Deserialize, Debug)]
 enum PlexEventType {
@@ -1534,5 +1534,5 @@ struct WebhookPayload {
     #[serde(rename = "Player")]
     player: Player,
     #[serde(rename = "Metadata")]
-    metadata: Value,
+    metadata: Metadata,
 }
