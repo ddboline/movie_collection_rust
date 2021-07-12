@@ -1,4 +1,4 @@
-CREATE TABLE movie_collection (
+CREATE TABLE IF NOT EXISTS movie_collection (
     idx INTEGER NOT NULL PRIMARY KEY,
     path TEXT UNIQUE,
     show TEXT,
