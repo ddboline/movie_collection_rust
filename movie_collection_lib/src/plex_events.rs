@@ -2,7 +2,6 @@ use anyhow::Error;
 use chrono::{DateTime, NaiveDateTime, Utc};
 use postgres_query::FromSqlRow;
 use serde::{Deserialize, Serialize};
-use serde_json::Value;
 use stack_string::StackString;
 use std::{
     convert::{TryFrom, TryInto},
@@ -23,7 +22,6 @@ pub struct PlexEvent {
     pub grandparent_title: Option<StackString>,
     pub added_at: Option<DateTimeWrapper>,
     pub updated_at: Option<DateTimeWrapper>,
-    pub payload: Value,
 }
 
 impl TryFrom<WebhookPayload> for PlexEvent {
@@ -56,18 +54,16 @@ impl TryFrom<WebhookPayload> for PlexEvent {
 impl PlexEvent {
     pub fn get_from_payload(buf: &[u8]) -> Result<Self, Error> {
         let object: WebhookPayload = serde_json::from_slice(buf)?;
-        let mut plex_event: PlexEvent = object.try_into()?;
-        plex_event.payload = serde_json::from_slice(buf)?;
-        Ok(plex_event)
+        object.try_into()
     }
 
     pub async fn write_event(&self, pool: &PgPool) -> Result<(), Error> {
         let query = postgres_query::query!(
             "
             INSERT INTO plex_event (event, account, server, player_title, player_address, title,
-                parent_title, grandparent_title, added_at, updated_at, payload)
+                parent_title, grandparent_title, added_at, updated_at)
             VALUES ($event, $account, $server, $player_title, $player_address, $title,
-                $parent_title, $grandparent_title, $added_at, $updated_at, $payload)",
+                $parent_title, $grandparent_title, $added_at, $updated_at)",
             event = self.event,
             account = self.account,
             server = self.server,
@@ -78,7 +74,6 @@ impl PlexEvent {
             grandparent_title = self.grandparent_title,
             added_at = self.added_at,
             updated_at = self.updated_at,
-            payload = self.payload,
         );
         let conn = pool.get().await?;
         query.execute(&conn).await?;

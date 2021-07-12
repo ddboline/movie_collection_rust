@@ -1,4 +1,4 @@
-CREATE SEQUENCE imdb_episodes_id_seq;
+CREATE SEQUENCE IF NOT EXISTS imdb_episodes_id_seq;
 
 CREATE TABLE IF NOT EXISTS imdb_episodes (
     id INTEGER NOT NULL PRIMARY KEY DEFAULT nextval('imdb_episodes_id_seq'::regclass),
