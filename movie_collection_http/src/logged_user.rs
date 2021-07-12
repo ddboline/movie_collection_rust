@@ -31,7 +31,7 @@ impl From<LoggedUser> for AuthorizedUser {
     fn from(user: LoggedUser) -> Self {
         Self {
             email: user.email,
-            session: None,
+            ..AuthorizedUser::default()
         }
     }
 }

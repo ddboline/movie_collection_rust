@@ -5,6 +5,7 @@ use std::{
     path::{Path, PathBuf},
     sync::Arc,
 };
+use uuid::Uuid;
 
 use stack_string::StackString;
 
@@ -47,6 +48,8 @@ pub struct ConfigInner {
     #[serde(default = "default_secret_path")]
     pub jwt_secret_path: PathBuf,
     pub video_playback_path: Option<PathBuf>,
+    #[serde(default = "default_plex_webhook_key")]
+    pub plex_webhook_key: Uuid,
 }
 
 fn default_suffixes() -> Vec<StackString> {
@@ -93,6 +96,9 @@ fn default_secret_path() -> PathBuf {
         .unwrap()
         .join("aws_app_rust")
         .join("secret.bin")
+}
+fn default_plex_webhook_key() -> Uuid {
+    Uuid::new_v4()
 }
 
 #[derive(Debug, Default, Clone)]

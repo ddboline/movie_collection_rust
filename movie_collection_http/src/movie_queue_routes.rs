@@ -1,9 +1,11 @@
 #![allow(clippy::needless_pass_by_value)]
 
 use anyhow::format_err;
+use bytes::Buf;
 use itertools::Itertools;
+use log::error;
 use maplit::hashmap;
-use rweb::{get, post, Json, Query, Rejection, Schema};
+use rweb::{get, multipart::FormData, post, Json, Query, Rejection, Schema};
 use rweb_helper::{
     html_response::HtmlResponse as HtmlBase, json_response::JsonResponse as JsonBase, RwebResponse,
 };
@@ -20,9 +22,11 @@ use std::{
 };
 use stdout_channel::{MockStdout, StdoutChannel};
 use tokio::{fs::remove_file, time::timeout};
+use tokio_stream::StreamExt;
 
 use movie_collection_lib::{
     config::Config,
+    datetime_wrapper::DateTimeWrapper,
     imdb_episodes::ImdbEpisodes,
     imdb_ratings::ImdbRatings,
     make_list::FileLists,
@@ -32,6 +36,7 @@ use movie_collection_lib::{
     },
     movie_queue::{MovieQueueDB, MovieQueueResult, MovieQueueRow},
     pgpool::PgPool,
+    plex_events::PlexEvent,
     trakt_connection::TraktConnection,
     trakt_utils::{
         get_watched_shows_db, get_watchlist_shows_db_map, TraktActions, WatchListShow,
@@ -41,6 +46,8 @@ use movie_collection_lib::{
     tv_show_source::TvShowSource,
     utils::HBR,
 };
+
+use crate::uuid_wrapper::UuidWrapper;
 
 use super::{
     errors::ServiceError as Error,
@@ -1418,4 +1425,64 @@ pub async fn watched_action_http_worker(
     }
     .into();
     Ok(body)
+}
+
+#[derive(RwebResponse)]
+#[response(description = "Plex Events")]
+struct PlexEventResponse(JsonBase<Vec<PlexEvent>, Error>);
+
+#[derive(Serialize, Deserialize, Debug, Schema)]
+pub struct PlexEventRequest {
+    pub start_timestamp: Option<DateTimeWrapper>,
+}
+
+#[get("/list/plex/events")]
+pub async fn plex_events(
+    query: Query<PlexEventRequest>,
+    #[data] state: AppState,
+    #[cookie = "jwt"] _: LoggedUser,
+) -> WarpResult<PlexEventResponse> {
+    let start_timestamp = query.into_inner().start_timestamp.map(Into::into);
+    let events = PlexEvent::get_events(&state.db, start_timestamp)
+        .await
+        .map_err(Into::<Error>::into)?;
+    Ok(JsonBase::new(events).into())
+}
+
+#[derive(RwebResponse)]
+#[response(description = "Plex Webhook", content = "html", status = "CREATED")]
+struct PlexWebhookResponse(HtmlBase<&'static str, Error>);
+
+#[post("/list/plex/webhook/{webhook_key}")]
+pub async fn plex_webhook(
+    #[filter = "rweb::multipart::form"] form: FormData,
+    #[data] state: AppState,
+    webhook_key: UuidWrapper,
+) -> WarpResult<PlexWebhookResponse> {
+    if state.config.plex_webhook_key == webhook_key.into() {
+        process_payload(form, &state.db)
+            .await
+            .map_err(Into::<Error>::into)?;
+    } else {
+        error!("Incorrect webhook key");
+    }
+    Ok(HtmlBase::new("").into())
+}
+
+async fn process_payload(mut form: FormData, pool: &PgPool) -> Result<(), anyhow::Error> {
+    let mut buf = Vec::new();
+    if let Some(item) = form.next().await {
+        let mut stream = item?.stream();
+        while let Some(chunk) = stream.next().await {
+            buf.extend_from_slice(&chunk?.chunk());
+        }
+    }
+    if let Ok(event) = PlexEvent::get_from_payload(&buf) {
+        event.write_event(pool).await?;
+        Ok(())
+    } else {
+        let buf = std::str::from_utf8(&buf)?;
+        error!("failed deserialize {}", buf);
+        Err(format_err!("failed deserialize {}", buf))
+    }
 }

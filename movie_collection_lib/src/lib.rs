@@ -27,6 +27,7 @@ pub mod movie_queue;
 pub mod naivedate_wrapper;
 pub mod parse_imdb;
 pub mod pgpool;
+pub mod plex_events;
 pub mod trakt_connection;
 pub mod trakt_utils;
 pub mod transcode_service;
