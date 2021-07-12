@@ -26,6 +26,7 @@ use tokio_stream::StreamExt;
 
 use movie_collection_lib::{
     config::Config,
+    datetime_wrapper::DateTimeWrapper,
     imdb_episodes::ImdbEpisodes,
     imdb_ratings::ImdbRatings,
     make_list::FileLists,
@@ -1427,6 +1428,28 @@ pub async fn watched_action_http_worker(
 }
 
 #[derive(RwebResponse)]
+#[response(description = "Plex Events")]
+struct PlexEventResponse(JsonBase<Vec<PlexEvent>, Error>);
+
+#[derive(Serialize, Deserialize, Debug, Schema)]
+pub struct PlexEventRequest {
+    pub start_timestamp: Option<DateTimeWrapper>,
+}
+
+#[get("/list/plex/events")]
+pub async fn plex_events(
+    query: Query<PlexEventRequest>,
+    #[data] state: AppState,
+    #[cookie = "jwt"] _: LoggedUser,
+) -> WarpResult<PlexEventResponse> {
+    let start_timestamp = query.into_inner().start_timestamp.map(Into::into);
+    let events = PlexEvent::get_events(&state.db, start_timestamp)
+        .await
+        .map_err(Into::<Error>::into)?;
+    Ok(JsonBase::new(events).into())
+}
+
+#[derive(RwebResponse)]
 #[response(description = "Plex Webhook", content = "html", status = "CREATED")]
 struct PlexWebhookResponse(HtmlBase<&'static str, Error>);
 
@@ -1436,12 +1459,12 @@ pub async fn plex_webhook(
     #[data] state: AppState,
     webhook_key: UuidWrapper,
 ) -> WarpResult<PlexWebhookResponse> {
-    if state.config.plex_webhook_key != webhook_key.into() {
-        error!("Incorrect webhook key");
-    } else {
+    if state.config.plex_webhook_key == webhook_key.into() {
         process_payload(form, &state.db)
             .await
             .map_err(Into::<Error>::into)?;
+    } else {
+        error!("Incorrect webhook key");
     }
     Ok(HtmlBase::new("").into())
 }

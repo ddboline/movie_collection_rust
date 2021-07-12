@@ -1,6 +1,7 @@
 use anyhow::Error;
 use chrono::{DateTime, NaiveDateTime, Utc};
-use postgres_query::FromSqlRow;
+use postgres_query::{query, query_dyn, FromSqlRow, Parameter, Query};
+use rweb::Schema;
 use serde::{Deserialize, Serialize};
 use stack_string::StackString;
 use std::{
@@ -10,7 +11,7 @@ use std::{
 
 use crate::{datetime_wrapper::DateTimeWrapper, pgpool::PgPool};
 
-#[derive(FromSqlRow, Default, Debug)]
+#[derive(FromSqlRow, Default, Debug, Serialize, Schema)]
 pub struct PlexEvent {
     pub event: StackString,
     pub account: StackString,
@@ -22,32 +23,36 @@ pub struct PlexEvent {
     pub grandparent_title: Option<StackString>,
     pub added_at: Option<DateTimeWrapper>,
     pub updated_at: Option<DateTimeWrapper>,
+    pub created_at: Option<DateTimeWrapper>,
 }
 
 impl TryFrom<WebhookPayload> for PlexEvent {
     type Error = Error;
     fn try_from(item: WebhookPayload) -> Result<Self, Self::Error> {
-        let event = serde_json::to_string(&item.event)?.into();
-
         fn dt_from_tm(x: u64) -> DateTimeWrapper {
             let dt = NaiveDateTime::from_timestamp(x as i64, 0);
             let dt = DateTime::from_utc(dt, Utc);
             dt.into()
         }
 
-        Ok(Self {
-            event,
-            account: item.account.title,
-            server: item.server.title,
-            player_title: item.player.title,
-            player_address: item.player.public_address.to_string().into(),
-            title: item.metadata.title,
-            parent_title: item.metadata.parent_title,
-            grandparent_title: item.metadata.grandparent_title,
-            added_at: item.metadata.added_at.map(dt_from_tm),
-            updated_at: item.metadata.updated_at.map(dt_from_tm),
-            ..Self::default()
-        })
+        serde_json::to_string(&item.event)
+            .map(|event| {
+                let event = event.into();
+                Self {
+                    event,
+                    account: item.account.title,
+                    server: item.server.title,
+                    player_title: item.player.title,
+                    player_address: item.player.public_address.to_string().into(),
+                    title: item.metadata.title,
+                    parent_title: item.metadata.parent_title,
+                    grandparent_title: item.metadata.grandparent_title,
+                    added_at: item.metadata.added_at.map(dt_from_tm),
+                    updated_at: item.metadata.updated_at.map(dt_from_tm),
+                    created_at: Some(Utc::now().into()),
+                }
+            })
+            .map_err(Into::into)
     }
 }
 
@@ -57,8 +62,23 @@ impl PlexEvent {
         object.try_into()
     }
 
+    pub async fn get_events(
+        pool: &PgPool,
+        start_timestamp: Option<DateTime<Utc>>,
+    ) -> Result<Vec<Self>, Error> {
+        let mut query = format!("SELECT * FROM plex_event");
+        let mut bindings = Vec::new();
+        if let Some(start_timestamp) = &start_timestamp {
+            query += " WHERE created_at > $start_timestamp";
+            bindings.push(("start_timestamp", start_timestamp as Parameter));
+        }
+        let query: Query = query_dyn!(&query, ..bindings)?;
+        let conn = pool.get().await?;
+        query.fetch(&conn).await.map_err(Into::into)
+    }
+
     pub async fn write_event(&self, pool: &PgPool) -> Result<(), Error> {
-        let query = postgres_query::query!(
+        let query = query!(
             "
             INSERT INTO plex_event (event, account, server, player_title, player_address, title,
                 parent_title, grandparent_title, added_at, updated_at)
