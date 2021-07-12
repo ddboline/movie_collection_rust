@@ -1,12 +1,11 @@
 #![allow(clippy::needless_pass_by_value)]
 
 use anyhow::format_err;
+use bytes::Buf;
 use itertools::Itertools;
+use log::error;
 use maplit::hashmap;
-use rweb::{
-    get, post, Json, Query, Rejection, Schema,
-    multipart::{FormData},
-};
+use rweb::{get, multipart::FormData, post, Json, Query, Rejection, Schema};
 use rweb_helper::{
     html_response::HtmlResponse as HtmlBase, json_response::JsonResponse as JsonBase, RwebResponse,
 };
@@ -23,10 +22,7 @@ use std::{
 };
 use stdout_channel::{MockStdout, StdoutChannel};
 use tokio::{fs::remove_file, time::timeout};
-use log::error;
 use tokio_stream::StreamExt;
-use bytes::Buf;
-use std::net::Ipv4Addr;
 
 use movie_collection_lib::{
     config::Config,
@@ -39,6 +35,7 @@ use movie_collection_lib::{
     },
     movie_queue::{MovieQueueDB, MovieQueueResult, MovieQueueRow},
     pgpool::PgPool,
+    plex_events::PlexEvent,
     trakt_connection::TraktConnection,
     trakt_utils::{
         get_watched_shows_db, get_watchlist_shows_db_map, TraktActions, WatchListShow,
@@ -1430,11 +1427,7 @@ pub async fn watched_action_http_worker(
 }
 
 #[derive(RwebResponse)]
-#[response(
-    description="Plex Webhook",
-    content="html",
-    status="CREATED"
-)]
+#[response(description = "Plex Webhook", content = "html", status = "CREATED")]
 struct PlexWebhookResponse(HtmlBase<&'static str, Error>);
 
 #[post("/list/plex/webhook/{webhook_key}")]
@@ -1446,13 +1439,14 @@ pub async fn plex_webhook(
     if state.config.plex_webhook_key != webhook_key.into() {
         error!("Incorrect webhook key");
     } else {
-        let buf = get_payload(form).await.map_err(Into::<Error>::into)?;
-        error!("buf: {:#?}", buf);
+        process_payload(form, &state.db)
+            .await
+            .map_err(Into::<Error>::into)?;
     }
     Ok(HtmlBase::new("").into())
 }
 
-async fn get_payload(mut form: FormData) -> Result<WebhookPayload, anyhow::Error> {
+async fn process_payload(mut form: FormData, pool: &PgPool) -> Result<(), anyhow::Error> {
     let mut buf = Vec::new();
     if let Some(item) = form.next().await {
         let mut stream = item?.stream();
@@ -1460,85 +1454,12 @@ async fn get_payload(mut form: FormData) -> Result<WebhookPayload, anyhow::Error
             buf.extend_from_slice(&chunk?.chunk());
         }
     }
-    if let Ok(payload) = serde_json::from_slice(&buf) {
-        Ok(payload)
+    if let Ok(event) = PlexEvent::get_from_payload(&buf) {
+        event.write_event(pool).await?;
+        Ok(())
     } else {
         let buf = std::str::from_utf8(&buf)?;
         error!("failed deserialize {}", buf);
         Err(format_err!("failed deserialize {}", buf))
     }
-}
-
-#[derive(Deserialize, Debug)]
-struct Account {
-    id: isize,
-    thumb: StackString,
-    title: StackString,
-}
-
-#[derive(Deserialize, Debug)]
-struct Server {
-    title: StackString,
-    uuid: StackString,
-}
-
-#[derive(Deserialize, Debug)]
-struct Player {
-    local: bool,
-    #[serde(rename = "publicAddress")]
-    public_address: Ipv4Addr,
-    title: StackString,
-    uuid: StackString,
-}
-
-#[derive(Deserialize, Debug)]
-struct Metadata {
-    #[serde(rename = "type")]
-    metadata_type: Option<StackString>,
-    title: Option<StackString>,
-    summary: Option<StackString>,
-    rating: Option<f64>,
-}
-
-#[derive(Deserialize, Debug)]
-enum PlexEventType {
-    #[serde(rename = "library.on.deck")]
-    LibraryOnDeck,
-    #[serde(rename = "library.new")]
-    LibraryNew,
-    #[serde(rename = "media.pause")]
-    MediaPause,
-    #[serde(rename = "media.play")]
-    MediaPlay,
-    #[serde(rename = "media.rate")]
-    MediaRate,
-    #[serde(rename = "media.resume")]
-    MediaResume,
-    #[serde(rename = "media.scrobble")]
-    MediaScrobble,
-    #[serde(rename = "media.stop")]
-    MediaStop,
-    #[serde(rename = "admin.database.backup")]
-    AdminDatabaseBackup,
-    #[serde(rename = "admin.database.corrupted")]
-    AdminDatabaseCorrupted,
-    #[serde(rename = "device.new")]
-    DeviceNew,
-    #[serde(rename = "playback.started")]
-    PlaybackStarted,
-}
-
-#[derive(Deserialize, Debug)]
-struct WebhookPayload {
-    event: PlexEventType,
-    user: bool,
-    owner: bool,
-    #[serde(rename = "Account")]
-    account: Account,
-    #[serde(rename = "Server")]
-    server: Server,
-    #[serde(rename = "Player")]
-    player: Player,
-    #[serde(rename = "Metadata")]
-    metadata: Metadata,
 }
