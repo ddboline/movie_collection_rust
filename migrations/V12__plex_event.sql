@@ -1,4 +1,4 @@
-CREATE SEQUENCE IF NOT EXISTS plex_event_id_seq;
+CREATE SEQUENCE plex_event_id_seq;
 
 CREATE TABLE plex_event (
     id INTEGER NOT NULL PRIMARY KEY DEFAULT nextval('plex_event_id_seq'::regclass),

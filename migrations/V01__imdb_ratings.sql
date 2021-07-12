@@ -1,6 +1,6 @@
-CREATE SEQUENCE IF NOT EXISTS imdb_ratings_id_seq;
+CREATE SEQUENCE imdb_ratings_id_seq;
 
-CREATE TABLE IF NOT EXISTS imdb_ratings (
+CREATE TABLE imdb_ratings (
     index INTEGER NOT NULL PRIMARY KEY DEFAULT nextval('imdb_ratings_id_seq'::regclass),
     show text NOT NULL UNIQUE,
     title text,
