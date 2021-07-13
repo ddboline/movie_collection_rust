@@ -30,7 +30,7 @@ use super::{
         movie_queue_transcode_cleanup, movie_queue_transcode_directory, movie_queue_transcode_file,
         movie_queue_transcode_status, movie_queue_update, plex_webhook, refresh_auth,
         trakt_auth_url, trakt_cal, trakt_callback, trakt_watched_action, trakt_watched_list,
-        trakt_watched_seasons, trakt_watchlist, trakt_watchlist_action, tvshows, user,
+        trakt_watched_seasons, trakt_watchlist, trakt_watchlist_action, tvshows, user, plex_events,
     },
 };
 
@@ -111,6 +111,7 @@ fn get_full_path(app: &AppState) -> BoxedFilter<(impl Reply,)> {
     let full_queue_path = movie_queue(app.clone()).boxed();
     let movie_queue_show_path = movie_queue_show(app.clone()).boxed();
     let plex_webhook_path = plex_webhook(app.clone()).boxed();
+    let plex_events_path = plex_events(app.clone()).boxed();
     let list_path = frontpage_path
         .or(find_new_episodes_path)
         .or(tvshows_path)
@@ -127,7 +128,8 @@ fn get_full_path(app: &AppState) -> BoxedFilter<(impl Reply,)> {
         .or(user_path)
         .or(full_queue_path)
         .or(movie_queue_show_path)
-        .or(plex_webhook_path);
+        .or(plex_webhook_path)
+        .or(plex_events_path);
     let auth_url_path = trakt_auth_url(app.clone()).boxed();
     let trakt_callback_path = trakt_callback(app.clone()).boxed();
     let refresh_auth_path = refresh_auth(app.clone()).boxed();

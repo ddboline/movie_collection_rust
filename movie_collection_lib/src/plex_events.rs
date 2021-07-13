@@ -37,7 +37,7 @@ impl TryFrom<WebhookPayload> for PlexEvent {
 
         serde_json::to_string(&item.event)
             .map(|event| {
-                let event = event.into();
+                let event = event.trim_matches('"').into();
                 Self {
                     event,
                     account: item.account.title,
