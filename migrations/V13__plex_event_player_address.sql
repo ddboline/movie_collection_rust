@@ -1,0 +1,1 @@
+ALTER TABLE plex_event ADD COLUMN player_address TEXT;
