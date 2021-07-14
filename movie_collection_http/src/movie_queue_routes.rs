@@ -1436,7 +1436,7 @@ pub struct PlexEventRequest {
     pub start_timestamp: Option<DateTimeWrapper>,
 }
 
-#[get("/list/plex/events")]
+#[get("/list/plex_event")]
 pub async fn plex_events(
     query: Query<PlexEventRequest>,
     #[data] state: AppState,
@@ -1462,7 +1462,7 @@ pub struct PlexEventUpdateRequest {
 )]
 struct PlexEventUpdateResponse(HtmlBase<&'static str, Error>);
 
-#[post("/list/plex/events")]
+#[post("/list/plex_event")]
 pub async fn plex_events_update(
     payload: Json<PlexEventUpdateRequest>,
     #[data] state: AppState,

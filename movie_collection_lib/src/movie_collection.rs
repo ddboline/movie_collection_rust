@@ -922,6 +922,7 @@ impl LastModifiedResponse {
             "imdb_ratings",
             "movie_collection",
             "movie_queue",
+            "plex_event",
         ];
 
         let futures = tables.into_iter().map(|table| async move {
