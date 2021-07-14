@@ -19,6 +19,7 @@ use movie_collection_lib::{
     movie_queue::{MovieQueueDB, MovieQueueRow},
     pgpool::PgPool,
     transcode_service::transcode_status,
+    plex_events::PlexEvent,
 };
 
 embed_migrations!("migrations");
@@ -98,6 +99,18 @@ impl MovieQueueCli {
                         });
                         let results: Result<Vec<_>, Error> = try_join_all(futures).await;
                         stdout.send(format!("imdb_episodes {}\n", results?.len()));
+                    }
+                    "plex_event" => {
+                        let events: Vec<PlexEvent> = serde_json::from_str(&data)?;
+                        let futures = events.into_iter().map(|event| {
+                            let pool = pool.clone();
+                            async move {
+                                event.write_event(&pool).await?;
+                                Ok(())
+                            }
+                        });
+                        let results: Result<Vec<_>, Error> = try_join_all(futures).await;
+                        stdout.send(format!("plex_event {}\n", results?.len()));
                     }
                     "movie_collection" => {
                         let rows: Vec<MovieCollectionRow> = serde_json::from_str(&data)?;
@@ -180,6 +193,10 @@ impl MovieQueueCli {
                             ImdbEpisodes::get_episodes_after_timestamp(start_timestamp, &pool)
                                 .await?;
                         file.write_all(&serde_json::to_vec(&episodes)?).await?;
+                    }
+                    "plex_event" => {
+                        let events = PlexEvent::get_events(&pool, Some(start_timestamp)).await?;
+                        file.write_all(&serde_json::to_vec(&events)?).await?;
                     }
                     "movie_collection" => {
                         let mc = MovieCollection::new(&config, &pool, &stdout);
