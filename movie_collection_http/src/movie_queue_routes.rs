@@ -1449,6 +1449,37 @@ pub async fn plex_events(
     Ok(JsonBase::new(events).into())
 }
 
+#[derive(Serialize, Deserialize, Debug, Schema)]
+pub struct PlexEventUpdateRequest {
+    events: Vec<PlexEvent>,
+}
+
+#[derive(RwebResponse)]
+#[response(
+    description = "Update Plex Events",
+    content = "html",
+    status = "CREATED"
+)]
+struct PlexEventUpdateResponse(HtmlBase<&'static str, Error>);
+
+#[post("/list/plex/events")]
+pub async fn plex_events_update(
+    payload: Json<PlexEventUpdateRequest>,
+    #[data] state: AppState,
+    #[cookie = "jwt"] _: LoggedUser,
+) -> WarpResult<PlexEventUpdateResponse> {
+    let payload = payload.into_inner();
+
+    for event in payload.events {
+        event
+            .write_event(&state.db)
+            .await
+            .map_err(Into::<Error>::into)?;
+    }
+
+    Ok(HtmlBase::new("Success").into())
+}
+
 #[derive(RwebResponse)]
 #[response(description = "Plex Webhook", content = "html", status = "CREATED")]
 struct PlexWebhookResponse(HtmlBase<&'static str, Error>);

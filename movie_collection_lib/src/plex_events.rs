@@ -11,7 +11,7 @@ use std::{
 
 use crate::{datetime_wrapper::DateTimeWrapper, pgpool::PgPool};
 
-#[derive(FromSqlRow, Default, Debug, Serialize, Schema)]
+#[derive(FromSqlRow, Default, Debug, Serialize, Deserialize, Schema)]
 pub struct PlexEvent {
     pub event: StackString,
     pub account: StackString,
