@@ -24,6 +24,7 @@ pub struct PlexEvent {
     pub added_at: Option<DateTimeWrapper>,
     pub updated_at: Option<DateTimeWrapper>,
     pub created_at: Option<DateTimeWrapper>,
+    pub last_modified: Option<DateTimeWrapper>,
 }
 
 impl TryFrom<WebhookPayload> for PlexEvent {
@@ -50,6 +51,7 @@ impl TryFrom<WebhookPayload> for PlexEvent {
                     added_at: item.metadata.added_at.map(dt_from_tm),
                     updated_at: item.metadata.updated_at.map(dt_from_tm),
                     created_at: Some(Utc::now().into()),
+                    last_modified: Some(Utc::now().into()),
                 }
             })
             .map_err(Into::into)
@@ -81,9 +83,9 @@ impl PlexEvent {
         let query = query!(
             "
             INSERT INTO plex_event (event, account, server, player_title, player_address, title,
-                parent_title, grandparent_title, added_at, updated_at)
+                parent_title, grandparent_title, added_at, updated_at, created_at, last_modified)
             VALUES ($event, $account, $server, $player_title, $player_address, $title,
-                $parent_title, $grandparent_title, $added_at, $updated_at)",
+                $parent_title, $grandparent_title, $added_at, $updated_at, $created_at, $last_modified)",
             event = self.event,
             account = self.account,
             server = self.server,
@@ -94,6 +96,8 @@ impl PlexEvent {
             grandparent_title = self.grandparent_title,
             added_at = self.added_at,
             updated_at = self.updated_at,
+            created_at =  self.created_at,
+            last_modified = self.last_modified,
         );
         let conn = pool.get().await?;
         query.execute(&conn).await?;
