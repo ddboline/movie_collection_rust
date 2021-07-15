@@ -74,6 +74,7 @@ impl PlexEvent {
             query += " WHERE created_at > $start_timestamp";
             bindings.push(("start_timestamp", start_timestamp as Parameter));
         }
+        query += " ORDER by created_at desc";
         let query: Query = query_dyn!(&query, ..bindings)?;
         let conn = pool.get().await?;
         query.fetch(&conn).await.map_err(Into::into)
@@ -85,7 +86,8 @@ impl PlexEvent {
             INSERT INTO plex_event (event, account, server, player_title, player_address, title,
                 parent_title, grandparent_title, added_at, updated_at, created_at, last_modified)
             VALUES ($event, $account, $server, $player_title, $player_address, $title,
-                $parent_title, $grandparent_title, $added_at, $updated_at, $created_at, $last_modified)",
+                $parent_title, $grandparent_title, $added_at, $updated_at, $created_at, \
+             $last_modified)",
             event = self.event,
             account = self.account,
             server = self.server,
@@ -96,7 +98,7 @@ impl PlexEvent {
             grandparent_title = self.grandparent_title,
             added_at = self.added_at,
             updated_at = self.updated_at,
-            created_at =  self.created_at,
+            created_at = self.created_at,
             last_modified = self.last_modified,
         );
         let conn = pool.get().await?;

@@ -18,8 +18,8 @@ use movie_collection_lib::{
     movie_collection::{LastModifiedResponse, MovieCollection, MovieCollectionRow},
     movie_queue::{MovieQueueDB, MovieQueueRow},
     pgpool::PgPool,
-    transcode_service::transcode_status,
     plex_events::PlexEvent,
+    transcode_service::transcode_status,
 };
 
 embed_migrations!("migrations");
