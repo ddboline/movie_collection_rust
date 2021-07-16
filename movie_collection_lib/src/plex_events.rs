@@ -1,4 +1,4 @@
-use anyhow::Error;
+use anyhow::{format_err, Error};
 use chrono::{DateTime, NaiveDateTime, Utc};
 use postgres_query::{query, query_dyn, FromSqlRow, Parameter, Query};
 use rweb::Schema;
@@ -7,6 +7,7 @@ use stack_string::StackString;
 use std::{
     convert::{TryFrom, TryInto},
     net::Ipv4Addr,
+    str::FromStr,
 };
 
 use crate::{datetime_wrapper::DateTimeWrapper, pgpool::PgPool};
@@ -35,26 +36,22 @@ impl TryFrom<WebhookPayload> for PlexEvent {
             let dt = DateTime::from_utc(dt, Utc);
             dt.into()
         }
-
-        serde_json::to_string(&item.event)
-            .map(|event| {
-                let event = event.trim_matches('"').into();
-                Self {
-                    event,
-                    account: item.account.title,
-                    server: item.server.title,
-                    player_title: item.player.title,
-                    player_address: item.player.public_address.to_string().into(),
-                    title: item.metadata.title,
-                    parent_title: item.metadata.parent_title,
-                    grandparent_title: item.metadata.grandparent_title,
-                    added_at: item.metadata.added_at.map(dt_from_tm),
-                    updated_at: item.metadata.updated_at.map(dt_from_tm),
-                    created_at: Some(Utc::now().into()),
-                    last_modified: Some(Utc::now().into()),
-                }
-            })
-            .map_err(Into::into)
+        let event = item.event.to_str().into();
+        let payload = Self {
+            event,
+            account: item.account.title,
+            server: item.server.title,
+            player_title: item.player.title,
+            player_address: item.player.public_address.to_string().into(),
+            title: item.metadata.title,
+            parent_title: item.metadata.parent_title,
+            grandparent_title: item.metadata.grandparent_title,
+            added_at: item.metadata.added_at.map(dt_from_tm),
+            updated_at: item.metadata.updated_at.map(dt_from_tm),
+            created_at: Some(Utc::now().into()),
+            last_modified: Some(Utc::now().into()),
+        };
+        Ok(payload)
     }
 }
 
@@ -67,14 +64,42 @@ impl PlexEvent {
     pub async fn get_events(
         pool: &PgPool,
         start_timestamp: Option<DateTime<Utc>>,
+        event_type: Option<PlexEventType>,
+        offset: Option<u64>,
+        limit: Option<u64>,
     ) -> Result<Vec<Self>, Error> {
-        let mut query = format!("SELECT * FROM plex_event");
+        let mut constraints = Vec::new();
         let mut bindings = Vec::new();
         if let Some(start_timestamp) = &start_timestamp {
-            query += " WHERE created_at > $start_timestamp";
+            constraints.push("created_at > $start_timestamp");
             bindings.push(("start_timestamp", start_timestamp as Parameter));
         }
-        query += " ORDER by created_at desc";
+        let event_type = event_type.map(|s| s.to_str().to_string());
+        if let Some(event_type) = &event_type {
+            constraints.push("event = $event");
+            bindings.push(("event", event_type as Parameter));
+        }
+        let query = format!(
+            "
+                SELECT * FROM plex_event
+                {where} ORDER by created_at desc {limit} {offset}
+            ",
+            where = if !constraints.is_empty() {
+                format!("WHERE {}", constraints.join(" AND "))
+            } else {
+                String::new()
+            },
+            limit = if let Some(limit) = limit {
+                format!("LIMIT {}", limit)
+            } else {
+                String::new()
+            },
+            offset = if let Some(offset) = offset {
+                format!("OFFSET {}", offset)
+            } else {
+                String::new()
+            }
+        );
         let query: Query = query_dyn!(&query, ..bindings)?;
         let conn = pool.get().await?;
         query.fetch(&conn).await.map_err(Into::into)
@@ -153,7 +178,7 @@ pub struct Metadata {
     pub updated_at: Option<u64>,
 }
 
-#[derive(Serialize, Deserialize, Debug)]
+#[derive(Serialize, Deserialize, Debug, Schema)]
 pub enum PlexEventType {
     #[serde(rename = "library.on.deck")]
     LibraryOnDeck,
@@ -179,6 +204,46 @@ pub enum PlexEventType {
     DeviceNew,
     #[serde(rename = "playback.started")]
     PlaybackStarted,
+}
+
+impl PlexEventType {
+    pub fn to_str(self) -> &'static str {
+        match self {
+            Self::LibraryOnDeck => "library.on.deck",
+            Self::LibraryNew => "library.new",
+            Self::MediaPause => "media.pause",
+            Self::MediaPlay => "media.play",
+            Self::MediaRate => "media.rate",
+            Self::MediaResume => "media.resume",
+            Self::MediaScrobble => "media.scrobble",
+            Self::MediaStop => "media.stop",
+            Self::AdminDatabaseBackup => "admin.database.backup",
+            Self::AdminDatabaseCorrupted => "admin.database.corrupted",
+            Self::DeviceNew => "device.new",
+            Self::PlaybackStarted => "playback.started",
+        }
+    }
+}
+
+impl FromStr for PlexEventType {
+    type Err = Error;
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        match s {
+            "library.on.deck" => Ok(Self::LibraryOnDeck),
+            "library.new" => Ok(Self::LibraryNew),
+            "media.pause" => Ok(Self::MediaPause),
+            "media.play" => Ok(Self::MediaPlay),
+            "media.rate" => Ok(Self::MediaRate),
+            "media.resume" => Ok(Self::MediaResume),
+            "media.scrobble" => Ok(Self::MediaScrobble),
+            "media.stop" => Ok(Self::MediaStop),
+            "admin.database.backup" => Ok(Self::AdminDatabaseBackup),
+            "admin.database.corrupted" => Ok(Self::AdminDatabaseCorrupted),
+            "device.new" => Ok(Self::DeviceNew),
+            "playback.started" => Ok(Self::PlaybackStarted),
+            _ => Err(format_err!("Invalid PlexEventType")),
+        }
+    }
 }
 
 #[derive(Deserialize, Debug)]
