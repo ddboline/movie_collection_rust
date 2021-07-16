@@ -36,7 +36,7 @@ use movie_collection_lib::{
     },
     movie_queue::{MovieQueueDB, MovieQueueResult, MovieQueueRow},
     pgpool::PgPool,
-    plex_events::PlexEvent,
+    plex_events::{PlexEvent, PlexEventType},
     trakt_connection::TraktConnection,
     trakt_utils::{
         get_watched_shows_db, get_watchlist_shows_db_map, TraktActions, WatchListShow,
@@ -1434,6 +1434,9 @@ struct PlexEventResponse(JsonBase<Vec<PlexEvent>, Error>);
 #[derive(Serialize, Deserialize, Debug, Schema)]
 pub struct PlexEventRequest {
     pub start_timestamp: Option<DateTimeWrapper>,
+    pub event_type: Option<PlexEventType>,
+    pub offset: Option<u64>,
+    pub limit: Option<u64>,
 }
 
 #[get("/list/plex_event")]
@@ -1442,10 +1445,16 @@ pub async fn plex_events(
     #[data] state: AppState,
     #[cookie = "jwt"] _: LoggedUser,
 ) -> WarpResult<PlexEventResponse> {
-    let start_timestamp = query.into_inner().start_timestamp.map(Into::into);
-    let events = PlexEvent::get_events(&state.db, start_timestamp)
-        .await
-        .map_err(Into::<Error>::into)?;
+    let query = query.into_inner();
+    let events = PlexEvent::get_events(
+        &state.db,
+        query.start_timestamp.map(Into::into),
+        query.event_type,
+        query.offset,
+        query.limit,
+    )
+    .await
+    .map_err(Into::<Error>::into)?;
     Ok(JsonBase::new(events).into())
 }
 
