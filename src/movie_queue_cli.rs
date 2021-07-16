@@ -195,7 +195,9 @@ impl MovieQueueCli {
                         file.write_all(&serde_json::to_vec(&episodes)?).await?;
                     }
                     "plex_event" => {
-                        let events = PlexEvent::get_events(&pool, Some(start_timestamp)).await?;
+                        let events =
+                            PlexEvent::get_events(&pool, Some(start_timestamp), None, None, None)
+                                .await?;
                         file.write_all(&serde_json::to_vec(&events)?).await?;
                     }
                     "movie_collection" => {
