@@ -11,7 +11,7 @@ use std::{fmt, path::Path};
 use stdout_channel::StdoutChannel;
 
 use crate::{config::Config, movie_collection::MovieCollection, pgpool::PgPool};
-
+use crate::datetime_wrapper::DateTimeWrapper;
 use crate::utils::{option_string_wrapper, parse_file_stem};
 
 #[derive(Default, Serialize)]
@@ -294,7 +294,7 @@ impl MovieQueueDB {
     ) -> Result<Vec<MovieQueueRow>, Error> {
         let query = query!(
             r#"
-                SELECT a.idx, a.collection_idx, b.path, b.show
+                SELECT a.idx, a.collection_idx, b.path, b.show, a.last_modified
                 FROM movie_queue a
                 JOIN movie_collection b ON a.collection_idx = b.idx
                 WHERE a.last_modified >= $timestamp
@@ -312,4 +312,5 @@ pub struct MovieQueueRow {
     pub collection_idx: i32,
     pub path: StackString,
     pub show: StackString,
+    pub last_modified: Option<DateTimeWrapper>,
 }
