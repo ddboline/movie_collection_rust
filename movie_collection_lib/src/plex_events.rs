@@ -86,10 +86,10 @@ impl PlexEvent {
                 SELECT * FROM plex_event
                 {where} ORDER by created_at desc {limit} {offset}
             ",
-            where = if !constraints.is_empty() {
-                format!("WHERE {}", constraints.join(" AND "))
-            } else {
+            where = if constraints.is_empty() {
                 String::new()
+            } else {
+                format!("WHERE {}", constraints.join(" AND "))
             },
             limit = if let Some(limit) = limit {
                 format!("LIMIT {}", limit)
@@ -180,7 +180,7 @@ pub struct Metadata {
     pub updated_at: Option<u64>,
 }
 
-#[derive(Serialize, Deserialize, Debug, Schema)]
+#[derive(Serialize, Deserialize, Debug, Schema, Clone, Copy)]
 pub enum PlexEventType {
     #[serde(rename = "library.on.deck")]
     LibraryOnDeck,
