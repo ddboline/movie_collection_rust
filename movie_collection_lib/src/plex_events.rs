@@ -9,6 +9,7 @@ use std::{
     net::Ipv4Addr,
     str::FromStr,
 };
+use log::info;
 
 use crate::{datetime_wrapper::DateTimeWrapper, pgpool::PgPool};
 
@@ -27,6 +28,8 @@ pub struct PlexEvent {
     pub created_at: Option<DateTimeWrapper>,
     pub last_modified: Option<DateTimeWrapper>,
     pub metadata_type: Option<StackString>,
+    pub section_type: Option<StackString>,
+    pub section_title: Option<StackString>,
 }
 
 impl TryFrom<WebhookPayload> for PlexEvent {
@@ -52,6 +55,8 @@ impl TryFrom<WebhookPayload> for PlexEvent {
             created_at: Some(Utc::now().into()),
             last_modified: Some(Utc::now().into()),
             metadata_type: item.metadata.metadata_type,
+            section_type: item.metadata.library_section_type,
+            section_title: item.metadata.library_section_title,
         };
         Ok(payload)
     }
@@ -60,6 +65,7 @@ impl TryFrom<WebhookPayload> for PlexEvent {
 impl PlexEvent {
     pub fn get_from_payload(buf: &[u8]) -> Result<Self, Error> {
         let object: WebhookPayload = serde_json::from_slice(buf)?;
+        info!("{:#?}", object);
         object.try_into()
     }
 
@@ -178,6 +184,10 @@ pub struct Metadata {
     pub added_at: Option<u64>,
     #[serde(rename = "updatedAt")]
     pub updated_at: Option<u64>,
+    #[serde(rename = "librarySectionType")]
+    pub library_section_type: Option<StackString>,
+    #[serde(rename = "librarySectionTitle")]
+    pub library_section_title: Option<StackString>,
 }
 
 #[derive(Serialize, Deserialize, Debug, Schema, Clone, Copy)]
