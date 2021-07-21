@@ -120,7 +120,7 @@ impl PlexEvent {
                 parent_title, grandparent_title, added_at, updated_at, created_at, last_modified)
             VALUES ($event, $account, $server, $player_title, $player_address, $title,
                 $parent_title, $grandparent_title, $added_at, $updated_at, $created_at, \
-             $last_modified)",
+             $last_modified, $metadata_type, $section_type, $section_title)",
             event = self.event,
             account = self.account,
             server = self.server,
@@ -133,6 +133,9 @@ impl PlexEvent {
             updated_at = self.updated_at,
             created_at = self.created_at,
             last_modified = self.last_modified,
+            metadata_type = self.metadata_type,
+            section_type = self.section_type,
+            section_title = self.section_title,
         );
         let conn = pool.get().await?;
         query.execute(&conn).await?;
