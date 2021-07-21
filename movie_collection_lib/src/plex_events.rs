@@ -26,6 +26,7 @@ pub struct PlexEvent {
     pub updated_at: Option<DateTimeWrapper>,
     pub created_at: Option<DateTimeWrapper>,
     pub last_modified: Option<DateTimeWrapper>,
+    pub metadata_type: Option<StackString>,
 }
 
 impl TryFrom<WebhookPayload> for PlexEvent {
@@ -50,6 +51,7 @@ impl TryFrom<WebhookPayload> for PlexEvent {
             updated_at: item.metadata.updated_at.map(dt_from_tm),
             created_at: Some(Utc::now().into()),
             last_modified: Some(Utc::now().into()),
+            metadata_type: item.metadata.metadata_type,
         };
         Ok(payload)
     }
