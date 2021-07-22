@@ -1,5 +1,6 @@
 use anyhow::{format_err, Error};
 use chrono::{DateTime, NaiveDateTime, Utc};
+use log::info;
 use postgres_query::{query, query_dyn, FromSqlRow, Parameter, Query};
 use rweb::Schema;
 use serde::{Deserialize, Serialize};
@@ -9,7 +10,6 @@ use std::{
     net::Ipv4Addr,
     str::FromStr,
 };
-use log::info;
 
 use crate::{datetime_wrapper::DateTimeWrapper, pgpool::PgPool};
 
@@ -90,7 +90,10 @@ impl PlexEvent {
         let query = format!(
             "
                 SELECT * FROM plex_event
-                {where} ORDER by created_at desc {limit} {offset}
+                {where}
+                ORDER BY created_at DESC
+                {limit}
+                {offset}
             ",
             where = if constraints.is_empty() {
                 String::new()
@@ -116,12 +119,17 @@ impl PlexEvent {
     pub async fn write_event(&self, pool: &PgPool) -> Result<(), Error> {
         let query = query!(
             "
-            INSERT INTO plex_event (event, account, server, player_title, player_address, title,
-                parent_title, grandparent_title, added_at, updated_at, created_at, last_modified,
-                metadata_type, section_type, section_title)
-            VALUES ($event, $account, $server, $player_title, $player_address, $title,
-                $parent_title, $grandparent_title, $added_at, $updated_at, $created_at, \
-             $last_modified, $metadata_type, $section_type, $section_title)",
+            INSERT INTO plex_event (
+                event, account, server, player_title, player_address, title, parent_title,
+                grandparent_title, added_at, updated_at, created_at, last_modified,
+                metadata_type, section_type, section_title
+            )
+            VALUES (
+                $event, $account, $server, $player_title, $player_address, $title,
+                $parent_title, $grandparent_title, $added_at, $updated_at, $created_at,
+                $last_modified, $metadata_type, $section_type, $section_title
+            )
+            ",
             event = self.event,
             account = self.account,
             server = self.server,

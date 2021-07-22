@@ -10,9 +10,13 @@ use stack_string::StackString;
 use std::{fmt, path::Path};
 use stdout_channel::StdoutChannel;
 
-use crate::{config::Config, movie_collection::MovieCollection, pgpool::PgPool};
-use crate::datetime_wrapper::DateTimeWrapper;
-use crate::utils::{option_string_wrapper, parse_file_stem};
+use crate::{
+    config::Config,
+    datetime_wrapper::DateTimeWrapper,
+    movie_collection::MovieCollection,
+    pgpool::PgPool,
+    utils::{option_string_wrapper, parse_file_stem},
+};
 
 #[derive(Default, Serialize)]
 pub struct MovieQueueResult {
