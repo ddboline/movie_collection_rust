@@ -1,5 +1,6 @@
 use anyhow::{format_err, Error};
-use chrono::{DateTime, NaiveDateTime, Utc};
+use chrono::{DateTime, Local, NaiveDateTime, Utc};
+use chrono_tz::Tz;
 use log::info;
 use postgres_query::{query, query_dyn, FromSqlRow, Parameter, Query};
 use rweb::Schema;
@@ -11,7 +12,7 @@ use std::{
     str::FromStr,
 };
 
-use crate::{datetime_wrapper::DateTimeWrapper, pgpool::PgPool};
+use crate::{config::Config, datetime_wrapper::DateTimeWrapper, pgpool::PgPool};
 
 #[derive(FromSqlRow, Default, Debug, Serialize, Deserialize, Schema)]
 pub struct PlexEvent {
@@ -149,6 +150,31 @@ impl PlexEvent {
         let conn = pool.get().await?;
         query.execute(&conn).await?;
         Ok(())
+    }
+
+    pub fn event_http(&self, config: &Config) -> StackString {
+        let created_at =
+            self.created_at
+                .map_or(String::new(), |created_at| match config.default_time_zone {
+                    Some(tz) => {
+                        let tz: Tz = tz.into();
+                        created_at.with_timezone(&tz).to_string()
+                    }
+                    None => created_at.with_timezone(&Local).to_string(),
+                });
+        format!(
+            r#"<tr style="text-align; center;"><td>{}</td><td>{}</td><td>{}</td><td>{}</td><td>{}</td></tr>"#,
+            created_at,
+            self.event,
+            self.metadata_type.as_ref().map_or("", |s| s.as_str()),
+            self.section_title.as_ref().map_or("", |s| s.as_str()),
+            format!(
+                "{} {} {}",
+                self.title.as_ref().map_or("", |s| s.as_str()),
+                self.parent_title.as_ref().map_or("", |s| s.as_str()),
+                self.grandparent_title.as_ref().map_or("", |s| s.as_str()),
+            )
+        ).into()
     }
 }
 

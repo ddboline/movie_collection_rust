@@ -1526,3 +1526,45 @@ async fn process_payload(mut form: FormData, pool: &PgPool) -> Result<(), anyhow
         Err(format_err!("failed deserialize {}", buf))
     }
 }
+
+#[derive(RwebResponse)]
+#[response(description = "Plex Event List", content = "html")]
+struct PlexEventList(HtmlBase<String, Error>);
+
+#[get("/list/plex")]
+pub async fn plex_list(
+    #[cookie = "jwt"] _: LoggedUser,
+    #[data] state: AppState,
+    query: Query<PlexEventRequest>,
+) -> WarpResult<PlexEventList> {
+    let query = query.into_inner();
+    let events = PlexEvent::get_events(
+        &state.db,
+        query.start_timestamp.map(Into::into),
+        query.event_type,
+        query.offset,
+        query.limit,
+    )
+    .await
+    .map_err(Into::<Error>::into)?;
+    let body = events
+        .into_iter()
+        .map(|e| e.event_http(&state.config))
+        .join("\n");
+    let body = format!(
+        r#"
+            <table border="1" class="dataframe">
+            <thead><tr>
+            <th>Time</th>
+            <th>Event Type</th>
+            <th>Item Type</th>
+            <th>Section</th>
+            <th>Title</th></tr></thead>
+            <tbody>{}</tbody>
+            </table>
+        "#,
+        body,
+    );
+
+    Ok(HtmlBase::new(body).into())
+}

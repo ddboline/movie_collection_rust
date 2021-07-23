@@ -166,9 +166,10 @@ pub async fn movie_queue_http(
         let entry = if ext == "mp4" {
             let collection_idx = mc.get_collection_index(&row.path).await?.unwrap_or(-1);
             format!(
-                r#"<a href="javascript:updateMainArticle('{}');">{}</a>"#,
-                &format!("{}/{}", "/list/play", collection_idx),
-                file_name
+                r#"<a href="javascript:updateMainArticle('{play_url}');">{idx} {file_name}</a>"#,
+                idx=row.idx,
+                play_url=format!("{}/{}", "/list/play", collection_idx),
+                file_name=file_name,
             )
         } else {
             file_name.clone()

@@ -288,7 +288,7 @@ impl MovieQueueDB {
         let results: Result<Vec<_>, Error> = try_join_all(futures).await;
         let mut results = results?;
 
-        results.sort_by_key(|r| r.idx);
+        results.sort_by_key(|r| -r.idx);
         Ok(results)
     }
 

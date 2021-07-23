@@ -9,6 +9,8 @@ use uuid::Uuid;
 
 use stack_string::StackString;
 
+use crate::timezone::TimeZone;
+
 #[derive(Debug, Default, Deserialize)]
 pub struct ConfigInner {
     #[serde(default = "default_home_dir")]
@@ -50,6 +52,7 @@ pub struct ConfigInner {
     pub video_playback_path: Option<PathBuf>,
     #[serde(default = "default_plex_webhook_key")]
     pub plex_webhook_key: Uuid,
+    pub default_time_zone: Option<TimeZone>,
 }
 
 fn default_suffixes() -> Vec<StackString> {
