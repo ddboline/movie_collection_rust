@@ -65,6 +65,14 @@ impl TryFrom<WebhookPayload> for PlexEvent {
 
 impl PlexEvent {
     pub fn get_from_payload(buf: &[u8]) -> Result<Self, Error> {
+        info!(
+            "buf {}",
+            if let Ok(s) = std::str::from_utf8(buf) {
+                s
+            } else {
+                ""
+            }
+        );
         let object: WebhookPayload = serde_json::from_slice(buf)?;
         info!("{:#?}", object);
         object.try_into()
@@ -152,7 +160,7 @@ impl PlexEvent {
         Ok(())
     }
 
-    pub fn event_http(&self, config: &Config) -> StackString {
+    pub fn event_http(&self, config: &Config) -> String {
         let created_at =
             self.created_at
                 .map_or(String::new(), |created_at| match config.default_time_zone {
@@ -163,7 +171,11 @@ impl PlexEvent {
                     None => created_at.with_timezone(&Local).to_string(),
                 });
         format!(
-            r#"<tr style="text-align; center;"><td>{}</td><td>{}</td><td>{}</td><td>{}</td><td>{}</td></tr>"#,
+            r#"
+                <tr style="text-align; center;">
+                <td>{}</td><td>{}</td><td>{}</td><td>{}</td><td>{}</td>
+                </tr>
+            "#,
             created_at,
             self.event,
             self.metadata_type.as_ref().map_or("", |s| s.as_str()),
@@ -174,7 +186,7 @@ impl PlexEvent {
                 self.parent_title.as_ref().map_or("", |s| s.as_str()),
                 self.grandparent_title.as_ref().map_or("", |s| s.as_str()),
             )
-        ).into()
+        )
     }
 }
 
