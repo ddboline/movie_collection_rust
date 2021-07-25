@@ -118,7 +118,10 @@ impl MovieQueueCli {
                         let futures = filenames.into_iter().map(|filename| {
                             let pool = pool.clone();
                             async move {
-                                if PlexFilename::get_by_key(&pool, &filename.metadata_key).await?.is_none() {
+                                if PlexFilename::get_by_key(&pool, &filename.metadata_key)
+                                    .await?
+                                    .is_none()
+                                {
                                     filename.insert(&pool).await?;
                                 }
                                 Ok(())
@@ -216,7 +219,9 @@ impl MovieQueueCli {
                         file.write_all(&serde_json::to_vec(&events)?).await?;
                     }
                     "plex_filename" => {
-                        let filenames = PlexFilename::get_filenames(&pool, Some(start_timestamp), None, None).await?;
+                        let filenames =
+                            PlexFilename::get_filenames(&pool, Some(start_timestamp), None, None)
+                                .await?;
                         file.write_all(&serde_json::to_vec(&filenames)?).await?;
                     }
                     "movie_collection" => {
