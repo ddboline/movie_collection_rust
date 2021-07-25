@@ -164,33 +164,100 @@ impl PlexEvent {
         Ok(())
     }
 
-    pub fn event_http(&self, config: &Config) -> String {
-        let created_at =
-            self.created_at
-                .map_or(String::new(), |created_at| match config.default_time_zone {
-                    Some(tz) => {
-                        let tz: Tz = tz.into();
-                        created_at.with_timezone(&tz).to_string()
-                    }
-                    None => created_at.with_timezone(&Local).to_string(),
-                });
-        format!(
-            r#"
-                <tr style="text-align; center;">
-                <td>{}</td><td>{}</td><td>{}</td><td>{}</td><td>{}</td>
-                </tr>
-            "#,
-            created_at,
-            self.event,
-            self.metadata_type.as_ref().map_or("", |s| s.as_str()),
-            self.section_title.as_ref().map_or("", |s| s.as_str()),
-            format!(
-                "{} {} {}",
-                self.title.as_ref().map_or("", |s| s.as_str()),
-                self.parent_title.as_ref().map_or("", |s| s.as_str()),
-                self.grandparent_title.as_ref().map_or("", |s| s.as_str()),
-            )
-        )
+    pub async fn get_event_http(
+        pool: &PgPool,
+        config: &Config,
+        start_timestamp: Option<DateTime<Utc>>,
+        event_type: Option<PlexEventType>,
+        offset: Option<u64>,
+        limit: Option<u64>,
+    ) -> Result<Vec<String>, Error> {
+        #[derive(FromSqlRow)]
+        struct EventOutput {
+            event: StackString,
+            metadata_type: Option<StackString>,
+            section_title: Option<StackString>,
+            title: Option<StackString>,
+            parent_title: Option<StackString>,
+            grandparent_title: Option<StackString>,
+            filename: Option<StackString>,
+            created_at: Option<DateTime<Utc>>,
+        }
+
+        let mut constraints = Vec::new();
+        let mut bindings = Vec::new();
+        if let Some(start_timestamp) = &start_timestamp {
+            constraints.push("a.last_modified > $start_timestamp");
+            bindings.push(("start_timestamp", start_timestamp as Parameter));
+        }
+        let event_type = event_type.map(|s| s.to_str().to_string());
+        if let Some(event_type) = &event_type {
+            constraints.push("a.event = $event");
+            bindings.push(("event", event_type as Parameter));
+        }
+        let query = format!(
+            "
+                SELECT a.event, a.metadata_type, a.section_title, a.title, a.parent_title,
+                       a.grandparent_title, b.filename, a.created_at
+                FROM plex_event a
+                LEFT JOIN plex_filename b ON a.metadata_key = b.metadata_key
+                {where}
+                ORDER BY a.last_modified DESC
+                {limit}
+                {offset}
+            ",
+            where = if constraints.is_empty() {
+                String::new()
+            } else {
+                format!("WHERE {}", constraints.join(" AND "))
+            },
+            limit = if let Some(limit) = limit {
+                format!("LIMIT {}", limit)
+            } else {
+                String::new()
+            },
+            offset = if let Some(offset) = offset {
+                format!("OFFSET {}", offset)
+            } else {
+                String::new()
+            }
+        );
+        let query: Query = query_dyn!(&query, ..bindings)?;
+        let conn = pool.get().await?;
+        let output: Vec<EventOutput> = query.fetch(&conn).await?;
+        let body = output
+            .into_iter()
+            .map(|event| {
+                let created_at = event
+                    .created_at
+                    .map_or(String::new(), |created_at| match config.default_time_zone {
+                        Some(tz) => {
+                            let tz: Tz = tz.into();
+                            created_at.with_timezone(&tz).to_string()
+                        }
+                        None => created_at.with_timezone(&Local).to_string(),
+                    });
+                format!(
+                    r#"
+                    <tr style="text-align; center;">
+                    <td>{}</td><td>{}</td><td>{}</td><td>{}</td><td>{}</td>
+                    </tr>
+                "#,
+                    created_at,
+                    event.event,
+                    event.metadata_type.as_ref().map_or("", |s| s.as_str()),
+                    event.section_title.as_ref().map_or("", |s| s.as_str()),
+                    format!(
+                        "{} {} {} {}",
+                        event.title.as_ref().map_or("", |s| s.as_str()),
+                        event.parent_title.as_ref().map_or("", |s| s.as_str()),
+                        event.grandparent_title.as_ref().map_or("", |s| s.as_str()),
+                        event.filename.as_ref().map_or("", |s| s.as_str()),
+                    )
+                )
+            })
+            .collect();
+        Ok(body)
     }
 
     pub async fn get_filename(&self, config: &Config) -> Result<PlexFilename, Error> {

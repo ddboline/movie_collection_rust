@@ -1551,19 +1551,17 @@ pub async fn plex_list(
     query: Query<PlexEventRequest>,
 ) -> WarpResult<PlexEventList> {
     let query = query.into_inner();
-    let events = PlexEvent::get_events(
+    let body = PlexEvent::get_event_http(
         &state.db,
+        &state.config,
         query.start_timestamp.map(Into::into),
         query.event_type,
         query.offset,
         query.limit,
     )
     .await
-    .map_err(Into::<Error>::into)?;
-    let body = events
-        .into_iter()
-        .map(|e| e.event_http(&state.config))
-        .join("\n");
+    .map_err(Into::<Error>::into)?
+    .join("\n");
     let body = format!(
         r#"
             <table border="1" class="dataframe">
