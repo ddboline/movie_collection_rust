@@ -438,6 +438,7 @@ mod tests {
     use crate::{config::Config, pgpool::PgPool, plex_events::PlexEvent};
 
     #[tokio::test]
+    #[ignore]
     async fn test_get_plex_filename() -> Result<(), Error> {
         let config = Config::with_config()?;
         let pool = PgPool::new(&config.pgurl);
