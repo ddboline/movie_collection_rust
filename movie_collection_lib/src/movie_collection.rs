@@ -923,6 +923,7 @@ impl LastModifiedResponse {
             "movie_collection",
             "movie_queue",
             "plex_event",
+            "plex_filename",
         ];
 
         let futures = tables.into_iter().map(|table| async move {

@@ -53,6 +53,8 @@ pub struct ConfigInner {
     #[serde(default = "default_plex_webhook_key")]
     pub plex_webhook_key: Uuid,
     pub default_time_zone: Option<TimeZone>,
+    pub plex_token: Option<StackString>,
+    pub plex_host: Option<StackString>,
 }
 
 fn default_suffixes() -> Vec<StackString> {

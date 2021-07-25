@@ -3,6 +3,7 @@ use chrono::{DateTime, Local, NaiveDateTime, Utc};
 use chrono_tz::Tz;
 use log::info;
 use postgres_query::{query, query_dyn, FromSqlRow, Parameter, Query};
+use roxmltree::Document;
 use rweb::Schema;
 use serde::{Deserialize, Serialize};
 use stack_string::StackString;
@@ -90,7 +91,7 @@ impl PlexEvent {
         let mut constraints = Vec::new();
         let mut bindings = Vec::new();
         if let Some(start_timestamp) = &start_timestamp {
-            constraints.push("created_at > $start_timestamp");
+            constraints.push("last_modified > $start_timestamp");
             bindings.push(("start_timestamp", start_timestamp as Parameter));
         }
         let event_type = event_type.map(|s| s.to_str().to_string());
@@ -102,7 +103,7 @@ impl PlexEvent {
             "
                 SELECT * FROM plex_event
                 {where}
-                ORDER BY created_at DESC
+                ORDER BY last_modified DESC
                 {limit}
                 {offset}
             ",
@@ -190,6 +191,40 @@ impl PlexEvent {
                 self.grandparent_title.as_ref().map_or("", |s| s.as_str()),
             )
         )
+    }
+
+    pub async fn get_filename(&self, config: &Config) -> Result<PlexFilename, Error> {
+        let plex_host = config
+            .plex_host
+            .as_ref()
+            .ok_or_else(|| format_err!("No Host"))?;
+        let plex_token = config
+            .plex_token
+            .as_ref()
+            .ok_or_else(|| format_err!("No Token"))?;
+        let metadata_key = self
+            .metadata_key
+            .as_ref()
+            .ok_or_else(|| format_err!("No metadata_key"))?;
+        let url = format!(
+            "http://{host}:32400{key}?X-Plex-Token={token}",
+            host = plex_host,
+            token = plex_token,
+            key = metadata_key,
+        );
+        let data = reqwest::get(url).await?.error_for_status()?.text().await?;
+        let filename = Self::extract_filename_from_xml(&data)?;
+        Ok(PlexFilename {
+            metadata_key: metadata_key.clone(),
+            filename,
+        })
+    }
+
+    fn extract_filename_from_xml(xml: &str) -> Result<StackString, Error> {
+        let doc = Document::parse(xml)?;
+        doc.descendants()
+            .find_map(|n| n.attribute("file").map(Into::into))
+            .ok_or_else(|| format_err!("No file found"))
     }
 }
 
@@ -324,4 +359,106 @@ pub struct WebhookPayload {
     pub player: Player,
     #[serde(rename = "Metadata")]
     pub metadata: Metadata,
+}
+
+#[derive(FromSqlRow, Default, Debug, Serialize, Deserialize, Schema)]
+pub struct PlexFilename {
+    pub metadata_key: StackString,
+    pub filename: StackString,
+}
+
+impl PlexFilename {
+    pub async fn get_filenames(
+        pool: &PgPool,
+        start_timestamp: Option<DateTime<Utc>>,
+        offset: Option<u64>,
+        limit: Option<u64>,
+    ) -> Result<Vec<Self>, Error> {
+        let mut constraints = Vec::new();
+        let mut bindings = Vec::new();
+        if let Some(start_timestamp) = &start_timestamp {
+            constraints.push("last_modified > $start_timestamp");
+            bindings.push(("start_timestamp", start_timestamp as Parameter));
+        }
+        let query = format!(
+            "
+                SELECT * FROM plex_filename
+                {where}
+                ORDER BY last_modified DESC
+                {limit}
+                {offset}
+            ",
+            where = if constraints.is_empty() {
+                String::new()
+            } else {
+                format!("WHERE {}", constraints.join(" AND "))
+            },
+            limit = if let Some(limit) = limit {
+                format!("LIMIT {}", limit)
+            } else {
+                String::new()
+            },
+            offset = if let Some(offset) = offset {
+                format!("OFFSET {}", offset)
+            } else {
+                String::new()
+            }
+        );
+        let query: Query = query_dyn!(&query, ..bindings)?;
+        let conn = pool.get().await?;
+        query.fetch(&conn).await.map_err(Into::into)
+    }
+
+    pub async fn get_by_key(pool: &PgPool, key: &str) -> Result<Option<Self>, Error> {
+        let query = query!(
+            "SELECT * FROM plex_filename WHERE metadata_key = $key",
+            key = key,
+        );
+        let conn = pool.get().await?;
+        query.fetch_opt(&conn).await.map_err(Into::into)
+    }
+
+    pub async fn insert(&self, pool: &PgPool) -> Result<(), Error> {
+        let query = query!(
+            "INSERT INTO plex_filename (metadata_key, filename)
+            VALUES ($metadata_key, $filename",
+            metadata_key = self.metadata_key,
+            filename = self.filename,
+        );
+        let conn = pool.get().await?;
+        query.execute(&conn).await?;
+        Ok(())
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use anyhow::Error;
+
+    use crate::{config::Config, pgpool::PgPool, plex_events::PlexEvent};
+
+    #[tokio::test]
+    async fn test_get_plex_filename() -> Result<(), Error> {
+        let config = Config::with_config()?;
+        let pool = PgPool::new(&config.pgurl);
+        let event = PlexEvent::get_events(&pool, None, None, None, None)
+            .await?
+            .into_iter()
+            .find(|event| event.metadata_key.is_some())
+            .unwrap();
+        let filename = event.get_filename(&config).await?;
+        assert!(filename.filename.starts_with("/shares/"));
+        Ok(())
+    }
+
+    #[test]
+    fn test_extract_filename_from_xml() -> Result<(), Error> {
+        let data = include_str!("../../tests/data/plex_metadata.xml");
+        let output = PlexEvent::extract_filename_from_xml(&data)?;
+        assert_eq!(
+            output.as_str(),
+            "/shares/seagate4000/Documents/movies/scifi/galaxy_quest.mp4"
+        );
+        Ok(())
+    }
 }

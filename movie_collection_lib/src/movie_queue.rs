@@ -105,15 +105,23 @@ impl MovieQueueDB {
         &self,
         collection_idx: i32,
     ) -> Result<(), Error> {
-        let query = query!(
-            r#"SELECT idx FROM movie_queue WHERE collection_idx=$idx"#,
-            idx = collection_idx
-        );
-        let conn = self.pool.get().await?;
-        if let Some((idx,)) = query.fetch_opt(&conn).await? {
+        if let Some(idx) = self.get_idx_from_collection_idx(collection_idx).await? {
             self.remove_from_queue_by_idx(idx).await?;
         }
         Ok(())
+    }
+
+    pub async fn get_idx_from_collection_idx(
+        &self,
+        collection_idx: i32,
+    ) -> Result<Option<i32>, Error> {
+        let query = query!(
+            "SELECT idx FROM movie_queue WHERE collection_idx=$collection_idx",
+            collection_idx = collection_idx,
+        );
+        let conn = self.pool.get().await?;
+        let x: Option<(i32,)> = query.fetch_opt(&conn).await?;
+        Ok(x.map(|(x,)| x))
     }
 
     pub async fn remove_from_queue_by_path(&self, path: &str) -> Result<(), Error> {

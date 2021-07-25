@@ -377,6 +377,8 @@ impl MovieQueueUpdateRequest {
             if cidx != entry.collection_idx {
                 return Err(format_err!("{} != {}", cidx, entry.collection_idx).into());
             }
+            mq.remove_from_queue_by_collection_idx(entry.collection_idx)
+                .await?;
             mq.insert_into_queue_by_collection_idx(entry.idx, entry.collection_idx)
                 .await?;
         }

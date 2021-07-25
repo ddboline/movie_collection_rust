@@ -1,0 +1,72 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<MediaContainer size="1" allowSync="1" identifier="com.plexapp.plugins.library" librarySectionID="1" librarySectionTitle="Movies" librarySectionUUID="a645352a-b67d-4341-8f77-c85063249c47" mediaTagPrefix="/system/bundle/media/flags/" mediaTagVersion="1626707250">
+<Video ratingKey="17011" key="/library/metadata/17011" guid="com.plexapp.agents.imdb://tt0177789?lang=en" studio="DreamWorks Pictures" type="movie" title="Galaxy Quest" librarySectionTitle="Movies" librarySectionID="1" librarySectionKey="/library/sections/1" contentRating="PG" summary="For four years, the courageous crew of the NSEA protector - &#34;Commander Peter Quincy Taggart&#34; (Tim Allen), &#34;Lt. Tawny Madison (Sigourney Weaver) and &#34;Dr.Lazarus&#34; (Alan Rickman) - set off on a thrilling and often dangerous mission in space...and then their series was cancelled! Now, twenty years later, aliens under attack have mistaken the Galaxy Quest television transmissions for &#34;historical documents&#34; and beam up the crew of has-been actors to save the universe. With no script, no director and no clue, the actors must turn in the performances of their lives." rating="9.0" audienceRating="7.9" viewOffset="144000" lastViewedAt="1627225125" year="1999" tagline="A comedy of Galactic Proportions." thumb="/library/metadata/17011/thumb/1626588475" art="/library/metadata/17011/art/1626588475" duration="6128043" originallyAvailableAt="1999-12-23" addedAt="1626588275" updatedAt="1626588475" audienceRatingImage="rottentomatoes://image.rating.upright" primaryExtraKey="/library/metadata/17012" ratingImage="rottentomatoes://image.rating.ripe">
+<Media id="19085" duration="6128043" bitrate="1084" width="720" height="368" aspectRatio="2.35" audioChannels="2" audioCodec="aac" videoCodec="h264" videoResolution="sd" container="mp4" videoFrameRate="24p" optimizedForStreaming="0" audioProfile="lc" has64bitOffsets="0" videoProfile="main">
+<Part id="19085" key="/library/parts/19085/1626547273/file.mp4" duration="6128043" file="/shares/seagate4000/Documents/movies/scifi/galaxy_quest.mp4" size="836392356" audioProfile="lc" container="mp4" has64bitOffsets="0" optimizedForStreaming="0" videoProfile="main">
+<Stream id="39886" streamType="1" default="1" codec="h264" index="0" bitrate="955" anamorphic="1" bitDepth="8" chromaLocation="left" chromaSubsampling="4:2:0" codedHeight="368" codedWidth="720" colorPrimaries="smpte170m" colorRange="tv" colorSpace="smpte170m" colorTrc="bt709" frameRate="24.024" hasScalingMatrix="0" height="368" level="30" pixelAspectRatio="427:360" profile="main" refFrames="4" streamIdentifier="1" width="720" displayTitle="SD (H.264)" extendedDisplayTitle="SD (H.264)">
+</Stream>
+<Stream id="39887" streamType="2" selected="1" default="1" codec="aac" index="1" channels="2" bitrate="129" audioChannelLayout="stereo" profile="lc" samplingRate="48000" streamIdentifier="2" displayTitle="Unknown (AAC Stereo)" extendedDisplayTitle="Unknown (AAC Stereo)">
+</Stream>
+</Part>
+</Media>
+<Genre id="1486" filter="genre=1486" tag="Family" />
+<Genre id="58" filter="genre=58" tag="Adventure" />
+<Genre id="184" filter="genre=184" tag="Sci-Fi" />
+<Genre id="183" filter="genre=183" tag="Comedy" />
+<Director id="19578" filter="director=19578" tag="Dean Parisot" />
+<Writer id="37591" filter="writer=37591" tag="David Howard" />
+<Writer id="37592" filter="writer=37592" tag="Robert Gordon" />
+<Producer id="37608" filter="producer=37608" tag="Mark Johnson" />
+<Producer id="37609" filter="producer=37609" tag="Charles Newirth" />
+<Country id="64" filter="country=64" tag="USA" />
+<Role id="37593" filter="actor=37593" tag="Tim Allen" role="Jason Nesmith" thumb="http://image.tmdb.org/t/p/original/6qlDjidQSKNcJFHzTXh0gQS83ub.jpg" />
+<Role id="1840" filter="actor=1840" tag="Sigourney Weaver" role="Gwen DeMarco" thumb="http://image.tmdb.org/t/p/original/flfhep27iBxseZIlxOMHt6zJFX1.jpg" />
+<Role id="37594" filter="actor=37594" tag="Alan Rickman" role="Alexander Dane" thumb="http://image.tmdb.org/t/p/original/7tADZs4ILE93oJ5pAh6mKQFEq2m.jpg" />
+<Role id="13558" filter="actor=13558" tag="Tony Shalhoub" role="Fred Kwan" thumb="http://image.tmdb.org/t/p/original/1zfBSuAmOr1xXjNg4WzFWPm5B0Z.jpg" />
+<Role id="8413" filter="actor=8413" tag="Sam Rockwell" role="Guy Fleegman" thumb="http://image.tmdb.org/t/p/original/vYpWxV0bnUgKo7SdasfGP9HttUq.jpg" />
+<Role id="37595" filter="actor=37595" tag="Daryl Mitchell" role="Tommy Webber" thumb="http://image.tmdb.org/t/p/original/7QGYaK5HrwdEnSYyZmjXPfxwWes.jpg" />
+<Role id="37596" filter="actor=37596" tag="Enrico Colantoni" role="Mathesar" thumb="http://image.tmdb.org/t/p/original/yxxy8IrGRwnRPbLmgyfwF26Feve.jpg" />
+<Role id="10159" filter="actor=10159" tag="Robin Sachs" role="Sarris" thumb="http://image.tmdb.org/t/p/original/yMGgpDCZqMt852CgYXQ0YBXdFxy.jpg" />
+<Role id="4938" filter="actor=4938" tag="Jed Rees" role="Teb" thumb="http://image.tmdb.org/t/p/original/o1ivnaWK3AXxPI6O9UmykTz2kcY.jpg" />
+<Role id="7596" filter="actor=7596" tag="Justin Long" role="Brandon" thumb="http://image.tmdb.org/t/p/original/Hlz1LnrOzGBKoZ50HBk9ytuVUa.jpg" />
+<Role id="7064" filter="actor=7064" tag="Missi Pyle" role="Laliari" thumb="http://image.tmdb.org/t/p/original/aGRSmafxwPmpRCLRGEJN1ygeh8D.jpg" />
+<Role id="37597" filter="actor=37597" tag="Patrick Breen" role="Quellek" thumb="http://image.tmdb.org/t/p/original/ayfRzRMB1fyBO5TpQhj2PrC6F2w.jpg" />
+<Role id="15424" filter="actor=15424" tag="Jeremy Howard" role="Kyle" thumb="http://image.tmdb.org/t/p/original/tkZNfmlNkiH7UZxYDaDqO9z1TuV.jpg" />
+<Role id="22537" filter="actor=22537" tag="Sam Lloyd" role="Neru" thumb="http://image.tmdb.org/t/p/original/ti0pt6k5eXGbW8j7ktxSXLfutLA.jpg" />
+<Role id="15057" filter="actor=15057" tag="Rainn Wilson" role="Lahnk" thumb="http://image.tmdb.org/t/p/original/1PWNWyTeJSzmsUvEpOtpk8Ajpto.jpg" />
+<Role id="37598" filter="actor=37598" tag="J.P. Manoux" role="Excited Alien" thumb="http://image.tmdb.org/t/p/original/lLEfizV970QfahQSBssUvj8Exs7.jpg" />
+<Role id="37599" filter="actor=37599" tag="Dian Bachar" role="Nervous Tech" />
+<Role id="37600" filter="actor=37600" tag="Heidi Swedberg" role="Brandon&#39;s Mom" thumb="http://image.tmdb.org/t/p/original/aDMeu2mOXgCYOXEr3U795BYpl7t.jpg" />
+<Role id="37601" filter="actor=37601" tag="Kevin McDonald" role="Announcer (as Kevin Hamilton McDonald)" thumb="http://image.tmdb.org/t/p/original/ymwrW99x9gyN0zeRkqavt3lZMa9.jpg" />
+<Role id="37602" filter="actor=37602" tag="Kaitlin Cullum" role="Katelyn" thumb="http://image.tmdb.org/t/p/original/yWcwF13Oc6PmcS7ZMHhtp2GOkca.jpg" />
+<Role id="37603" filter="actor=37603" tag="Jonathan Feyer" role="Hollister" />
+<Role id="37604" filter="actor=37604" tag="Corbin Bleu" role="Young Tommy" thumb="http://image.tmdb.org/t/p/original/3jW2XYk91hSxyy5kvo70t7mfJUR.jpg" />
+<Role id="4936" filter="actor=4936" tag="Isaac C. Singleton Jr." role="Sarris&#39; Guard" thumb="http://image.tmdb.org/t/p/original/AsVdOAbT1Ewqy6fbWZTvfKWkt4r.jpg" />
+<Role id="19379" filter="actor=19379" tag="Joel McKinnon Miller" role="Warrior Alien" thumb="http://image.tmdb.org/t/p/original/oSZfZNYkhncAmpCl8wKjK5j5XFk.jpg" />
+<Role id="37605" filter="actor=37605" tag="Todd Giebenhain" role="Teen in the Bathroom #2" />
+<Role id="37606" filter="actor=37606" tag="Jerry Penacoli" role="Reporter" />
+<Role id="37607" filter="actor=37607" tag="Jennifer Manley" role="Shy Girl" />
+<Role id="1390" filter="actor=1390" tag="Matt Winston" role="Technician #1" thumb="http://image.tmdb.org/t/p/original/et38vhCb9y8yGleMRNY2j4nDDyr.jpg" />
+<Similar id="1760" filter="similar=1760" tag="Spaceballs" />
+<Similar id="14437" filter="similar=14437" tag="Star Trek II: The Wrath of Khan" />
+<Similar id="2664" filter="similar=2664" tag="Star Trek: Insurrection" />
+<Similar id="14423" filter="similar=14423" tag="Star Trek IV: The Voyage Home" />
+<Similar id="2663" filter="similar=2663" tag="Star Trek: First Contact" />
+<Similar id="5692" filter="similar=5692" tag="Star Trek VI: The Undiscovered Country" />
+<Similar id="5693" filter="similar=5693" tag="Star Trek: Generations" />
+<Similar id="5691" filter="similar=5691" tag="Star Trek III: The Search for Spock" />
+<Similar id="3527" filter="similar=3527" tag="Dogma" />
+<Similar id="8986" filter="similar=8986" tag="Ghostbusters" />
+<Similar id="13959" filter="similar=13959" tag="Ghostbusters II" />
+<Similar id="13178" filter="similar=13178" tag="The Princess Bride" />
+<Similar id="1754" filter="similar=1754" tag="Groundhog Day" />
+<Similar id="37618" filter="similar=37618" tag="Close Encounters of the Third Kind" />
+<Similar id="37619" filter="similar=37619" tag="Stargate" />
+<Similar id="3532" filter="similar=3532" tag="Mallrats" />
+<Similar id="1910" filter="similar=1910" tag="Starship Troopers" />
+<Similar id="11029" filter="similar=11029" tag="Jungle 2 Jungle" />
+<Similar id="37620" filter="similar=37620" tag="How the Grinch Stole Christmas!" />
+<Similar id="1751" filter="similar=1751" tag="Blazing Saddles" />
+<Similar id="4696" filter="similar=4696" tag="Labyrinth" />
+</Video>
+</MediaContainer>

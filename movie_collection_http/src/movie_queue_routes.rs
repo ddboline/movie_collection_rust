@@ -36,7 +36,7 @@ use movie_collection_lib::{
     },
     movie_queue::{MovieQueueDB, MovieQueueResult, MovieQueueRow},
     pgpool::PgPool,
-    plex_events::{PlexEvent, PlexEventType},
+    plex_events::{PlexEvent, PlexEventType, PlexFilename},
     trakt_connection::TraktConnection,
     trakt_utils::{
         get_watched_shows_db, get_watchlist_shows_db_map, TraktActions, WatchListShow,
@@ -1478,7 +1478,6 @@ pub async fn plex_events_update(
     #[cookie = "jwt"] _: LoggedUser,
 ) -> WarpResult<PlexEventUpdateResponse> {
     let payload = payload.into_inner();
-
     for event in payload.events {
         event
             .write_event(&state.db)
@@ -1500,7 +1499,7 @@ pub async fn plex_webhook(
     webhook_key: UuidWrapper,
 ) -> WarpResult<PlexWebhookResponse> {
     if state.config.plex_webhook_key == webhook_key.into() {
-        process_payload(form, &state.db)
+        process_payload(form, &state.db, &state.config)
             .await
             .map_err(Into::<Error>::into)?;
     } else {
@@ -1509,7 +1508,11 @@ pub async fn plex_webhook(
     Ok(HtmlBase::new("").into())
 }
 
-async fn process_payload(mut form: FormData, pool: &PgPool) -> Result<(), anyhow::Error> {
+async fn process_payload(
+    mut form: FormData,
+    pool: &PgPool,
+    config: &Config,
+) -> Result<(), anyhow::Error> {
     let mut buf = Vec::new();
     if let Some(item) = form.next().await {
         let mut stream = item?.stream();
@@ -1519,6 +1522,16 @@ async fn process_payload(mut form: FormData, pool: &PgPool) -> Result<(), anyhow
     }
     if let Ok(event) = PlexEvent::get_from_payload(&buf) {
         event.write_event(pool).await?;
+        if let Some(metadata_key) = event.metadata_key.as_ref() {
+            if PlexFilename::get_by_key(pool, metadata_key)
+                .await?
+                .is_none()
+            {
+                if let Ok(filename) = event.get_filename(config).await {
+                    filename.insert(pool).await?;
+                }
+            }
+        }
         Ok(())
     } else {
         let buf = std::str::from_utf8(&buf)?;
@@ -1567,4 +1580,62 @@ pub async fn plex_list(
     );
 
     Ok(HtmlBase::new(body).into())
+}
+
+#[derive(RwebResponse)]
+#[response(description = "Plex Filenames")]
+struct PlexFilenameResponse(JsonBase<Vec<PlexFilename>, Error>);
+
+#[derive(Serialize, Deserialize, Debug, Schema)]
+pub struct PlexFilenameRequest {
+    pub start_timestamp: Option<DateTimeWrapper>,
+    pub offset: Option<u64>,
+    pub limit: Option<u64>,
+}
+
+#[get("/list/plex_filename")]
+pub async fn plex_filename(
+    query: Query<PlexFilenameRequest>,
+    #[data] state: AppState,
+    #[cookie = "jwt"] _: LoggedUser,
+) -> WarpResult<PlexFilenameResponse> {
+    let query = query.into_inner();
+    let filenames = PlexFilename::get_filenames(
+        &state.db,
+        query.start_timestamp.map(Into::into),
+        query.offset,
+        query.limit,
+    )
+    .await
+    .map_err(Into::<Error>::into)?;
+    Ok(JsonBase::new(filenames).into())
+}
+
+#[derive(Serialize, Deserialize, Debug, Schema)]
+pub struct PlexFilenameUpdateRequest {
+    filenames: Vec<PlexFilename>,
+}
+
+#[derive(RwebResponse)]
+#[response(
+    description = "Update Plex Filenames",
+    content = "html",
+    status = "CREATED"
+)]
+struct PlexFilenameUpdateResponse(HtmlBase<&'static str, Error>);
+
+#[post("/list/plex_filename")]
+pub async fn plex_filename_update(
+    payload: Json<PlexFilenameUpdateRequest>,
+    #[data] state: AppState,
+    #[cookie = "jwt"] _: LoggedUser,
+) -> WarpResult<PlexFilenameUpdateResponse> {
+    let payload = payload.into_inner();
+    for filename in payload.filenames {
+        filename
+            .insert(&state.db)
+            .await
+            .map_err(Into::<Error>::into)?;
+    }
+    Ok(HtmlBase::new("Success").into())
 }

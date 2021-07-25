@@ -41,6 +41,7 @@ smallvec = "1.6"
 procfs = "0.9"
 uuid = "0.8"
 chrono-tz = "0.5"
+roxmltree = "0.14"
 rweb = {version="0.12", features=["openapi"]}
 stack-string = { version="0.2", features=["postgres_types", "rweb-openapi"] }
 stdout-channel = "0.4"
