@@ -421,7 +421,7 @@ impl PlexFilename {
     pub async fn insert(&self, pool: &PgPool) -> Result<(), Error> {
         let query = query!(
             "INSERT INTO plex_filename (metadata_key, filename)
-            VALUES ($metadata_key, $filename",
+            VALUES ($metadata_key, $filename)",
             metadata_key = self.metadata_key,
             filename = self.filename,
         );

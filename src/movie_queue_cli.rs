@@ -18,7 +18,7 @@ use movie_collection_lib::{
     movie_collection::{LastModifiedResponse, MovieCollection, MovieCollectionRow},
     movie_queue::{MovieQueueDB, MovieQueueRow},
     pgpool::PgPool,
-    plex_events::PlexEvent,
+    plex_events::{PlexEvent, PlexFilename},
     transcode_service::transcode_status,
 };
 
@@ -48,6 +48,7 @@ enum MovieQueueCli {
     Status,
     /// Run refinery migrations
     RunMigrations,
+    FillPlex,
 }
 
 impl MovieQueueCli {
@@ -221,8 +222,23 @@ impl MovieQueueCli {
                 let mut conn = pool.get().await?;
                 migrations::runner().run_async(&mut **conn).await?;
             }
+            Self::FillPlex => {
+                for event in PlexEvent::get_events(&pool, None, None, None, None)
+                    .await?
+                    .into_iter()
+                    .filter(|event| event.metadata_key.is_some())
+                {
+                    let metadata_key = event.metadata_key.as_ref().expect("Unexpected failure");
+                    if PlexFilename::get_by_key(&pool, metadata_key)
+                        .await?
+                        .is_none()
+                    {
+                        let filename = event.get_filename(&config).await?;
+                        filename.insert(&pool).await?;
+                    }
+                }
+            }
         }
-
         Ok(())
     }
 }

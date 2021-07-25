@@ -29,9 +29,9 @@ use super::{
         movie_queue_remcom_file, movie_queue_route, movie_queue_show, movie_queue_transcode,
         movie_queue_transcode_cleanup, movie_queue_transcode_directory, movie_queue_transcode_file,
         movie_queue_transcode_status, movie_queue_update, plex_events, plex_events_update,
-        plex_list, plex_webhook, refresh_auth, trakt_auth_url, trakt_cal, trakt_callback,
-        trakt_watched_action, trakt_watched_list, trakt_watched_seasons, trakt_watchlist,
-        trakt_watchlist_action, tvshows, user, plex_filename, plex_filename_update,
+        plex_filename, plex_filename_update, plex_list, plex_webhook, refresh_auth, trakt_auth_url,
+        trakt_cal, trakt_callback, trakt_watched_action, trakt_watched_list, trakt_watched_seasons,
+        trakt_watchlist, trakt_watchlist_action, tvshows, user,
     },
 };
 
