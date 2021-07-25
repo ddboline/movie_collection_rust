@@ -71,7 +71,7 @@ impl TraktConnection {
     }
 
     async fn write_auth_token(&self, token: &AccessTokenResponse) -> Result<(), Error> {
-        write(&Self::token_path()?, &serde_json::to_string(token)?)
+        write(&Self::token_path()?, &serde_json::to_vec(token)?)
             .await
             .map_err(Into::into)
     }

@@ -7,7 +7,7 @@ use std::path::PathBuf;
 use stdout_channel::StdoutChannel;
 use structopt::StructOpt;
 use tokio::{
-    fs::{read_to_string, File},
+    fs::{read, File},
     io::{self, stdin, AsyncReadExt, AsyncWrite, AsyncWriteExt},
 };
 
@@ -61,16 +61,16 @@ impl MovieQueueCli {
         match Self::from_args() {
             Self::Import { table, filepath } => {
                 let data = if let Some(filepath) = filepath {
-                    read_to_string(&filepath).await?
+                    read(&filepath).await?
                 } else {
                     let mut stdin = stdin();
-                    let mut buf = String::new();
-                    stdin.read_to_string(&mut buf).await?;
+                    let mut buf = Vec::new();
+                    stdin.read_to_end(&mut buf).await?;
                     buf
                 };
                 match table.as_str() {
                     "imdb_ratings" => {
-                        let shows: Vec<ImdbRatings> = serde_json::from_str(&data)?;
+                        let shows: Vec<ImdbRatings> = serde_json::from_slice(&data)?;
                         let futures = shows.into_iter().map(|show| {
                             let pool = pool.clone();
                             async move {
@@ -87,7 +87,7 @@ impl MovieQueueCli {
                         stdout.send(format!("imdb_ratings {}\n", results?.len()));
                     }
                     "imdb_episodes" => {
-                        let episodes: Vec<ImdbEpisodes> = serde_json::from_str(&data)?;
+                        let episodes: Vec<ImdbEpisodes> = serde_json::from_slice(&data)?;
                         let futures = episodes.into_iter().map(|episode| {
                             let pool = pool.clone();
                             async move {
@@ -102,7 +102,7 @@ impl MovieQueueCli {
                         stdout.send(format!("imdb_episodes {}\n", results?.len()));
                     }
                     "plex_event" => {
-                        let events: Vec<PlexEvent> = serde_json::from_str(&data)?;
+                        let events: Vec<PlexEvent> = serde_json::from_slice(&data)?;
                         let futures = events.into_iter().map(|event| {
                             let pool = pool.clone();
                             async move {
@@ -114,7 +114,7 @@ impl MovieQueueCli {
                         stdout.send(format!("plex_event {}\n", results?.len()));
                     }
                     "plex_filename" => {
-                        let filenames: Vec<PlexFilename> = serde_json::from_str(&data)?;
+                        let filenames: Vec<PlexFilename> = serde_json::from_slice(&data)?;
                         let futures = filenames.into_iter().map(|filename| {
                             let pool = pool.clone();
                             async move {
@@ -131,7 +131,7 @@ impl MovieQueueCli {
                         stdout.send(format!("plex_filename {}\n", results?.len()));
                     }
                     "movie_collection" => {
-                        let rows: Vec<MovieCollectionRow> = serde_json::from_str(&data)?;
+                        let rows: Vec<MovieCollectionRow> = serde_json::from_slice(&data)?;
                         let mc = MovieCollection::new(&config, &pool, &stdout);
                         let futures = rows.into_iter().map(|entry| {
                             let mc = mc.clone();
@@ -155,7 +155,7 @@ impl MovieQueueCli {
                     "movie_queue" => {
                         let mq = MovieQueueDB::new(&config, &pool, &stdout);
                         let mc = MovieCollection::new(&config, &pool, &stdout);
-                        let entries: Vec<MovieQueueRow> = serde_json::from_str(&data)?;
+                        let entries: Vec<MovieQueueRow> = serde_json::from_slice(&data)?;
                         let futures = entries.into_iter().map(|entry| {
                             let mq = mq.clone();
                             let mc = mc.clone();
