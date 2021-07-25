@@ -31,6 +31,7 @@ pub struct PlexEvent {
     pub metadata_type: Option<StackString>,
     pub section_type: Option<StackString>,
     pub section_title: Option<StackString>,
+    pub metadata_key: Option<StackString>,
 }
 
 impl TryFrom<WebhookPayload> for PlexEvent {
@@ -58,6 +59,7 @@ impl TryFrom<WebhookPayload> for PlexEvent {
             metadata_type: item.metadata.metadata_type,
             section_type: item.metadata.library_section_type,
             section_title: item.metadata.library_section_title,
+            metadata_key: item.metadata.key,
         };
         Ok(payload)
     }
@@ -130,13 +132,13 @@ impl PlexEvent {
             "
             INSERT INTO plex_event (
                 event, account, server, player_title, player_address, title, parent_title,
-                grandparent_title, added_at, updated_at, created_at, last_modified,
-                metadata_type, section_type, section_title
+                grandparent_title, added_at, updated_at, created_at, last_modified, metadata_type,
+                section_type, section_title, metadata_key
             )
             VALUES (
-                $event, $account, $server, $player_title, $player_address, $title,
-                $parent_title, $grandparent_title, $added_at, $updated_at, $created_at,
-                $last_modified, $metadata_type, $section_type, $section_title
+                $event, $account, $server, $player_title, $player_address, $title, $parent_title,
+                $grandparent_title, $added_at, $updated_at, $created_at, $last_modified,
+                $metadata_type, $section_type, $section_title, $metadata_key
             )
             ",
             event = self.event,
@@ -154,6 +156,7 @@ impl PlexEvent {
             metadata_type = self.metadata_type,
             section_type = self.section_type,
             section_title = self.section_title,
+            metadata_key = self.metadata_key,
         );
         let conn = pool.get().await?;
         query.execute(&conn).await?;
