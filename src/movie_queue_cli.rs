@@ -113,6 +113,20 @@ impl MovieQueueCli {
                         let results: Result<Vec<_>, Error> = try_join_all(futures).await;
                         stdout.send(format!("plex_event {}\n", results?.len()));
                     }
+                    "plex_filename" => {
+                        let filenames: Vec<PlexFilename> = serde_json::from_str(&data)?;
+                        let futures = filenames.into_iter().map(|filename| {
+                            let pool = pool.clone();
+                            async move {
+                                if PlexFilename::get_by_key(&pool, &filename.metadata_key).await?.is_none() {
+                                    filename.insert(&pool).await?;
+                                }
+                                Ok(())
+                            }
+                        });
+                        let results: Result<Vec<_>, Error> = try_join_all(futures).await;
+                        stdout.send(format!("plex_filename {}\n", results?.len()));
+                    }
                     "movie_collection" => {
                         let rows: Vec<MovieCollectionRow> = serde_json::from_str(&data)?;
                         let mc = MovieCollection::new(&config, &pool, &stdout);
@@ -200,6 +214,10 @@ impl MovieQueueCli {
                             PlexEvent::get_events(&pool, Some(start_timestamp), None, None, None)
                                 .await?;
                         file.write_all(&serde_json::to_vec(&events)?).await?;
+                    }
+                    "plex_filename" => {
+                        let filenames = PlexFilename::get_filenames(&pool, Some(start_timestamp), None, None).await?;
+                        file.write_all(&serde_json::to_vec(&filenames)?).await?;
                     }
                     "movie_collection" => {
                         let mc = MovieCollection::new(&config, &pool, &stdout);
