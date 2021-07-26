@@ -1630,10 +1630,16 @@ pub async fn plex_filename_update(
 ) -> WarpResult<PlexFilenameUpdateResponse> {
     let payload = payload.into_inner();
     for filename in payload.filenames {
-        filename
-            .insert(&state.db)
+        if PlexFilename::get_by_key(&state.db, &filename.metadata_key)
             .await
-            .map_err(Into::<Error>::into)?;
+            .map_err(Into::<Error>::into)?
+            .is_none()
+        {
+            filename
+                .insert(&state.db)
+                .await
+                .map_err(Into::<Error>::into)?;
+        }
     }
     Ok(HtmlBase::new("Success").into())
 }

@@ -170,6 +170,8 @@ impl MovieQueueCli {
                                     entry.collection_idx
                                 };
                                 assert_eq!(cidx, entry.collection_idx);
+                                mq.remove_from_queue_by_collection_idx(entry.collection_idx)
+                                    .await?;
                                 mq.insert_into_queue_by_collection_idx(
                                     entry.idx,
                                     entry.collection_idx,
