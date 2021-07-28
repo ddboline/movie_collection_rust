@@ -1,1 +1,1 @@
-ALTER TABLE movie_queue ALTER COLUMN collection_idx SET UNIQUE;
+ALTER TABLE movie_queue ADD UNIQUE (collection_idx);
