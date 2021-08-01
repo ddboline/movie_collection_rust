@@ -6,7 +6,6 @@ use stdout_channel::{MockStdout, StdoutChannel};
 
 use movie_collection_lib::{
     config::Config,
-    datetime_wrapper::DateTimeWrapper,
     imdb_episodes::ImdbEpisodes,
     imdb_ratings::ImdbRatings,
     movie_collection::{
@@ -21,16 +20,18 @@ use movie_collection_lib::{
         get_watched_shows_db, get_watchlist_shows_db_map, TraktActions, WatchListMap,
         WatchListShow, WatchedEpisode,
     },
-    tv_show_source::TvShowSource,
 };
 
-use crate::errors::ServiceError as Error;
+use crate::{
+    datetime_wrapper::DateTimeWrapper, errors::ServiceError as Error, ImdbEpisodesWrapper,
+    ImdbRatingsWrapper, MovieCollectionRowWrapper, MovieQueueRowWrapper, TvShowSourceWrapper,
+};
 
 pub struct WatchlistShowsRequest {}
 
 impl WatchlistShowsRequest {
     pub async fn handle(&self, pool: &PgPool) -> Result<WatchListMap, Error> {
-        get_watchlist_shows_db_map(&pool).await.map_err(Into::into)
+        get_watchlist_shows_db_map(pool).await.map_err(Into::into)
     }
 }
 
@@ -49,7 +50,7 @@ impl MovieQueueRequest {
         let stdout = StdoutChannel::with_mock_stdout(mock_stdout.clone(), mock_stdout.clone());
 
         let patterns: Vec<_> = self.patterns.iter().map(StackString::as_str).collect();
-        let queue = MovieQueueDB::new(&config, &pool, &stdout)
+        let queue = MovieQueueDB::new(config, pool, &stdout)
             .print_movie_queue(&patterns)
             .await?;
         Ok((queue, self.patterns))
@@ -65,7 +66,7 @@ impl MoviePathRequest {
         let mock_stdout = MockStdout::new();
         let stdout = StdoutChannel::with_mock_stdout(mock_stdout.clone(), mock_stdout.clone());
 
-        MovieCollection::new(&config, &pool, &stdout)
+        MovieCollection::new(config, pool, &stdout)
             .get_collection_path(self.idx)
             .await
             .map_err(Into::into)
@@ -78,7 +79,7 @@ pub struct ImdbRatingsRequest {
 
 impl ImdbRatingsRequest {
     pub async fn handle(self, pool: &PgPool) -> Result<Option<(StackString, ImdbRatings)>, Error> {
-        ImdbRatings::get_show_by_link(&self.imdb_url, &pool)
+        ImdbRatings::get_show_by_link(&self.imdb_url, pool)
             .await
             .map(|s| s.map(|sh| (self.imdb_url, sh)))
             .map_err(Into::into)
@@ -97,7 +98,7 @@ impl ImdbSeasonsRequest {
         if &self.show == "" {
             Ok(Vec::new())
         } else {
-            MovieCollection::new(&config, pool, &stdout)
+            MovieCollection::new(config, pool, &stdout)
                 .print_imdb_all_seasons(&self.show)
                 .await
                 .map_err(Into::into)
@@ -120,12 +121,12 @@ impl WatchlistActionRequest {
             TraktActions::Add => {
                 trakt.init().await;
                 if let Some(show) = trakt.get_watchlist_shows().await?.get(&self.imdb_url) {
-                    show.insert_show(&pool).await?;
+                    show.insert_show(pool).await?;
                 }
             }
             TraktActions::Remove => {
-                if let Some(show) = WatchListShow::get_show_by_link(&self.imdb_url, &pool).await? {
-                    show.delete_show(&pool).await?;
+                if let Some(show) = WatchListShow::get_show_by_link(&self.imdb_url, pool).await? {
+                    show.delete_show(pool).await?;
                 }
             }
             _ => {}
@@ -141,7 +142,7 @@ pub struct WatchedShowsRequest {
 
 impl WatchedShowsRequest {
     pub async fn handle(&self, pool: &PgPool) -> Result<Vec<WatchedEpisode>, Error> {
-        get_watched_shows_db(&pool, &self.show, Some(self.season))
+        get_watched_shows_db(pool, &self.show, Some(self.season))
             .await
             .map_err(Into::into)
     }
@@ -157,7 +158,7 @@ impl ImdbEpisodesRequest {
         let mock_stdout = MockStdout::new();
         let stdout = StdoutChannel::with_mock_stdout(mock_stdout.clone(), mock_stdout.clone());
 
-        MovieCollection::new(&config, &pool, &stdout)
+        MovieCollection::new(&config, pool, &stdout)
             .print_imdb_episodes(&self.show, self.season)
             .await
             .map_err(Into::into)
@@ -207,8 +208,8 @@ impl ImdbShowRequest {
         let mock_stdout = MockStdout::new();
         let stdout = StdoutChannel::with_mock_stdout(mock_stdout.clone(), mock_stdout.clone());
 
-        let watchlist = get_watchlist_shows_db_map(&pool).await?;
-        let pi = ParseImdb::new(&config, pool, &stdout);
+        let watchlist = get_watchlist_shows_db_map(pool).await?;
+        let pi = ParseImdb::new(config, pool, &stdout);
         let body = pi.parse_imdb_http_worker(&self.into(), &watchlist).await?;
         Ok(body)
     }
@@ -216,7 +217,7 @@ impl ImdbShowRequest {
 
 #[derive(Serialize, Deserialize, Schema)]
 pub struct FindNewEpisodeRequest {
-    pub source: Option<TvShowSource>,
+    pub source: Option<TvShowSourceWrapper>,
     pub shows: Option<StackString>,
 }
 
@@ -225,9 +226,15 @@ impl FindNewEpisodeRequest {
         let mock_stdout = MockStdout::new();
         let stdout = StdoutChannel::with_mock_stdout(mock_stdout.clone(), mock_stdout.clone());
 
-        find_new_episodes_http_worker(config, pool, &stdout, self.shows, self.source)
-            .await
-            .map_err(Into::into)
+        find_new_episodes_http_worker(
+            config,
+            pool,
+            &stdout,
+            self.shows,
+            self.source.map(Into::into),
+        )
+        .await
+        .map_err(Into::into)
     }
 }
 
@@ -271,7 +278,7 @@ impl MovieQueueSyncRequest {
         let mock_stdout = MockStdout::new();
         let stdout = StdoutChannel::with_mock_stdout(mock_stdout.clone(), mock_stdout.clone());
 
-        let mq = MovieQueueDB::new(&config, pool, &stdout);
+        let mq = MovieQueueDB::new(config, pool, &stdout);
         mq.get_queue_after_timestamp(self.start_timestamp.into())
             .await
             .map_err(Into::into)
@@ -292,7 +299,7 @@ impl MovieCollectionSyncRequest {
         let mock_stdout = MockStdout::new();
         let stdout = StdoutChannel::with_mock_stdout(mock_stdout.clone(), mock_stdout.clone());
 
-        let mc = MovieCollection::new(&config, pool, &stdout);
+        let mc = MovieCollection::new(config, pool, &stdout);
         mc.get_collection_after_timestamp(self.start_timestamp.into())
             .await
             .map_err(Into::into)
@@ -301,15 +308,16 @@ impl MovieCollectionSyncRequest {
 
 #[derive(Serialize, Deserialize, Schema)]
 pub struct ImdbEpisodesUpdateRequest {
-    pub episodes: Vec<ImdbEpisodes>,
+    pub episodes: Vec<ImdbEpisodesWrapper>,
 }
 
 impl ImdbEpisodesUpdateRequest {
-    pub async fn handle(&self, pool: &PgPool) -> Result<(), Error> {
-        for episode in &self.episodes {
-            match episode.get_index(&pool).await? {
-                Some(_) => episode.update_episode(&pool).await?,
-                None => episode.insert_episode(&pool).await?,
+    pub async fn handle(self, pool: &PgPool) -> Result<(), Error> {
+        for episode in self.episodes {
+            let episode: ImdbEpisodes = episode.into();
+            match episode.get_index(pool).await? {
+                Some(_) => episode.update_episode(pool).await?,
+                None => episode.insert_episode(pool).await?,
             }
         }
         Ok(())
@@ -318,15 +326,16 @@ impl ImdbEpisodesUpdateRequest {
 
 #[derive(Serialize, Deserialize, Schema)]
 pub struct ImdbRatingsUpdateRequest {
-    pub shows: Vec<ImdbRatings>,
+    pub shows: Vec<ImdbRatingsWrapper>,
 }
 
 impl ImdbRatingsUpdateRequest {
-    pub async fn handle(&self, pool: &PgPool) -> Result<(), Error> {
-        for show in &self.shows {
-            match ImdbRatings::get_show_by_link(show.link.as_ref(), &pool).await? {
-                Some(_) => show.update_show(&pool).await?,
-                None => show.insert_show(&pool).await?,
+    pub async fn handle(self, pool: &PgPool) -> Result<(), Error> {
+        for show in self.shows {
+            let show: ImdbRatings = show.into();
+            match ImdbRatings::get_show_by_link(show.link.as_ref(), pool).await? {
+                Some(_) => show.update_show(pool).await?,
+                None => show.insert_show(pool).await?,
             }
         }
         Ok(())
@@ -336,7 +345,7 @@ impl ImdbRatingsUpdateRequest {
 #[derive(Serialize, Deserialize, Schema)]
 pub struct ImdbRatingsSetSourceRequest {
     pub link: StackString,
-    pub source: TvShowSource,
+    pub source: TvShowSourceWrapper,
 }
 
 impl ImdbRatingsSetSourceRequest {
@@ -344,10 +353,10 @@ impl ImdbRatingsSetSourceRequest {
         let mut imdb = ImdbRatings::get_show_by_link(self.link.as_ref(), pool)
             .await?
             .ok_or_else(|| format_err!("No show found for {}", self.link))?;
-        imdb.source = if self.source == TvShowSource::All {
+        imdb.source = if self.source == TvShowSourceWrapper::All {
             None
         } else {
-            Some(self.source)
+            Some(self.source.into())
         };
         imdb.update_show(pool).await?;
         Ok(())
@@ -356,7 +365,7 @@ impl ImdbRatingsSetSourceRequest {
 
 #[derive(Serialize, Deserialize, Schema)]
 pub struct MovieQueueUpdateRequest {
-    pub queue: Vec<MovieQueueRow>,
+    pub queue: Vec<MovieQueueRowWrapper>,
 }
 
 impl MovieQueueUpdateRequest {
@@ -364,8 +373,8 @@ impl MovieQueueUpdateRequest {
         let mock_stdout = MockStdout::new();
         let stdout = StdoutChannel::with_mock_stdout(mock_stdout.clone(), mock_stdout.clone());
 
-        let mq = MovieQueueDB::new(&config, pool, &stdout);
-        let mc = MovieCollection::new(&config, pool, &stdout);
+        let mq = MovieQueueDB::new(config, pool, &stdout);
+        let mc = MovieCollection::new(config, pool, &stdout);
         for entry in &self.queue {
             let cidx = if let Some(i) = mc.get_collection_index(entry.path.as_ref()).await? {
                 i
@@ -388,7 +397,7 @@ impl MovieQueueUpdateRequest {
 
 #[derive(Serialize, Deserialize, Schema)]
 pub struct MovieCollectionUpdateRequest {
-    pub collection: Vec<MovieCollectionRow>,
+    pub collection: Vec<MovieCollectionRowWrapper>,
 }
 
 impl MovieCollectionUpdateRequest {
@@ -396,7 +405,7 @@ impl MovieCollectionUpdateRequest {
         let mock_stdout = MockStdout::new();
         let stdout = StdoutChannel::with_mock_stdout(mock_stdout.clone(), mock_stdout.clone());
 
-        let mc = MovieCollection::new(&config, pool, &stdout);
+        let mc = MovieCollection::new(config, pool, &stdout);
         for entry in &self.collection {
             if let Some(cidx) = mc.get_collection_index(entry.path.as_ref()).await? {
                 if cidx == entry.idx {

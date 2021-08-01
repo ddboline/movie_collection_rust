@@ -64,7 +64,7 @@ impl FileLists {
                 .movie_dirs
                 .par_iter()
                 .filter(|d| d.exists())
-                .map(|d| walk_directory(&d, &patterns))
+                .map(|d| walk_directory(d, &patterns))
                 .collect::<Result<Vec<_>, Error>>()
                 .map(|x| x.into_iter().flatten().sorted().collect())
         })

@@ -4,7 +4,6 @@ use futures::future::try_join_all;
 use itertools::Itertools;
 use postgres_query::{query, query_dyn, FromSqlRow};
 use rayon::iter::{IntoParallelIterator, IntoParallelRefIterator, ParallelIterator};
-use rweb::Schema;
 use serde::{Deserialize, Serialize};
 use stack_string::StackString;
 use std::{
@@ -18,7 +17,6 @@ use stdout_channel::StdoutChannel;
 
 use crate::{
     config::Config,
-    datetime_wrapper::DateTimeWrapper,
     imdb_episodes::ImdbEpisodes,
     imdb_ratings::ImdbRatings,
     movie_queue::MovieQueueDB,
@@ -84,7 +82,7 @@ impl fmt::Display for TvShowsResult {
     }
 }
 
-#[derive(Default, Serialize, Deserialize, FromSqlRow, Schema)]
+#[derive(Default, Serialize, Deserialize, FromSqlRow)]
 pub struct MovieCollectionRow {
     pub idx: i32,
     pub path: StackString,
@@ -473,7 +471,7 @@ impl MovieCollection {
             .movie_dirs
             .par_iter()
             .filter(|d| d.exists())
-            .map(|d| walk_directory(&d, &self.config.suffixes))
+            .map(|d| walk_directory(d, &self.config.suffixes))
             .collect();
         let file_list = file_list?;
 
@@ -588,11 +586,11 @@ impl MovieCollection {
                     self.stdout
                         .send(format!("in queue but not disk {} {}", key, v));
                     let mq = MovieQueueDB::new(&self.config, &self.pool, &self.stdout);
-                    mq.remove_from_queue_by_path(&key).await?;
+                    mq.remove_from_queue_by_path(key).await?;
                 } else {
                     self.stdout.send(format!("not on disk {} {}", key, val));
                 }
-                self.remove_from_collection(&key).await?;
+                self.remove_from_collection(key).await?;
             }
         }
 
@@ -825,14 +823,14 @@ pub async fn find_new_episodes_http_worker(
         ),
     );
 
-    let mc = MovieCollection::new(config, &pool, stdout);
+    let mc = MovieCollection::new(config, pool, stdout);
     let shows_filter: Option<HashSet<StackString>> =
         shows.map(|s| s.as_ref().split(',').map(Into::into).collect());
 
     let mindate = (Local::today() + Duration::days(-14)).naive_local();
     let maxdate = (Local::today() + Duration::days(7)).naive_local();
 
-    let mq = MovieQueueDB::new(config, &pool, &stdout);
+    let mq = MovieQueueDB::new(config, pool, stdout);
 
     let episodes = mc.get_new_episodes(mindate, maxdate, source).await?;
 
@@ -909,10 +907,10 @@ pub async fn find_new_episodes_http_worker(
     Ok(output)
 }
 
-#[derive(Serialize, Deserialize, Schema)]
+#[derive(Serialize, Deserialize)]
 pub struct LastModifiedResponse {
     pub table: StackString,
-    pub last_modified: DateTimeWrapper,
+    pub last_modified: DateTime<Utc>,
 }
 
 impl LastModifiedResponse {
@@ -933,7 +931,7 @@ impl LastModifiedResponse {
                 let last_modified: DateTime<Utc> = last_modified;
                 Ok(Some(LastModifiedResponse {
                     table: (*table).into(),
-                    last_modified: last_modified.into(),
+                    last_modified,
                 }))
             } else {
                 Ok(None)

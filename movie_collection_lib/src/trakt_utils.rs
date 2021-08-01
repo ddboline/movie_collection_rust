@@ -4,7 +4,6 @@ use futures::future::try_join_all;
 use itertools::Itertools;
 use log::debug;
 use postgres_query::{query, query_dyn, FromSqlRow};
-use rweb::Schema;
 use serde::{Deserialize, Serialize};
 use stack_string::StackString;
 use std::{
@@ -24,7 +23,7 @@ use crate::{
 
 use crate::{tv_show_source::TvShowSource, utils::option_string_wrapper};
 
-#[derive(Clone, Copy, Schema)]
+#[derive(Clone, Copy)]
 pub enum TraktActions {
     None,
     List,
@@ -131,7 +130,7 @@ impl Hash for WatchListShow {
     where
         H: Hasher,
     {
-        self.link.hash(state)
+        self.link.hash(state);
     }
 }
 
@@ -398,7 +397,7 @@ impl Hash for WatchedMovie {
     where
         H: Hasher,
     {
-        self.imdb_url.hash(state)
+        self.imdb_url.hash(state);
     }
 }
 
@@ -622,7 +621,7 @@ async fn watchlist_add(
     show: Option<&str>,
 ) -> Result<(), Error> {
     trakt.init().await;
-    if let Some(imdb_url) = get_imdb_url_from_show(&mc, show).await? {
+    if let Some(imdb_url) = get_imdb_url_from_show(mc, show).await? {
         let imdb_url_ = imdb_url.clone();
         mc.stdout.send(format!(
             "result: {}",
@@ -642,7 +641,7 @@ async fn watchlist_rm(
     mc: &MovieCollection,
     show: Option<&str>,
 ) -> Result<(), Error> {
-    if let Some(imdb_url) = get_imdb_url_from_show(&mc, show).await? {
+    if let Some(imdb_url) = get_imdb_url_from_show(mc, show).await? {
         let imdb_url_ = imdb_url.clone();
         trakt.init().await;
         mc.stdout.send(format!(
@@ -671,7 +670,7 @@ async fn watched_add(
     episode: &[i32],
 ) -> Result<(), Error> {
     trakt.init().await;
-    if let Some(imdb_url) = get_imdb_url_from_show(&mc, show).await? {
+    if let Some(imdb_url) = get_imdb_url_from_show(mc, show).await? {
         if season != -1 && !episode.is_empty() {
             for epi in episode {
                 let epi_ = *epi;
@@ -710,7 +709,7 @@ async fn watched_rm(
     episode: &[i32],
 ) -> Result<(), Error> {
     trakt.init().await;
-    if let Some(imdb_url) = get_imdb_url_from_show(&mc, show).await? {
+    if let Some(imdb_url) = get_imdb_url_from_show(mc, show).await? {
         if season != -1 && !episode.is_empty() {
             for epi in episode {
                 let epi_ = *epi;
@@ -739,7 +738,7 @@ async fn watched_list(mc: &MovieCollection, show: Option<&str>, season: i32) -> 
     let watched_shows = get_watched_shows_db(&mc.pool, "", None).await?;
     let watched_movies = get_watched_movies_db(&mc.pool).await?;
 
-    if let Some(imdb_url) = get_imdb_url_from_show(&mc, show).await? {
+    if let Some(imdb_url) = get_imdb_url_from_show(mc, show).await? {
         let lines = watched_shows
             .iter()
             .filter_map(|show| {

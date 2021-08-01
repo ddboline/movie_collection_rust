@@ -45,7 +45,7 @@ async fn make_collection() -> Result<(), Error> {
         if do_time {
             let futures = shows.into_iter().map(|result| async move {
                 let path = Path::new(result.path.as_str());
-                let timeval = get_video_runtime(&path).await?;
+                let timeval = get_video_runtime(path).await?;
                 Ok(format!("{} {}", timeval, result))
             });
             let shows: Result<Vec<_>, Error> = try_join_all(futures).await;
@@ -67,7 +67,7 @@ async fn main() {
         Ok(_) => {}
         Err(e) => {
             if !e.to_string().contains("Broken pipe") {
-                panic!("{}", e)
+                panic!("{}", e);
             }
         }
     }

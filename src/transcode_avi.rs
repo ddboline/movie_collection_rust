@@ -33,8 +33,8 @@ async fn transcode_avi(
         if !path.exists() {
             panic!("file doesn't exist {}", path.to_string_lossy());
         }
-        let payload = TranscodeServiceRequest::create_transcode_request(&config, &path)?;
-        publish_single(&transcode_service, &payload).await?;
+        let payload = TranscodeServiceRequest::create_transcode_request(config, &path)?;
+        publish_single(transcode_service, &payload).await?;
         stdout.send(format!("script {:?}", payload));
     }
     stdout.close().await
@@ -45,7 +45,7 @@ async fn publish_single(
     payload: &TranscodeServiceRequest,
 ) -> Result<(), Error> {
     transcode_service
-        .publish_transcode_job(&payload, |data| async move {
+        .publish_transcode_job(payload, |data| async move {
             let transcode_channel = TranscodeChannel::open_channel().await?;
             transcode_channel.init(&transcode_service.queue).await?;
             transcode_channel
@@ -85,12 +85,12 @@ async fn main() -> Result<(), Error> {
     let transcode_service = TranscodeService::new(&config, &config.transcode_queue, &pool, &stdout);
 
     if let Some(request_file) = &opts.request_file {
-        match transcode_single(&transcode_service, &request_file).await {
+        match transcode_single(&transcode_service, request_file).await {
             Ok(_) => (),
             Err(e) => {
                 if e.to_string().contains("Broken pipe") {
                 } else {
-                    panic!("{}", e)
+                    panic!("{}", e);
                 }
             }
         }
@@ -102,7 +102,7 @@ async fn main() -> Result<(), Error> {
         Err(e) => {
             if e.to_string().contains("Broken pipe") {
             } else {
-                panic!("{}", e)
+                panic!("{}", e);
             }
         }
     }

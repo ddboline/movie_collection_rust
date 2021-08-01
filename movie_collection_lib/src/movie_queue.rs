@@ -4,7 +4,6 @@ use futures::future::try_join_all;
 use itertools::Itertools;
 use log::debug;
 use postgres_query::{query, query_dyn, FromSqlRow};
-use rweb::Schema;
 use serde::{Deserialize, Serialize};
 use stack_string::StackString;
 use std::{fmt, path::Path};
@@ -12,7 +11,6 @@ use stdout_channel::StdoutChannel;
 
 use crate::{
     config::Config,
-    datetime_wrapper::DateTimeWrapper,
     movie_collection::MovieCollection,
     pgpool::PgPool,
     utils::{option_string_wrapper, parse_file_stem},
@@ -126,7 +124,7 @@ impl MovieQueueDB {
 
     pub async fn remove_from_queue_by_path(&self, path: &str) -> Result<(), Error> {
         let mc = MovieCollection::new(&self.config, &self.pool, &self.stdout);
-        if let Some(collection_idx) = mc.get_collection_index(&path).await? {
+        if let Some(collection_idx) = mc.get_collection_index(path).await? {
             self.remove_from_queue_by_collection_idx(collection_idx)
                 .await
         } else {
@@ -135,15 +133,15 @@ impl MovieQueueDB {
     }
 
     pub async fn insert_into_queue(&self, idx: i32, path: &str) -> Result<(), Error> {
-        if !Path::new(&path).exists() {
+        if !Path::new(path).exists() {
             return Err(format_err!("File doesn't exist"));
         }
         let mc = MovieCollection::new(&self.config, &self.pool, &self.stdout);
-        let collection_idx = if let Some(i) = mc.get_collection_index(&path).await? {
+        let collection_idx = if let Some(i) = mc.get_collection_index(path).await? {
             i
         } else {
-            mc.insert_into_collection(&path, true).await?;
-            mc.get_collection_index(&path)
+            mc.insert_into_collection(path, true).await?;
+            mc.get_collection_index(path)
                 .await?
                 .ok_or_else(|| format_err!("Path not found"))?
         };
@@ -318,11 +316,11 @@ impl MovieQueueDB {
     }
 }
 
-#[derive(Default, Debug, Serialize, Deserialize, FromSqlRow, Schema)]
+#[derive(Default, Debug, Serialize, Deserialize, FromSqlRow)]
 pub struct MovieQueueRow {
     pub idx: i32,
     pub collection_idx: i32,
     pub path: StackString,
     pub show: StackString,
-    pub last_modified: Option<DateTimeWrapper>,
+    pub last_modified: Option<DateTime<Utc>>,
 }

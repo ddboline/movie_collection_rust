@@ -124,7 +124,7 @@ impl ParseImdb {
         let episodes: Option<HashMap<(i32, i32), _>> = episodes.map(|v| v.into_iter().collect());
 
         if opts.do_update {
-            self.parse_imdb_update_worker(&opts, &shows, &episodes, &mut output)
+            self.parse_imdb_update_worker(opts, &shows, &episodes, &mut output)
                 .await?;
         }
         Ok(output)
@@ -206,8 +206,7 @@ impl ParseImdb {
                         if let Some(episodes) = &episodes {
                             let airdate = episode
                                 .airdate
-                                .unwrap_or_else(|| NaiveDate::from_ymd(1970, 1, 1))
-                                .into();
+                                .unwrap_or_else(|| NaiveDate::from_ymd(1970, 1, 1));
 
                             if let Some(e) = episodes.get(&key) {
                                 let mut new = e.clone();
@@ -269,7 +268,7 @@ impl ParseImdb {
         );
 
         let output: Vec<_> = self
-            .parse_imdb_worker(&opts)
+            .parse_imdb_worker(opts)
             .await?
             .into_iter()
             .map(|line| {

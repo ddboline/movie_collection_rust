@@ -24,13 +24,13 @@ async fn remcom(
 ) -> Result<(), Error> {
     for file in files {
         let payload = TranscodeServiceRequest::create_remcom_request(
-            &config,
+            config,
             file.as_ref(),
             directory.as_ref(),
             unwatched,
         )
         .await?;
-        publish_single(&remcom_service, &payload).await?;
+        publish_single(remcom_service, &payload).await?;
         stdout.send(format!("script {:?}", payload));
     }
     stdout.close().await
@@ -41,7 +41,7 @@ async fn publish_single(
     payload: &TranscodeServiceRequest,
 ) -> Result<(), Error> {
     remcom_service
-        .publish_transcode_job(&payload, |data| async move {
+        .publish_transcode_job(payload, |data| async move {
             let remcom_channel = TranscodeChannel::open_channel().await?;
             remcom_channel.init(&remcom_service.queue).await?;
             remcom_channel.publish(&remcom_service.queue, data).await
@@ -56,7 +56,7 @@ async fn remcom_single(
 ) -> Result<(), Error> {
     let data = fs::read(request_file).await?;
     let payload = serde_json::from_slice(&data)?;
-    publish_single(&remcom_service, &payload).await?;
+    publish_single(remcom_service, &payload).await?;
     Ok(())
 }
 
@@ -92,7 +92,7 @@ async fn main() -> Result<(), Error> {
             Err(e) => {
                 if e.to_string().contains("Broken pipe") {
                 } else {
-                    panic!("{}", e)
+                    panic!("{}", e);
                 }
             }
         }
@@ -113,7 +113,7 @@ async fn main() -> Result<(), Error> {
         Err(e) => {
             if e.to_string().contains("Broken pipe") {
             } else {
-                panic!("{}", e)
+                panic!("{}", e);
             }
         }
     }
