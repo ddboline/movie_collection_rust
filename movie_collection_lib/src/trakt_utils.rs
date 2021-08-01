@@ -4,7 +4,6 @@ use futures::future::try_join_all;
 use itertools::Itertools;
 use log::debug;
 use postgres_query::{query, query_dyn, FromSqlRow};
-use rweb::Schema;
 use serde::{Deserialize, Serialize};
 use stack_string::StackString;
 use std::{
@@ -24,7 +23,7 @@ use crate::{
 
 use crate::{tv_show_source::TvShowSource, utils::option_string_wrapper};
 
-#[derive(Clone, Copy, Schema)]
+#[derive(Clone, Copy)]
 pub enum TraktActions {
     None,
     List,

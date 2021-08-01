@@ -26,17 +26,14 @@ use tokio_stream::StreamExt;
 
 use movie_collection_lib::{
     config::Config,
-    datetime_wrapper::DateTimeWrapper,
     imdb_episodes::ImdbEpisodes,
     imdb_ratings::ImdbRatings,
     make_list::FileLists,
     make_queue::movie_queue_http,
-    movie_collection::{
-        ImdbSeason, LastModifiedResponse, MovieCollection, MovieCollectionRow, TvShowsResult,
-    },
-    movie_queue::{MovieQueueDB, MovieQueueResult, MovieQueueRow},
+    movie_collection::{ImdbSeason, MovieCollection, TvShowsResult},
+    movie_queue::{MovieQueueDB, MovieQueueResult},
     pgpool::PgPool,
-    plex_events::{PlexEvent, PlexEventType, PlexFilename},
+    plex_events::{PlexEvent, PlexFilename},
     trakt_connection::TraktConnection,
     trakt_utils::{
         get_watched_shows_db, get_watchlist_shows_db_map, TraktActions, WatchListShow,
@@ -47,9 +44,8 @@ use movie_collection_lib::{
     utils::HBR,
 };
 
-use crate::uuid_wrapper::UuidWrapper;
-
-use super::{
+use crate::{
+    datetime_wrapper::DateTimeWrapper,
     errors::ServiceError as Error,
     logged_user::LoggedUser,
     movie_queue_app::AppState,
@@ -60,6 +56,10 @@ use super::{
         MovieCollectionUpdateRequest, MoviePathRequest, MovieQueueRequest, MovieQueueSyncRequest,
         MovieQueueUpdateRequest, ParseImdbRequest, WatchlistActionRequest,
     },
+    uuid_wrapper::UuidWrapper,
+    ImdbEpisodesWrapper, ImdbRatingsWrapper, LastModifiedResponseWrapper,
+    MovieCollectionRowWrapper, MovieQueueRowWrapper, PlexEventTypeWrapper, PlexEventWrapper,
+    PlexFilenameWrapper, TraktActionsWrapper,
 };
 
 pub type WarpResult<T> = Result<T, Rejection>;
@@ -327,7 +327,7 @@ pub async fn find_new_episodes(
 
 #[derive(RwebResponse)]
 #[response(description = "List Imdb Episodes")]
-struct ListImdbEpisodesResponse(JsonBase<Vec<ImdbEpisodes>, Error>);
+struct ListImdbEpisodesResponse(JsonBase<Vec<ImdbEpisodesWrapper>, Error>);
 
 #[get("/list/imdb_episodes")]
 pub async fn imdb_episodes_route(
@@ -335,7 +335,13 @@ pub async fn imdb_episodes_route(
     #[cookie = "jwt"] _: LoggedUser,
     #[data] state: AppState,
 ) -> WarpResult<ListImdbEpisodesResponse> {
-    let x = query.into_inner().handle(&state.db).await?;
+    let x = query
+        .into_inner()
+        .handle(&state.db)
+        .await?
+        .into_iter()
+        .map(Into::into)
+        .collect();
     Ok(JsonBase::new(x).into())
 }
 
@@ -359,7 +365,7 @@ pub async fn imdb_episodes_update(
 
 #[derive(RwebResponse)]
 #[response(description = "List Imdb Shows")]
-struct ListImdbShowsResponse(JsonBase<Vec<ImdbRatings>, Error>);
+struct ListImdbShowsResponse(JsonBase<Vec<ImdbRatingsWrapper>, Error>);
 
 #[get("/list/imdb_ratings")]
 pub async fn imdb_ratings_route(
@@ -367,7 +373,13 @@ pub async fn imdb_ratings_route(
     #[cookie = "jwt"] _: LoggedUser,
     #[data] state: AppState,
 ) -> WarpResult<ListImdbShowsResponse> {
-    let x = query.into_inner().handle(&state.db).await?;
+    let x = query
+        .into_inner()
+        .handle(&state.db)
+        .await?
+        .into_iter()
+        .map(Into::into)
+        .collect();
     Ok(JsonBase::new(x).into())
 }
 
@@ -405,7 +417,7 @@ pub async fn imdb_ratings_set_source(
 
 #[derive(RwebResponse)]
 #[response(description = "List Movie Queue Entries")]
-struct ListMovieQueueResponse(JsonBase<Vec<MovieQueueRow>, Error>);
+struct ListMovieQueueResponse(JsonBase<Vec<MovieQueueRowWrapper>, Error>);
 
 #[get("/list/movie_queue")]
 pub async fn movie_queue_route(
@@ -413,7 +425,13 @@ pub async fn movie_queue_route(
     #[cookie = "jwt"] _: LoggedUser,
     #[data] state: AppState,
 ) -> WarpResult<ListMovieQueueResponse> {
-    let x = query.into_inner().handle(&state.db, &state.config).await?;
+    let x = query
+        .into_inner()
+        .handle(&state.db, &state.config)
+        .await?
+        .into_iter()
+        .map(Into::into)
+        .collect();
     Ok(JsonBase::new(x).into())
 }
 
@@ -437,7 +455,7 @@ pub async fn movie_queue_update(
 
 #[derive(RwebResponse)]
 #[response(description = "List Movie Collection Entries")]
-struct ListMovieCollectionResponse(JsonBase<Vec<MovieCollectionRow>, Error>);
+struct ListMovieCollectionResponse(JsonBase<Vec<MovieCollectionRowWrapper>, Error>);
 
 #[get("/list/movie_collection")]
 pub async fn movie_collection_route(
@@ -445,7 +463,13 @@ pub async fn movie_collection_route(
     #[cookie = "jwt"] _: LoggedUser,
     #[data] state: AppState,
 ) -> WarpResult<ListMovieCollectionResponse> {
-    let x = query.into_inner().handle(&state.db, &state.config).await?;
+    let x = query
+        .into_inner()
+        .handle(&state.db, &state.config)
+        .await?
+        .into_iter()
+        .map(Into::into)
+        .collect();
     Ok(JsonBase::new(x).into())
 }
 
@@ -472,7 +496,7 @@ pub async fn movie_collection_update(
 
 #[derive(RwebResponse)]
 #[response(description = "Database Entries Last Modified Time")]
-struct ListLastModifiedResponse(JsonBase<Vec<LastModifiedResponse>, Error>);
+struct ListLastModifiedResponse(JsonBase<Vec<LastModifiedResponseWrapper>, Error>);
 
 #[get("/list/last_modified")]
 pub async fn last_modified_route(
@@ -480,7 +504,12 @@ pub async fn last_modified_route(
     #[data] state: AppState,
 ) -> WarpResult<ListLastModifiedResponse> {
     let req = LastModifiedRequest {};
-    let x = req.handle(&state.db).await?;
+    let x = req
+        .handle(&state.db)
+        .await?
+        .into_iter()
+        .map(Into::into)
+        .collect();
     Ok(JsonBase::new(x).into())
 }
 
@@ -941,14 +970,17 @@ struct TraktWatchlistActionResponse(HtmlBase<String, Error>);
 
 #[get("/trakt/watchlist/{action}/{imdb_url}")]
 pub async fn trakt_watchlist_action(
-    action: TraktActions,
+    action: TraktActionsWrapper,
     imdb_url: StackString,
     #[cookie = "jwt"] _: LoggedUser,
     #[data] state: AppState,
 ) -> WarpResult<TraktWatchlistActionResponse> {
-    let req = WatchlistActionRequest { action, imdb_url };
+    let req = WatchlistActionRequest {
+        action: action.into(),
+        imdb_url,
+    };
     let imdb_url = req.handle(&state.db, &state.trakt).await?;
-    let body: String = watchlist_action_worker(&state.trakt, action, &imdb_url)
+    let body: String = watchlist_action_worker(&state.trakt, action.into(), &imdb_url)
         .await?
         .into();
     Ok(HtmlBase::new(body).into())
@@ -1038,7 +1070,7 @@ struct TraktWatchlistEpisodeActionResponse(HtmlBase<String, Error>);
 
 #[get("/trakt/watched/{action}/{imdb_url}/{season}/{episode}")]
 pub async fn trakt_watched_action(
-    action: TraktActions,
+    action: TraktActionsWrapper,
     imdb_url: StackString,
     season: i32,
     episode: i32,
@@ -1051,7 +1083,7 @@ pub async fn trakt_watched_action(
     let body: String = watched_action_http_worker(
         &state.trakt,
         &state.db,
-        action,
+        action.into(),
         &imdb_url,
         season,
         episode,
@@ -1429,12 +1461,12 @@ pub async fn watched_action_http_worker(
 
 #[derive(RwebResponse)]
 #[response(description = "Plex Events")]
-struct PlexEventResponse(JsonBase<Vec<PlexEvent>, Error>);
+struct PlexEventResponse(JsonBase<Vec<PlexEventWrapper>, Error>);
 
 #[derive(Serialize, Deserialize, Debug, Schema)]
 pub struct PlexEventRequest {
     pub start_timestamp: Option<DateTimeWrapper>,
-    pub event_type: Option<PlexEventType>,
+    pub event_type: Option<PlexEventTypeWrapper>,
     pub offset: Option<u64>,
     pub limit: Option<u64>,
 }
@@ -1449,18 +1481,21 @@ pub async fn plex_events(
     let events = PlexEvent::get_events(
         &state.db,
         query.start_timestamp.map(Into::into),
-        query.event_type,
+        query.event_type.map(Into::into),
         query.offset,
         query.limit,
     )
     .await
-    .map_err(Into::<Error>::into)?;
+    .map_err(Into::<Error>::into)?
+    .into_iter()
+    .map(Into::into)
+    .collect();
     Ok(JsonBase::new(events).into())
 }
 
 #[derive(Serialize, Deserialize, Debug, Schema)]
 pub struct PlexEventUpdateRequest {
-    events: Vec<PlexEvent>,
+    events: Vec<PlexEventWrapper>,
 }
 
 #[derive(RwebResponse)]
@@ -1479,6 +1514,7 @@ pub async fn plex_events_update(
 ) -> WarpResult<PlexEventUpdateResponse> {
     let payload = payload.into_inner();
     for event in payload.events {
+        let event: PlexEvent = event.into();
         event
             .write_event(&state.db)
             .await
@@ -1555,7 +1591,7 @@ pub async fn plex_list(
         &state.db,
         &state.config,
         query.start_timestamp.map(Into::into),
-        query.event_type,
+        query.event_type.map(Into::into),
         query.offset,
         query.limit,
     )
@@ -1582,7 +1618,7 @@ pub async fn plex_list(
 
 #[derive(RwebResponse)]
 #[response(description = "Plex Filenames")]
-struct PlexFilenameResponse(JsonBase<Vec<PlexFilename>, Error>);
+struct PlexFilenameResponse(JsonBase<Vec<PlexFilenameWrapper>, Error>);
 
 #[derive(Serialize, Deserialize, Debug, Schema)]
 pub struct PlexFilenameRequest {
@@ -1605,13 +1641,16 @@ pub async fn plex_filename(
         query.limit,
     )
     .await
-    .map_err(Into::<Error>::into)?;
+    .map_err(Into::<Error>::into)?
+    .into_iter()
+    .map(Into::into)
+    .collect();
     Ok(JsonBase::new(filenames).into())
 }
 
 #[derive(Serialize, Deserialize, Debug, Schema)]
 pub struct PlexFilenameUpdateRequest {
-    filenames: Vec<PlexFilename>,
+    filenames: Vec<PlexFilenameWrapper>,
 }
 
 #[derive(RwebResponse)]
@@ -1635,6 +1674,7 @@ pub async fn plex_filename_update(
             .map_err(Into::<Error>::into)?
             .is_none()
         {
+            let filename: PlexFilename = filename.into();
             filename
                 .insert(&state.db)
                 .await

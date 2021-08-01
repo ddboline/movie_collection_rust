@@ -4,7 +4,6 @@ use futures::future::try_join_all;
 use itertools::Itertools;
 use log::debug;
 use postgres_query::{query, query_dyn, FromSqlRow};
-use rweb::Schema;
 use serde::{Deserialize, Serialize};
 use stack_string::StackString;
 use std::{fmt, path::Path};
@@ -12,7 +11,6 @@ use stdout_channel::StdoutChannel;
 
 use crate::{
     config::Config,
-    datetime_wrapper::DateTimeWrapper,
     movie_collection::MovieCollection,
     pgpool::PgPool,
     utils::{option_string_wrapper, parse_file_stem},
@@ -318,11 +316,11 @@ impl MovieQueueDB {
     }
 }
 
-#[derive(Default, Debug, Serialize, Deserialize, FromSqlRow, Schema)]
+#[derive(Default, Debug, Serialize, Deserialize, FromSqlRow)]
 pub struct MovieQueueRow {
     pub idx: i32,
     pub collection_idx: i32,
     pub path: StackString,
     pub show: StackString,
-    pub last_modified: Option<DateTimeWrapper>,
+    pub last_modified: Option<DateTime<Utc>>,
 }

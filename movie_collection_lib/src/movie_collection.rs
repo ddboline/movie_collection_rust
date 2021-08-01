@@ -4,7 +4,6 @@ use futures::future::try_join_all;
 use itertools::Itertools;
 use postgres_query::{query, query_dyn, FromSqlRow};
 use rayon::iter::{IntoParallelIterator, IntoParallelRefIterator, ParallelIterator};
-use rweb::Schema;
 use serde::{Deserialize, Serialize};
 use stack_string::StackString;
 use std::{
@@ -18,7 +17,6 @@ use stdout_channel::StdoutChannel;
 
 use crate::{
     config::Config,
-    datetime_wrapper::DateTimeWrapper,
     imdb_episodes::ImdbEpisodes,
     imdb_ratings::ImdbRatings,
     movie_queue::MovieQueueDB,
@@ -84,7 +82,7 @@ impl fmt::Display for TvShowsResult {
     }
 }
 
-#[derive(Default, Serialize, Deserialize, FromSqlRow, Schema)]
+#[derive(Default, Serialize, Deserialize, FromSqlRow)]
 pub struct MovieCollectionRow {
     pub idx: i32,
     pub path: StackString,
@@ -909,10 +907,10 @@ pub async fn find_new_episodes_http_worker(
     Ok(output)
 }
 
-#[derive(Serialize, Deserialize, Schema)]
+#[derive(Serialize, Deserialize)]
 pub struct LastModifiedResponse {
     pub table: StackString,
-    pub last_modified: DateTimeWrapper,
+    pub last_modified: DateTime<Utc>,
 }
 
 impl LastModifiedResponse {

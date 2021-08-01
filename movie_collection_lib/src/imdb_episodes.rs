@@ -1,20 +1,19 @@
 use anyhow::Error;
 use chrono::{DateTime, NaiveDate, Utc};
 use postgres_query::{query, query_dyn, FromSqlRow};
-use rweb::Schema;
 use serde::{Deserialize, Serialize};
 use stack_string::StackString;
 use std::fmt;
 
-use crate::{naivedate_wrapper::NaiveDateWrapper, pgpool::PgPool};
+use crate::pgpool::PgPool;
 
-#[derive(Clone, Serialize, Deserialize, FromSqlRow, Schema)]
+#[derive(Clone, Serialize, Deserialize, FromSqlRow)]
 pub struct ImdbEpisodes {
     pub show: StackString,
     pub title: StackString,
     pub season: i32,
     pub episode: i32,
-    pub airdate: NaiveDateWrapper,
+    pub airdate: NaiveDate,
     pub rating: f64,
     pub eptitle: StackString,
     pub epurl: StackString,

@@ -4,7 +4,6 @@ use chrono_tz::Tz;
 use log::info;
 use postgres_query::{query, query_dyn, FromSqlRow, Parameter, Query};
 use roxmltree::Document;
-use rweb::Schema;
 use serde::{Deserialize, Serialize};
 use stack_string::StackString;
 use std::{
@@ -13,9 +12,9 @@ use std::{
     str::FromStr,
 };
 
-use crate::{config::Config, datetime_wrapper::DateTimeWrapper, pgpool::PgPool};
+use crate::{config::Config, pgpool::PgPool};
 
-#[derive(FromSqlRow, Default, Debug, Serialize, Deserialize, Schema)]
+#[derive(FromSqlRow, Default, Debug, Serialize, Deserialize)]
 pub struct PlexEvent {
     pub event: StackString,
     pub account: StackString,
@@ -25,10 +24,10 @@ pub struct PlexEvent {
     pub title: Option<StackString>,
     pub parent_title: Option<StackString>,
     pub grandparent_title: Option<StackString>,
-    pub added_at: Option<DateTimeWrapper>,
-    pub updated_at: Option<DateTimeWrapper>,
-    pub created_at: Option<DateTimeWrapper>,
-    pub last_modified: Option<DateTimeWrapper>,
+    pub added_at: Option<DateTime<Utc>>,
+    pub updated_at: Option<DateTime<Utc>>,
+    pub created_at: Option<DateTime<Utc>>,
+    pub last_modified: Option<DateTime<Utc>>,
     pub metadata_type: Option<StackString>,
     pub section_type: Option<StackString>,
     pub section_title: Option<StackString>,
@@ -38,10 +37,9 @@ pub struct PlexEvent {
 impl TryFrom<WebhookPayload> for PlexEvent {
     type Error = Error;
     fn try_from(item: WebhookPayload) -> Result<Self, Self::Error> {
-        fn dt_from_tm(x: u64) -> DateTimeWrapper {
+        fn dt_from_tm(x: u64) -> DateTime<Utc> {
             let dt = NaiveDateTime::from_timestamp(x as i64, 0);
-            let dt = DateTime::from_utc(dt, Utc);
-            dt.into()
+            DateTime::from_utc(dt, Utc)
         }
         let event = item.event.to_str().into();
         let payload = Self {
@@ -311,7 +309,7 @@ pub struct Server {
 #[derive(Deserialize, Debug)]
 pub struct Player {
     pub local: bool,
-    #[serde(rename = "publicAddress")]
+    #[serde(alias = "publicAddress")]
     pub public_address: Ipv4Addr,
     pub title: StackString,
     pub uuid: StackString,
@@ -319,57 +317,57 @@ pub struct Player {
 
 #[derive(Deserialize, Debug)]
 pub struct Metadata {
-    #[serde(rename = "type")]
+    #[serde(alias = "type")]
     pub metadata_type: Option<StackString>,
     pub title: Option<StackString>,
-    #[serde(rename = "parentTitle")]
+    #[serde(alias = "parentTitle")]
     pub parent_title: Option<StackString>,
-    #[serde(rename = "grandparentTitle")]
+    #[serde(alias = "grandparentTitle")]
     pub grandparent_title: Option<StackString>,
     pub summary: Option<StackString>,
     pub rating: Option<f64>,
-    #[serde(rename = "ratingCount")]
+    #[serde(alias = "ratingCount")]
     pub rating_count: Option<u64>,
     pub key: Option<StackString>,
-    #[serde(rename = "parentKey")]
+    #[serde(alias = "parentKey")]
     pub parent_key: Option<StackString>,
-    #[serde(rename = "grandparentKey")]
+    #[serde(alias = "grandparentKey")]
     pub grandparent_key: Option<StackString>,
-    #[serde(rename = "addedAt")]
+    #[serde(alias = "addedAt")]
     pub added_at: Option<u64>,
-    #[serde(rename = "updatedAt")]
+    #[serde(alias = "updatedAt")]
     pub updated_at: Option<u64>,
-    #[serde(rename = "librarySectionType")]
+    #[serde(alias = "librarySectionType")]
     pub library_section_type: Option<StackString>,
-    #[serde(rename = "librarySectionTitle")]
+    #[serde(alias = "librarySectionTitle")]
     pub library_section_title: Option<StackString>,
 }
 
-#[derive(Serialize, Deserialize, Debug, Schema, Clone, Copy)]
+#[derive(Serialize, Deserialize, Debug, Clone, Copy)]
 pub enum PlexEventType {
-    #[serde(rename = "library.on.deck")]
+    #[serde(alias = "library.on.deck")]
     LibraryOnDeck,
-    #[serde(rename = "library.new")]
+    #[serde(alias = "library.new")]
     LibraryNew,
-    #[serde(rename = "media.pause")]
+    #[serde(alias = "media.pause")]
     MediaPause,
-    #[serde(rename = "media.play")]
+    #[serde(alias = "media.play")]
     MediaPlay,
-    #[serde(rename = "media.rate")]
+    #[serde(alias = "media.rate")]
     MediaRate,
-    #[serde(rename = "media.resume")]
+    #[serde(alias = "media.resume")]
     MediaResume,
-    #[serde(rename = "media.scrobble")]
+    #[serde(alias = "media.scrobble")]
     MediaScrobble,
-    #[serde(rename = "media.stop")]
+    #[serde(alias = "media.stop")]
     MediaStop,
-    #[serde(rename = "admin.database.backup")]
+    #[serde(alias = "admin.database.backup")]
     AdminDatabaseBackup,
-    #[serde(rename = "admin.database.corrupted")]
+    #[serde(alias = "admin.database.corrupted")]
     AdminDatabaseCorrupted,
-    #[serde(rename = "device.new")]
+    #[serde(alias = "device.new")]
     DeviceNew,
-    #[serde(rename = "playback.started")]
+    #[serde(alias = "playback.started")]
     PlaybackStarted,
 }
 
@@ -418,17 +416,17 @@ pub struct WebhookPayload {
     pub event: PlexEventType,
     pub user: bool,
     pub owner: bool,
-    #[serde(rename = "Account")]
+    #[serde(alias = "Account")]
     pub account: Account,
-    #[serde(rename = "Server")]
+    #[serde(alias = "Server")]
     pub server: Server,
-    #[serde(rename = "Player")]
+    #[serde(alias = "Player")]
     pub player: Player,
-    #[serde(rename = "Metadata")]
+    #[serde(alias = "Metadata")]
     pub metadata: Metadata,
 }
 
-#[derive(FromSqlRow, Default, Debug, Serialize, Deserialize, Schema)]
+#[derive(FromSqlRow, Default, Debug, Serialize, Deserialize)]
 pub struct PlexFilename {
     pub metadata_key: StackString,
     pub filename: StackString,

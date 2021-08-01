@@ -24,7 +24,7 @@ bytes = "1.0"
 anyhow = "1.0"
 thiserror = "1.0"
 dirs = "3.0"
-tokio = {version="1.0", features=["full"]}
+tokio = {version="1.9", features=["full"]}
 tokio-stream = {version="0.1", features=["fs"]}
 async-trait = "0.1"
 derive_more = "0.99"
@@ -42,7 +42,6 @@ procfs = "0.9"
 uuid = "0.8"
 chrono-tz = "0.5"
 roxmltree = "0.14"
-rweb = {version="0.12", features=["openapi"]}
-stack-string = { version="0.2", features=["postgres_types", "rweb-openapi"] }
+stack-string = { version="0.2", features=["postgres_types"] }
 stdout-channel = "0.4"
 postgres_query = {git = "https://github.com/ddboline/rust-postgres-query", tag = "0.3.3-2", features=["deadpool"]}

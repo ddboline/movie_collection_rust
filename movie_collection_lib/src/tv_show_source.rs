@@ -1,11 +1,10 @@
 use anyhow::{format_err, Error};
 use bytes::BytesMut;
-use rweb::Schema;
 use serde::{Deserialize, Serialize};
 use std::{cmp::Ordering, fmt, str::FromStr};
 use tokio_postgres::types::{FromSql, IsNull, ToSql, Type};
 
-#[derive(Serialize, Deserialize, Clone, Debug, Eq, Copy, PartialEq, Schema)]
+#[derive(Serialize, Deserialize, Clone, Debug, Eq, Copy, PartialEq)]
 pub enum TvShowSource {
     #[serde(rename = "all")]
     All,
