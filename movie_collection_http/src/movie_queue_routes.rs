@@ -86,14 +86,14 @@ fn movie_queue_body(patterns: &[StackString], entries: &[StackString]) -> StackS
 
 async fn queue_body_resp(
     config: &Config,
-    patterns: Vec<StackString>,
-    queue: Vec<MovieQueueResult>,
+    patterns: &[StackString],
+    queue: &[MovieQueueResult],
     pool: &PgPool,
 ) -> HttpResult<StackString> {
     let mock_stdout = MockStdout::new();
     let stdout = StdoutChannel::with_mock_stdout(mock_stdout.clone(), mock_stdout.clone());
 
-    let entries = movie_queue_http(&queue, pool, &config, &stdout).await?;
+    let entries = movie_queue_http(queue, pool, config, &stdout).await?;
     let body = movie_queue_body(&patterns, &entries);
     Ok(body)
 }
@@ -111,7 +111,7 @@ pub async fn movie_queue(
         patterns: Vec::new(),
     };
     let (queue, _) = req.handle(&state.db, &state.config).await?;
-    let body: String = queue_body_resp(&state.config, Vec::new(), queue, &state.db)
+    let body: String = queue_body_resp(&state.config, &[], &queue, &state.db)
         .await?
         .into();
     Ok(HtmlBase::new(body).into())
@@ -127,7 +127,7 @@ pub async fn movie_queue_show(
 
     let req = MovieQueueRequest { patterns };
     let (queue, patterns) = req.handle(&state.db, &state.config).await?;
-    let body: String = queue_body_resp(&state.config, patterns, queue, &state.db)
+    let body: String = queue_body_resp(&state.config, &patterns, &queue, &state.db)
         .await?
         .into();
     Ok(HtmlBase::new(body).into())
@@ -165,11 +165,11 @@ async fn transcode_worker(
     let mock_stdout = MockStdout::new();
     let stdout = StdoutChannel::with_mock_stdout(mock_stdout.clone(), mock_stdout.clone());
 
-    let remcom_service = TranscodeService::new(&config, &config.remcom_queue, pool, &stdout);
+    let remcom_service = TranscodeService::new(config, &config.remcom_queue, pool, &stdout);
     let mut output = Vec::new();
     for entry in entries {
         let payload = TranscodeServiceRequest::create_remcom_request(
-            &config,
+            config,
             &path::Path::new(entry.path.as_str()),
             directory,
             false,
@@ -179,7 +179,7 @@ async fn transcode_worker(
             .publish_transcode_job(&payload, |_| async move { Ok(()) })
             .await?;
         output.push(format!("{:?}", payload));
-        output.push(payload.publish_to_cli(&config).await?.into());
+        output.push(payload.publish_to_cli(config).await?.into());
     }
     Ok(output.join("").into())
 }
@@ -217,7 +217,7 @@ pub async fn movie_queue_transcode_directory(
     let (entries, _) = req.handle(&state.db, &state.config).await?;
     let body: String = transcode_worker(
         &state.config,
-        Some(&path::Path::new(directory.as_str())),
+        Some(path::Path::new(directory.as_str())),
         &entries,
         &state.db,
     )
@@ -273,7 +273,7 @@ pub async fn movie_queue_play(
     let req = MoviePathRequest { idx };
     let movie_path = req.handle(&state.db, &state.config).await?;
     let movie_path = path::Path::new(movie_path.as_str());
-    let body = play_worker(&state.config, &movie_path)?;
+    let body = play_worker(&state.config, movie_path)?;
     Ok(HtmlBase::new(body).into())
 }
 
@@ -517,6 +517,7 @@ pub async fn last_modified_route(
 #[response(description = "Frontpage", content = "html")]
 struct FrontpageResponse(HtmlBase<String, Error>);
 
+#[allow(clippy::unused_async)]
 #[get("/list/index.html")]
 pub async fn frontpage(#[cookie = "jwt"] _: LoggedUser) -> WarpResult<FrontpageResponse> {
     let body = HBR
@@ -546,7 +547,7 @@ impl Hash for ProcessShowItem {
     where
         H: Hasher,
     {
-        self.link.hash(state)
+        self.link.hash(state);
     }
 }
 
@@ -630,12 +631,11 @@ fn process_shows(
     tvshows: HashSet<ProcessShowItem>,
     watchlist: HashSet<ProcessShowItem>,
 ) -> Vec<StackString> {
-    let watchlist_shows: Vec<_> = watchlist
+    let watchlist_shows = watchlist
         .iter()
-        .filter(|item| tvshows.get(item.link.as_str()).is_none())
-        .collect();
+        .filter(|item| tvshows.get(item.link.as_str()).is_none());
 
-    let mut shows: Vec<_> = tvshows.iter().chain(watchlist_shows.into_iter()).collect();
+    let mut shows: Vec<_> = tvshows.iter().chain(watchlist_shows).collect();
     shows.sort_by(|x, y| x.show.cmp(&y.show));
 
     let button_add = r#"<td><button type="submit" id="ID" onclick="watchlist_add('SHOW');">add to watchlist</button></td>"#;
@@ -682,6 +682,7 @@ fn process_shows(
 #[response(description = "Logged in User")]
 struct UserResponse(JsonBase<LoggedUser, Error>);
 
+#[allow(clippy::unused_async)]
 #[get("/list/user")]
 pub async fn user(#[cookie = "jwt"] user: LoggedUser) -> WarpResult<UserResponse> {
     Ok(JsonBase::new(user).into())
@@ -957,8 +958,8 @@ async fn watchlist_action_worker(
 ) -> HttpResult<StackString> {
     trakt.init().await;
     let body = match action {
-        TraktActions::Add => trakt.add_watchlist_show(&imdb_url).await?.to_string(),
-        TraktActions::Remove => trakt.remove_watchlist_show(&imdb_url).await?.to_string(),
+        TraktActions::Add => trakt.add_watchlist_show(imdb_url).await?.to_string(),
+        TraktActions::Remove => trakt.remove_watchlist_show(imdb_url).await?.to_string(),
         _ => "".to_string(),
     };
     Ok(body.into())
@@ -1201,7 +1202,7 @@ async fn trakt_cal_http_worker(
 
     let mut lines = Vec::new();
     for cal in cal_list {
-        let show = match ImdbRatings::get_show_by_link(&cal.link, &pool).await? {
+        let show = match ImdbRatings::get_show_by_link(&cal.link, pool).await? {
             Some(s) => s.show,
             None => "".into(),
         };
@@ -1214,11 +1215,11 @@ async fn trakt_cal_http_worker(
                 episode: cal.episode,
                 ..ImdbEpisodes::default()
             }
-            .get_index(&pool)
+            .get_index(pool)
             .await?;
 
             match idx_opt {
-                Some(idx) => ImdbEpisodes::from_index(idx, &pool).await?,
+                Some(idx) => ImdbEpisodes::from_index(idx, pool).await?,
                 None => None,
             }
         };
@@ -1282,11 +1283,11 @@ pub async fn watch_list_http_worker(
     let mc = MovieCollection::new(config, pool, stdout);
     let mq = MovieQueueDB::new(config, pool, stdout);
 
-    let show = ImdbRatings::get_show_by_link(imdb_url, &pool)
+    let show = ImdbRatings::get_show_by_link(imdb_url, pool)
         .await?
         .ok_or_else(|| format_err!("Show Doesn't exist"))?;
 
-    let watched_episodes_db: HashSet<i32> = get_watched_shows_db(&pool, &show.show, Some(season))
+    let watched_episodes_db: HashSet<i32> = get_watched_shows_db(pool, &show.show, Some(season))
         .await?
         .into_iter()
         .map(|s| s.episode)
@@ -1553,7 +1554,7 @@ async fn process_payload(
     if let Some(item) = form.next().await {
         let mut stream = item?.stream();
         while let Some(chunk) = stream.next().await {
-            buf.extend_from_slice(&chunk?.chunk());
+            buf.extend_from_slice(chunk?.chunk());
         }
     }
     if let Ok(event) = PlexEvent::get_from_payload(&buf) {

@@ -83,6 +83,7 @@ impl ImdbConnection {
         }
     }
 
+    #[allow(clippy::needless_collect)]
     pub async fn parse_imdb(&self, title: &str) -> Result<Vec<ImdbTuple>, Error> {
         let endpoint = "http://www.imdb.com/find?";
         let url = Url::parse_with_params(endpoint, &[("s", "all"), ("q", title)])?;
@@ -210,7 +211,7 @@ impl ImdbConnection {
         episodes_url: &str,
         season: i32,
     ) -> Result<Vec<ImdbEpisodeResult>, Error> {
-        let episodes_url = Url::parse(&episodes_url)?;
+        let episodes_url = Url::parse(episodes_url)?;
         let body = self.get(&episodes_url).await?.text().await?;
 
         let mut results = Vec::new();
@@ -261,7 +262,7 @@ impl ImdbConnection {
 
         let futures = results.into_iter().map(|mut result| async {
             if let Some(link) = result.epurl.as_ref() {
-                let r = self.parse_imdb_rating(&link).await?;
+                let r = self.parse_imdb_rating(link).await?;
                 result.rating = r.rating;
                 result.nrating = r.count;
             }

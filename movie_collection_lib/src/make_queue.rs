@@ -75,12 +75,12 @@ pub async fn make_queue_worker(
                 PathOrIndex::Index(idx) => mq.remove_from_queue_by_idx(*idx).await?,
                 PathOrIndex::Path(path) => {
                     mq.remove_from_queue_by_path(&path.to_string_lossy())
-                        .await?
+                        .await?;
                 }
             };
         }
     } else if add_files.is_empty() {
-        let movie_queue = mq.print_movie_queue(&patterns).await?;
+        let movie_queue = mq.print_movie_queue(patterns).await?;
         if do_time {
             let futures = movie_queue.into_iter().map(|result| async move {
                 let path = Path::new(result.path.as_str());
@@ -140,7 +140,7 @@ pub async fn movie_queue_http(
     config: &Config,
     stdout: &StdoutChannel<StackString>,
 ) -> Result<Vec<StackString>, Error> {
-    let mc = Arc::new(MovieCollection::new(&config, pool, &stdout));
+    let mc = Arc::new(MovieCollection::new(config, pool, stdout));
 
     let button = r#"<td><button type="submit" id="ID" onclick="delete_show('SHOW');"> remove </button></td>"#;
 

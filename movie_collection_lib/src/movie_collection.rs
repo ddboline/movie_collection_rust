@@ -471,7 +471,7 @@ impl MovieCollection {
             .movie_dirs
             .par_iter()
             .filter(|d| d.exists())
-            .map(|d| walk_directory(&d, &self.config.suffixes))
+            .map(|d| walk_directory(d, &self.config.suffixes))
             .collect();
         let file_list = file_list?;
 
@@ -586,11 +586,11 @@ impl MovieCollection {
                     self.stdout
                         .send(format!("in queue but not disk {} {}", key, v));
                     let mq = MovieQueueDB::new(&self.config, &self.pool, &self.stdout);
-                    mq.remove_from_queue_by_path(&key).await?;
+                    mq.remove_from_queue_by_path(key).await?;
                 } else {
                     self.stdout.send(format!("not on disk {} {}", key, val));
                 }
-                self.remove_from_collection(&key).await?;
+                self.remove_from_collection(key).await?;
             }
         }
 
@@ -823,14 +823,14 @@ pub async fn find_new_episodes_http_worker(
         ),
     );
 
-    let mc = MovieCollection::new(config, &pool, stdout);
+    let mc = MovieCollection::new(config, pool, stdout);
     let shows_filter: Option<HashSet<StackString>> =
         shows.map(|s| s.as_ref().split(',').map(Into::into).collect());
 
     let mindate = (Local::today() + Duration::days(-14)).naive_local();
     let maxdate = (Local::today() + Duration::days(7)).naive_local();
 
-    let mq = MovieQueueDB::new(config, &pool, &stdout);
+    let mq = MovieQueueDB::new(config, pool, stdout);
 
     let episodes = mc.get_new_episodes(mindate, maxdate, source).await?;
 
@@ -931,7 +931,7 @@ impl LastModifiedResponse {
                 let last_modified: DateTime<Utc> = last_modified;
                 Ok(Some(LastModifiedResponse {
                     table: (*table).into(),
-                    last_modified: last_modified.into(),
+                    last_modified,
                 }))
             } else {
                 Ok(None)

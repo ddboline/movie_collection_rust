@@ -222,7 +222,7 @@ impl TranscodeServiceRequest {
 
     pub async fn publish_to_cli(&self, config: &Config) -> Result<StackString, Error> {
         let cmd_path = self.get_cmd_path();
-        let json_path = self.get_json_path(&config);
+        let json_path = self.get_json_path(config);
         if cmd_path.exists() {
             let output = Command::new(&cmd_path)
                 .args(&["-f", json_path.to_string_lossy().as_ref()])
@@ -277,7 +277,7 @@ impl TranscodeService {
     }
 
     pub async fn process_data(&self, data: &[u8]) -> Result<(), Error> {
-        let payload: TranscodeServiceRequest = serde_json::from_slice(&data)?;
+        let payload: TranscodeServiceRequest = serde_json::from_slice(data)?;
         match payload.job_type {
             JobType::Transcode => {
                 self.run_transcode(&payload.prefix, &payload.input_path, &payload.output_path)
@@ -677,7 +677,7 @@ impl TranscodeStatus {
                         .join("</td></tr><tr><td>"),
                 )
                 .into(),
-            )
+            );
         }
 
         if !self.procs.is_empty() {

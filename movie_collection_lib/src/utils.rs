@@ -113,7 +113,7 @@ pub async fn get_video_runtime(f: &Path) -> Result<StackString, Error> {
         .split(|c| *c == b'\n')
         .chain(output.stderr.split(|c| *c == b'\n'))
     {
-        let line = std::str::from_utf8(&l)?;
+        let line = std::str::from_utf8(l)?;
         let items: SmallVec<[&str; 6]> = line.split_whitespace().take(6).collect();
         if items.len() > 5 && items[1] == "V:" {
             let fps: f64 = items[2].parse()?;

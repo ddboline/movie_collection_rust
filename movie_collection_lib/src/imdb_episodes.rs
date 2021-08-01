@@ -49,7 +49,7 @@ impl ImdbEpisodes {
             title: "".into(),
             season: -1,
             episode: -1,
-            airdate: NaiveDate::from_ymd(1970, 1, 1).into(),
+            airdate: NaiveDate::from_ymd(1970, 1, 1),
             rating: -1.0,
             eptitle: "".into(),
             epurl: "".into(),
