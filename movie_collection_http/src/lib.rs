@@ -11,6 +11,7 @@
 #![allow(clippy::used_underscore_binding)]
 #![allow(clippy::manual_map)]
 #![allow(clippy::default_trait_access)]
+#![allow(clippy::unused_async)]
 
 pub mod datetime_wrapper;
 pub mod errors;

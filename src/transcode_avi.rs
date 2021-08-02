@@ -62,7 +62,7 @@ async fn transcode_single(
 ) -> Result<(), Error> {
     let data = fs::read(request_file).await?;
     let payload = serde_json::from_slice(&data)?;
-    publish_single(&transcode_service, &payload).await?;
+    publish_single(transcode_service, &payload).await?;
     Ok(())
 }
 

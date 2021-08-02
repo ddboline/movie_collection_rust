@@ -94,7 +94,7 @@ async fn queue_body_resp(
     let stdout = StdoutChannel::with_mock_stdout(mock_stdout.clone(), mock_stdout.clone());
 
     let entries = movie_queue_http(queue, pool, config, &stdout).await?;
-    let body = movie_queue_body(&patterns, &entries);
+    let body = movie_queue_body(patterns, &entries);
     Ok(body)
 }
 
@@ -517,7 +517,6 @@ pub async fn last_modified_route(
 #[response(description = "Frontpage", content = "html")]
 struct FrontpageResponse(HtmlBase<String, Error>);
 
-#[allow(clippy::unused_async)]
 #[get("/list/index.html")]
 pub async fn frontpage(#[cookie = "jwt"] _: LoggedUser) -> WarpResult<FrontpageResponse> {
     let body = HBR
@@ -682,7 +681,6 @@ fn process_shows(
 #[response(description = "Logged in User")]
 struct UserResponse(JsonBase<LoggedUser, Error>);
 
-#[allow(clippy::unused_async)]
 #[get("/list/user")]
 pub async fn user(#[cookie = "jwt"] user: LoggedUser) -> WarpResult<UserResponse> {
     Ok(JsonBase::new(user).into())
