@@ -11,6 +11,7 @@
 #![allow(clippy::used_underscore_binding)]
 #![allow(clippy::manual_map)]
 #![allow(clippy::default_trait_access)]
+#![allow(clippy::unused_async)]
 
 pub mod datetime_wrapper;
 pub mod errors;
@@ -206,20 +207,19 @@ impl From<LastModifiedResponse> for LastModifiedResponseWrapper {
     }
 }
 
-#[derive(Default, Debug, Serialize, Deserialize, Schema)]
+#[derive(Debug, Serialize, Deserialize, Schema)]
 pub struct PlexEventWrapper {
     pub event: StackString,
     pub account: StackString,
     pub server: StackString,
     pub player_title: StackString,
     pub player_address: StackString,
-    pub title: Option<StackString>,
+    pub title: StackString,
     pub parent_title: Option<StackString>,
     pub grandparent_title: Option<StackString>,
-    pub added_at: Option<DateTimeWrapper>,
+    pub added_at: DateTimeWrapper,
     pub updated_at: Option<DateTimeWrapper>,
-    pub created_at: Option<DateTimeWrapper>,
-    pub last_modified: Option<DateTimeWrapper>,
+    pub last_modified: DateTimeWrapper,
     pub metadata_type: Option<StackString>,
     pub section_type: Option<StackString>,
     pub section_title: Option<StackString>,
@@ -237,10 +237,9 @@ impl From<PlexEvent> for PlexEventWrapper {
             title: item.title,
             parent_title: item.parent_title,
             grandparent_title: item.grandparent_title,
-            added_at: item.added_at.map(Into::into),
+            added_at: item.added_at.into(),
             updated_at: item.updated_at.map(Into::into),
-            created_at: item.created_at.map(Into::into),
-            last_modified: item.last_modified.map(Into::into),
+            last_modified: item.last_modified.into(),
             metadata_type: item.metadata_type,
             section_type: item.section_type,
             section_title: item.section_title,
@@ -260,10 +259,9 @@ impl From<PlexEventWrapper> for PlexEvent {
             title: item.title,
             parent_title: item.parent_title,
             grandparent_title: item.grandparent_title,
-            added_at: item.added_at.map(Into::into),
+            added_at: item.added_at.into(),
             updated_at: item.updated_at.map(Into::into),
-            created_at: item.created_at.map(Into::into),
-            last_modified: item.last_modified.map(Into::into),
+            last_modified: item.last_modified.into(),
             metadata_type: item.metadata_type,
             section_type: item.section_type,
             section_title: item.section_title,

@@ -158,7 +158,7 @@ impl ImdbEpisodesRequest {
         let mock_stdout = MockStdout::new();
         let stdout = StdoutChannel::with_mock_stdout(mock_stdout.clone(), mock_stdout.clone());
 
-        MovieCollection::new(&config, pool, &stdout)
+        MovieCollection::new(config, pool, &stdout)
             .print_imdb_episodes(&self.show, self.season)
             .await
             .map_err(Into::into)

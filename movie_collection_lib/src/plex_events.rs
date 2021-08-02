@@ -14,20 +14,19 @@ use std::{
 
 use crate::{config::Config, pgpool::PgPool};
 
-#[derive(FromSqlRow, Default, Debug, Serialize, Deserialize)]
+#[derive(FromSqlRow, Debug, Serialize, Deserialize)]
 pub struct PlexEvent {
     pub event: StackString,
     pub account: StackString,
     pub server: StackString,
     pub player_title: StackString,
     pub player_address: StackString,
-    pub title: Option<StackString>,
+    pub title: StackString,
     pub parent_title: Option<StackString>,
     pub grandparent_title: Option<StackString>,
-    pub added_at: Option<DateTime<Utc>>,
+    pub added_at: DateTime<Utc>,
     pub updated_at: Option<DateTime<Utc>>,
-    pub created_at: Option<DateTime<Utc>>,
-    pub last_modified: Option<DateTime<Utc>>,
+    pub last_modified: DateTime<Utc>,
     pub metadata_type: Option<StackString>,
     pub section_type: Option<StackString>,
     pub section_title: Option<StackString>,
@@ -51,10 +50,9 @@ impl TryFrom<WebhookPayload> for PlexEvent {
             title: item.metadata.title,
             parent_title: item.metadata.parent_title,
             grandparent_title: item.metadata.grandparent_title,
-            added_at: item.metadata.added_at.map(dt_from_tm),
+            added_at: dt_from_tm(item.metadata.added_at),
             updated_at: item.metadata.updated_at.map(dt_from_tm),
-            created_at: Some(Utc::now()),
-            last_modified: Some(Utc::now()),
+            last_modified: Utc::now(),
             metadata_type: item.metadata.metadata_type,
             section_type: item.metadata.library_section_type,
             section_title: item.metadata.library_section_title,
@@ -131,12 +129,12 @@ impl PlexEvent {
             "
             INSERT INTO plex_event (
                 event, account, server, player_title, player_address, title, parent_title,
-                grandparent_title, added_at, updated_at, created_at, last_modified, metadata_type,
+                grandparent_title, added_at, updated_at, last_modified, metadata_type,
                 section_type, section_title, metadata_key
             )
             VALUES (
                 $event, $account, $server, $player_title, $player_address, $title, $parent_title,
-                $grandparent_title, $added_at, $updated_at, $created_at, $last_modified,
+                $grandparent_title, $added_at, $updated_at, $last_modified,
                 $metadata_type, $section_type, $section_title, $metadata_key
             )
             ",
@@ -150,7 +148,6 @@ impl PlexEvent {
             grandparent_title = self.grandparent_title,
             added_at = self.added_at,
             updated_at = self.updated_at,
-            created_at = self.created_at,
             last_modified = self.last_modified,
             metadata_type = self.metadata_type,
             section_type = self.section_type,
@@ -319,7 +316,7 @@ pub struct Player {
 pub struct Metadata {
     #[serde(alias = "type")]
     pub metadata_type: Option<StackString>,
-    pub title: Option<StackString>,
+    pub title: StackString,
     #[serde(alias = "parentTitle")]
     pub parent_title: Option<StackString>,
     #[serde(alias = "grandparentTitle")]
@@ -334,7 +331,7 @@ pub struct Metadata {
     #[serde(alias = "grandparentKey")]
     pub grandparent_key: Option<StackString>,
     #[serde(alias = "addedAt")]
-    pub added_at: Option<u64>,
+    pub added_at: u64,
     #[serde(alias = "updatedAt")]
     pub updated_at: Option<u64>,
     #[serde(alias = "librarySectionType")]

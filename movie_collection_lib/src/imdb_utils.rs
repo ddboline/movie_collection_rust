@@ -162,6 +162,7 @@ impl ImdbConnection {
         Ok(RatingOutput::default())
     }
 
+    #[allow(clippy::needless_collect)]
     pub async fn parse_imdb_episode_list(
         &self,
         imdb_id: &str,
