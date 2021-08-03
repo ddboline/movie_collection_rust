@@ -172,11 +172,11 @@ impl PlexEvent {
             event: StackString,
             metadata_type: Option<StackString>,
             section_title: Option<StackString>,
-            title: Option<StackString>,
+            title: StackString,
             parent_title: Option<StackString>,
             grandparent_title: Option<StackString>,
             filename: Option<StackString>,
-            created_at: Option<DateTime<Utc>>,
+            last_modified: DateTime<Utc>,
         }
 
         let mut constraints = Vec::new();
@@ -193,7 +193,7 @@ impl PlexEvent {
         let query = format!(
             "
                 SELECT a.event, a.metadata_type, a.section_title, a.title, a.parent_title,
-                       a.grandparent_title, b.filename, a.created_at
+                       a.grandparent_title, b.filename, a.last_modified
                 FROM plex_event a
                 LEFT JOIN plex_filename b ON a.metadata_key = b.metadata_key
                 {where}
@@ -223,28 +223,26 @@ impl PlexEvent {
         let body = output
             .into_iter()
             .map(|event| {
-                let created_at = event
-                    .created_at
-                    .map_or(String::new(), |created_at| match config.default_time_zone {
-                        Some(tz) => {
-                            let tz: Tz = tz.into();
-                            created_at.with_timezone(&tz).to_string()
-                        }
-                        None => created_at.with_timezone(&Local).to_string(),
-                    });
+                let last_modified = match config.default_time_zone {
+                    Some(tz) => {
+                        let tz: Tz = tz.into();
+                        event.last_modified.with_timezone(&tz).to_string()
+                    }
+                    None => event.last_modified.with_timezone(&Local).to_string(),
+                };
                 format!(
                     r#"
                     <tr style="text-align; center;">
                     <td>{}</td><td>{}</td><td>{}</td><td>{}</td><td>{}</td>
                     </tr>
                 "#,
-                    created_at,
+                    last_modified,
                     event.event,
                     event.metadata_type.as_ref().map_or("", |s| s.as_str()),
                     event.section_title.as_ref().map_or("", |s| s.as_str()),
                     format!(
                         "{} {} {} {}",
-                        event.title.as_ref().map_or("", |s| s.as_str()),
+                        event.title,
                         event.parent_title.as_ref().map_or("", |s| s.as_str()),
                         event.grandparent_title.as_ref().map_or("", |s| s.as_str()),
                         event.filename.as_ref().map_or("", |s| s.as_str()),
