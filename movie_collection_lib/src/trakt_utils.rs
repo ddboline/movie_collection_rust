@@ -115,6 +115,7 @@ impl fmt::Display for TraktResult {
 #[derive(Serialize, Deserialize, Debug, Default, FromSqlRow, Eq)]
 pub struct WatchListShow {
     pub link: StackString,
+    pub show: Option<StackString>,
     pub title: StackString,
     pub year: i32,
 }
@@ -150,18 +151,25 @@ impl WatchListShow {
     pub async fn get_show_by_link(link: &str, pool: &PgPool) -> Result<Option<Self>, Error> {
         #[derive(FromSqlRow)]
         struct TitleYear {
+            show: Option<StackString>,
             title: StackString,
             year: i32,
         }
         let query = query!(
-            "SELECT title, year FROM trakt_watchlist WHERE link = $link",
+            "
+                SELECT a.show, a.title, a.year
+                FROM trakt_watchlist a
+                JOIN imdb_ratings b ON a.show = b.show
+                WHERE (a.link = $link OR b.link = $link)
+            ",
             link = link
         );
         let conn = pool.get().await?;
         Ok(query.fetch_opt(&conn).await?.map(|row| {
-            let TitleYear { title, year } = row;
+            let TitleYear { show, title, year } = row;
             Self {
                 link: link.into(),
+                show,
                 title,
                 year,
             }
@@ -170,7 +178,12 @@ impl WatchListShow {
 
     pub async fn get_index(&self, pool: &PgPool) -> Result<Option<i32>, Error> {
         let query = query!(
-            "SELECT id FROM trakt_watchlist WHERE link = $link",
+            "
+                SELECT a.id
+                FROM trakt_watchlist a
+                JOIN imdb_ratings b ON a.show = b.show
+                WHERE (a.link = $link OR b.link = $link)
+            ",
             link = self.link
         );
         let conn = pool.get().await?;
@@ -180,8 +193,12 @@ impl WatchListShow {
 
     pub async fn insert_show(&self, pool: &PgPool) -> Result<(), Error> {
         let query = query!(
-            "INSERT INTO trakt_watchlist (link, title, year) VALUES ($link, $title, $year)",
+            "
+                INSERT INTO trakt_watchlist (link, show, title, year)
+                VALUES ($link, $show, $title, $year)
+            ",
             link = self.link,
+            show = self.show,
             title = self.title,
             year = self.year
         );
@@ -191,7 +208,10 @@ impl WatchListShow {
 
     pub async fn delete_show(&self, pool: &PgPool) -> Result<(), Error> {
         let query = query!(
-            "DELETE FROM trakt_watchlist WHERE link=$link",
+            "
+                DELETE FROM trakt_watchlist
+                WHERE (link=$link OR show=(SELECT a.show FROM imdb_ratings a WHERE a.link = $link))
+            ",
             link = self.link
         );
         let conn = pool.get().await?;
@@ -202,7 +222,7 @@ impl WatchListShow {
 pub async fn get_watchlist_shows_db(pool: &PgPool) -> Result<HashSet<WatchListShow>, Error> {
     let query = query!(
         r#"
-        SELECT a.link, a.title, a.year
+        SELECT a.link, a.show, a.title, a.year
         FROM trakt_watchlist a
     "#
     );
@@ -223,9 +243,9 @@ pub async fn get_watchlist_shows_db_map(pool: &PgPool) -> Result<WatchListMap, E
         source: Option<StackString>,
     }
     let query = r#"
-        SELECT b.show, a.link, a.title, a.year, b.source
+        SELECT b.show, b.link, a.title, a.year, b.source
         FROM trakt_watchlist a
-        JOIN imdb_ratings b ON a.link=b.link
+        JOIN imdb_ratings b ON a.show=b.show
     "#;
     pool.get()
         .await?
@@ -246,6 +266,7 @@ pub async fn get_watchlist_shows_db_map(pool: &PgPool) -> Result<WatchListMap, E
                     row.show.clone(),
                     WatchListShow {
                         link: row.link,
+                        show: Some(row.show),
                         title: row.title,
                         year: row.year,
                     },
@@ -259,6 +280,7 @@ pub async fn get_watchlist_shows_db_map(pool: &PgPool) -> Result<WatchListMap, E
 #[derive(Serialize, Deserialize, Debug, Default, PartialEq, Eq, Hash, FromSqlRow)]
 pub struct WatchedEpisode {
     pub title: StackString,
+    pub show: Option<StackString>,
     pub imdb_url: StackString,
     pub episode: i32,
     pub season: i32,
@@ -300,12 +322,13 @@ impl WatchedEpisode {
         let query = query!(
             r#"
                 SELECT a.link as imdb_url,
-                       b.title,
+                       c.title,
                        a.season,
                        a.episode
                 FROM trakt_watched_episodes a
-                JOIN imdb_ratings b ON a.link = b.link
-                WHERE a.link = $link AND a.season = $season AND a.episode = $episode
+                JOIN trakt_watchlist b ON a.link = b.link
+                JOIN imdb_ratings c ON b.show = c.show
+                WHERE c.link = $link AND a.season = $season AND a.episode = $episode
             "#,
             link = link,
             season = season,
@@ -351,10 +374,10 @@ pub async fn get_watched_shows_db(
 ) -> Result<Vec<WatchedEpisode>, Error> {
     let mut where_vec = Vec::new();
     if !show.is_empty() {
-        where_vec.push(format!("show='{}'", show));
+        where_vec.push(format!("c.show='{}'", show));
     }
     if let Some(season) = season {
-        where_vec.push(format!("season={}", season));
+        where_vec.push(format!("a.season={}", season));
     }
 
     let where_str = if where_vec.is_empty() {
@@ -366,13 +389,15 @@ pub async fn get_watched_shows_db(
     let query = query_dyn!(&format!(
         r#"
             SELECT a.link as imdb_url,
-                   b.title,
+                   c.show,
+                   c.title,
                    a.season,
                    a.episode
             FROM trakt_watched_episodes a
-            JOIN imdb_ratings b ON a.link = b.link
+            JOIN trakt_watchlist b ON a.link = b.link
+            JOIN imdb_ratings c ON b.show = c.show
             {}
-            ORDER BY 2,3,4
+            ORDER BY 3,4,5
         "#,
         where_str
     ))?;
@@ -569,20 +594,16 @@ pub async fn sync_trakt_with_db(
 
 async fn get_imdb_url_from_show(
     mc: &MovieCollection,
-    show: Option<&str>,
+    show: &str,
 ) -> Result<Option<StackString>, Error> {
-    let result = if let Some(show) = show {
-        let imdb_shows = mc.print_imdb_shows(show, false).await?;
-        if imdb_shows.len() > 1 {
-            for show in imdb_shows {
-                debug!("{}", show);
-            }
-            None
-        } else {
-            Some(imdb_shows[0].link.clone())
+    let imdb_shows = mc.print_imdb_shows(show, false).await?;
+    let result = if imdb_shows.len() > 1 {
+        for show in imdb_shows {
+            debug!("{}", show);
         }
-    } else {
         None
+    } else {
+        Some(imdb_shows[0].link.clone())
     };
     Ok(result)
 }
@@ -618,20 +639,31 @@ async fn trakt_cal_list(trakt: &TraktConnection, mc: &MovieCollection) -> Result
 async fn watchlist_add(
     trakt: &TraktConnection,
     mc: &MovieCollection,
-    show: Option<&str>,
+    show: &str,
+    imdb_link: Option<&str>,
 ) -> Result<(), Error> {
     trakt.init().await;
-    if let Some(imdb_url) = get_imdb_url_from_show(mc, show).await? {
-        let imdb_url_ = imdb_url.clone();
-        mc.stdout.send(format!(
-            "result: {}",
-            trakt.add_watchlist_show(&imdb_url_).await?
-        ));
-        debug!("GOT HERE");
-        if let Some(show) = trakt.get_watchlist_shows().await?.get(imdb_url.as_str()) {
-            debug!("INSERT SHOW {}", show);
-            show.insert_show(&mc.pool).await?;
-        }
+    let imdb_url = if let Some(link) = imdb_link {
+        link.into()
+    } else if let Some(link) = get_imdb_url_from_show(mc, show).await? {
+        link
+    } else {
+        return Ok(());
+    };
+
+    mc.stdout.send(format!(
+        "result: {}",
+        trakt.add_watchlist_show(&imdb_url).await?
+    ));
+    debug!("GOT HERE");
+    if let Some(show_obj) = trakt
+        .get_watchlist_shows()
+        .await?
+        .get_mut(imdb_url.as_str())
+    {
+        show_obj.show = Some(show.into());
+        debug!("INSERT SHOW {}", show_obj);
+        show_obj.insert_show(&mc.pool).await?;
     }
     Ok(())
 }
@@ -639,7 +671,7 @@ async fn watchlist_add(
 async fn watchlist_rm(
     trakt: &TraktConnection,
     mc: &MovieCollection,
-    show: Option<&str>,
+    show: &str,
 ) -> Result<(), Error> {
     if let Some(imdb_url) = get_imdb_url_from_show(mc, show).await? {
         let imdb_url_ = imdb_url.clone();
@@ -665,7 +697,7 @@ async fn watchlist_list(mc: &MovieCollection) -> Result<(), Error> {
 async fn watched_add(
     trakt: &TraktConnection,
     mc: &MovieCollection,
-    show: Option<&str>,
+    show: &str,
     season: i32,
     episode: &[i32],
 ) -> Result<(), Error> {
@@ -704,7 +736,7 @@ async fn watched_add(
 async fn watched_rm(
     trakt: &TraktConnection,
     mc: &MovieCollection,
-    show: Option<&str>,
+    show: &str,
     season: i32,
     episode: &[i32],
 ) -> Result<(), Error> {
@@ -734,7 +766,7 @@ async fn watched_rm(
     Ok(())
 }
 
-async fn watched_list(mc: &MovieCollection, show: Option<&str>, season: i32) -> Result<(), Error> {
+async fn watched_list(mc: &MovieCollection, show: &str, season: i32) -> Result<(), Error> {
     let watched_shows = get_watched_shows_db(&mc.pool, "", None).await?;
     let watched_movies = get_watched_movies_db(&mc.pool).await?;
 
@@ -780,6 +812,7 @@ pub async fn trakt_app_parse(
     trakt_command: &TraktCommands,
     trakt_action: TraktActions,
     show: Option<&str>,
+    imdb_link: Option<&str>,
     season: i32,
     episode: &[i32],
     stdout: &StdoutChannel<StackString>,
@@ -789,15 +822,35 @@ pub async fn trakt_app_parse(
     match trakt_command {
         TraktCommands::Calendar => trakt_cal_list(trakt, &mc).await?,
         TraktCommands::WatchList => match trakt_action {
-            TraktActions::Add => watchlist_add(trakt, &mc, show).await?,
-            TraktActions::Remove => watchlist_rm(trakt, &mc, show).await?,
+            TraktActions::Add => {
+                if let Some(show) = show {
+                    watchlist_add(trakt, &mc, show, imdb_link).await?;
+                }
+            }
+            TraktActions::Remove => {
+                if let Some(show) = show {
+                    watchlist_rm(trakt, &mc, show).await?;
+                }
+            }
             TraktActions::List => watchlist_list(&mc).await?,
             TraktActions::None => {}
         },
         TraktCommands::Watched => match trakt_action {
-            TraktActions::Add => watched_add(trakt, &mc, show, season, episode).await?,
-            TraktActions::Remove => watched_rm(trakt, &mc, show, season, episode).await?,
-            TraktActions::List => watched_list(&mc, show, season).await?,
+            TraktActions::Add => {
+                if let Some(show) = show {
+                    watched_add(trakt, &mc, show, season, episode).await?;
+                }
+            }
+            TraktActions::Remove => {
+                if let Some(show) = show {
+                    watched_rm(trakt, &mc, show, season, episode).await?;
+                }
+            }
+            TraktActions::List => {
+                if let Some(show) = show {
+                    watched_list(&mc, show, season).await?;
+                }
+            }
             TraktActions::None => {}
         },
         TraktCommands::None => {}

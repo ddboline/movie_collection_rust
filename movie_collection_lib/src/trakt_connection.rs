@@ -241,6 +241,7 @@ impl TraktConnection {
                         link: imdb,
                         title: r.show.title,
                         year: r.show.year,
+                        ..WatchListShow::default()
                     },
                 )
             })
@@ -407,6 +408,7 @@ impl TraktConnection {
                                 imdb_url: imdb_url.clone(),
                                 episode,
                                 season,
+                                ..WatchedEpisode::default()
                             };
                             ((imdb_url.clone(), season, episode), epi)
                         })

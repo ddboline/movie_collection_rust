@@ -20,6 +20,10 @@ struct TraktAppOpts {
     /// Parse collection for new videos
     parse: bool,
 
+    #[structopt(long, short)]
+    /// Optional imdb link
+    imdb_link: Option<StackString>,
+
     /// cal, watchlist, watched
     #[structopt(parse(from_str))]
     trakt_command: Option<TraktCommands>,
@@ -48,6 +52,7 @@ async fn trakt_app() -> Result<(), Error> {
     let trakt_command = opts.trakt_command.unwrap_or(TraktCommands::None);
     let trakt_action = opts.trakt_action.unwrap_or(TraktActions::None);
     let show = opts.show.as_ref().map(StackString::as_str);
+    let imdb_link = opts.imdb_link.as_ref().map(StackString::as_str);
     let season = opts.season.unwrap_or(-1);
 
     let mc = MovieCollection::new(&config, &pool, &stdout);
@@ -62,6 +67,7 @@ async fn trakt_app() -> Result<(), Error> {
             &trakt_command,
             trakt_action,
             show,
+            imdb_link,
             season,
             &opts.episode,
             &stdout,
