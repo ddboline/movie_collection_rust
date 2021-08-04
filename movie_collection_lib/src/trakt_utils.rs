@@ -656,7 +656,11 @@ async fn watchlist_add(
         trakt.add_watchlist_show(&imdb_url).await?
     ));
     debug!("GOT HERE");
-    if let Some(show_obj) = trakt.get_watchlist_shows().await?.get_mut(imdb_url.as_str()) {
+    if let Some(show_obj) = trakt
+        .get_watchlist_shows()
+        .await?
+        .get_mut(imdb_url.as_str())
+    {
         show_obj.show = Some(show.into());
         debug!("INSERT SHOW {}", show_obj);
         show_obj.insert_show(&mc.pool).await?;
@@ -818,15 +822,35 @@ pub async fn trakt_app_parse(
     match trakt_command {
         TraktCommands::Calendar => trakt_cal_list(trakt, &mc).await?,
         TraktCommands::WatchList => match trakt_action {
-            TraktActions::Add => if let Some(show) = show {watchlist_add(trakt, &mc, show, imdb_link).await?;},
-            TraktActions::Remove => if let Some(show) = show {watchlist_rm(trakt, &mc, show).await?;},
+            TraktActions::Add => {
+                if let Some(show) = show {
+                    watchlist_add(trakt, &mc, show, imdb_link).await?;
+                }
+            }
+            TraktActions::Remove => {
+                if let Some(show) = show {
+                    watchlist_rm(trakt, &mc, show).await?;
+                }
+            }
             TraktActions::List => watchlist_list(&mc).await?,
             TraktActions::None => {}
         },
         TraktCommands::Watched => match trakt_action {
-            TraktActions::Add => if let Some(show) = show {watched_add(trakt, &mc, show, season, episode).await?;},
-            TraktActions::Remove => if let Some(show) = show {watched_rm(trakt, &mc, show, season, episode).await?;},
-            TraktActions::List => if let Some(show) = show {watched_list(&mc, show, season).await?;},
+            TraktActions::Add => {
+                if let Some(show) = show {
+                    watched_add(trakt, &mc, show, season, episode).await?;
+                }
+            }
+            TraktActions::Remove => {
+                if let Some(show) = show {
+                    watched_rm(trakt, &mc, show, season, episode).await?;
+                }
+            }
+            TraktActions::List => {
+                if let Some(show) = show {
+                    watched_list(&mc, show, season).await?;
+                }
+            }
             TraktActions::None => {}
         },
         TraktCommands::None => {}
