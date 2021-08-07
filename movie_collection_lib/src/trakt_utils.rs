@@ -343,6 +343,7 @@ impl WatchedEpisode {
             r#"
                 INSERT INTO trakt_watched_episodes (link, season, episode)
                 VALUES ($link, $season, $episode)
+                ON CONFLICT DO NOTHING
             "#,
             link = self.imdb_url,
             season = self.season,
