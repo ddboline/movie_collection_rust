@@ -548,7 +548,7 @@ pub async fn sync_trakt_with_db(
             if !watched_shows_db.contains_key(&key) {
                 if episode.insert_episode(&mc.pool).await? > 0 {
                     mc.stdout
-                    .send(format!("insert watched episode {}", episode));
+                        .send(format!("insert watched episode {}", episode));
                 }
             }
             Ok(())
