@@ -338,7 +338,7 @@ impl WatchedEpisode {
         query.fetch_opt(&conn).await.map_err(Into::into)
     }
 
-    pub async fn insert_episode(&self, pool: &PgPool) -> Result<(), Error> {
+    pub async fn insert_episode(&self, pool: &PgPool) -> Result<u64, Error> {
         let query = query!(
             r#"
                 INSERT INTO trakt_watched_episodes (link, season, episode)
@@ -350,7 +350,7 @@ impl WatchedEpisode {
             episode = self.episode
         );
         let conn = pool.get().await?;
-        query.execute(&conn).await.map(|_| ()).map_err(Into::into)
+        query.execute(&conn).await.map_err(Into::into)
     }
 
     pub async fn delete_episode(&self, pool: &PgPool) -> Result<(), Error> {
@@ -546,9 +546,10 @@ pub async fn sync_trakt_with_db(
         let watched_shows_db = watched_shows_db.clone();
         async move {
             if !watched_shows_db.contains_key(&key) {
-                episode.insert_episode(&mc.pool).await?;
-                mc.stdout
+                if episode.insert_episode(&mc.pool).await? > 0 {
+                    mc.stdout
                     .send(format!("insert watched episode {}", episode));
+                }
             }
             Ok(())
         }
