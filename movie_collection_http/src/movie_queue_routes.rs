@@ -2,6 +2,7 @@
 
 use anyhow::format_err;
 use bytes::Buf;
+use chrono::{DateTime, Utc};
 use itertools::Itertools;
 use log::error;
 use maplit::hashmap;
@@ -23,6 +24,7 @@ use std::{
 use stdout_channel::{MockStdout, StdoutChannel};
 use tokio::{fs::remove_file, time::timeout};
 use tokio_stream::StreamExt;
+use uuid::Uuid;
 
 use movie_collection_lib::{
     config::Config,
@@ -45,7 +47,6 @@ use movie_collection_lib::{
 };
 
 use crate::{
-    datetime_wrapper::DateTimeWrapper,
     errors::ServiceError as Error,
     logged_user::LoggedUser,
     movie_queue_app::AppState,
@@ -56,7 +57,6 @@ use crate::{
         MovieCollectionUpdateRequest, MoviePathRequest, MovieQueueRequest, MovieQueueSyncRequest,
         MovieQueueUpdateRequest, ParseImdbRequest, WatchlistActionRequest,
     },
-    uuid_wrapper::UuidWrapper,
     ImdbEpisodesWrapper, ImdbRatingsWrapper, LastModifiedResponseWrapper,
     MovieCollectionRowWrapper, MovieQueueRowWrapper, PlexEventTypeWrapper, PlexEventWrapper,
     PlexFilenameWrapper, TraktActionsWrapper,
@@ -1464,7 +1464,7 @@ struct PlexEventResponse(JsonBase<Vec<PlexEventWrapper>, Error>);
 
 #[derive(Serialize, Deserialize, Debug, Schema)]
 pub struct PlexEventRequest {
-    pub start_timestamp: Option<DateTimeWrapper>,
+    pub start_timestamp: Option<DateTime<Utc>>,
     pub event_type: Option<PlexEventTypeWrapper>,
     pub offset: Option<u64>,
     pub limit: Option<u64>,
@@ -1531,7 +1531,7 @@ struct PlexWebhookResponse(HtmlBase<&'static str, Error>);
 pub async fn plex_webhook(
     #[filter = "rweb::multipart::form"] form: FormData,
     #[data] state: AppState,
-    webhook_key: UuidWrapper,
+    webhook_key: Uuid,
 ) -> WarpResult<PlexWebhookResponse> {
     if state.config.plex_webhook_key == webhook_key.into() {
         process_payload(form, &state.db, &state.config)
@@ -1621,7 +1621,7 @@ struct PlexFilenameResponse(JsonBase<Vec<PlexFilenameWrapper>, Error>);
 
 #[derive(Serialize, Deserialize, Debug, Schema)]
 pub struct PlexFilenameRequest {
-    pub start_timestamp: Option<DateTimeWrapper>,
+    pub start_timestamp: Option<DateTime<Utc>>,
     pub offset: Option<u64>,
     pub limit: Option<u64>,
 }

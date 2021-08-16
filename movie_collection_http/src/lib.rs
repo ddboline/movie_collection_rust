@@ -13,15 +13,13 @@
 #![allow(clippy::default_trait_access)]
 #![allow(clippy::unused_async)]
 
-pub mod datetime_wrapper;
 pub mod errors;
 pub mod logged_user;
 pub mod movie_queue_app;
 pub mod movie_queue_requests;
 pub mod movie_queue_routes;
-pub mod naivedate_wrapper;
-pub mod uuid_wrapper;
 
+use chrono::{DateTime, NaiveDate, Utc};
 use rweb::Schema;
 use serde::{Deserialize, Serialize};
 use stack_string::StackString;
@@ -37,15 +35,13 @@ use movie_collection_lib::{
     tv_show_source::TvShowSource,
 };
 
-use crate::{datetime_wrapper::DateTimeWrapper, naivedate_wrapper::NaiveDateWrapper};
-
 #[derive(Clone, Serialize, Deserialize, Schema)]
 pub struct ImdbEpisodesWrapper {
     pub show: StackString,
     pub title: StackString,
     pub season: i32,
     pub episode: i32,
-    pub airdate: NaiveDateWrapper,
+    pub airdate: NaiveDate,
     pub rating: f64,
     pub eptitle: StackString,
     pub epurl: StackString,
@@ -160,7 +156,7 @@ pub struct MovieQueueRowWrapper {
     pub collection_idx: i32,
     pub path: StackString,
     pub show: StackString,
-    pub last_modified: Option<DateTimeWrapper>,
+    pub last_modified: Option<DateTime<Utc>>,
 }
 
 impl From<MovieQueueRow> for MovieQueueRowWrapper {
@@ -195,7 +191,7 @@ impl From<MovieCollectionRow> for MovieCollectionRowWrapper {
 #[derive(Serialize, Deserialize, Schema)]
 pub struct LastModifiedResponseWrapper {
     pub table: StackString,
-    pub last_modified: DateTimeWrapper,
+    pub last_modified: DateTime<Utc>,
 }
 
 impl From<LastModifiedResponse> for LastModifiedResponseWrapper {
@@ -217,9 +213,9 @@ pub struct PlexEventWrapper {
     pub title: StackString,
     pub parent_title: Option<StackString>,
     pub grandparent_title: Option<StackString>,
-    pub added_at: DateTimeWrapper,
-    pub updated_at: Option<DateTimeWrapper>,
-    pub last_modified: DateTimeWrapper,
+    pub added_at: DateTime<Utc>,
+    pub updated_at: Option<DateTime<Utc>>,
+    pub last_modified: DateTime<Utc>,
     pub metadata_type: Option<StackString>,
     pub section_type: Option<StackString>,
     pub section_title: Option<StackString>,

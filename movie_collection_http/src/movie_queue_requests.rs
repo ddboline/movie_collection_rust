@@ -1,4 +1,5 @@
 use anyhow::format_err;
+use chrono::{DateTime, Utc};
 use rweb::Schema;
 use serde::{Deserialize, Serialize};
 use stack_string::StackString;
@@ -23,8 +24,8 @@ use movie_collection_lib::{
 };
 
 use crate::{
-    datetime_wrapper::DateTimeWrapper, errors::ServiceError as Error, ImdbEpisodesWrapper,
-    ImdbRatingsWrapper, MovieCollectionRowWrapper, MovieQueueRowWrapper, TvShowSourceWrapper,
+    errors::ServiceError as Error, ImdbEpisodesWrapper, ImdbRatingsWrapper,
+    MovieCollectionRowWrapper, MovieQueueRowWrapper, TvShowSourceWrapper,
 };
 
 pub struct WatchlistShowsRequest {}
@@ -240,7 +241,7 @@ impl FindNewEpisodeRequest {
 
 #[derive(Serialize, Deserialize, Debug, Schema)]
 pub struct ImdbEpisodesSyncRequest {
-    pub start_timestamp: DateTimeWrapper,
+    pub start_timestamp: DateTime<Utc>,
 }
 
 impl ImdbEpisodesSyncRequest {
@@ -253,7 +254,7 @@ impl ImdbEpisodesSyncRequest {
 
 #[derive(Serialize, Deserialize, Schema)]
 pub struct ImdbRatingsSyncRequest {
-    pub start_timestamp: DateTimeWrapper,
+    pub start_timestamp: DateTime<Utc>,
 }
 
 impl ImdbRatingsSyncRequest {
@@ -266,7 +267,7 @@ impl ImdbRatingsSyncRequest {
 
 #[derive(Serialize, Deserialize, Schema)]
 pub struct MovieQueueSyncRequest {
-    pub start_timestamp: DateTimeWrapper,
+    pub start_timestamp: DateTime<Utc>,
 }
 
 impl MovieQueueSyncRequest {
@@ -287,7 +288,7 @@ impl MovieQueueSyncRequest {
 
 #[derive(Serialize, Deserialize, Schema)]
 pub struct MovieCollectionSyncRequest {
-    pub start_timestamp: DateTimeWrapper,
+    pub start_timestamp: DateTime<Utc>,
 }
 
 impl MovieCollectionSyncRequest {
