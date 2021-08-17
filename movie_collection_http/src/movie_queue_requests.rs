@@ -168,17 +168,17 @@ impl ImdbEpisodesRequest {
 
 #[derive(Deserialize, Default, Schema)]
 pub struct ParseImdbRequest {
-    #[schema(description="All Entries Flag")]
+    #[schema(description = "All Entries Flag")]
     pub all: Option<bool>,
-    #[schema(description="Database Flag")]
+    #[schema(description = "Database Flag")]
     pub database: Option<bool>,
-    #[schema(description="IsTv Flag")]
+    #[schema(description = "IsTv Flag")]
     pub tv: Option<bool>,
-    #[schema(description="Update Flag")]
+    #[schema(description = "Update Flag")]
     pub update: Option<bool>,
-    #[schema(description="IMDB ID")]
+    #[schema(description = "IMDB ID")]
     pub link: Option<StackString>,
-    #[schema(description="Season")]
+    #[schema(description = "Season")]
     pub season: Option<i32>,
 }
 
@@ -224,9 +224,9 @@ impl ImdbShowRequest {
 
 #[derive(Serialize, Deserialize, Schema)]
 pub struct FindNewEpisodeRequest {
-    #[schema(description="TV Show Source")]
+    #[schema(description = "TV Show Source")]
     pub source: Option<TvShowSourceWrapper>,
-    #[schema(description="TV Show")]
+    #[schema(description = "TV Show")]
     pub shows: Option<StackString>,
 }
 
@@ -249,13 +249,13 @@ impl FindNewEpisodeRequest {
 
 #[derive(Serialize, Deserialize, Debug, Schema)]
 pub struct ImdbEpisodesSyncRequest {
-    #[schema(description="Start Timestamp")]
+    #[schema(description = "Start Timestamp")]
     pub start_timestamp: DateTime<Utc>,
 }
 
 impl ImdbEpisodesSyncRequest {
     pub async fn handle(&self, pool: &PgPool) -> Result<Vec<ImdbEpisodes>, Error> {
-        ImdbEpisodes::get_episodes_after_timestamp(self.start_timestamp.into(), pool)
+        ImdbEpisodes::get_episodes_after_timestamp(self.start_timestamp, pool)
             .await
             .map_err(Into::into)
     }
@@ -268,7 +268,7 @@ pub struct ImdbRatingsSyncRequest {
 
 impl ImdbRatingsSyncRequest {
     pub async fn handle(&self, pool: &PgPool) -> Result<Vec<ImdbRatings>, Error> {
-        ImdbRatings::get_shows_after_timestamp(self.start_timestamp.into(), pool)
+        ImdbRatings::get_shows_after_timestamp(self.start_timestamp, pool)
             .await
             .map_err(Into::into)
     }
@@ -289,7 +289,7 @@ impl MovieQueueSyncRequest {
         let stdout = StdoutChannel::with_mock_stdout(mock_stdout.clone(), mock_stdout.clone());
 
         let mq = MovieQueueDB::new(config, pool, &stdout);
-        mq.get_queue_after_timestamp(self.start_timestamp.into())
+        mq.get_queue_after_timestamp(self.start_timestamp)
             .await
             .map_err(Into::into)
     }
@@ -310,7 +310,7 @@ impl MovieCollectionSyncRequest {
         let stdout = StdoutChannel::with_mock_stdout(mock_stdout.clone(), mock_stdout.clone());
 
         let mc = MovieCollection::new(config, pool, &stdout);
-        mc.get_collection_after_timestamp(self.start_timestamp.into())
+        mc.get_collection_after_timestamp(self.start_timestamp)
             .await
             .map_err(Into::into)
     }
@@ -354,9 +354,9 @@ impl ImdbRatingsUpdateRequest {
 
 #[derive(Serialize, Deserialize, Schema)]
 pub struct ImdbRatingsSetSourceRequest {
-    #[schema(description="IMDB ID")]
+    #[schema(description = "IMDB ID")]
     pub link: StackString,
-    #[schema(description="TV Show Source")]
+    #[schema(description = "TV Show Source")]
     pub source: TvShowSourceWrapper,
 }
 

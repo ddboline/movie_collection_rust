@@ -545,11 +545,9 @@ pub async fn sync_trakt_with_db(
     let futures = watched_shows.into_iter().map(|(key, episode)| {
         let watched_shows_db = watched_shows_db.clone();
         async move {
-            if !watched_shows_db.contains_key(&key) {
-                if episode.insert_episode(&mc.pool).await? > 0 {
-                    mc.stdout
-                        .send(format!("insert watched episode {}", episode));
-                }
+            if !watched_shows_db.contains_key(&key) && episode.insert_episode(&mc.pool).await? > 0 {
+                mc.stdout
+                    .send(format!("insert watched episode {}", episode));
             }
             Ok(())
         }
