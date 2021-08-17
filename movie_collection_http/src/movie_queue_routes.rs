@@ -1139,7 +1139,9 @@ pub async fn trakt_auth_url(
 
 #[derive(Serialize, Deserialize, Schema)]
 pub struct TraktCallbackRequest {
+    #[schema(description="Authorization Code")]
     pub code: StackString,
+    #[schema(description="CSRF State")]
     pub state: StackString,
 }
 
@@ -1464,9 +1466,13 @@ struct PlexEventResponse(JsonBase<Vec<PlexEventWrapper>, Error>);
 
 #[derive(Serialize, Deserialize, Debug, Schema)]
 pub struct PlexEventRequest {
+    #[schema(description="Start Timestamp")]
     pub start_timestamp: Option<DateTime<Utc>>,
+    #[schema(description="Event Type")]
     pub event_type: Option<PlexEventTypeWrapper>,
+    #[schema(description="Offset")]
     pub offset: Option<u64>,
+    #[schema(description="Limit")]
     pub limit: Option<u64>,
 }
 
@@ -1621,8 +1627,11 @@ struct PlexFilenameResponse(JsonBase<Vec<PlexFilenameWrapper>, Error>);
 
 #[derive(Serialize, Deserialize, Debug, Schema)]
 pub struct PlexFilenameRequest {
+    #[schema(description="Start Timestamp")]
     pub start_timestamp: Option<DateTime<Utc>>,
+    #[schema(description="Offset")]
     pub offset: Option<u64>,
+    #[schema(description="Limit")]
     pub limit: Option<u64>,
 }
 

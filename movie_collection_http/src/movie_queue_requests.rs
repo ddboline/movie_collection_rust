@@ -168,11 +168,17 @@ impl ImdbEpisodesRequest {
 
 #[derive(Deserialize, Default, Schema)]
 pub struct ParseImdbRequest {
+    #[schema(description="All Entries Flag")]
     pub all: Option<bool>,
+    #[schema(description="Database Flag")]
     pub database: Option<bool>,
+    #[schema(description="IsTv Flag")]
     pub tv: Option<bool>,
+    #[schema(description="Update Flag")]
     pub update: Option<bool>,
+    #[schema(description="IMDB ID")]
     pub link: Option<StackString>,
+    #[schema(description="Season")]
     pub season: Option<i32>,
 }
 
@@ -218,7 +224,9 @@ impl ImdbShowRequest {
 
 #[derive(Serialize, Deserialize, Schema)]
 pub struct FindNewEpisodeRequest {
+    #[schema(description="TV Show Source")]
     pub source: Option<TvShowSourceWrapper>,
+    #[schema(description="TV Show")]
     pub shows: Option<StackString>,
 }
 
@@ -241,6 +249,7 @@ impl FindNewEpisodeRequest {
 
 #[derive(Serialize, Deserialize, Debug, Schema)]
 pub struct ImdbEpisodesSyncRequest {
+    #[schema(description="Start Timestamp")]
     pub start_timestamp: DateTime<Utc>,
 }
 
@@ -345,7 +354,9 @@ impl ImdbRatingsUpdateRequest {
 
 #[derive(Serialize, Deserialize, Schema)]
 pub struct ImdbRatingsSetSourceRequest {
+    #[schema(description="IMDB ID")]
     pub link: StackString,
+    #[schema(description="TV Show Source")]
     pub source: TvShowSourceWrapper,
 }
 

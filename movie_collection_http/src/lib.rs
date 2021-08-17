@@ -37,13 +37,21 @@ use movie_collection_lib::{
 
 #[derive(Clone, Serialize, Deserialize, Schema)]
 pub struct ImdbEpisodesWrapper {
+    #[schema(description="TV Show Name")]
     pub show: StackString,
+    #[schema(description="Title")]
     pub title: StackString,
+    #[schema(description="Season")]
     pub season: i32,
+    #[schema(description="Episode")]
     pub episode: i32,
+    #[schema(description="Airdate")]
     pub airdate: NaiveDate,
+    #[schema(description="Rating")]
     pub rating: f64,
+    #[schema(description="Episode Title")]
     pub eptitle: StackString,
+    #[schema(description="Episode URL")]
     pub epurl: StackString,
 }
 
@@ -113,12 +121,19 @@ impl From<TvShowSourceWrapper> for TvShowSource {
 
 #[derive(Default, Clone, Debug, Serialize, Deserialize, Schema)]
 pub struct ImdbRatingsWrapper {
+    #[schema(description="Index")]
     pub index: i32,
+    #[schema(description="TV Show Name")]
     pub show: StackString,
+    #[schema(description="Title")]
     pub title: Option<StackString>,
+    #[schema(description="IMDB ID")]
     pub link: StackString,
+    #[schema(description="Rating")]
     pub rating: Option<f64>,
+    #[schema(description="IsTv Flag")]
     pub istv: Option<bool>,
+    #[schema(description="Source")]
     pub source: Option<TvShowSourceWrapper>,
 }
 
@@ -152,10 +167,15 @@ impl From<ImdbRatingsWrapper> for ImdbRatings {
 
 #[derive(Default, Debug, Serialize, Deserialize, Schema)]
 pub struct MovieQueueRowWrapper {
+    #[schema(description="Queue Index")]
     pub idx: i32,
+    #[schema(description="Collection Index")]
     pub collection_idx: i32,
+    #[schema(description="Collection Path")]
     pub path: StackString,
+    #[schema(description="TV Show Name")]
     pub show: StackString,
+    #[schema(description="Last Modified")]
     pub last_modified: Option<DateTime<Utc>>,
 }
 
@@ -173,8 +193,11 @@ impl From<MovieQueueRow> for MovieQueueRowWrapper {
 
 #[derive(Default, Serialize, Deserialize, Schema)]
 pub struct MovieCollectionRowWrapper {
+    #[schema(description="Collection Index")]
     pub idx: i32,
+    #[schema(description="Collection Path")]
     pub path: StackString,
+    #[schema(description="TV Show Name")]
     pub show: StackString,
 }
 
@@ -190,7 +213,9 @@ impl From<MovieCollectionRow> for MovieCollectionRowWrapper {
 
 #[derive(Serialize, Deserialize, Schema)]
 pub struct LastModifiedResponseWrapper {
+    #[schema(description="Table Name")]
     pub table: StackString,
+    #[schema(description="Last Modified")]
     pub last_modified: DateTime<Utc>,
 }
 
@@ -205,20 +230,35 @@ impl From<LastModifiedResponse> for LastModifiedResponseWrapper {
 
 #[derive(Debug, Serialize, Deserialize, Schema)]
 pub struct PlexEventWrapper {
+    #[schema(description="Event")]
     pub event: StackString,
+    #[schema(description="Account")]
     pub account: StackString,
+    #[schema(description="Server")]
     pub server: StackString,
+    #[schema(description="Player Title")]
     pub player_title: StackString,
+    #[schema(description="Player Address")]
     pub player_address: StackString,
+    #[schema(description="Title")]
     pub title: StackString,
+    #[schema(description="Parent Title")]
     pub parent_title: Option<StackString>,
+    #[schema(description="Grandparent Title")]
     pub grandparent_title: Option<StackString>,
+    #[schema(description="Added At Timestamp")]
     pub added_at: DateTime<Utc>,
+    #[schema(description="Updated At Timestamp")]
     pub updated_at: Option<DateTime<Utc>>,
+    #[schema(description="Last Modified")]
     pub last_modified: DateTime<Utc>,
+    #[schema(description="Metadata Type")]
     pub metadata_type: Option<StackString>,
+    #[schema(description="Section Type")]
     pub section_type: Option<StackString>,
+    #[schema(description="Section Title")]
     pub section_title: Option<StackString>,
+    #[schema(description="Metadata Key")]
     pub metadata_key: Option<StackString>,
 }
 
@@ -268,7 +308,9 @@ impl From<PlexEventWrapper> for PlexEvent {
 
 #[derive(Default, Debug, Serialize, Deserialize, Schema)]
 pub struct PlexFilenameWrapper {
+    #[schema(description="Metadata Key")]
     pub metadata_key: StackString,
+    #[schema(description="Filename")]
     pub filename: StackString,
 }
 
@@ -290,11 +332,15 @@ impl From<PlexFilenameWrapper> for PlexFilename {
     }
 }
 
-#[derive(Clone, Copy, Schema)]
+#[derive(Clone, Copy, Schema, Deserialize, Serialize)]
 pub enum TraktActionsWrapper {
+    #[serde(rename="none")]
     None,
+    #[serde(rename="list")]
     List,
+    #[serde(rename="add")]
     Add,
+    #[serde(rename="remove")]
     Remove,
 }
 
@@ -329,17 +375,29 @@ impl FromStr for TraktActionsWrapper {
 
 #[derive(Serialize, Deserialize, Debug, Clone, Copy, Schema)]
 pub enum PlexEventTypeWrapper {
+    #[serde(rename="library-on-deck")]
     LibraryOnDeck,
+    #[serde(rename="library-new")]
     LibraryNew,
+    #[serde(rename="media-pause")]
     MediaPause,
+    #[serde(rename="media-play")]
     MediaPlay,
+    #[serde(rename="media-rate")]
     MediaRate,
+    #[serde(rename="media-resume")]
     MediaResume,
+    #[serde(rename="media-scrobble")]
     MediaScrobble,
+    #[serde(rename="media-stop")]
     MediaStop,
+    #[serde(rename="admin-database-backup")]
     AdminDatabaseBackup,
+    #[serde(rename="admin-database-corrupted")]
     AdminDatabaseCorrupted,
+    #[serde(rename="device-new")]
     DeviceNew,
+    #[serde(rename="playback-started")]
     PlaybackStarted,
 }
 

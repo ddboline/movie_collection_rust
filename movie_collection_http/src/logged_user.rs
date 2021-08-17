@@ -18,6 +18,7 @@ use crate::errors::ServiceError as Error;
 
 #[derive(Debug, Serialize, Deserialize, PartialEq, Eq, Hash, Clone, Schema)]
 pub struct LoggedUser {
+    #[schema(description="Email Address")]
     pub email: StackString,
 }
 
