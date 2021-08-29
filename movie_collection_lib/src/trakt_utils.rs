@@ -23,11 +23,15 @@ use crate::{
 
 use crate::{tv_show_source::TvShowSource, utils::option_string_wrapper};
 
-#[derive(Clone, Copy)]
+#[derive(Clone, Copy, Deserialize, Serialize)]
 pub enum TraktActions {
+    #[serde(rename = "none")]
     None,
+    #[serde(rename = "list")]
     List,
+    #[serde(rename = "add")]
     Add,
+    #[serde(rename = "remove")]
     Remove,
 }
 

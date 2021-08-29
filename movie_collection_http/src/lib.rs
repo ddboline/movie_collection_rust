@@ -20,10 +20,11 @@ pub mod movie_queue_requests;
 pub mod movie_queue_routes;
 
 use chrono::{DateTime, NaiveDate, Utc};
+use derive_more::{Deref, From, FromStr, Into};
 use rweb::Schema;
+use rweb_helper::derive_rweb_schema;
 use serde::{Deserialize, Serialize};
 use stack_string::StackString;
-use std::str::FromStr;
 
 use movie_collection_lib::{
     imdb_episodes::ImdbEpisodes,
@@ -35,58 +36,40 @@ use movie_collection_lib::{
     tv_show_source::TvShowSource,
 };
 
-#[derive(Clone, Serialize, Deserialize, Schema)]
-pub struct ImdbEpisodesWrapper {
+#[derive(Clone, Serialize, Deserialize, Into, From)]
+pub struct ImdbEpisodesWrapper(ImdbEpisodes);
+
+derive_rweb_schema!(ImdbEpisodesWrapper, _ImdbEpisodesWrapper);
+
+#[allow(dead_code)]
+#[derive(Schema)]
+struct _ImdbEpisodesWrapper {
     #[schema(description = "TV Show Name")]
-    pub show: StackString,
+    show: StackString,
     #[schema(description = "Title")]
-    pub title: StackString,
+    title: StackString,
     #[schema(description = "Season")]
-    pub season: i32,
+    season: i32,
     #[schema(description = "Episode")]
-    pub episode: i32,
+    episode: i32,
     #[schema(description = "Airdate")]
-    pub airdate: NaiveDate,
+    airdate: NaiveDate,
     #[schema(description = "Rating")]
-    pub rating: f64,
+    rating: f64,
     #[schema(description = "Episode Title")]
-    pub eptitle: StackString,
+    eptitle: StackString,
     #[schema(description = "Episode URL")]
-    pub epurl: StackString,
+    epurl: StackString,
 }
 
-impl From<ImdbEpisodes> for ImdbEpisodesWrapper {
-    fn from(item: ImdbEpisodes) -> Self {
-        Self {
-            show: item.show,
-            title: item.title,
-            season: item.season,
-            episode: item.episode,
-            airdate: item.airdate,
-            rating: item.rating,
-            eptitle: item.eptitle,
-            epurl: item.epurl,
-        }
-    }
-}
+#[derive(Serialize, Deserialize, Clone, Debug, Eq, Copy, PartialEq, Into, From)]
+pub struct TvShowSourceWrapper(TvShowSource);
 
-impl From<ImdbEpisodesWrapper> for ImdbEpisodes {
-    fn from(item: ImdbEpisodesWrapper) -> Self {
-        Self {
-            show: item.show,
-            title: item.title,
-            season: item.season,
-            episode: item.episode,
-            airdate: item.airdate,
-            rating: item.rating,
-            eptitle: item.eptitle,
-            epurl: item.epurl,
-        }
-    }
-}
+derive_rweb_schema!(TvShowSourceWrapper, _TvShowSourceWrapper);
 
-#[derive(Serialize, Deserialize, Clone, Debug, Eq, Copy, PartialEq, Schema)]
-pub enum TvShowSourceWrapper {
+#[allow(dead_code)]
+#[derive(Serialize, Schema)]
+enum _TvShowSourceWrapper {
     #[serde(rename = "all")]
     All,
     #[serde(rename = "amazon")]
@@ -97,139 +80,87 @@ pub enum TvShowSourceWrapper {
     Netflix,
 }
 
-impl From<TvShowSource> for TvShowSourceWrapper {
-    fn from(item: TvShowSource) -> Self {
-        match item {
-            TvShowSource::All => Self::All,
-            TvShowSource::Amazon => Self::Amazon,
-            TvShowSource::Hulu => Self::Hulu,
-            TvShowSource::Netflix => Self::Netflix,
-        }
-    }
-}
+#[derive(Default, Clone, Debug, Serialize, Deserialize, Into, From)]
+pub struct ImdbRatingsWrapper(ImdbRatings);
 
-impl From<TvShowSourceWrapper> for TvShowSource {
-    fn from(item: TvShowSourceWrapper) -> Self {
-        match item {
-            TvShowSourceWrapper::All => Self::All,
-            TvShowSourceWrapper::Amazon => Self::Amazon,
-            TvShowSourceWrapper::Hulu => Self::Hulu,
-            TvShowSourceWrapper::Netflix => Self::Netflix,
-        }
-    }
-}
+derive_rweb_schema!(ImdbRatingsWrapper, _ImdbRatingsWrapper);
 
-#[derive(Default, Clone, Debug, Serialize, Deserialize, Schema)]
-pub struct ImdbRatingsWrapper {
+#[allow(dead_code)]
+#[derive(Schema)]
+struct _ImdbRatingsWrapper {
     #[schema(description = "Index")]
-    pub index: i32,
+    index: i32,
     #[schema(description = "TV Show Name")]
-    pub show: StackString,
+    show: StackString,
     #[schema(description = "Title")]
-    pub title: Option<StackString>,
+    title: Option<StackString>,
     #[schema(description = "IMDB ID")]
-    pub link: StackString,
+    link: StackString,
     #[schema(description = "Rating")]
-    pub rating: Option<f64>,
+    rating: Option<f64>,
     #[schema(description = "IsTv Flag")]
-    pub istv: Option<bool>,
+    istv: Option<bool>,
     #[schema(description = "Source")]
-    pub source: Option<TvShowSourceWrapper>,
+    source: Option<TvShowSourceWrapper>,
 }
 
-impl From<ImdbRatings> for ImdbRatingsWrapper {
-    fn from(item: ImdbRatings) -> Self {
-        Self {
-            index: item.index,
-            show: item.show,
-            title: item.title,
-            link: item.link,
-            rating: item.rating,
-            istv: item.istv,
-            source: item.source.map(Into::into),
-        }
-    }
-}
+#[derive(Default, Debug, Serialize, Deserialize, Into, From, Deref)]
+pub struct MovieQueueRowWrapper(MovieQueueRow);
 
-impl From<ImdbRatingsWrapper> for ImdbRatings {
-    fn from(item: ImdbRatingsWrapper) -> Self {
-        Self {
-            index: item.index,
-            show: item.show,
-            title: item.title,
-            link: item.link,
-            rating: item.rating,
-            istv: item.istv,
-            source: item.source.map(Into::into),
-        }
-    }
-}
+derive_rweb_schema!(MovieQueueRowWrapper, _MovieQueueRowWrapper);
 
-#[derive(Default, Debug, Serialize, Deserialize, Schema)]
-pub struct MovieQueueRowWrapper {
+#[allow(dead_code)]
+#[derive(Schema)]
+struct _MovieQueueRowWrapper {
     #[schema(description = "Queue Index")]
-    pub idx: i32,
+    idx: i32,
     #[schema(description = "Collection Index")]
-    pub collection_idx: i32,
+    collection_idx: i32,
     #[schema(description = "Collection Path")]
-    pub path: StackString,
+    path: StackString,
     #[schema(description = "TV Show Name")]
-    pub show: StackString,
+    show: StackString,
     #[schema(description = "Last Modified")]
-    pub last_modified: Option<DateTime<Utc>>,
+    last_modified: Option<DateTime<Utc>>,
 }
 
-impl From<MovieQueueRow> for MovieQueueRowWrapper {
-    fn from(item: MovieQueueRow) -> Self {
-        Self {
-            idx: item.idx,
-            collection_idx: item.collection_idx,
-            path: item.path,
-            show: item.show,
-            last_modified: item.last_modified.map(Into::into),
-        }
-    }
-}
+#[derive(Default, Serialize, Deserialize, Into, From, Deref)]
+pub struct MovieCollectionRowWrapper(MovieCollectionRow);
 
-#[derive(Default, Serialize, Deserialize, Schema)]
-pub struct MovieCollectionRowWrapper {
+derive_rweb_schema!(MovieCollectionRowWrapper, _MovieCollectionRowWrapper);
+
+#[allow(dead_code)]
+#[derive(Schema)]
+struct _MovieCollectionRowWrapper {
     #[schema(description = "Collection Index")]
-    pub idx: i32,
+    idx: i32,
     #[schema(description = "Collection Path")]
-    pub path: StackString,
+    path: StackString,
     #[schema(description = "TV Show Name")]
-    pub show: StackString,
+    show: StackString,
 }
 
-impl From<MovieCollectionRow> for MovieCollectionRowWrapper {
-    fn from(item: MovieCollectionRow) -> Self {
-        Self {
-            idx: item.idx,
-            path: item.path,
-            show: item.show,
-        }
-    }
-}
+#[derive(Serialize, Deserialize, Into, From)]
+pub struct LastModifiedResponseWrapper(LastModifiedResponse);
 
-#[derive(Serialize, Deserialize, Schema)]
-pub struct LastModifiedResponseWrapper {
+derive_rweb_schema!(LastModifiedResponseWrapper, _LastModifiedResponseWrapper);
+
+#[allow(dead_code)]
+#[derive(Schema)]
+struct _LastModifiedResponseWrapper {
     #[schema(description = "Table Name")]
-    pub table: StackString,
+    table: StackString,
     #[schema(description = "Last Modified")]
-    pub last_modified: DateTime<Utc>,
+    last_modified: DateTime<Utc>,
 }
 
-impl From<LastModifiedResponse> for LastModifiedResponseWrapper {
-    fn from(item: LastModifiedResponse) -> Self {
-        Self {
-            table: item.table,
-            last_modified: item.last_modified,
-        }
-    }
-}
+#[derive(Debug, Serialize, Deserialize, Into, From)]
+pub struct PlexEventWrapper(PlexEvent);
 
-#[derive(Debug, Serialize, Deserialize, Schema)]
-pub struct PlexEventWrapper {
+derive_rweb_schema!(PlexEventWrapper, _PlexEventWrapper);
+
+#[derive(Schema)]
+pub struct _PlexEventWrapper {
     #[schema(description = "Event")]
     pub event: StackString,
     #[schema(description = "Account")]
@@ -262,78 +193,28 @@ pub struct PlexEventWrapper {
     pub metadata_key: Option<StackString>,
 }
 
-impl From<PlexEvent> for PlexEventWrapper {
-    fn from(item: PlexEvent) -> Self {
-        Self {
-            event: item.event,
-            account: item.account,
-            server: item.server,
-            player_title: item.player_title,
-            player_address: item.player_address,
-            title: item.title,
-            parent_title: item.parent_title,
-            grandparent_title: item.grandparent_title,
-            added_at: item.added_at,
-            updated_at: item.updated_at,
-            last_modified: item.last_modified,
-            metadata_type: item.metadata_type,
-            section_type: item.section_type,
-            section_title: item.section_title,
-            metadata_key: item.metadata_key,
-        }
-    }
-}
+#[derive(Default, Debug, Serialize, Deserialize, Into, From, Deref)]
+pub struct PlexFilenameWrapper(PlexFilename);
 
-impl From<PlexEventWrapper> for PlexEvent {
-    fn from(item: PlexEventWrapper) -> Self {
-        Self {
-            event: item.event,
-            account: item.account,
-            server: item.server,
-            player_title: item.player_title,
-            player_address: item.player_address,
-            title: item.title,
-            parent_title: item.parent_title,
-            grandparent_title: item.grandparent_title,
-            added_at: item.added_at,
-            updated_at: item.updated_at,
-            last_modified: item.last_modified,
-            metadata_type: item.metadata_type,
-            section_type: item.section_type,
-            section_title: item.section_title,
-            metadata_key: item.metadata_key,
-        }
-    }
-}
+derive_rweb_schema!(PlexFilenameWrapper, _PlexFilenameWrapper);
 
-#[derive(Default, Debug, Serialize, Deserialize, Schema)]
-pub struct PlexFilenameWrapper {
+#[allow(dead_code)]
+#[derive(Schema)]
+struct _PlexFilenameWrapper {
     #[schema(description = "Metadata Key")]
-    pub metadata_key: StackString,
+    metadata_key: StackString,
     #[schema(description = "Filename")]
-    pub filename: StackString,
+    filename: StackString,
 }
 
-impl From<PlexFilename> for PlexFilenameWrapper {
-    fn from(item: PlexFilename) -> Self {
-        Self {
-            metadata_key: item.metadata_key,
-            filename: item.filename,
-        }
-    }
-}
+#[derive(Clone, Copy, Deserialize, Serialize, Into, From, Deref, FromStr)]
+pub struct TraktActionsWrapper(TraktActions);
 
-impl From<PlexFilenameWrapper> for PlexFilename {
-    fn from(item: PlexFilenameWrapper) -> Self {
-        Self {
-            metadata_key: item.metadata_key,
-            filename: item.filename,
-        }
-    }
-}
+derive_rweb_schema!(TraktActionsWrapper, _TraktActionsWrapper);
 
-#[derive(Clone, Copy, Schema, Deserialize, Serialize)]
-pub enum TraktActionsWrapper {
+#[allow(dead_code)]
+#[derive(Schema, Serialize)]
+enum _TraktActionsWrapper {
     #[serde(rename = "none")]
     None,
     #[serde(rename = "list")]
@@ -344,37 +225,13 @@ pub enum TraktActionsWrapper {
     Remove,
 }
 
-impl From<TraktActions> for TraktActionsWrapper {
-    fn from(item: TraktActions) -> Self {
-        match item {
-            TraktActions::None => Self::None,
-            TraktActions::List => Self::List,
-            TraktActions::Add => Self::Add,
-            TraktActions::Remove => Self::Remove,
-        }
-    }
-}
+#[derive(Serialize, Deserialize, Debug, Clone, Copy, Deref, Into, From)]
+pub struct PlexEventTypeWrapper(PlexEventType);
 
-impl From<TraktActionsWrapper> for TraktActions {
-    fn from(item: TraktActionsWrapper) -> Self {
-        match item {
-            TraktActionsWrapper::None => Self::None,
-            TraktActionsWrapper::List => Self::List,
-            TraktActionsWrapper::Add => Self::Add,
-            TraktActionsWrapper::Remove => Self::Remove,
-        }
-    }
-}
+derive_rweb_schema!(PlexEventTypeWrapper, _PlexEventTypeWrapper);
 
-impl FromStr for TraktActionsWrapper {
-    type Err = ();
-    fn from_str(s: &str) -> Result<Self, Self::Err> {
-        Ok(TraktActions::from(s).into())
-    }
-}
-
-#[derive(Serialize, Deserialize, Debug, Clone, Copy, Schema)]
-pub enum PlexEventTypeWrapper {
+#[derive(Serialize, Deserialize, Schema)]
+pub enum _PlexEventTypeWrapper {
     #[serde(rename = "library-on-deck")]
     LibraryOnDeck,
     #[serde(rename = "library-new")]
@@ -399,42 +256,4 @@ pub enum PlexEventTypeWrapper {
     DeviceNew,
     #[serde(rename = "playback-started")]
     PlaybackStarted,
-}
-
-impl From<PlexEventType> for PlexEventTypeWrapper {
-    fn from(item: PlexEventType) -> Self {
-        match item {
-            PlexEventType::LibraryOnDeck => Self::LibraryOnDeck,
-            PlexEventType::LibraryNew => Self::LibraryNew,
-            PlexEventType::MediaPause => Self::MediaPause,
-            PlexEventType::MediaPlay => Self::MediaPlay,
-            PlexEventType::MediaRate => Self::MediaRate,
-            PlexEventType::MediaResume => Self::MediaResume,
-            PlexEventType::MediaScrobble => Self::MediaScrobble,
-            PlexEventType::MediaStop => Self::MediaStop,
-            PlexEventType::AdminDatabaseBackup => Self::AdminDatabaseBackup,
-            PlexEventType::AdminDatabaseCorrupted => Self::AdminDatabaseCorrupted,
-            PlexEventType::DeviceNew => Self::DeviceNew,
-            PlexEventType::PlaybackStarted => Self::PlaybackStarted,
-        }
-    }
-}
-
-impl From<PlexEventTypeWrapper> for PlexEventType {
-    fn from(item: PlexEventTypeWrapper) -> Self {
-        match item {
-            PlexEventTypeWrapper::LibraryOnDeck => Self::LibraryOnDeck,
-            PlexEventTypeWrapper::LibraryNew => Self::LibraryNew,
-            PlexEventTypeWrapper::MediaPause => Self::MediaPause,
-            PlexEventTypeWrapper::MediaPlay => Self::MediaPlay,
-            PlexEventTypeWrapper::MediaRate => Self::MediaRate,
-            PlexEventTypeWrapper::MediaResume => Self::MediaResume,
-            PlexEventTypeWrapper::MediaScrobble => Self::MediaScrobble,
-            PlexEventTypeWrapper::MediaStop => Self::MediaStop,
-            PlexEventTypeWrapper::AdminDatabaseBackup => Self::AdminDatabaseBackup,
-            PlexEventTypeWrapper::AdminDatabaseCorrupted => Self::AdminDatabaseCorrupted,
-            PlexEventTypeWrapper::DeviceNew => Self::DeviceNew,
-            PlexEventTypeWrapper::PlaybackStarted => Self::PlaybackStarted,
-        }
-    }
 }

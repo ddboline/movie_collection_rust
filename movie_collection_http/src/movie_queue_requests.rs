@@ -21,6 +21,7 @@ use movie_collection_lib::{
         get_watched_shows_db, get_watchlist_shows_db_map, TraktActions, WatchListMap,
         WatchListShow, WatchedEpisode,
     },
+    tv_show_source::TvShowSource,
 };
 
 use crate::{
@@ -365,7 +366,8 @@ impl ImdbRatingsSetSourceRequest {
         let mut imdb = ImdbRatings::get_show_by_link(self.link.as_ref(), pool)
             .await?
             .ok_or_else(|| format_err!("No show found for {}", self.link))?;
-        imdb.source = if self.source == TvShowSourceWrapper::All {
+        let source: TvShowSource = self.source.into();
+        imdb.source = if source == TvShowSource::All {
             None
         } else {
             Some(self.source.into())
