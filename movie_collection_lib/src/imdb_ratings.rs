@@ -78,12 +78,10 @@ impl ImdbRatings {
                 bindings.push(("istv", istv as Parameter));
                 ",istv=$istv"
             }),
-            if let Some(source) = self.source.as_ref() {
+            self.source.as_ref().map_or(",source=null", |source| {
                 bindings.push(("source", source as Parameter));
                 ",source=$source"
-            } else {
-                ",source=null"
-            },
+            }),
         );
         let query = query_dyn!(&query, show = self.show, ..bindings)?;
         let conn = pool.get().await?;
