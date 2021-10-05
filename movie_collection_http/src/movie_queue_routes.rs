@@ -104,7 +104,7 @@ struct MovieQueueResponse(HtmlBase<String, Error>);
 
 #[get("/list/full_queue")]
 pub async fn movie_queue(
-    #[cookie = "jwt"] _: LoggedUser,
+    #[filter = "LoggedUser::filter"] _: LoggedUser,
     #[data] state: AppState,
 ) -> WarpResult<MovieQueueResponse> {
     let req = MovieQueueRequest {
@@ -120,7 +120,7 @@ pub async fn movie_queue(
 #[get("/list/queue/{path}")]
 pub async fn movie_queue_show(
     path: StackString,
-    #[cookie = "jwt"] _: LoggedUser,
+    #[filter = "LoggedUser::filter"] _: LoggedUser,
     #[data] state: AppState,
 ) -> WarpResult<MovieQueueResponse> {
     let patterns = vec![path];
@@ -140,7 +140,7 @@ struct DeleteMovieQueueResponse(HtmlBase<String, Error>);
 #[get("/list/delete/{path}")]
 pub async fn movie_queue_delete(
     path: StackString,
-    #[cookie = "jwt"] _: LoggedUser,
+    #[filter = "LoggedUser::filter"] _: LoggedUser,
     #[data] state: AppState,
 ) -> WarpResult<DeleteMovieQueueResponse> {
     let mock_stdout = MockStdout::new();
@@ -191,7 +191,7 @@ struct TranscodeQueueResponse(HtmlBase<String, Error>);
 #[get("/list/transcode/queue/{path}")]
 pub async fn movie_queue_transcode(
     path: StackString,
-    #[cookie = "jwt"] _: LoggedUser,
+    #[filter = "LoggedUser::filter"] _: LoggedUser,
     #[data] state: AppState,
 ) -> WarpResult<TranscodeQueueResponse> {
     let patterns = vec![path];
@@ -208,7 +208,7 @@ pub async fn movie_queue_transcode(
 pub async fn movie_queue_transcode_directory(
     directory: StackString,
     file: StackString,
-    #[cookie = "jwt"] _: LoggedUser,
+    #[filter = "LoggedUser::filter"] _: LoggedUser,
     #[data] state: AppState,
 ) -> WarpResult<TranscodeQueueResponse> {
     let patterns = vec![file];
@@ -267,7 +267,7 @@ struct PlayQueueResponse(HtmlBase<String, Error>);
 #[get("/list/play/{idx}")]
 pub async fn movie_queue_play(
     idx: i32,
-    #[cookie = "jwt"] _: LoggedUser,
+    #[filter = "LoggedUser::filter"] _: LoggedUser,
     #[data] state: AppState,
 ) -> WarpResult<PlayQueueResponse> {
     let req = MoviePathRequest { idx };
@@ -285,7 +285,7 @@ struct ListImdbResponse(HtmlBase<String, Error>);
 pub async fn imdb_show(
     show: StackString,
     query: Query<ParseImdbRequest>,
-    #[cookie = "jwt"] _: LoggedUser,
+    #[filter = "LoggedUser::filter"] _: LoggedUser,
     #[data] state: AppState,
 ) -> WarpResult<ListImdbResponse> {
     let query = query.into_inner();
@@ -317,7 +317,7 @@ struct ListCalendarResponse(HtmlBase<String, Error>);
 #[get("/list/cal")]
 pub async fn find_new_episodes(
     query: Query<FindNewEpisodeRequest>,
-    #[cookie = "jwt"] _: LoggedUser,
+    #[filter = "LoggedUser::filter"] _: LoggedUser,
     #[data] state: AppState,
 ) -> WarpResult<ListCalendarResponse> {
     let entries = query.into_inner().handle(&state.db, &state.config).await?;
@@ -332,7 +332,7 @@ struct ListImdbEpisodesResponse(JsonBase<Vec<ImdbEpisodesWrapper>, Error>);
 #[get("/list/imdb_episodes")]
 pub async fn imdb_episodes_route(
     query: Query<ImdbEpisodesSyncRequest>,
-    #[cookie = "jwt"] _: LoggedUser,
+    #[filter = "LoggedUser::filter"] _: LoggedUser,
     #[data] state: AppState,
 ) -> WarpResult<ListImdbEpisodesResponse> {
     let x = query
@@ -356,7 +356,7 @@ struct ImdbEpisodesUpdateResponse(HtmlBase<&'static str, Error>);
 #[post("/list/imdb_episodes")]
 pub async fn imdb_episodes_update(
     episodes: Json<ImdbEpisodesUpdateRequest>,
-    #[cookie = "jwt"] _: LoggedUser,
+    #[filter = "LoggedUser::filter"] _: LoggedUser,
     #[data] state: AppState,
 ) -> WarpResult<ImdbEpisodesUpdateResponse> {
     episodes.into_inner().handle(&state.db).await?;
@@ -370,7 +370,7 @@ struct ListImdbShowsResponse(JsonBase<Vec<ImdbRatingsWrapper>, Error>);
 #[get("/list/imdb_ratings")]
 pub async fn imdb_ratings_route(
     query: Query<ImdbRatingsSyncRequest>,
-    #[cookie = "jwt"] _: LoggedUser,
+    #[filter = "LoggedUser::filter"] _: LoggedUser,
     #[data] state: AppState,
 ) -> WarpResult<ListImdbShowsResponse> {
     let x = query
@@ -394,7 +394,7 @@ struct UpdateImdbShowsResponse(HtmlBase<&'static str, Error>);
 #[post("/list/imdb_ratings")]
 pub async fn imdb_ratings_update(
     shows: Json<ImdbRatingsUpdateRequest>,
-    #[cookie = "jwt"] _: LoggedUser,
+    #[filter = "LoggedUser::filter"] _: LoggedUser,
     #[data] state: AppState,
 ) -> WarpResult<UpdateImdbShowsResponse> {
     shows.into_inner().handle(&state.db).await?;
@@ -408,7 +408,7 @@ struct ImdbSetSourceResponse(HtmlBase<&'static str, Error>);
 #[get("/list/imdb_ratings/set_source")]
 pub async fn imdb_ratings_set_source(
     query: Query<ImdbRatingsSetSourceRequest>,
-    #[cookie = "jwt"] _: LoggedUser,
+    #[filter = "LoggedUser::filter"] _: LoggedUser,
     #[data] state: AppState,
 ) -> WarpResult<ImdbSetSourceResponse> {
     query.into_inner().handle(&state.db).await?;
@@ -422,7 +422,7 @@ struct ListMovieQueueResponse(JsonBase<Vec<MovieQueueRowWrapper>, Error>);
 #[get("/list/movie_queue")]
 pub async fn movie_queue_route(
     query: Query<MovieQueueSyncRequest>,
-    #[cookie = "jwt"] _: LoggedUser,
+    #[filter = "LoggedUser::filter"] _: LoggedUser,
     #[data] state: AppState,
 ) -> WarpResult<ListMovieQueueResponse> {
     let x = query
@@ -446,7 +446,7 @@ struct UpdateMovieQueueResponse(HtmlBase<&'static str, Error>);
 #[post("/list/movie_queue")]
 pub async fn movie_queue_update(
     queue: Json<MovieQueueUpdateRequest>,
-    #[cookie = "jwt"] _: LoggedUser,
+    #[filter = "LoggedUser::filter"] _: LoggedUser,
     #[data] state: AppState,
 ) -> WarpResult<UpdateMovieQueueResponse> {
     queue.into_inner().handle(&state.db, &state.config).await?;
@@ -460,7 +460,7 @@ struct ListMovieCollectionResponse(JsonBase<Vec<MovieCollectionRowWrapper>, Erro
 #[get("/list/movie_collection")]
 pub async fn movie_collection_route(
     query: Query<MovieCollectionSyncRequest>,
-    #[cookie = "jwt"] _: LoggedUser,
+    #[filter = "LoggedUser::filter"] _: LoggedUser,
     #[data] state: AppState,
 ) -> WarpResult<ListMovieCollectionResponse> {
     let x = query
@@ -484,7 +484,7 @@ struct UpdateMovieCollectionResponse(HtmlBase<&'static str, Error>);
 #[post("/list/movie_collection")]
 pub async fn movie_collection_update(
     collection: Json<MovieCollectionUpdateRequest>,
-    #[cookie = "jwt"] _: LoggedUser,
+    #[filter = "LoggedUser::filter"] _: LoggedUser,
     #[data] state: AppState,
 ) -> WarpResult<UpdateMovieCollectionResponse> {
     collection
@@ -500,7 +500,7 @@ struct ListLastModifiedResponse(JsonBase<Vec<LastModifiedResponseWrapper>, Error
 
 #[get("/list/last_modified")]
 pub async fn last_modified_route(
-    #[cookie = "jwt"] _: LoggedUser,
+    #[filter = "LoggedUser::filter"] _: LoggedUser,
     #[data] state: AppState,
 ) -> WarpResult<ListLastModifiedResponse> {
     let req = LastModifiedRequest {};
@@ -518,7 +518,9 @@ pub async fn last_modified_route(
 struct FrontpageResponse(HtmlBase<String, Error>);
 
 #[get("/list/index.html")]
-pub async fn frontpage(#[cookie = "jwt"] _: LoggedUser) -> WarpResult<FrontpageResponse> {
+pub async fn frontpage(
+    #[filter = "LoggedUser::filter"] _: LoggedUser,
+) -> WarpResult<FrontpageResponse> {
     let body = HBR
         .render("index.html", &hashmap! {"BODY" => ""})
         .map_err(Into::<Error>::into)?;
@@ -611,7 +613,7 @@ struct ListTvShowsResponse(HtmlBase<String, Error>);
 
 #[get("/list/tvshows")]
 pub async fn tvshows(
-    #[cookie = "jwt"] _: LoggedUser,
+    #[filter = "LoggedUser::filter"] _: LoggedUser,
     #[data] state: AppState,
 ) -> WarpResult<ListTvShowsResponse> {
     let mock_stdout = MockStdout::new();
@@ -682,7 +684,7 @@ fn process_shows(
 struct UserResponse(JsonBase<LoggedUser, Error>);
 
 #[get("/list/user")]
-pub async fn user(#[cookie = "jwt"] user: LoggedUser) -> WarpResult<UserResponse> {
+pub async fn user(#[filter = "LoggedUser::filter"] user: LoggedUser) -> WarpResult<UserResponse> {
     Ok(JsonBase::new(user).into())
 }
 
@@ -692,7 +694,7 @@ struct TranscodeStatusResponse(HtmlBase<String, Error>);
 
 #[get("/list/transcode/status")]
 pub async fn movie_queue_transcode_status(
-    #[cookie = "jwt"] _: LoggedUser,
+    #[filter = "LoggedUser::filter"] _: LoggedUser,
     #[data] state: AppState,
 ) -> WarpResult<TranscodeStatusResponse> {
     let config = state.config.clone();
@@ -714,7 +716,7 @@ struct TranscodeFileResponse(HtmlBase<String, Error>);
 #[get("/list/transcode/file/{filename}")]
 pub async fn movie_queue_transcode_file(
     filename: StackString,
-    #[cookie = "jwt"] _: LoggedUser,
+    #[filter = "LoggedUser::filter"] _: LoggedUser,
     #[data] state: AppState,
 ) -> WarpResult<TranscodeFileResponse> {
     let mock_stdout = MockStdout::new();
@@ -749,7 +751,7 @@ pub async fn movie_queue_transcode_file(
 #[get("/list/transcode/remcom/file/{filename}")]
 pub async fn movie_queue_remcom_file(
     filename: StackString,
-    #[cookie = "jwt"] _: LoggedUser,
+    #[filter = "LoggedUser::filter"] _: LoggedUser,
     #[data] state: AppState,
 ) -> WarpResult<TranscodeFileResponse> {
     let mock_stdout = MockStdout::new();
@@ -792,7 +794,7 @@ pub async fn movie_queue_remcom_file(
 pub async fn movie_queue_remcom_directory_file(
     directory: StackString,
     filename: StackString,
-    #[cookie = "jwt"] _: LoggedUser,
+    #[filter = "LoggedUser::filter"] _: LoggedUser,
     #[data] state: AppState,
 ) -> WarpResult<TranscodeFileResponse> {
     let mock_stdout = MockStdout::new();
@@ -837,7 +839,7 @@ struct CleanupTranscodeFileResponse(HtmlBase<String, Error>);
 #[get("/list/transcode/cleanup/{path}")]
 pub async fn movie_queue_transcode_cleanup(
     path: StackString,
-    #[cookie = "jwt"] _: LoggedUser,
+    #[filter = "LoggedUser::filter"] _: LoggedUser,
     #[data] state: AppState,
 ) -> WarpResult<CleanupTranscodeFileResponse> {
     let movie_path = state
@@ -939,7 +941,7 @@ struct TraktWatchlistResponse(HtmlBase<String, Error>);
 
 #[get("/trakt/watchlist")]
 pub async fn trakt_watchlist(
-    #[cookie = "jwt"] _: LoggedUser,
+    #[filter = "LoggedUser::filter"] _: LoggedUser,
     #[data] state: AppState,
 ) -> WarpResult<TraktWatchlistResponse> {
     let shows = get_watchlist_shows_db_map(&state.db)
@@ -971,7 +973,7 @@ struct TraktWatchlistActionResponse(HtmlBase<String, Error>);
 pub async fn trakt_watchlist_action(
     action: TraktActionsWrapper,
     imdb_url: StackString,
-    #[cookie = "jwt"] _: LoggedUser,
+    #[filter = "LoggedUser::filter"] _: LoggedUser,
     #[data] state: AppState,
 ) -> WarpResult<TraktWatchlistActionResponse> {
     let req = WatchlistActionRequest {
@@ -1026,7 +1028,7 @@ struct TraktWatchlistShowListResponse(HtmlBase<String, Error>);
 #[get("/trakt/watched/list/{imdb_url}")]
 pub async fn trakt_watched_seasons(
     imdb_url: StackString,
-    #[cookie = "jwt"] _: LoggedUser,
+    #[filter = "LoggedUser::filter"] _: LoggedUser,
     #[data] state: AppState,
 ) -> WarpResult<TraktWatchlistShowListResponse> {
     let show_opt = ImdbRatings::get_show_by_link(&imdb_url, &state.db)
@@ -1051,7 +1053,7 @@ struct TraktWatchlistShowSeasonResponse(HtmlBase<String, Error>);
 pub async fn trakt_watched_list(
     imdb_url: StackString,
     season: i32,
-    #[cookie = "jwt"] _: LoggedUser,
+    #[filter = "LoggedUser::filter"] _: LoggedUser,
     #[data] state: AppState,
 ) -> WarpResult<TraktWatchlistShowSeasonResponse> {
     let mock_stdout = MockStdout::new();
@@ -1073,7 +1075,7 @@ pub async fn trakt_watched_action(
     imdb_url: StackString,
     season: i32,
     episode: i32,
-    #[cookie = "jwt"] _: LoggedUser,
+    #[filter = "LoggedUser::filter"] _: LoggedUser,
     #[data] state: AppState,
 ) -> WarpResult<TraktWatchlistEpisodeActionResponse> {
     let mock_stdout = MockStdout::new();
@@ -1110,7 +1112,7 @@ struct TraktCalendarResponse(HtmlBase<String, Error>);
 
 #[get("/trakt/cal")]
 pub async fn trakt_cal(
-    #[cookie = "jwt"] _: LoggedUser,
+    #[filter = "LoggedUser::filter"] _: LoggedUser,
     #[data] state: AppState,
 ) -> WarpResult<TraktCalendarResponse> {
     let entries = trakt_cal_http_worker(&state.trakt, &state.db).await?;
@@ -1124,7 +1126,7 @@ struct TraktAuthUrlResponse(HtmlBase<String, Error>);
 
 #[get("/trakt/auth_url")]
 pub async fn trakt_auth_url(
-    #[cookie = "jwt"] _: LoggedUser,
+    #[filter = "LoggedUser::filter"] _: LoggedUser,
     #[data] state: AppState,
 ) -> WarpResult<TraktAuthUrlResponse> {
     state.trakt.init().await;
@@ -1152,7 +1154,7 @@ struct TraktCallbackResponse(HtmlBase<&'static str, Error>);
 #[get("/trakt/callback")]
 pub async fn trakt_callback(
     query: Query<TraktCallbackRequest>,
-    #[cookie = "jwt"] _: LoggedUser,
+    #[filter = "LoggedUser::filter"] _: LoggedUser,
     #[data] state: AppState,
 ) -> WarpResult<TraktCallbackResponse> {
     state.trakt.init().await;
@@ -1175,7 +1177,7 @@ struct TraktRefreshAuthResponse(HtmlBase<&'static str, Error>);
 
 #[get("/trakt/refresh_auth")]
 pub async fn refresh_auth(
-    #[cookie = "jwt"] _: LoggedUser,
+    #[filter = "LoggedUser::filter"] _: LoggedUser,
     #[data] state: AppState,
 ) -> WarpResult<TraktRefreshAuthResponse> {
     state.trakt.init().await;
@@ -1480,7 +1482,7 @@ pub struct PlexEventRequest {
 pub async fn plex_events(
     query: Query<PlexEventRequest>,
     #[data] state: AppState,
-    #[cookie = "jwt"] _: LoggedUser,
+    #[filter = "LoggedUser::filter"] _: LoggedUser,
 ) -> WarpResult<PlexEventResponse> {
     let query = query.into_inner();
     let events = PlexEvent::get_events(
@@ -1515,7 +1517,7 @@ struct PlexEventUpdateResponse(HtmlBase<&'static str, Error>);
 pub async fn plex_events_update(
     payload: Json<PlexEventUpdateRequest>,
     #[data] state: AppState,
-    #[cookie = "jwt"] _: LoggedUser,
+    #[filter = "LoggedUser::filter"] _: LoggedUser,
 ) -> WarpResult<PlexEventUpdateResponse> {
     let payload = payload.into_inner();
     for event in payload.events {
@@ -1587,7 +1589,7 @@ struct PlexEventList(HtmlBase<String, Error>);
 
 #[get("/list/plex")]
 pub async fn plex_list(
-    #[cookie = "jwt"] _: LoggedUser,
+    #[filter = "LoggedUser::filter"] _: LoggedUser,
     #[data] state: AppState,
     query: Query<PlexEventRequest>,
 ) -> WarpResult<PlexEventList> {
@@ -1639,7 +1641,7 @@ pub struct PlexFilenameRequest {
 pub async fn plex_filename(
     query: Query<PlexFilenameRequest>,
     #[data] state: AppState,
-    #[cookie = "jwt"] _: LoggedUser,
+    #[filter = "LoggedUser::filter"] _: LoggedUser,
 ) -> WarpResult<PlexFilenameResponse> {
     let query = query.into_inner();
     let filenames = PlexFilename::get_filenames(
@@ -1673,7 +1675,7 @@ struct PlexFilenameUpdateResponse(HtmlBase<&'static str, Error>);
 pub async fn plex_filename_update(
     payload: Json<PlexFilenameUpdateRequest>,
     #[data] state: AppState,
-    #[cookie = "jwt"] _: LoggedUser,
+    #[filter = "LoggedUser::filter"] _: LoggedUser,
 ) -> WarpResult<PlexFilenameUpdateResponse> {
     let payload = payload.into_inner();
     for filename in payload.filenames {
