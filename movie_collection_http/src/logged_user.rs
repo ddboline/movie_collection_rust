@@ -54,15 +54,6 @@ impl From<AuthorizedUser> for LoggedUser {
     }
 }
 
-impl From<LoggedUser> for AuthorizedUser {
-    fn from(user: LoggedUser) -> Self {
-        Self {
-            email: user.email,
-            session: user.session,
-        }
-    }
-}
-
 impl TryFrom<Token> for LoggedUser {
     type Error = Error;
     fn try_from(token: Token) -> Result<Self, Self::Error> {
