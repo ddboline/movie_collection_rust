@@ -1,0 +1,1 @@
+ALTER TABLE trakt_watchlist ALTER COLUMN show SET NOT NULL;

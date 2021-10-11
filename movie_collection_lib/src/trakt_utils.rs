@@ -327,6 +327,7 @@ impl WatchedEpisode {
             r#"
                 SELECT a.link as imdb_url,
                        c.title,
+                       c.show,
                        a.season,
                        a.episode
                 FROM trakt_watched_episodes a
