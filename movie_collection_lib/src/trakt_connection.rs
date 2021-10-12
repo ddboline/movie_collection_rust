@@ -236,7 +236,7 @@ impl TraktConnection {
             .filter_map(|r| {
                 let imdb: StackString = r.show.ids.imdb.unwrap_or_else(|| "".into());
                 let title = r.show.title;
-                r.show.year.clone().map(|year| {
+                r.show.year.map(|year| {
                     (
                         imdb.clone(),
                         WatchListShow {
@@ -514,8 +514,7 @@ impl TraktConnection {
             self.get_movie_by_imdb_id(imdb_id)
                 .await?
                 .into_iter()
-                .filter(|o| o.movie.year.is_some())
-                .next()
+                .find(|o| o.movie.year.is_some())
                 .ok_or_else(|| format_err!("No show returned"))?
         };
         let headers = self.get_rw_headers().await?;
@@ -577,8 +576,7 @@ impl TraktConnection {
             .get_movie_by_imdb_id(imdb_id)
             .await?
             .into_iter()
-            .filter(|o| o.movie.year.is_some())
-            .next()
+            .find(|o| o.movie.year.is_some())
             .ok_or_else(|| format_err!("No show returned"))?;
         let headers = self.get_rw_headers().await?;
         let url = format!("{}/sync/history/remove", self.config.trakt_endpoint);
