@@ -233,17 +233,20 @@ impl TraktConnection {
         }
         let watchlist = results
             .into_iter()
-            .map(|r| {
+            .filter_map(|r| {
                 let imdb: StackString = r.show.ids.imdb.unwrap_or_else(|| "".into());
-                (
-                    imdb.clone(),
-                    WatchListShow {
-                        link: imdb,
-                        title: r.show.title,
-                        year: r.show.year,
-                        ..WatchListShow::default()
-                    },
-                )
+                let title = r.show.title;
+                r.show.year.clone().map(|year| {
+                    (
+                        imdb.clone(),
+                        WatchListShow {
+                            link: imdb,
+                            title,
+                            year,
+                            ..WatchListShow::default()
+                        },
+                    )
+                })
             })
             .collect();
         Ok(watchlist)
@@ -507,19 +510,23 @@ impl TraktConnection {
     }
 
     pub async fn add_movie_to_watched(&self, imdb_id: &str) -> Result<TraktResult, Error> {
-        let movie_obj = self
-            .get_movie_by_imdb_id(imdb_id)
-            .await?
-            .pop()
-            .ok_or_else(|| format_err!("No show returned"))?;
+        let movie_obj = {
+            self.get_movie_by_imdb_id(imdb_id)
+                .await?
+                .into_iter()
+                .filter(|o| o.movie.year.is_some())
+                .next()
+                .ok_or_else(|| format_err!("No show returned"))?
+        };
         let headers = self.get_rw_headers().await?;
         let url = format!("{}/sync/history", self.config.trakt_endpoint);
+        let year = movie_obj.movie.year.expect("No year");
         let data = hashmap! {
             "movies" => vec![
                 WatchedMovieRequest {
                     watched_at: Utc::now(),
                     title: movie_obj.movie.title.clone(),
-                    year: movie_obj.movie.year,
+                    year,
                     ids: movie_obj.movie.ids,
                 }
             ]
@@ -569,16 +576,19 @@ impl TraktConnection {
         let movie_obj = self
             .get_movie_by_imdb_id(imdb_id)
             .await?
-            .pop()
+            .into_iter()
+            .filter(|o| o.movie.year.is_some())
+            .next()
             .ok_or_else(|| format_err!("No show returned"))?;
         let headers = self.get_rw_headers().await?;
         let url = format!("{}/sync/history/remove", self.config.trakt_endpoint);
+        let year = movie_obj.movie.year.expect("No year");
         let data = hashmap! {
             "movies" => vec![
                 WatchedMovieRequest {
                     watched_at: Utc::now(),
                     title: movie_obj.movie.title.clone(),
-                    year: movie_obj.movie.year,
+                    year,
                     ids: movie_obj.movie.ids,
                 }
             ]
@@ -634,7 +644,7 @@ pub struct TraktIdObject {
 #[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct TraktShowObject {
     pub title: StackString,
-    pub year: i32,
+    pub year: Option<i32>,
     pub ids: TraktIdObject,
 }
 
