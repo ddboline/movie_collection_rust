@@ -35,6 +35,17 @@ pub enum TraktActions {
     Remove,
 }
 
+impl fmt::Display for TraktActions {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            Self::List => write!(f, "list"),
+            Self::Add => write!(f, "add"),
+            Self::Remove => write!(f, "rm"),
+            _ => write!(f, ""),
+        }
+    }
+}
+
 impl From<&str> for TraktActions {
     fn from(s: &str) -> Self {
         match s {
