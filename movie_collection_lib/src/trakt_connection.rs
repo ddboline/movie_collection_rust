@@ -53,6 +53,10 @@ impl TraktConnection {
         }
     }
 
+    pub fn get_client(&self) -> &Client {
+        &self.client
+    }
+
     pub async fn init(&self) {
         if let Ok(auth_token) = self.read_auth_token().await {
             AUTH_TOKEN.write().await.replace(Arc::new(auth_token));
