@@ -3,6 +3,7 @@ pub use authorized_users::{
     KEY_LENGTH, SECRET_KEY, TRIGGER_DB_UPDATE,
 };
 use log::debug;
+use reqwest::{header::HeaderValue, Client};
 use rweb::{filters::cookie::cookie, Filter, Rejection, Schema};
 use serde::{Deserialize, Serialize};
 use stack_string::StackString;
@@ -11,9 +12,10 @@ use std::{
     env::var,
     str::FromStr,
 };
+use tokio::task::{spawn, JoinHandle};
 use uuid::Uuid;
 
-use movie_collection_lib::{pgpool::PgPool, utils::get_authorized_users};
+use movie_collection_lib::{config::Config, pgpool::PgPool, utils::get_authorized_users};
 
 use crate::errors::ServiceError as Error;
 
@@ -23,6 +25,8 @@ pub struct LoggedUser {
     pub email: StackString,
     #[schema(description = "Session UUID")]
     pub session: Uuid,
+    #[schema(description = "Secret Key")]
+    pub secret_key: StackString,
 }
 
 impl LoggedUser {
@@ -43,6 +47,56 @@ impl LoggedUser {
                     .map_err(rweb::reject::custom)
             })
     }
+
+    pub async fn get_url(&self, client: &Client, config: &Config) -> Result<String, anyhow::Error> {
+        let url = format!("https://{}/api/session", config.domain);
+        let value = HeaderValue::from_str(&self.session.to_string())?;
+        let key = HeaderValue::from_str(&self.secret_key)?;
+        client
+            .get(url)
+            .header("session", value)
+            .header("secret-key", key)
+            .send()
+            .await?
+            .error_for_status()?
+            .json()
+            .await
+            .map_err(Into::into)
+    }
+
+    pub async fn set_url(
+        &self,
+        client: &Client,
+        config: &Config,
+        set_url: &str,
+    ) -> Result<(), anyhow::Error> {
+        let url = format!("https://{}/api/session", config.domain);
+        let value = HeaderValue::from_str(&self.session.to_string())?;
+        let key = HeaderValue::from_str(&self.secret_key)?;
+        client
+            .post(url)
+            .header("session", value)
+            .header("secret-key", key)
+            .json(set_url)
+            .send()
+            .await?
+            .error_for_status()?;
+        Ok(())
+    }
+
+    pub async fn store_url_task(
+        self,
+        client: &Client,
+        config: &Config,
+        set_url: &str,
+    ) -> JoinHandle<Option<()>> {
+        spawn({
+            let client = client.clone();
+            let config = config.clone();
+            let set_url = set_url.to_owned();
+            async move { self.set_url(&client, &config, &set_url).await.ok() }
+        })
+    }
 }
 
 impl From<AuthorizedUser> for LoggedUser {
@@ -50,6 +104,7 @@ impl From<AuthorizedUser> for LoggedUser {
         Self {
             email: user.email,
             session: user.session,
+            secret_key: user.secret_key,
         }
     }
 }
