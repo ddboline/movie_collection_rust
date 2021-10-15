@@ -20,7 +20,7 @@ pub mod movie_queue_requests;
 pub mod movie_queue_routes;
 
 use chrono::{DateTime, NaiveDate, Utc};
-use derive_more::{Deref, From, FromStr, Into};
+use derive_more::{Deref, Display, From, FromStr, Into};
 use rweb::Schema;
 use rweb_helper::derive_rweb_schema;
 use serde::{Deserialize, Serialize};
@@ -207,7 +207,7 @@ struct _PlexFilenameWrapper {
     filename: StackString,
 }
 
-#[derive(Clone, Copy, Deserialize, Serialize, Into, From, Deref, FromStr)]
+#[derive(Clone, Copy, Deserialize, Serialize, Into, From, Deref, FromStr, Display)]
 pub struct TraktActionsWrapper(TraktActions);
 
 derive_rweb_schema!(TraktActionsWrapper, _TraktActionsWrapper);
