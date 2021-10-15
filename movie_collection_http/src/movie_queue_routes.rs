@@ -334,7 +334,11 @@ pub async fn movie_queue_play(
     let req = MoviePathRequest { idx };
     let movie_path = req.handle(&state.db, &state.config).await?;
     let movie_path = path::Path::new(movie_path.as_str());
-    let body = play_worker(&state.config, movie_path, Some(last_url.as_str()))?;
+    let body = play_worker(
+        &state.config,
+        movie_path,
+        last_url.as_ref().map(|s| s.as_str()),
+    )?;
     task.await.ok();
     Ok(HtmlBase::new(body).into())
 }

@@ -19,6 +19,11 @@ use movie_collection_lib::{config::Config, pgpool::PgPool, utils::get_authorized
 
 use crate::errors::ServiceError as Error;
 
+#[derive(Serialize, Deserialize)]
+struct SessionData {
+    movie_last_url: StackString,
+}
+
 #[derive(Debug, Serialize, Deserialize, PartialEq, Eq, Hash, Clone, Schema)]
 pub struct LoggedUser {
     #[schema(description = "Email Address")]
@@ -48,11 +53,15 @@ impl LoggedUser {
             })
     }
 
-    pub async fn get_url(&self, client: &Client, config: &Config) -> Result<String, anyhow::Error> {
+    pub async fn get_url(
+        &self,
+        client: &Client,
+        config: &Config,
+    ) -> Result<Option<StackString>, anyhow::Error> {
         let url = format!("https://{}/api/session", config.domain);
         let value = HeaderValue::from_str(&self.session.to_string())?;
         let key = HeaderValue::from_str(&self.secret_key)?;
-        client
+        let session: Option<SessionData> = client
             .get(url)
             .header("session", value)
             .header("secret-key", key)
@@ -60,8 +69,8 @@ impl LoggedUser {
             .await?
             .error_for_status()?
             .json()
-            .await
-            .map_err(Into::into)
+            .await?;
+        Ok(session.map(|x| x.movie_last_url))
     }
 
     pub async fn set_url(
@@ -73,11 +82,14 @@ impl LoggedUser {
         let url = format!("https://{}/api/session", config.domain);
         let value = HeaderValue::from_str(&self.session.to_string())?;
         let key = HeaderValue::from_str(&self.secret_key)?;
+        let session = SessionData {
+            movie_last_url: set_url.into(),
+        };
         client
             .post(url)
             .header("session", value)
             .header("secret-key", key)
-            .json(set_url)
+            .json(&session)
             .send()
             .await?
             .error_for_status()?;
