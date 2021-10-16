@@ -1,6 +1,6 @@
 [package]
 name = "movie_collection_http"
-version = "0.8.48"
+version = "0.8.49"
 authors = ["Daniel Boline <ddboline@gmail.com>"]
 edition = "2018"
 
@@ -33,6 +33,6 @@ postgres-types = "0.2"
 url = "2.2"
 reqwest = {version="0.11", features=["cookies", "json", "rustls-tls"]}
 rweb_helper = { git = "https://github.com/ddboline/rweb_helper.git", tag="0.3.4" }
-authorized_users = { git = "https://github.com/ddboline/auth_server_rust.git", tag="0.7.5"}
+authorized_users = { git = "https://github.com/ddboline/auth_server_rust.git", tag="0.7.7"}
 stack-string = { version="0.3", features=["postgres_types", "rweb-openapi"] }
 stdout-channel = "0.4"
