@@ -58,7 +58,7 @@ impl LoggedUser {
         client: &Client,
         config: &Config,
     ) -> Result<Option<StackString>, anyhow::Error> {
-        let url = format!("https://{}/api/session", config.domain);
+        let url = format!("https://{}/api/session/movie-queue", config.domain);
         let value = HeaderValue::from_str(&self.session.to_string())?;
         let key = HeaderValue::from_str(&self.secret_key)?;
         let session: Option<SessionData> = client
@@ -79,7 +79,7 @@ impl LoggedUser {
         config: &Config,
         set_url: &str,
     ) -> Result<(), anyhow::Error> {
-        let url = format!("https://{}/api/session", config.domain);
+        let url = format!("https://{}/api/session/movie-queue", config.domain);
         let value = HeaderValue::from_str(&self.session.to_string())?;
         let key = HeaderValue::from_str(&self.secret_key)?;
         let session = SessionData {
