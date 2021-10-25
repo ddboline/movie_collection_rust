@@ -3,7 +3,7 @@ openapi: 3.0.1
 info:
   title: Movie Queue WebApp
   description: Web Frontend for Movie Queue
-  version: 0.8.43
+  version: 0.8.49
 paths:
   /list/index.html:
     get:
@@ -864,9 +864,18 @@ paths:
                   email:
                     description: Email Address
                     type: string
+                  session:
+                    description: Session UUID
+                    format: uuid
+                    type: string
+                  secret_key:
+                    description: Secret Key
+                    type: string
                 type: object
                 required:
                   - email
+                  - session
+                  - secret_key
         "400":
           description: Bad Request
         "404":
