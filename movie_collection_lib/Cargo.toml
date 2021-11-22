@@ -1,6 +1,6 @@
 [package]
 name = "movie_collection_lib"
-version = "0.8.50"
+version = "0.8.51"
 authors = ["Daniel Boline <ddboline@gmail.com>"]
 edition = "2018"
 
@@ -15,7 +15,7 @@ rayon = "1.5"
 clap = "2.33"
 dotenv = "0.15"
 select = "0.5"
-reqwest = {version="0.11", features=["cookies", "json", "rustls-tls"]}
+reqwest = {version="0.11", features=["cookies", "json", "rustls-tls"], default_features=false}
 chrono = { version = "0.4", features = ["serde"] }
 rand = "0.8"
 futures = "0.3"

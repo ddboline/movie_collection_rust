@@ -1,6 +1,6 @@
 FROM rust:alpine3.14 as buildstage
 
-RUN apk add musl-dev && mkdir -p /build/movie_collection_rust
+RUN apk add musl-dev openssl-dev && mkdir -p /build/movie_collection_rust
 
 ADD Cargo.toml /build/movie_collection_rust/
 COPY src /build/movie_collection_rust/src
