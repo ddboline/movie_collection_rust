@@ -199,7 +199,7 @@ async fn run_app(config: Config, pool: PgPool, trakt: TraktConnection) -> Result
         .or(spec_json_path)
         .or(spec_yaml_path)
         .recover(error_response);
-    let addr: SocketAddr = format!("127.0.0.1:{}", port).parse()?;
+    let addr: SocketAddr = format!("{}:{}", app.config.host, port).parse()?;
     rweb::serve(routes).bind(addr).await;
     Ok(())
 }

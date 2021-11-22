@@ -9,8 +9,8 @@ edition = "2018"
 [dependencies]
 movie_collection_lib = {path = "../movie_collection_lib"}
 anyhow = "1.0"
-deadpool = "0.8"
-deadpool-lapin = "0.8"
+deadpool = "0.9"
+deadpool-lapin = "0.9"
 lapin = "1.6"
 derive_more = "0.99"
 futures = "0.3"

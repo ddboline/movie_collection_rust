@@ -9,8 +9,8 @@ serde = {version="1.0", features=["derive"]}
 serde_json = "1.0"
 tokio-postgres = {version="0.7", features=["with-chrono-0_4", "with-serde_json-1"]}
 postgres-types = "0.2"
-deadpool = "0.8"
-deadpool-postgres = "0.9"
+deadpool = "0.9"
+deadpool-postgres = "0.10"
 rayon = "1.5"
 clap = "2.33"
 dotenv = "0.15"
@@ -38,10 +38,10 @@ jwalk = "0.6"
 itertools = "0.10"
 handlebars = "4.0"
 smallvec = "1.6"
-procfs = "0.10"
+procfs = "0.11"
 uuid = "0.8"
 chrono-tz = "0.6"
 roxmltree = "0.14"
-stack-string = { version="0.3", features=["postgres_types"] }
+stack-string = { version="0.4", features=["postgres_types"] }
 stdout-channel = "0.4"
-postgres_query = {git = "https://github.com/ddboline/rust-postgres-query", tag = "0.3.3-2", features=["deadpool"]}
+postgres_query = {git = "https://github.com/ddboline/rust-postgres-query", tag = "0.3.4", features=["deadpool"]}

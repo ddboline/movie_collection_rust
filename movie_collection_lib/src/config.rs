@@ -29,6 +29,8 @@ pub struct ConfigInner {
     pub ratings_table: StackString,
     #[serde(default = "default_episode_table")]
     pub episode_table: StackString,
+    #[serde(default = "default_host")]
+    pub host: StackString,
     #[serde(default = "default_port")]
     pub port: u32,
     #[serde(default = "default_domain")]
@@ -65,6 +67,9 @@ fn default_preferred_dir() -> PathBuf {
 }
 fn default_home_dir() -> PathBuf {
     dirs::home_dir().expect("No home directory")
+}
+fn default_host() -> StackString {
+    "0.0.0.0".into()
 }
 fn default_port() -> u32 {
     8042

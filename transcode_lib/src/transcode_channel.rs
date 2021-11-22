@@ -20,7 +20,7 @@ pub struct TranscodeChannel(Channel);
 impl TranscodeChannel {
     pub async fn open_channel() -> Result<Self, Error> {
         let cfg = LapinConfig::default();
-        let pool = cfg.create_pool();
+        let pool = cfg.create_pool(None)?;
         let conn = pool.get().await?;
         conn.create_channel().await.map_err(Into::into).map(Self)
     }
