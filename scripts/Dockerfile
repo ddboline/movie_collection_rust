@@ -24,4 +24,4 @@ STOPSIGNAL SIGTERM
 
 EXPOSE 8042
 
-CMD ["/usr/bin/aws-app-http"]
+CMD ["/usr/bin/movie-queue-http"]
