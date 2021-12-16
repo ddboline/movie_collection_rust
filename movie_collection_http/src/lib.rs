@@ -257,3 +257,31 @@ pub enum _PlexEventTypeWrapper {
     #[serde(rename = "playback-started")]
     PlaybackStarted,
 }
+
+#[cfg(test)]
+mod test {
+    use rweb_helper::derive_rweb_test;
+
+    use crate::{
+        ImdbEpisodesWrapper, ImdbRatingsWrapper, LastModifiedResponseWrapper,
+        MovieCollectionRowWrapper, MovieQueueRowWrapper, PlexEventTypeWrapper, PlexEventWrapper,
+        PlexFilenameWrapper, TraktActionsWrapper, TvShowSourceWrapper, _ImdbEpisodesWrapper,
+        _ImdbRatingsWrapper, _LastModifiedResponseWrapper, _MovieCollectionRowWrapper,
+        _MovieQueueRowWrapper, _PlexEventTypeWrapper, _PlexEventWrapper, _PlexFilenameWrapper,
+        _TraktActionsWrapper, _TvShowSourceWrapper,
+    };
+
+    #[test]
+    fn test_type() {
+        derive_rweb_test!(ImdbEpisodesWrapper, _ImdbEpisodesWrapper);
+        derive_rweb_test!(TvShowSourceWrapper, _TvShowSourceWrapper);
+        derive_rweb_test!(ImdbRatingsWrapper, _ImdbRatingsWrapper);
+        derive_rweb_test!(MovieQueueRowWrapper, _MovieQueueRowWrapper);
+        derive_rweb_test!(MovieCollectionRowWrapper, _MovieCollectionRowWrapper);
+        derive_rweb_test!(LastModifiedResponseWrapper, _LastModifiedResponseWrapper);
+        derive_rweb_test!(PlexEventWrapper, _PlexEventWrapper);
+        derive_rweb_test!(PlexFilenameWrapper, _PlexFilenameWrapper);
+        derive_rweb_test!(TraktActionsWrapper, _TraktActionsWrapper);
+        derive_rweb_test!(PlexEventTypeWrapper, _PlexEventTypeWrapper);
+    }
+}
