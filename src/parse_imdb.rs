@@ -1,6 +1,7 @@
 #![allow(clippy::used_underscore_binding)]
 
 use anyhow::Error;
+use stack_string::StackString;
 use stdout_channel::StdoutChannel;
 use structopt::StructOpt;
 
@@ -39,7 +40,8 @@ async fn main() {
     match parse_imdb_parser().await {
         Ok(_) => (),
         Err(e) => {
-            if e.to_string().contains("Broken pipe") {
+            let e = StackString::from_display(e).unwrap();
+            if e.contains("Broken pipe") {
             } else {
                 panic!("{}", e);
             }

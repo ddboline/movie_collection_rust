@@ -52,7 +52,7 @@ async fn make_collection() -> Result<(), Error> {
             stdout.send(shows?.join("\n"));
         } else {
             for show in shows {
-                stdout.send(show.to_string());
+                stdout.send(StackString::from_display(show).unwrap());
             }
         }
     }
@@ -66,7 +66,8 @@ async fn main() {
     match make_collection().await {
         Ok(_) => {}
         Err(e) => {
-            if !e.to_string().contains("Broken pipe") {
+            let e = StackString::from_display(e).unwrap();
+            if !e.contains("Broken pipe") {
                 panic!("{}", e);
             }
         }

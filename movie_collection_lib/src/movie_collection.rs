@@ -10,6 +10,7 @@ use std::{
     collections::{HashMap, HashSet},
     ffi::OsStr,
     fmt,
+    fmt::Write,
     path::Path,
     sync::Arc,
 };
@@ -77,7 +78,8 @@ impl fmt::Display for TvShowsResult {
             self.count,
             self.source
                 .as_ref()
-                .map_or_else(|| "".to_string(), ToString::to_string),
+                .map_or(StackString::new(), |s| StackString::from_display(s)
+                    .unwrap()),
         )
     }
 }
@@ -152,8 +154,8 @@ impl ImdbSeason {
         vec![
             self.show.clone(),
             self.title.clone(),
-            self.season.to_string().into(),
-            self.nepisodes.to_string().into(),
+            StackString::from_display(self.season).unwrap(),
+            StackString::from_display(self.nepisodes).unwrap(),
         ]
     }
 }
@@ -261,6 +263,10 @@ impl MovieCollection {
         show: &str,
         season: Option<i32>,
     ) -> Result<Vec<ImdbEpisodes>, Error> {
+        let mut season_str = StackString::new();
+        if let Some(season) = season {
+            write!(season_str, "AND a.season = {}", season)?;
+        }
         let query = query_dyn!(
             &format!(
                 r#"
@@ -273,11 +279,7 @@ impl MovieCollection {
                     WHERE a.show = $show {}
                     ORDER BY a.season, a.episode
                 "#,
-                if let Some(season) = season {
-                    format!("AND a.season = {}", season)
-                } else {
-                    "".to_string()
-                }
+                season_str,
             ),
             show = show,
         )?;
@@ -313,6 +315,18 @@ impl MovieCollection {
             title: StackString,
             istv: Option<bool>,
         }
+        let mut search_constr = StackString::new();
+        if !search_strs.is_empty() {
+            let search_strs = search_strs
+                .iter()
+                .map(|s| {
+                    let mut buf = StackString::new();
+                    write!(buf, "a.path like '%{}%'", s.as_ref()).unwrap();
+                    buf
+                })
+                .join(" OR ");
+            write!(search_constr, "AND ({})", search_strs)?;
+        }
 
         let query = query_dyn!(&format!(
             r#"
@@ -324,15 +338,7 @@ impl MovieCollection {
                 LEFT JOIN imdb_ratings b ON a.show_id = b.index
                 WHERE a.is_deleted = false {}
             "#,
-            if search_strs.is_empty() {
-                "".to_string()
-            } else {
-                let search_strs = search_strs
-                    .iter()
-                    .map(|s| format!("a.path like '%{}%'", s.as_ref()))
-                    .join(" OR ");
-                format!("AND ({})", search_strs)
-            },
+            search_constr,
         ),)?;
         let conn = self.pool.get().await?;
         let results: Vec<SearchMovieCollection> = query.fetch(&conn).await?;
@@ -699,6 +705,12 @@ impl MovieCollection {
         maxdate: NaiveDate,
         source: Option<TvShowSource>,
     ) -> Result<Vec<NewEpisodesResult>, Error> {
+        let mut source_str = StackString::new();
+        match source {
+            Some(TvShowSource::All) => (),
+            Some(s) => write!(source_str, "AND c.source = '{}'", s)?,
+            None => write!(source_str, "AND c.source is null")?,
+        }
         let query = query_dyn!(
             &format!(
                 r#"
@@ -733,11 +745,7 @@ impl MovieCollection {
                     GROUP BY 1,2,3,4,5,6,7,8,9,10
                     ORDER BY d.airdate, c.show, d.season, d.episode
                 "#,
-                match source {
-                    Some(TvShowSource::All) => "".to_string(),
-                    Some(s) => format!("AND c.source = '{}'", s),
-                    None => "AND c.source is null".to_string(),
-                }
+                source_str
             ),
             mindate = mindate,
             maxdate = maxdate
@@ -809,19 +817,22 @@ pub async fn find_new_episodes_http_worker(
     shows: Option<impl AsRef<str>>,
     source: Option<TvShowSource>,
 ) -> Result<Vec<StackString>, Error> {
-    let button_add = format!(
+    let mut source_str = StackString::new();
+    if let Some(s) = source.as_ref() {
+        write!(source_str, "?source={}", s)?;
+    }
+    let mut button_add = StackString::new();
+    write!(
+        button_add,
         "{}{}",
         r#"<td><button type="submit" id="ID" "#,
         format!(
             r#"onclick="imdb_update('SHOW', 'LINK', SEASON,
             '/list/cal{}');"
             >update database</button></td>"#,
-            match source.as_ref() {
-                Some(s) => format!("?source={}", s.to_string()),
-                None => "".to_string(),
-            }
+            source_str,
         ),
-    );
+    )?;
 
     let mc = MovieCollection::new(config, pool, stdout);
     let shows_filter: Option<HashSet<StackString>> =
@@ -874,6 +885,7 @@ pub async fn find_new_episodes_http_worker(
     let output = episodes
         .into_iter()
         .map(|epi| {
+            let season_str = StackString::from_display(epi.season).unwrap();
             let key = (epi.show.clone(), epi.season, epi.episode);
             format!(
                 "<tr><td>{}</td><td>{}</td><td>{}</td><td>{}</td><td>{}</td>{}</tr>",
@@ -886,8 +898,9 @@ pub async fn find_new_episodes_http_worker(
                         r#"<a href="javascript:updateMainArticle('{}');">{}</a>"#,
                         &format!(r#"{}/{}"#, "/list/play", idx),
                         epi.eptitle
-                    ),
-                    None => epi.eptitle.to_string(),
+                    )
+                    .into(),
+                    None => epi.eptitle.clone(),
                 },
                 format!(
                     r#"<a href="https://www.imdb.com/title/{}" target="_blank">s{:02} ep{:02}</a>"#,
@@ -898,7 +911,7 @@ pub async fn find_new_episodes_http_worker(
                 button_add
                     .replace("SHOW", &epi.show)
                     .replace("LINK", &epi.link)
-                    .replace("SEASON", &epi.season.to_string()),
+                    .replace("SEASON", &season_str),
             )
             .into()
         })

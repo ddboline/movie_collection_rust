@@ -20,7 +20,7 @@ impl Deref for TimeZone {
 
 impl From<TimeZone> for String {
     fn from(item: TimeZone) -> Self {
-        item.0.name().to_string()
+        item.0.name().into()
     }
 }
 

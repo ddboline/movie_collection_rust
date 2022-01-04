@@ -21,6 +21,9 @@ pub struct ImdbRatings {
 
 impl fmt::Display for ImdbRatings {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        let source_str = self.source.as_ref().map_or(StackString::new(), |s| {
+            StackString::from_display(s).unwrap()
+        });
         write!(
             f,
             "{} {} {} {} {} {} ",
@@ -29,16 +32,17 @@ impl fmt::Display for ImdbRatings {
             self.link,
             self.rating.unwrap_or(-1.0),
             self.istv.unwrap_or(false),
-            self.source
-                .as_ref()
-                .map_or_else(|| "".to_string(), ToString::to_string),
+            source_str,
         )
     }
 }
 
 impl ImdbRatings {
     pub async fn insert_show(&self, pool: &PgPool) -> Result<(), Error> {
-        let source = self.source.as_ref().map(ToString::to_string);
+        let source = self
+            .source
+            .as_ref()
+            .map(|s| StackString::from_display(s).unwrap());
         let query = query!(
             r#"
                 INSERT INTO imdb_ratings
@@ -122,12 +126,11 @@ impl ImdbRatings {
             self.show.clone(),
             option_string_wrapper(self.title.as_ref()).into(),
             self.link.clone(),
-            self.rating.unwrap_or(-1.0).to_string().into(),
-            self.istv.unwrap_or(false).to_string().into(),
-            self.source
-                .as_ref()
-                .map_or_else(|| "".to_string(), ToString::to_string)
-                .into(),
+            StackString::from_display(self.rating.unwrap_or(-1.0)).unwrap(),
+            StackString::from_display(self.istv.unwrap_or(false)).unwrap(),
+            self.source.as_ref().map_or(StackString::new(), |s| {
+                StackString::from_display(s).unwrap()
+            }),
         ]
     }
 }

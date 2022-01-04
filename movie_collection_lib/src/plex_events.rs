@@ -41,12 +41,13 @@ impl TryFrom<WebhookPayload> for PlexEvent {
             DateTime::from_utc(dt, Utc)
         }
         let event = item.event.to_str().into();
+        let player_address = StackString::from_display(item.player.public_address)?;
         let payload = Self {
             event,
             account: item.account.title,
             server: item.server.title,
             player_title: item.player.title,
-            player_address: item.player.public_address.to_string().into(),
+            player_address,
             title: item.metadata.title,
             parent_title: item.metadata.parent_title,
             grandparent_title: item.metadata.grandparent_title,
@@ -90,7 +91,7 @@ impl PlexEvent {
             constraints.push("last_modified > $start_timestamp");
             bindings.push(("start_timestamp", start_timestamp as Parameter));
         }
-        let event_type = event_type.map(|s| s.to_str().to_string());
+        let event_type: Option<StackString> = event_type.map(|s| s.to_str().into());
         if let Some(event_type) = &event_type {
             constraints.push("event = $event");
             bindings.push(("event", event_type as Parameter));
@@ -185,7 +186,7 @@ impl PlexEvent {
             constraints.push("a.last_modified > $start_timestamp");
             bindings.push(("start_timestamp", start_timestamp as Parameter));
         }
-        let event_type = event_type.map(|s| s.to_str().to_string());
+        let event_type: Option<StackString> = event_type.map(|s| s.to_str().into());
         if let Some(event_type) = &event_type {
             constraints.push("a.event = $event");
             bindings.push(("event", event_type as Parameter));
@@ -226,9 +227,10 @@ impl PlexEvent {
                 let last_modified = match config.default_time_zone {
                     Some(tz) => {
                         let tz: Tz = tz.into();
-                        event.last_modified.with_timezone(&tz).to_string()
+                        StackString::from_display(event.last_modified.with_timezone(&tz)).unwrap()
                     }
-                    None => event.last_modified.with_timezone(&Local).to_string(),
+                    None => StackString::from_display(event.last_modified.with_timezone(&Local))
+                        .unwrap(),
                 };
                 format!(
                     r#"

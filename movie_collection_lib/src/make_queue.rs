@@ -66,7 +66,7 @@ pub async fn make_queue_worker(
             .print_tv_shows()
             .await?
             .into_iter()
-            .map(|s| s.to_string())
+            .map(|s| StackString::from_display(s).unwrap())
             .join("\n");
         stdout.send(shows);
     } else if !del_files.is_empty() {
@@ -90,7 +90,12 @@ pub async fn make_queue_worker(
             let results: Result<Vec<_>, Error> = try_join_all(futures).await;
             stdout.send(results?.join("\n"));
         } else {
-            stdout.send(movie_queue.into_iter().map(|x| x.to_string()).join("\n"));
+            stdout.send(
+                movie_queue
+                    .into_iter()
+                    .map(|x| StackString::from_display(x).unwrap())
+                    .join("\n"),
+            );
         }
     } else if add_files.len() == 1 {
         let max_idx = mq.get_max_queue_index().await?;

@@ -9,7 +9,7 @@ use select::{
 };
 use serde::Deserialize;
 use stack_string::StackString;
-use std::fmt;
+use std::{fmt, fmt::Write};
 
 use crate::utils::{option_string_wrapper, ExponentialRetry};
 
@@ -89,7 +89,7 @@ impl ImdbConnection {
         let url = Url::parse_with_params(endpoint, &[("s", "all"), ("q", title)])?;
         let body = self.get(&url).await?.text().await?;
 
-        let tl_vec: Vec<_> = Document::from(body.as_str())
+        let tl_vec: Vec<(StackString, StackString)> = Document::from(body.as_str())
             .find(Class("result_text"))
             .flat_map(|tr| {
                 tr.find(Name("a"))
@@ -97,7 +97,7 @@ impl ImdbConnection {
                         a.attr("href").and_then(|link| {
                             link.split('/').nth(2).and_then(|imdb_id| {
                                 if imdb_id.starts_with("tt") {
-                                    Some((tr.text().trim().to_string(), imdb_id.to_string()))
+                                    Some((tr.text().trim().into(), imdb_id.into()))
                                 } else {
                                     None
                                 }
@@ -172,17 +172,20 @@ impl ImdbConnection {
         let url = Url::parse(&endpoint)?;
         let body = self.get(&url).await?.text().await?;
 
-        let ep_season_vec: Vec<_> = Document::from(body.as_str())
+        let ep_season_vec: Vec<(StackString, StackString)> = Document::from(body.as_str())
             .find(Name("a"))
             .filter_map(|a| {
                 if let Some("season") = a.attr("class") {
                     let season_ = a.attr("season_number").unwrap_or("-1");
                     if let Some(link) = a.attr("href") {
-                        let episodes_url = format!(
+                        let mut episodes_url = StackString::new();
+                        write!(
+                            episodes_url,
                             "{}/{}/episodes/{}",
                             "http://www.imdb.com/title", imdb_id, link
-                        );
-                        Some((episodes_url, season_.to_string()))
+                        )
+                        .unwrap();
+                        Some((episodes_url, season_.into()))
                     } else {
                         None
                     }

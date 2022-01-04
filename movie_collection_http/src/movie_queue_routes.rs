@@ -15,6 +15,7 @@ use stack_string::StackString;
 use std::{
     borrow::Borrow,
     collections::{HashMap, HashSet},
+    fmt::Write,
     hash::{Hash, Hasher},
     path,
     path::PathBuf,
@@ -68,20 +69,20 @@ pub type HttpResult<T> = Result<T, Error>;
 fn movie_queue_body(patterns: &[StackString], entries: &[StackString]) -> StackString {
     let previous = r#"<a href="javascript:updateMainArticle('/list/tvshows')">Go Back</a><br>"#;
 
-    let watchlist_url = if patterns.is_empty() {
-        "/trakt/watchlist".to_string()
+    let mut watchlist_url = StackString::new();
+    if patterns.is_empty() {
+        write!(watchlist_url, "/trakt/watchlist").unwrap();
     } else {
-        format!("/trakt/watched/list/{}", patterns.join("_"))
-    };
-
-    let entries = format!(
+        write!(watchlist_url, "/trakt/watched/list/{}", patterns.join("_")).unwrap();
+    }
+    let mut output = StackString::new();
+    write!(output,
         r#"{}<a href="javascript:updateMainArticle('{}')">Watch List</a><table border="0">{}</table>"#,
         previous,
         watchlist_url,
         entries.join("")
-    );
-
-    entries.into()
+    ).unwrap();
+    output
 }
 
 async fn queue_body_resp(
@@ -796,6 +797,10 @@ fn process_shows(
         .into_iter()
         .map(|item| {
             let has_watchlist = watchlist.contains(item.link.as_str());
+            let mut watchlist_str = StackString::new();
+            if has_watchlist {
+                write!(watchlist_str, r#"<a href="javascript:updateMainArticle('/trakt/watched/list/{}')">watchlist</a>"#, item.link).unwrap();
+            }
             format!(
                 r#"<tr><td>{}</td>
                 <td><a href="https://www.imdb.com/title/{}" target="_blank">imdb</a></td><td>{}</td><td>{}</td><td>{}</td></tr>"#,
@@ -814,11 +819,7 @@ fn process_shows(
                     Some(TvShowSource::Amazon) => r#"<a href="https://amazon.com" target="_blank">amazon</a>"#,
                     _ => "",
                 },
-                if has_watchlist {
-                    format!(r#"<a href="javascript:updateMainArticle('/trakt/watched/list/{}')">watchlist</a>"#, item.link)
-                } else {
-                    "".to_string()
-                },
+                watchlist_str,
                 if has_watchlist {
                     button_rm.replace("SHOW", &item.link)
                 } else {
@@ -1154,12 +1155,13 @@ async fn watchlist_action_worker(
     imdb_url: &str,
 ) -> HttpResult<StackString> {
     trakt.init().await;
-    let body = match action {
-        TraktActions::Add => trakt.add_watchlist_show(imdb_url).await?.to_string(),
-        TraktActions::Remove => trakt.remove_watchlist_show(imdb_url).await?.to_string(),
-        _ => "".to_string(),
-    };
-    Ok(body.into())
+    let mut body = StackString::new();
+    match action {
+        TraktActions::Add => write!(body, "{}", trakt.add_watchlist_show(imdb_url).await?)?,
+        TraktActions::Remove => write!(body, "{}", trakt.remove_watchlist_show(imdb_url).await?)?,
+        _ => (),
+    }
+    Ok(body)
 }
 
 #[derive(RwebResponse)]
@@ -1477,7 +1479,21 @@ async fn trakt_cal_http_worker(
                 None => None,
             }
         };
-        let line = format!(
+        let season_str = StackString::from_display(cal.season)?;
+        let mut button = StackString::new();
+        if exists.is_none() {
+            write!(
+                button,
+                "{}",
+                button_add
+                    .replace("SHOW", &show)
+                    .replace("LINK", &cal.link)
+                    .replace("SEASON", &season_str)
+            )?;
+        }
+        let mut line = StackString::new();
+        write!(
+            line,
             "<tr><td>{}</td><td>{}</td><td>{}</td><td>{}</td>{}</tr>",
             format!(
                 r#"<a href="javascript:updateMainArticle('/trakt/watched/list/{}/{}')">{}</a>"#,
@@ -1501,16 +1517,8 @@ async fn trakt_cal_http_worker(
                 format!("{} {}", cal.season, cal.episode,)
             },
             cal.airdate,
-            if exists.is_some() {
-                "".to_string()
-            } else {
-                button_add
-                    .replace("SHOW", &show)
-                    .replace("LINK", &cal.link)
-                    .replace("SEASON", &cal.season.to_string())
-            },
-        )
-        .into();
+            button,
+        )?;
         lines.push(line);
     }
     Ok(lines)
@@ -1577,16 +1585,20 @@ pub async fn watch_list_http_worker(
     let entries = entries
         .iter()
         .map(|s| {
-            let entry = if let Some(collection_idx) = collection_idx_map.get(&s.episode) {
-                format!(
+            let mut entry = StackString::new();
+            if let Some(collection_idx) = collection_idx_map.get(&s.episode) {
+                write!(
+                    entry,
                     r#"<a href="javascript:updateMainArticle('{}');">{}</a>"#,
                     &format!("{}/{}", "/list/play", collection_idx),
                     s.eptitle
                 )
+                .unwrap();
             } else {
-                s.eptitle.to_string()
-            };
-
+                write!(entry, "{}", s.eptitle).unwrap();
+            }
+            let season_str = StackString::from_display(season).unwrap();
+            let episode_str = StackString::from_display(s.episode).unwrap();
             format!(
                 "<tr><td>{}</td><td><td>{}</td><td>{}</td><td>{}</td><td>{}</td><td>{}</td></tr>",
                 show.show,
@@ -1604,13 +1616,13 @@ pub async fn watch_list_http_worker(
                 if watched_episodes_db.contains(&s.episode) {
                     button_rm
                         .replace("SHOW", &show.link)
-                        .replace("SEASON", &season.to_string())
-                        .replace("EPISODE", &s.episode.to_string())
+                        .replace("SEASON", &season_str)
+                        .replace("EPISODE", &episode_str)
                 } else {
                     button_add
                         .replace("SHOW", &show.link)
-                        .replace("SEASON", &season.to_string())
-                        .replace("EPISODE", &s.episode.to_string())
+                        .replace("SEASON", &season_str)
+                        .replace("EPISODE", &episode_str)
                 }
             )
         })
@@ -1653,20 +1665,21 @@ pub async fn watched_action_http_worker(
     stdout: &StdoutChannel<StackString>,
 ) -> HttpResult<StackString> {
     let mc = MovieCollection::new(config, pool, stdout);
-    let imdb_url = Arc::new(imdb_url.to_owned());
+    // let imdb_url = Arc::new(imdb_url.to_owned());
     trakt.init().await;
-    let body = match action {
+    let mut body = StackString::new();
+    match action {
         TraktActions::Add => {
             let result = if season != -1 && episode != -1 {
                 trakt
-                    .add_episode_to_watched(&imdb_url, season, episode)
+                    .add_episode_to_watched(imdb_url, season, episode)
                     .await?
             } else {
-                trakt.add_movie_to_watched(&imdb_url).await?
+                trakt.add_movie_to_watched(imdb_url).await?
             };
             if season != -1 && episode != -1 {
                 WatchedEpisode {
-                    imdb_url: imdb_url.to_string().into(),
+                    imdb_url: imdb_url.into(),
                     season,
                     episode,
                     ..WatchedEpisode::default()
@@ -1675,42 +1688,38 @@ pub async fn watched_action_http_worker(
                 .await?;
             } else {
                 WatchedMovie {
-                    imdb_url: imdb_url.to_string().into(),
+                    imdb_url: imdb_url.into(),
                     title: "".into(),
                 }
                 .insert_movie(&mc.pool)
                 .await?;
             }
 
-            format!("{}", result)
+            write!(body, "{}", result)?;
         }
         TraktActions::Remove => {
-            let imdb_url_ = Arc::clone(&imdb_url);
             let result = if season != -1 && episode != -1 {
                 trakt
-                    .remove_episode_to_watched(&imdb_url_, season, episode)
+                    .remove_episode_to_watched(imdb_url, season, episode)
                     .await?
             } else {
-                trakt.remove_movie_to_watched(&imdb_url_).await?
+                trakt.remove_movie_to_watched(imdb_url).await?
             };
 
             if season != -1 && episode != -1 {
                 if let Some(epi_) =
-                    WatchedEpisode::get_watched_episode(&mc.pool, &imdb_url, season, episode)
-                        .await?
+                    WatchedEpisode::get_watched_episode(&mc.pool, imdb_url, season, episode).await?
                 {
                     epi_.delete_episode(&mc.pool).await?;
                 }
-            } else if let Some(movie) = WatchedMovie::get_watched_movie(&mc.pool, &imdb_url).await?
-            {
+            } else if let Some(movie) = WatchedMovie::get_watched_movie(&mc.pool, imdb_url).await? {
                 movie.delete_movie(&mc.pool).await?;
             };
 
-            format!("{}", result)
+            write!(body, "{}", result)?;
         }
-        _ => "".to_string(),
+        _ => (),
     }
-    .into();
     Ok(body)
 }
 

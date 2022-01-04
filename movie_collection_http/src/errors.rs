@@ -12,7 +12,12 @@ use rweb::{
 };
 use serde::Serialize;
 use stack_string::StackString;
-use std::{borrow::Cow, convert::Infallible, fmt::Debug, io::Error as IoError};
+use std::{
+    borrow::Cow,
+    convert::Infallible,
+    fmt::{Debug, Error as FmtError},
+    io::Error as IoError,
+};
 use thiserror::Error;
 
 use crate::logged_user::TRIGGER_DB_UPDATE;
@@ -32,14 +37,16 @@ pub enum ServiceError {
     RenderError(#[from] RenderError),
     #[error("IoError {0}")]
     IoError(#[from] IoError),
+    #[error("FmtError {0}")]
+    FmtError(#[from] FmtError),
 }
 
 impl Reject for ServiceError {}
 
 #[derive(Serialize)]
-struct ErrorMessage {
+struct ErrorMessage<'a> {
     code: u16,
-    message: String,
+    message: &'a str,
 }
 
 #[allow(clippy::unused_async)]
@@ -87,7 +94,7 @@ pub async fn error_response(err: Rejection) -> Result<Box<dyn Reply>, Infallible
 
     let reply = rweb::reply::json(&ErrorMessage {
         code: code.as_u16(),
-        message: message.to_string(),
+        message,
     });
     let reply = rweb::reply::with_status(reply, code);
 

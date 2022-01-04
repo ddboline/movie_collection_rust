@@ -59,7 +59,8 @@ impl LoggedUser {
         config: &Config,
     ) -> Result<Option<StackString>, anyhow::Error> {
         let url = format!("https://{}/api/session/movie-queue", config.domain);
-        let value = HeaderValue::from_str(&self.session.to_string())?;
+        let session_str = StackString::from_display(self.session)?;
+        let value = HeaderValue::from_str(&session_str)?;
         let key = HeaderValue::from_str(&self.secret_key)?;
         let session: Option<SessionData> = client
             .get(url)
@@ -80,7 +81,8 @@ impl LoggedUser {
         set_url: &str,
     ) -> Result<(), anyhow::Error> {
         let url = format!("https://{}/api/session/movie-queue", config.domain);
-        let value = HeaderValue::from_str(&self.session.to_string())?;
+        let session_str = StackString::from_display(self.session)?;
+        let value = HeaderValue::from_str(&session_str)?;
         let key = HeaderValue::from_str(&self.secret_key)?;
         let session = SessionData {
             movie_last_url: set_url.into(),

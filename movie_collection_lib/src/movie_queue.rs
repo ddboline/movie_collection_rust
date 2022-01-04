@@ -6,7 +6,7 @@ use log::debug;
 use postgres_query::{query, query_dyn, FromSqlRow};
 use serde::{Deserialize, Serialize};
 use stack_string::StackString;
-use std::{fmt, path::Path};
+use std::{fmt, fmt::Write, path::Path};
 use stdout_channel::StdoutChannel;
 
 use crate::{
@@ -236,7 +236,10 @@ impl MovieQueueDB {
             .iter()
             .map(|p| format!("b.path like '%{}%'", p))
             .join(" OR ");
-
+        let mut where_str = StackString::new();
+        if !constraints.is_empty() {
+            write!(where_str, "WHERE {}", constraints)?;
+        }
         let query = query_dyn!(&format!(
             r#"
                 SELECT a.idx, b.path, c.link, c.istv
@@ -246,11 +249,7 @@ impl MovieQueueDB {
                 {}
                 ORDER BY a.idx
             "#,
-            if constraints.is_empty() {
-                "".to_string()
-            } else {
-                format!("WHERE {}", constraints)
-            }
+            where_str
         ),)?;
         let conn = self.pool.get().await?;
         let results: Vec<PrintMovieQueue> = query.fetch(&conn).await?;
@@ -284,7 +283,7 @@ impl MovieQueueDB {
                 if let Some((epurl,)) = query.fetch_opt(&conn).await? {
                     let epurl: String = epurl;
                     result.eplink = Some(epurl.into());
-                    result.show = Some(show.to_string().into());
+                    result.show = Some(show);
                     result.season = Some(season);
                     result.episode = Some(episode);
                 }

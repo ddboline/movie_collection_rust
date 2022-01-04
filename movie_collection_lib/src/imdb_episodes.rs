@@ -154,10 +154,10 @@ impl ImdbEpisodes {
         vec![
             self.show.clone(),
             self.title.clone(),
-            self.season.to_string().into(),
-            self.episode.to_string().into(),
-            self.airdate.to_string().into(),
-            self.rating.to_string().into(),
+            StackString::from_display(self.season).unwrap(),
+            StackString::from_display(self.episode).unwrap(),
+            StackString::from_display(self.airdate).unwrap(),
+            StackString::from_display(self.rating).unwrap(),
             self.eptitle.clone(),
             self.epurl.clone(),
         ]

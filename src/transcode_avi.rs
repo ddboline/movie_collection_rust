@@ -88,7 +88,8 @@ async fn main() -> Result<(), Error> {
         match transcode_single(&transcode_service, request_file).await {
             Ok(_) => (),
             Err(e) => {
-                if e.to_string().contains("Broken pipe") {
+                let e = StackString::from_display(e).unwrap();
+                if e.contains("Broken pipe") {
                 } else {
                     panic!("{}", e);
                 }
@@ -100,7 +101,8 @@ async fn main() -> Result<(), Error> {
     match transcode_avi(&transcode_service, &config, &stdout, &opts.files).await {
         Ok(_) => (),
         Err(e) => {
-            if e.to_string().contains("Broken pipe") {
+            let e = StackString::from_display(e).unwrap();
+            if e.contains("Broken pipe") {
             } else {
                 panic!("{}", e);
             }

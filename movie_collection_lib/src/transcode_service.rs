@@ -10,6 +10,7 @@ use std::{
     collections::HashMap,
     ffi::OsStr,
     fmt,
+    fmt::Write,
     future::Future,
     path::{Path, PathBuf},
     process::Stdio,
@@ -35,7 +36,7 @@ pub enum JobType {
 }
 
 impl JobType {
-    fn get_str(self) -> &'static str {
+    fn to_str(self) -> &'static str {
         match self {
             Self::Transcode => "transcode",
             Self::Move => "move",
@@ -45,7 +46,7 @@ impl JobType {
 
 impl fmt::Display for JobType {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "{}", self.get_str())
+        write!(f, "{}", self.to_str())
     }
 }
 
@@ -121,7 +122,7 @@ impl TranscodeServiceRequest {
             .to_string_lossy();
         let file_stem = path.file_stem().expect("No file stem");
         if ext == "mp4" {
-            let prefix = file_stem.to_string_lossy().to_string();
+            let prefix = file_stem.to_string_lossy().into_owned().into();
             let output_dir = if let Some(d) = directory {
                 let d = config
                     .preferred_dir
@@ -170,7 +171,6 @@ impl TranscodeServiceRequest {
                 d
             };
 
-            let prefix = prefix.into();
             let input_path = path.to_path_buf();
             let output_path = output_dir.join(&format!("{}.mp4", prefix));
 
@@ -187,19 +187,19 @@ impl TranscodeServiceRequest {
 
     pub fn get_html(&self) -> Vec<StackString> {
         vec![
-            self.job_type.to_string().into(),
+            self.job_type.to_str().into(),
             self.prefix.clone(),
             self.input_path
                 .file_name()
                 .unwrap_or_else(|| OsStr::new(""))
                 .to_string_lossy()
-                .to_string()
+                .into_owned()
                 .into(),
             self.output_path
                 .file_name()
                 .unwrap_or_else(|| OsStr::new(""))
                 .to_string_lossy()
-                .to_string()
+                .into_owned()
                 .into(),
         ]
     }
@@ -430,43 +430,40 @@ impl TranscodeService {
         let new_path = output_file.with_extension("new");
         let task0 = spawn({
             let new_path = new_path.clone();
-            debug_output_file
-                .write_all(
-                    format!(
-                        "copy {} to {}\n",
-                        show_path.to_string_lossy(),
-                        new_path.to_string_lossy()
-                    )
-                    .as_bytes(),
-                )
-                .await?;
+            let mut buf = StackString::new();
+            write!(
+                buf,
+                "copy {} to {}\n",
+                show_path.to_string_lossy(),
+                new_path.to_string_lossy()
+            )
+            .unwrap();
+            debug_output_file.write_all(buf.as_bytes()).await?;
             async move { fs::copy(&show_path, &new_path).await }
         });
         if output_file.exists() {
             let old_path = output_file.with_extension("old");
-            debug_output_file
-                .write_all(
-                    format!(
-                        "copy {} to {}\n",
-                        output_file.to_string_lossy(),
-                        old_path.to_string_lossy()
-                    )
-                    .as_bytes(),
-                )
-                .await?;
+            let mut buf = StackString::new();
+            write!(
+                buf,
+                "copy {} to {}\n",
+                output_file.to_string_lossy(),
+                old_path.to_string_lossy()
+            )
+            .unwrap();
+            debug_output_file.write_all(buf.as_bytes()).await?;
             fs::rename(&output_file, &old_path).await?;
         }
         task0.await??;
-        debug_output_file
-            .write_all(
-                format!(
-                    "copy {} to {}\n",
-                    new_path.to_string_lossy(),
-                    output_file.to_string_lossy()
-                )
-                .as_bytes(),
-            )
-            .await?;
+        let mut buf = StackString::new();
+        write!(
+            buf,
+            "copy {} to {}\n",
+            new_path.to_string_lossy(),
+            output_file.to_string_lossy()
+        )
+        .unwrap();
+        debug_output_file.write_all(buf.as_bytes()).await?;
         fs::rename(&new_path, &output_file).await?;
         make_queue_worker(
             &self.config,
@@ -478,9 +475,9 @@ impl TranscodeService {
             &self.stdout,
         )
         .await?;
-        debug_output_file
-            .write_all(format!("add {} to queue\n", output_file.to_string_lossy()).as_bytes())
-            .await?;
+        let mut buf = StackString::new();
+        write!(buf, "add {} to queue\n", output_file.to_string_lossy()).unwrap();
+        debug_output_file.write_all(buf.as_bytes()).await?;
         make_queue_worker(
             &self.config,
             &[output_file.into()],
@@ -545,9 +542,9 @@ impl ProcInfo {
 
     pub fn get_html(&self) -> Vec<StackString> {
         vec![
-            self.pid.to_string().into(),
+            StackString::from_display(self.pid).unwrap(),
             self.name.clone(),
-            self.exe.to_string_lossy().to_string().into(),
+            self.exe.to_string_lossy().into_owned().into(),
             self.cmdline.join(" ").into(),
         ]
     }
@@ -596,32 +593,44 @@ impl TranscodeStatus {
     pub fn get_proc_map(&self) -> HashMap<StackString, Option<ProcStatus>> {
         let upcoming = self.upcoming_jobs.iter().filter_map(|j| {
             j.input_path.file_name().map(|f| {
-                let f_key = f
-                    .to_string_lossy()
-                    .replace(".mkv", "")
-                    .replace(".avi", "")
-                    .replace(".mp4", "");
+                let f = f.to_string_lossy().into_owned();
+                let mut f_key = f.as_str();
+                if let Some(s) = f_key.strip_suffix(".mkv") {
+                    f_key = s;
+                }
+                if let Some(s) = f_key.strip_suffix(".avi") {
+                    f_key = s;
+                }
+                if let Some(s) = f_key.strip_suffix(".mp4") {
+                    f_key = s;
+                }
                 (f_key.into(), Some(ProcStatus::Upcoming))
             })
         });
         let current = self.current_jobs.iter().filter_map(|(p, _)| {
             p.file_name().map(|f| {
-                let f = f
-                    .to_string_lossy()
-                    .replace("_mp4.out", "")
-                    .replace("_copy.out", "")
-                    .into();
-                (f, Some(ProcStatus::Current))
+                let f = f.to_string_lossy().into_owned();
+                let mut f_key = f.as_str();
+                if let Some(s) = f_key.strip_suffix("_mp4.out") {
+                    f_key = s;
+                }
+                if let Some(s) = f_key.strip_suffix("_copy.out") {
+                    f_key = s;
+                }
+                (f_key.into(), Some(ProcStatus::Current))
             })
         });
         let finished = self.finished_jobs.iter().filter_map(|p| {
             p.file_name().map(|f| {
-                let f = f
-                    .to_string_lossy()
-                    .replace("_copy.out", "")
-                    .replace("_mp4.out", "")
-                    .into();
-                (f, Some(ProcStatus::Finished))
+                let f = f.to_string_lossy().into_owned();
+                let mut f_key = f.as_str();
+                if let Some(s) = f_key.strip_suffix("_mp4.out") {
+                    f_key = s;
+                }
+                if let Some(s) = f_key.strip_suffix("_copy.out") {
+                    f_key = s;
+                }
+                (f_key.into(), Some(ProcStatus::Finished))
             })
         });
 
@@ -771,7 +780,7 @@ impl fmt::Display for TranscodeStatus {
                 "Upcoming jobs:\n\n{}\n\n",
                 self.upcoming_jobs
                     .iter()
-                    .map(ToString::to_string)
+                    .map(|s| StackString::from_display(s).unwrap())
                     .join("\n")
             )?;
         }

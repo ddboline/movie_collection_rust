@@ -4,7 +4,7 @@ use itertools::Itertools;
 use log::debug;
 use rayon::iter::{IntoParallelRefIterator, ParallelIterator};
 use stack_string::StackString;
-use std::{collections::HashMap, ffi::OsStr, path::PathBuf};
+use std::{collections::HashMap, ffi::OsStr, fmt::Write, path::PathBuf};
 use stdout_channel::StdoutChannel;
 use tokio::{
     fs,
@@ -110,27 +110,33 @@ pub async fn make_list(stdout: &StdoutChannel<StackString>) -> Result<(), Error>
     let proc_map = transcode_task.await??.get_proc_map();
     debug!("{:?}", proc_map);
 
-    file_lists
-        .local_file_list
-        .iter()
-        .map(|f| {
-            let f_key = f
-                .replace(".mkv", "")
-                .replace(".avi", "")
-                .replace(".mp4", "");
-            if let Some(full_path) = file_map.get(f_key.as_str()) {
-                format!("{} {}", f, full_path.to_string_lossy())
-            } else if let Some(Some(status)) = proc_map.get(f_key.as_str()) {
-                format!("{} {}", f, status)
-            } else {
-                f.to_string()
-            }
-        })
-        .for_each(|e| stdout.send(e));
+    for f in &file_lists.local_file_list {
+        let mut f_key = f.as_str();
+        if let Some(s) = f_key.strip_suffix(".mkv") {
+            f_key = s;
+        }
+        if let Some(s) = f_key.strip_suffix(".avi") {
+            f_key = s;
+        }
+        if let Some(s) = f_key.strip_suffix(".mp4") {
+            f_key = s;
+        }
+        let mut fout = StackString::new();
+        if let Some(full_path) = file_map.get(f_key) {
+            write!(fout, "{} {}", f, full_path.to_string_lossy()).unwrap();
+        } else if let Some(Some(status)) = proc_map.get(f_key) {
+            write!(fout, "{} {}", f, status).unwrap();
+        } else {
+            write!(fout, "{}", f).unwrap();
+        }
+        stdout.send(fout);
+    }
 
     let futures = file_lists.file_list.iter().map(|f| async move {
         let timeval = get_video_runtime(f).await.unwrap_or_else(|_| "".into());
-        format!("{} {}", timeval, f.to_string_lossy())
+        let mut buf = StackString::new();
+        write!(buf, "{} {}", timeval, f.to_string_lossy()).unwrap();
+        buf
     });
 
     for e in join_all(futures).await {

@@ -191,7 +191,7 @@ impl ParseImdb {
                 }
             }
             for result in &results {
-                output.push(vec![result.to_string().into()]);
+                output.push(vec![StackString::from_display(result).unwrap()]);
             }
         } else if let Some(link) = link {
             output.push(vec![format!("Using {}", link).into()]);

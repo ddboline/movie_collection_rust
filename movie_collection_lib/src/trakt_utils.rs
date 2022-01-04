@@ -10,6 +10,7 @@ use std::{
     borrow::Borrow,
     collections::{HashMap, HashSet},
     fmt,
+    fmt::Write,
     hash::{Hash, Hasher},
     str::FromStr,
     sync::Arc,
@@ -35,14 +36,20 @@ pub enum TraktActions {
     Remove,
 }
 
+impl TraktActions {
+    pub fn to_str(self) -> &'static str {
+        match self {
+            Self::List => "list",
+            Self::Add => "add",
+            Self::Remove => "rm",
+            _ => "",
+        }
+    }
+}
+
 impl fmt::Display for TraktActions {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        match self {
-            Self::List => write!(f, "list"),
-            Self::Add => write!(f, "add"),
-            Self::Remove => write!(f, "rm"),
-            _ => write!(f, ""),
-        }
+        f.write_str(self.to_str())
     }
 }
 
@@ -397,11 +404,10 @@ pub async fn get_watched_shows_db(
         where_vec.push(format!("a.season={}", season));
     }
 
-    let where_str = if where_vec.is_empty() {
-        "".to_string()
-    } else {
-        format!("WHERE {}", where_vec.join(" AND "))
-    };
+    let mut where_str = StackString::new();
+    if !where_vec.is_empty() {
+        write!(where_str, "WHERE {}", where_vec.join(" AND "))?;
+    }
 
     let query = query_dyn!(&format!(
         r#"
@@ -705,8 +711,12 @@ async fn watchlist_rm(
 
 async fn watchlist_list(mc: &MovieCollection) -> Result<(), Error> {
     let show_map = get_watchlist_shows_db(&mc.pool).await?;
-    mc.stdout
-        .send(show_map.iter().map(ToString::to_string).join("\n"));
+    mc.stdout.send(
+        show_map
+            .iter()
+            .map(|w| StackString::from_display(w).unwrap())
+            .join("\n"),
+    );
     Ok(())
 }
 
@@ -794,7 +804,7 @@ async fn watched_list(mc: &MovieCollection, show: &str, season: i32) -> Result<(
                     return None;
                 }
                 if show.imdb_url.as_str() == imdb_url.as_str() {
-                    Some(show.to_string())
+                    Some(StackString::from_display(show).unwrap())
                 } else {
                     None
                 }
@@ -805,7 +815,7 @@ async fn watched_list(mc: &MovieCollection, show: &str, season: i32) -> Result<(
             .iter()
             .filter_map(|show| {
                 if show.imdb_url.as_str() == imdb_url.as_str() {
-                    Some(show.to_string())
+                    Some(StackString::from_display(show).unwrap())
                 } else {
                     None
                 }
@@ -813,10 +823,18 @@ async fn watched_list(mc: &MovieCollection, show: &str, season: i32) -> Result<(
             .join("\n");
         mc.stdout.send(lines);
     } else {
-        mc.stdout
-            .send(watched_shows.iter().map(ToString::to_string).join("\n"));
-        mc.stdout
-            .send(watched_movies.iter().map(ToString::to_string).join("\n"));
+        mc.stdout.send(
+            watched_shows
+                .iter()
+                .map(|w| StackString::from_display(w).unwrap())
+                .join("\n"),
+        );
+        mc.stdout.send(
+            watched_movies
+                .iter()
+                .map(|w| StackString::from_display(w).unwrap())
+                .join("\n"),
+        );
     }
     Ok(())
 }

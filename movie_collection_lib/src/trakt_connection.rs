@@ -205,10 +205,9 @@ impl TraktConnection {
     ) -> Result<Vec<WatchListShowsResponse>, Error> {
         let headers = self.get_rw_headers().await?;
         let url = format!("{}/sync/watchlist/shows", self.config.trakt_endpoint);
-        let url = Url::parse_with_params(
-            &url,
-            &[("page", &page.to_string()), ("limit", &limit.to_string())],
-        )?;
+        let page_str = StackString::from_display(page)?;
+        let limit_str = StackString::from_display(limit)?;
+        let url = Url::parse_with_params(&url, &[("page", &page_str), ("limit", &limit_str)])?;
         let resp = self
             .client
             .get(url)

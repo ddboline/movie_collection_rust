@@ -12,11 +12,3 @@
 #![allow(clippy::used_underscore_binding)]
 
 pub mod transcode_channel;
-
-#[cfg(test)]
-mod tests {
-    #[test]
-    fn it_works() {
-        assert_eq!(2 + 2, 4);
-    }
-}

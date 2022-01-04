@@ -26,20 +26,20 @@ impl TvShowSource {
             Self::Netflix => 3,
         }
     }
+
+    pub fn to_str(self) -> &'static str {
+        match self {
+            Self::Netflix => "netflix",
+            Self::Hulu => "hulu",
+            Self::Amazon => "amazon",
+            Self::All => "all",
+        }
+    }
 }
 
 impl fmt::Display for TvShowSource {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        write!(
-            f,
-            "{}",
-            match self {
-                Self::Netflix => "netflix",
-                Self::Hulu => "hulu",
-                Self::Amazon => "amazon",
-                Self::All => "all",
-            }
-        )
+        write!(f, "{}", self.to_str(),)
     }
 }
 
@@ -92,7 +92,7 @@ impl ToSql for TvShowSource {
     where
         Self: Sized,
     {
-        self.to_string().to_sql(ty, out)
+        self.to_str().to_sql(ty, out)
     }
 
     fn accepts(ty: &Type) -> bool
@@ -107,6 +107,6 @@ impl ToSql for TvShowSource {
         ty: &Type,
         out: &mut BytesMut,
     ) -> Result<IsNull, Box<dyn std::error::Error + Sync + Send>> {
-        self.to_string().to_sql_checked(ty, out)
+        self.to_str().to_sql_checked(ty, out)
     }
 }

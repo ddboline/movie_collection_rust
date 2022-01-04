@@ -1,6 +1,7 @@
 #![allow(clippy::used_underscore_binding)]
 
 use anyhow::Error;
+use stack_string::StackString;
 use stdout_channel::StdoutChannel;
 
 use movie_collection_lib::make_list::make_list;
@@ -13,7 +14,8 @@ async fn main() -> Result<(), Error> {
     match make_list(&stdout).await {
         Ok(_) => {}
         Err(e) => {
-            if e.to_string().contains("Broken pipe") {
+            let e = StackString::from_display(e).unwrap();
+            if e.contains("Broken pipe") {
             } else {
                 panic!("{}", e);
             }

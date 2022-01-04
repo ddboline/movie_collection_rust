@@ -86,7 +86,8 @@ async fn main() {
     match trakt_app().await {
         Ok(_) => (),
         Err(e) => {
-            if e.to_string().contains("Broken pipe") {
+            let e = StackString::from_display(e).unwrap();
+            if e.contains("Broken pipe") {
             } else {
                 panic!("{}", e);
             }
