@@ -108,12 +108,13 @@ impl ImdbConnection {
             })
             .collect();
 
-        let futures = tl_vec.into_iter().map(|(t, l)| async move {
-            let r = self.parse_imdb_rating(&l).await?;
+        let futures = tl_vec.into_iter().map(|(title, link)| async move {
+            let r = self.parse_imdb_rating(&link).await?;
+            let rating = r.rating.unwrap_or(-1.0);
             Ok(ImdbTuple {
-                title: t.into(),
-                link: l.into(),
-                rating: r.rating.unwrap_or(-1.0),
+                title,
+                link,
+                rating,
             })
         });
         try_join_all(futures).await
@@ -181,8 +182,8 @@ impl ImdbConnection {
                         let mut episodes_url = StackString::new();
                         write!(
                             episodes_url,
-                            "{}/{}/episodes/{}",
-                            "http://www.imdb.com/title", imdb_id, link
+                            "http://www.imdb.com/title/{}/episodes/{}",
+                            imdb_id, link,
                         )
                         .unwrap();
                         Some((episodes_url, season_.into()))

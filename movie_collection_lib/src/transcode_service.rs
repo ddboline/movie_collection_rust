@@ -431,9 +431,9 @@ impl TranscodeService {
         let task0 = spawn({
             let new_path = new_path.clone();
             let mut buf = StackString::new();
-            write!(
+            writeln!(
                 buf,
-                "copy {} to {}\n",
+                "copy {} to {}",
                 show_path.to_string_lossy(),
                 new_path.to_string_lossy()
             )
@@ -444,9 +444,9 @@ impl TranscodeService {
         if output_file.exists() {
             let old_path = output_file.with_extension("old");
             let mut buf = StackString::new();
-            write!(
+            writeln!(
                 buf,
-                "copy {} to {}\n",
+                "copy {} to {}",
                 output_file.to_string_lossy(),
                 old_path.to_string_lossy()
             )
@@ -456,9 +456,9 @@ impl TranscodeService {
         }
         task0.await??;
         let mut buf = StackString::new();
-        write!(
+        writeln!(
             buf,
-            "copy {} to {}\n",
+            "copy {} to {}",
             new_path.to_string_lossy(),
             output_file.to_string_lossy()
         )
@@ -476,7 +476,7 @@ impl TranscodeService {
         )
         .await?;
         let mut buf = StackString::new();
-        write!(buf, "add {} to queue\n", output_file.to_string_lossy()).unwrap();
+        writeln!(buf, "add {} to queue", output_file.to_string_lossy()).unwrap();
         debug_output_file.write_all(buf.as_bytes()).await?;
         make_queue_worker(
             &self.config,

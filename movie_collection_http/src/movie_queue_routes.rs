@@ -338,7 +338,7 @@ pub async fn movie_queue_play(
     let body = play_worker(
         &state.config,
         movie_path,
-        last_url.as_ref().map(|s| s.as_str()),
+        last_url.as_ref().map(StackString::as_str),
     )?;
     task.await.ok();
     Ok(HtmlBase::new(body).into())

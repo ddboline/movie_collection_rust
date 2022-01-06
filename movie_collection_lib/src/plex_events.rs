@@ -240,14 +240,17 @@ impl PlexEvent {
                 "#,
                     last_modified,
                     event.event,
-                    event.metadata_type.as_ref().map_or("", |s| s.as_str()),
-                    event.section_title.as_ref().map_or("", |s| s.as_str()),
+                    event.metadata_type.as_ref().map_or("", StackString::as_str),
+                    event.section_title.as_ref().map_or("", StackString::as_str),
                     format!(
                         "{} {} {} {}",
                         event.title,
-                        event.parent_title.as_ref().map_or("", |s| s.as_str()),
-                        event.grandparent_title.as_ref().map_or("", |s| s.as_str()),
-                        event.filename.as_ref().map_or("", |s| s.as_str()),
+                        event.parent_title.as_ref().map_or("", StackString::as_str),
+                        event
+                            .grandparent_title
+                            .as_ref()
+                            .map_or("", StackString::as_str),
+                        event.filename.as_ref().map_or("", StackString::as_str),
                     )
                 )
             })

@@ -42,7 +42,7 @@ impl TraktActions {
             Self::List => "list",
             Self::Add => "add",
             Self::Remove => "rm",
-            _ => "",
+            Self::None => "",
         }
     }
 }

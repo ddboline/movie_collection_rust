@@ -67,9 +67,7 @@ async fn main() {
         Ok(_) => {}
         Err(e) => {
             let e = StackString::from_display(e).unwrap();
-            if !e.contains("Broken pipe") {
-                panic!("{}", e);
-            }
+            assert!(e.contains("Broken pipe"), "{}", e);
         }
     }
 }

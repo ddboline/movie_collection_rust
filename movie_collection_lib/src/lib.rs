@@ -13,6 +13,7 @@
 #![allow(clippy::upper_case_acronyms)]
 #![allow(clippy::inconsistent_struct_constructor)]
 #![allow(clippy::default_trait_access)]
+#![allow(clippy::missing_panics_doc)]
 
 pub mod config;
 pub mod imdb_episodes;

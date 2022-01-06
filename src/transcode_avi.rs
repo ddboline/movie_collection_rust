@@ -29,10 +29,11 @@ async fn transcode_avi(
             movie_path.join(path)
         }
         .canonicalize()?;
-
-        if !path.exists() {
-            panic!("file doesn't exist {}", path.to_string_lossy());
-        }
+        assert!(
+            path.exists(),
+            "file doesn't exist {}",
+            path.to_string_lossy()
+        );
         let payload = TranscodeServiceRequest::create_transcode_request(config, &path)?;
         publish_single(transcode_service, &payload).await?;
         stdout.send(format!("script {:?}", payload));
