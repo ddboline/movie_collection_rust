@@ -12,6 +12,7 @@
 #![allow(clippy::manual_map)]
 #![allow(clippy::default_trait_access)]
 #![allow(clippy::unused_async)]
+#![allow(clippy::missing_panics_doc)]
 
 pub mod errors;
 pub mod logged_user;
