@@ -1,7 +1,7 @@
 use anyhow::Error;
 use chrono::NaiveDate;
-use stack_string::StackString;
-use std::collections::HashMap;
+use stack_string::{format_sstr, StackString};
+use std::{collections::HashMap, fmt::Write};
 use stdout_channel::StdoutChannel;
 use structopt::StructOpt;
 
@@ -167,13 +167,17 @@ impl ParseImdb {
                             new.rating = Some(result.rating);
                         }
                         new.update_show(&self.mc.pool).await?;
-                        output.push(vec![format!(
+                        output.push(vec![format_sstr!(
                             "exists {} {} {}",
-                            opts.show, s, result.rating
+                            opts.show,
+                            s,
+                            result.rating
                         )
                         .into()]);
                     } else {
-                        output.push(vec![format!("not exists {} {}", opts.show, result).into()]);
+                        output.push(vec![
+                            format_sstr!("not exists {} {}", opts.show, result).into()
+                        ]);
                         let istv = result.title.contains("TV Series")
                             || result.title.contains("TV Mini-Series");
 
@@ -191,16 +195,16 @@ impl ParseImdb {
                 }
             }
             for result in &results {
-                output.push(vec![StackString::from_display(result).unwrap()]);
+                output.push(vec![StackString::from_display(result)]);
             }
         } else if let Some(link) = link {
-            output.push(vec![format!("Using {}", link).into()]);
+            output.push(vec![format_sstr!("Using {}", link).into()]);
             if let Some(result) = shows.get(&link) {
                 let episode_list = imdb_conn
                     .parse_imdb_episode_list(&link, opts.season)
                     .await?;
                 for episode in episode_list {
-                    output.push(vec![format!("{} {}", result, episode).into()]);
+                    output.push(vec![format_sstr!("{} {}", result, episode).into()]);
                     if opts.update_database {
                         let key = (episode.season, episode.episode);
                         if let Some(episodes) = &episodes {
@@ -220,16 +224,21 @@ impl ParseImdb {
                                 if new.airdate != airdate {
                                     new.airdate = airdate;
                                 }
-                                output.push(vec![format!(
+                                output.push(vec![format_sstr!(
                                     "exists {} {} {}",
-                                    result, episode, e.rating
+                                    result,
+                                    episode,
+                                    e.rating
                                 )
                                 .into()]);
                                 new.update_episode(&self.mc.pool).await?;
                             } else {
-                                output.push(vec![
-                                    format!("not exists {} {}", result, episode).into()
-                                ]);
+                                output.push(vec![format_sstr!(
+                                    "not exists {} {}",
+                                    result,
+                                    episode
+                                )
+                                .into()]);
                                 ImdbEpisodes {
                                     show: opts.show.clone(),
                                     title: result.title.clone().unwrap_or_else(|| "".into()),
@@ -256,12 +265,12 @@ impl ParseImdb {
         opts: &ParseImdbOptions,
         watchlist: &WatchListMap,
     ) -> Result<StackString, Error> {
-        let button_add = format!(
+        let button_add = format_sstr!(
             "{}{}",
             r#"<td><button type="submit" id="ID" "#,
             r#"onclick="watchlist_add('SHOW');">add to watchlist</button></td>"#
         );
-        let button_rm = format!(
+        let button_rm = format_sstr!(
             "{}{}",
             r#"<td><button type="submit" id="ID" "#,
             r#"onclick="watchlist_rm('SHOW');">remove from watchlist</button></td>"#
@@ -278,7 +287,7 @@ impl ParseImdb {
                         .map(|imdb_url_| {
                             if imdb_url_.starts_with("tt") {
                                 imdb_url = imdb_url_;
-                                format!(
+                                format_sstr!(
                                 r#"<a href="https://www.imdb.com/title/{}" target="_blank">{}</a>"#,
                                 imdb_url, imdb_url
                             ).into()
@@ -287,7 +296,7 @@ impl ParseImdb {
                             }
                         })
                         .collect();
-                format!(
+                format_sstr!(
                     "<tr><td>{}</td><td>{}</td></tr>",
                     tmp.join("</td><td>"),
                     if watchlist.contains_key(&imdb_url) {

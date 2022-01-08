@@ -14,7 +14,7 @@ async fn main() -> Result<(), Error> {
     match make_list(&stdout).await {
         Ok(_) => {}
         Err(e) => {
-            let e = StackString::from_display(e).unwrap();
+            let e = StackString::from_display(e);
             if e.contains("Broken pipe") {
             } else {
                 panic!("{}", e);

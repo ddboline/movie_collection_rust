@@ -5,7 +5,7 @@ use jwalk::WalkDir;
 use procfs::process;
 use serde::{Deserialize, Serialize};
 use smallvec::{smallvec, SmallVec};
-use stack_string::StackString;
+use stack_string::{format_sstr, StackString};
 use std::{
     collections::HashMap,
     ffi::OsStr,
@@ -164,7 +164,7 @@ impl TranscodeServiceRequest {
                     .join("Documents")
                     .join("television")
                     .join(show.as_str())
-                    .join(format!("season{}", season));
+                    .join(format_sstr!("season{}", season));
                 if !d.exists() {
                     fs::create_dir_all(&d).await?;
                 }
@@ -172,7 +172,7 @@ impl TranscodeServiceRequest {
             };
 
             let input_path = path.to_path_buf();
-            let output_path = output_dir.join(&format!("{}.mp4", prefix));
+            let output_path = output_dir.join(&format_sstr!("{}.mp4", prefix));
 
             Ok(Self {
                 job_type: JobType::Move,
@@ -215,7 +215,7 @@ impl TranscodeServiceRequest {
         match self.job_type {
             JobType::Transcode => job_dir(config).join(&self.prefix).with_extension("json"),
             JobType::Move => job_dir(config)
-                .join(&format!("{}_copy", self.prefix))
+                .join(&format_sstr!("{}_copy", self.prefix))
                 .with_extension("json"),
         }
     }
@@ -334,7 +334,7 @@ impl TranscodeService {
             .join("Documents")
             .join("movies")
             .join(output_path);
-        let debug_output_path = log_dir(&self.config).join(&format!("{}_mp4", prefix));
+        let debug_output_path = log_dir(&self.config).join(&format_sstr!("{}_mp4", prefix));
         let stdout_path = debug_output_path.with_extension("out");
         let stderr_path = debug_output_path.with_extension("err");
 
@@ -382,7 +382,7 @@ impl TranscodeService {
                     f.write_all(&stdout).await?;
                 }
             }
-            let new_debug_output_path = tmp_avi_path.join(&format!("{}_mp4.out", prefix));
+            let new_debug_output_path = tmp_avi_path.join(&format_sstr!("{}_mp4.out", prefix));
             fs::rename(&stderr_path, &new_debug_output_path).await?;
             fs::remove_file(&stdout_path).await?;
         }
@@ -396,7 +396,7 @@ impl TranscodeService {
         output_file: &Path,
     ) -> Result<(), Error> {
         let script_file = job_dir(&self.config)
-            .join(&format!("{}_copy", show))
+            .join(&format_sstr!("{}_copy", show))
             .with_extension("json");
         if script_file.exists() {
             fs::remove_file(&script_file).await?;
@@ -415,7 +415,7 @@ impl TranscodeService {
             return Err(format_err!("{:?} does not exist", input_file));
         }
 
-        let debug_output_path = log_dir(&self.config).join(&format!("{}_copy.out", show));
+        let debug_output_path = log_dir(&self.config).join(&format_sstr!("{}_copy.out", show));
         let mut debug_output_file = File::create(&debug_output_path).await?;
 
         let show_path = self
@@ -423,21 +423,18 @@ impl TranscodeService {
             .home_dir
             .join("Documents")
             .join("movies")
-            .join(&format!("{}.mp4", show));
+            .join(&format_sstr!("{}.mp4", show));
         if !show_path.exists() {
             return Ok(());
         }
         let new_path = output_file.with_extension("new");
         let task0 = spawn({
             let new_path = new_path.clone();
-            let mut buf = StackString::new();
-            writeln!(
-                buf,
-                "copy {} to {}",
+            let buf = format_sstr!(
+                "copy {} to {}\n",
                 show_path.to_string_lossy(),
                 new_path.to_string_lossy()
-            )
-            .unwrap();
+            );
             debug_output_file.write_all(buf.as_bytes()).await?;
             async move { fs::copy(&show_path, &new_path).await }
         });
@@ -496,7 +493,8 @@ impl TranscodeService {
         debug_output_file.flush().await?;
 
         if debug_output_path.exists() {
-            let new_debug_output_path = tmp_dir(&self.config).join(&format!("{}_copy.out", show));
+            let new_debug_output_path =
+                tmp_dir(&self.config).join(&format_sstr!("{}_copy.out", show));
             fs::rename(&debug_output_path, &new_debug_output_path).await?;
         }
 
@@ -542,7 +540,7 @@ impl ProcInfo {
 
     pub fn get_html(&self) -> Vec<StackString> {
         vec![
-            StackString::from_display(self.pid).unwrap(),
+            StackString::from_display(self.pid),
             self.name.clone(),
             self.exe.to_string_lossy().into_owned().into(),
             self.cmdline.join(" ").into(),
@@ -647,7 +645,7 @@ impl TranscodeStatus {
             output.push(r#"<table border="1" class="dataframe">"#.into());
             output.push(r#"<thead><tr><th>File</th><th>Action</th></tr></thead>"#.into());
             output.push(
-                format!(
+                format_sstr!(
                     r#"<tbody><tr><td>{}</td></tr></tbody>"#,
                     flists
                         .local_file_list
@@ -655,20 +653,20 @@ impl TranscodeStatus {
                         .map(|f| {
                             let f_key = f.replace(".mkv", "").replace(".avi", "").replace(".mp4", "");
                             if file_map.get(f_key.as_str()).is_some() {
-                                format!(
+                                format_sstr!(
                                     r#"{file_name}</td><td><button type="submit" id="{file_name}" onclick="cleanup_file('{file_name}');"> cleanup </button>"#,
                                     file_name=f,
 
                                 )
                             } else if let Some(Some(status)) = proc_map.get(f_key.as_str()) {
                                 match status {
-                                    ProcStatus::Current => format!("{}</td><td>running", f),
-                                    ProcStatus::Upcoming => format!("{}</td><td>upcoming", f),
+                                    ProcStatus::Current => format_sstr!("{}</td><td>running", f),
+                                    ProcStatus::Upcoming => format_sstr!("{}</td><td>upcoming", f),
                                     ProcStatus::Finished => {
                                         let mut movie_dirs = movie_directories(config).unwrap_or_else(|_| Vec::new());
                                         movie_dirs.insert(0, "".into());
-                                        let movie_dirs = movie_dirs.into_iter().map(|d| format!(r#"<option value="{d}">{d}</option>"#, d=d)).join("\n");
-                                        format!(
+                                        let movie_dirs = movie_dirs.into_iter().map(|d| format_sstr!(r#"<option value="{d}">{d}</option>"#, d=d)).join("\n");
+                                        format_sstr!(
                                         r#"{file_name}</td>
                                             <td><select id="movie_dir">{movie_dirs}</select>
                                             <button type="submit" id="{file_name}" onclick="remcom_file('{file_name}');"> move </button>"#,
@@ -677,7 +675,7 @@ impl TranscodeStatus {
                                     )},
                                 }
                             } else {
-                                format!(
+                                format_sstr!(
                                     r#"{file_name}</td><td><button type="submit" id="{file_name}" onclick="transcode_file('{file_name}');"> transcode </button>"#,
                                     file_name=f
                                 )
@@ -693,14 +691,14 @@ impl TranscodeStatus {
             output.push("Running procs:<br>".into());
             output.push(r#"<table border="1" class="dataframe">"#.into());
             output.push(
-                format!(
+                format_sstr!(
                     r#"<thead><tr><th>{}</th></tr></thead>"#,
                     ProcInfo::get_header().join("</th><th>")
                 )
                 .into(),
             );
             output.push(
-                format!(
+                format_sstr!(
                     r#"<tbody><tr><td>{}</td></tr></tbody>"#,
                     self.procs
                         .iter()
@@ -715,14 +713,14 @@ impl TranscodeStatus {
             output.push("Upcoming jobs:<br>".into());
             output.push(r#"<table border="1" class="dataframe">"#.into());
             output.push(
-                format!(
+                format_sstr!(
                     r#"<thead><tr><th>{}</th></tr></thead>"#,
                     TranscodeServiceRequest::get_header().join("</th><th>")
                 )
                 .into(),
             );
             output.push(
-                format!(
+                format_sstr!(
                     r#"<tbody><tr><td>{}</td></tr></tbody>"#,
                     self.upcoming_jobs
                         .iter()
@@ -735,7 +733,7 @@ impl TranscodeStatus {
         }
         if !self.current_jobs.is_empty() {
             output.push(
-                format!(
+                format_sstr!(
                     "Current jobs:<br>{}<br>",
                     self.current_jobs.iter().map(|(_, s)| s).join("<br>")
                 )
@@ -747,11 +745,11 @@ impl TranscodeStatus {
             output.push(r#"<table border="1" class="dataframe">"#.into());
             output.push(r#"<thead><tr><th>File</th><th>Action</th></tr></thead>"#.into());
             output.push(
-                format!(
+                format_sstr!(
                     r#"<tbody><tr><td>{}</td></tr></tbody>"#,
                     self.finished_jobs
                         .iter()
-                        .map(|f| format!(
+                        .map(|f| format_sstr!(
                             r#"{file_name}</td><td><button type="submit" id="{file_name}" onclick="cleanup_file('{file_name}');"> cleanup </button>"#,
                             file_name=f.file_name().unwrap_or_else(|| OsStr::new("")).to_string_lossy()
                         ))
@@ -771,7 +769,7 @@ impl fmt::Display for TranscodeStatus {
             write!(
                 f,
                 "Running procs:\n\n{}\n\n",
-                self.procs.iter().map(|p| format!("{}", p)).join("\n")
+                self.procs.iter().map(|p| format_sstr!("{}", p)).join("\n")
             )?;
         }
         if !self.upcoming_jobs.is_empty() {
@@ -780,7 +778,7 @@ impl fmt::Display for TranscodeStatus {
                 "Upcoming jobs:\n\n{}\n\n",
                 self.upcoming_jobs
                     .iter()
-                    .map(|s| StackString::from_display(s).unwrap())
+                    .map(|s| StackString::from_display(s))
                     .join("\n")
             )?;
         }
@@ -938,7 +936,8 @@ pub fn movie_directories(config: &Config) -> Result<Vec<StackString>, Error> {
 #[cfg(test)]
 mod tests {
     use anyhow::Error;
-    use std::{collections::HashSet, env::set_var, fs::create_dir_all, path::Path};
+    use stack_string::{format_sstr, StackString};
+    use std::{collections::HashSet, env::set_var, fmt::Write, fs::create_dir_all, path::Path};
 
     use crate::{
         config::Config,
@@ -1066,8 +1065,8 @@ mod tests {
             cmdline: cmdline.clone(),
         };
         assert_eq!(
-            p.to_string(),
-            format!(
+            StackString::from_display(p),
+            format_sstr!(
                 "25625\tHandBrakeCLI\t/usr/bin/HandBrakeCLI\t{}",
                 cmdline.join(" ")
             )

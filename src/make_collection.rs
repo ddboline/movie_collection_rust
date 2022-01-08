@@ -52,7 +52,7 @@ async fn make_collection() -> Result<(), Error> {
             stdout.send(shows?.join("\n"));
         } else {
             for show in shows {
-                stdout.send(StackString::from_display(show).unwrap());
+                stdout.send(StackString::from_display(show));
             }
         }
     }
@@ -66,7 +66,7 @@ async fn main() {
     match make_collection().await {
         Ok(_) => {}
         Err(e) => {
-            let e = StackString::from_display(e).unwrap();
+            let e = StackString::from_display(e);
             assert!(e.contains("Broken pipe"), "{}", e);
         }
     }

@@ -10,8 +10,11 @@ use rand::{
 use reqwest::{Client, Response, Url};
 use serde::{Deserialize, Serialize};
 use smallvec::SmallVec;
-use stack_string::StackString;
-use std::path::{Path, PathBuf};
+use stack_string::{format_sstr, StackString};
+use std::{
+    fmt::Write,
+    path::{Path, PathBuf},
+};
 use tokio::{
     process::Command,
     time::{sleep, Duration},
@@ -124,14 +127,14 @@ pub async fn get_video_runtime(f: &Path) -> Result<StackString, Error> {
             let nsecs: f64 = nframes as f64 / fps;
             let nmin = (nsecs / 60.) as u64;
             let nhour = (nmin as f64 / 60.) as u64;
-            timeval = format!("{:02}:{:02}:{:02}", nhour, nmin % 60, nsecs as u64 % 60).into();
+            timeval = format_sstr!("{:02}:{:02}:{:02}", nhour, nmin % 60, nsecs as u64 % 60).into();
         }
         if items.len() > 1 && items[0] == "Duration:" {
             let its: SmallVec<[&str; 3]> = items[1].trim_matches(',').split(':').take(3).collect();
             let nhour: u64 = its[0].parse()?;
             let nmin: u64 = its[1].parse()?;
             let nsecs: f64 = its[2].parse()?;
-            timeval = format!("{:02}:{:02}:{:02}", nhour, nmin, nsecs as u64).into();
+            timeval = format_sstr!("{:02}:{:02}:{:02}", nhour, nmin, nsecs as u64).into();
         }
     }
     Ok(timeval)

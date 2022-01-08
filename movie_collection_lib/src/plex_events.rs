@@ -5,9 +5,10 @@ use log::info;
 use postgres_query::{query, query_dyn, FromSqlRow, Parameter, Query};
 use roxmltree::Document;
 use serde::{Deserialize, Serialize};
-use stack_string::StackString;
+use stack_string::{format_sstr, StackString};
 use std::{
     convert::{TryFrom, TryInto},
+    fmt::Write,
     net::Ipv4Addr,
     str::FromStr,
 };
@@ -41,7 +42,7 @@ impl TryFrom<WebhookPayload> for PlexEvent {
             DateTime::from_utc(dt, Utc)
         }
         let event = item.event.to_str().into();
-        let player_address = StackString::from_display(item.player.public_address)?;
+        let player_address = StackString::from_display(item.player.public_address);
         let payload = Self {
             event,
             account: item.account.title,
@@ -96,7 +97,7 @@ impl PlexEvent {
             constraints.push("event = $event");
             bindings.push(("event", event_type as Parameter));
         }
-        let query = format!(
+        let query = format_sstr!(
             "
                 SELECT * FROM plex_event
                 {where}
@@ -105,19 +106,19 @@ impl PlexEvent {
                 {offset}
             ",
             where = if constraints.is_empty() {
-                String::new()
+                StackString::new()
             } else {
-                format!("WHERE {}", constraints.join(" AND "))
+                format_sstr!("WHERE {}", constraints.join(" AND "))
             },
             limit = if let Some(limit) = limit {
-                format!("LIMIT {}", limit)
+                format_sstr!("LIMIT {}", limit)
             } else {
-                String::new()
+                StackString::new()
             },
             offset = if let Some(offset) = offset {
-                format!("OFFSET {}", offset)
+                format_sstr!("OFFSET {}", offset)
             } else {
-                String::new()
+                StackString::new()
             }
         );
         let query: Query = query_dyn!(&query, ..bindings)?;
@@ -167,7 +168,7 @@ impl PlexEvent {
         event_type: Option<PlexEventType>,
         offset: Option<u64>,
         limit: Option<u64>,
-    ) -> Result<Vec<String>, Error> {
+    ) -> Result<Vec<StackString>, Error> {
         #[derive(FromSqlRow)]
         struct EventOutput {
             event: StackString,
@@ -191,7 +192,7 @@ impl PlexEvent {
             constraints.push("a.event = $event");
             bindings.push(("event", event_type as Parameter));
         }
-        let query = format!(
+        let query = format_sstr!(
             "
                 SELECT a.event, a.metadata_type, a.section_title, a.title, a.parent_title,
                        a.grandparent_title, b.filename, a.last_modified
@@ -203,19 +204,19 @@ impl PlexEvent {
                 {offset}
             ",
             where = if constraints.is_empty() {
-                String::new()
+                StackString::new()
             } else {
-                format!("WHERE {}", constraints.join(" AND "))
+                format_sstr!("WHERE {}", constraints.join(" AND "))
             },
             limit = if let Some(limit) = limit {
-                format!("LIMIT {}", limit)
+                format_sstr!("LIMIT {}", limit)
             } else {
-                String::new()
+                StackString::new()
             },
             offset = if let Some(offset) = offset {
-                format!("OFFSET {}", offset)
+                format_sstr!("OFFSET {}", offset)
             } else {
-                String::new()
+                StackString::new()
             }
         );
         let query: Query = query_dyn!(&query, ..bindings)?;
@@ -227,12 +228,11 @@ impl PlexEvent {
                 let last_modified = match config.default_time_zone {
                     Some(tz) => {
                         let tz: Tz = tz.into();
-                        StackString::from_display(event.last_modified.with_timezone(&tz)).unwrap()
+                        StackString::from_display(event.last_modified.with_timezone(&tz))
                     }
-                    None => StackString::from_display(event.last_modified.with_timezone(&Local))
-                        .unwrap(),
+                    None => StackString::from_display(event.last_modified.with_timezone(&Local)),
                 };
-                format!(
+                format_sstr!(
                     r#"
                     <tr style="text-align; center;">
                     <td>{}</td><td>{}</td><td>{}</td><td>{}</td><td>{}</td>
@@ -242,7 +242,7 @@ impl PlexEvent {
                     event.event,
                     event.metadata_type.as_ref().map_or("", StackString::as_str),
                     event.section_title.as_ref().map_or("", StackString::as_str),
-                    format!(
+                    format_sstr!(
                         "{} {} {} {}",
                         event.title,
                         event.parent_title.as_ref().map_or("", StackString::as_str),
@@ -271,13 +271,17 @@ impl PlexEvent {
             .metadata_key
             .as_ref()
             .ok_or_else(|| format_err!("No metadata_key"))?;
-        let url = format!(
+        let url = format_sstr!(
             "http://{host}:32400{key}?X-Plex-Token={token}",
             host = plex_host,
             token = plex_token,
             key = metadata_key,
         );
-        let data = reqwest::get(url).await?.error_for_status()?.text().await?;
+        let data = reqwest::get(url.as_str())
+            .await?
+            .error_for_status()?
+            .text()
+            .await?;
         let filename = Self::extract_filename_from_xml(&data)?;
         Ok(PlexFilename {
             metadata_key: metadata_key.clone(),
@@ -445,7 +449,7 @@ impl PlexFilename {
             constraints.push("last_modified > $start_timestamp");
             bindings.push(("start_timestamp", start_timestamp as Parameter));
         }
-        let query = format!(
+        let query = format_sstr!(
             "
                 SELECT * FROM plex_filename
                 {where}
@@ -454,19 +458,19 @@ impl PlexFilename {
                 {offset}
             ",
             where = if constraints.is_empty() {
-                String::new()
+                StackString::new()
             } else {
-                format!("WHERE {}", constraints.join(" AND "))
+                format_sstr!("WHERE {}", constraints.join(" AND "))
             },
             limit = if let Some(limit) = limit {
-                format!("LIMIT {}", limit)
+                format_sstr!("LIMIT {}", limit)
             } else {
-                String::new()
+                StackString::new()
             },
             offset = if let Some(offset) = offset {
-                format!("OFFSET {}", offset)
+                format_sstr!("OFFSET {}", offset)
             } else {
-                String::new()
+                StackString::new()
             }
         );
         let query: Query = query_dyn!(&query, ..bindings)?;

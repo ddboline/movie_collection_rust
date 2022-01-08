@@ -5,7 +5,7 @@ use itertools::Itertools;
 use log::debug;
 use postgres_query::{query, query_dyn, FromSqlRow};
 use serde::{Deserialize, Serialize};
-use stack_string::StackString;
+use stack_string::{format_sstr, StackString};
 use std::{fmt, fmt::Write, path::Path};
 use stdout_channel::StdoutChannel;
 
@@ -234,13 +234,13 @@ impl MovieQueueDB {
         }
         let constraints = patterns
             .iter()
-            .map(|p| format!("b.path like '%{}%'", p))
+            .map(|p| format_sstr!("b.path like '%{}%'", p))
             .join(" OR ");
         let mut where_str = StackString::new();
         if !constraints.is_empty() {
             write!(where_str, "WHERE {}", constraints)?;
         }
-        let query = query_dyn!(&format!(
+        let query = query_dyn!(&format_sstr!(
             r#"
                 SELECT a.idx, b.path, c.link, c.istv
                 FROM movie_queue a

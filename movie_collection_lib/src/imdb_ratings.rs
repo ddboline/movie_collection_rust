@@ -3,8 +3,8 @@ use chrono::{DateTime, Utc};
 use log::debug;
 use postgres_query::{query, query_dyn, FromSqlRow, Parameter};
 use serde::{Deserialize, Serialize};
-use stack_string::StackString;
-use std::fmt;
+use stack_string::{format_sstr, StackString};
+use std::{fmt, fmt::Write};
 
 use crate::{pgpool::PgPool, tv_show_source::TvShowSource, utils::option_string_wrapper};
 
@@ -21,9 +21,10 @@ pub struct ImdbRatings {
 
 impl fmt::Display for ImdbRatings {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        let source_str = self.source.as_ref().map_or(StackString::new(), |s| {
-            StackString::from_display(s).unwrap()
-        });
+        let source_str = self
+            .source
+            .as_ref()
+            .map_or(StackString::new(), |s| StackString::from_display(s));
         write!(
             f,
             "{} {} {} {} {} {} ",
@@ -39,10 +40,7 @@ impl fmt::Display for ImdbRatings {
 
 impl ImdbRatings {
     pub async fn insert_show(&self, pool: &PgPool) -> Result<(), Error> {
-        let source = self
-            .source
-            .as_ref()
-            .map(|s| StackString::from_display(s).unwrap());
+        let source = self.source.as_ref().map(|s| StackString::from_display(s));
         let query = query!(
             r#"
                 INSERT INTO imdb_ratings
@@ -64,7 +62,7 @@ impl ImdbRatings {
 
     pub async fn update_show(&self, pool: &PgPool) -> Result<(), Error> {
         let mut bindings = Vec::new();
-        let query = format!(
+        let query = format_sstr!(
             r#"
                 UPDATE imdb_ratings
                 SET last_modified=now(){}{}{}{}
@@ -126,11 +124,11 @@ impl ImdbRatings {
             self.show.clone(),
             option_string_wrapper(self.title.as_ref()).into(),
             self.link.clone(),
-            StackString::from_display(self.rating.unwrap_or(-1.0)).unwrap(),
-            StackString::from_display(self.istv.unwrap_or(false)).unwrap(),
-            self.source.as_ref().map_or(StackString::new(), |s| {
-                StackString::from_display(s).unwrap()
-            }),
+            StackString::from_display(self.rating.unwrap_or(-1.0)),
+            StackString::from_display(self.istv.unwrap_or(false)),
+            self.source
+                .as_ref()
+                .map_or(StackString::new(), |s| StackString::from_display(s)),
         ]
     }
 }

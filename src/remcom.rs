@@ -90,7 +90,7 @@ async fn main() -> Result<(), Error> {
         match remcom_single(&remcom_service, &request_file).await {
             Ok(_) => (),
             Err(e) => {
-                let e = StackString::from_display(e).unwrap();
+                let e = StackString::from_display(e);
                 if e.contains("Broken pipe") {
                 } else {
                     panic!("{}", e);
@@ -112,7 +112,7 @@ async fn main() -> Result<(), Error> {
     {
         Ok(_) => (),
         Err(e) => {
-            let e = StackString::from_display(e).unwrap();
+            let e = StackString::from_display(e);
             if e.contains("Broken pipe") {
             } else {
                 panic!("{}", e);

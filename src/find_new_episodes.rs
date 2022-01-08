@@ -37,7 +37,7 @@ async fn find_new_episodes() -> Result<(), Error> {
     let output = mc.find_new_episodes(source, &opts.shows).await?;
 
     for epi in output {
-        stdout.send(StackString::from_display(epi).unwrap());
+        stdout.send(StackString::from_display(epi));
     }
     stdout.close().await
 }
@@ -49,7 +49,7 @@ async fn main() {
     match find_new_episodes().await {
         Ok(_) => (),
         Err(e) => {
-            let e = StackString::from_display(e).unwrap();
+            let e = StackString::from_display(e);
             if e.contains("Broken pipe") {
             } else {
                 panic!("{}", e);

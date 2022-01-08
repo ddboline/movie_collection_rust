@@ -41,6 +41,6 @@ procfs = "0.12"
 uuid = "0.8"
 chrono-tz = "0.6"
 roxmltree = "0.14"
-stack-string = { version="0.4", features=["postgres_types"] }
+stack-string = { version="0.5", features=["postgres_types"] }
 stdout-channel = "0.4"
 postgres_query = {git = "https://github.com/ddboline/rust-postgres-query", tag = "0.3.4", features=["deadpool"]}

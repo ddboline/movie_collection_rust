@@ -2,8 +2,8 @@ use anyhow::Error;
 use chrono::{DateTime, NaiveDate, Utc};
 use postgres_query::{query, query_dyn, FromSqlRow};
 use serde::{Deserialize, Serialize};
-use stack_string::StackString;
-use std::fmt;
+use stack_string::{format_sstr, StackString};
+use std::{fmt, fmt::Write};
 
 use crate::pgpool::PgPool;
 
@@ -109,7 +109,7 @@ impl ImdbEpisodes {
             return self.update_episode(pool).await;
         }
         let query = query_dyn!(
-            &format!(
+            &format_sstr!(
                 r#"
                     INSERT INTO imdb_episodes
                     (show, season, episode, airdate, rating, eptitle, epurl, last_modified)
@@ -131,7 +131,7 @@ impl ImdbEpisodes {
 
     pub async fn update_episode(&self, pool: &PgPool) -> Result<(), Error> {
         let query = query_dyn!(
-            &format!(
+            &format_sstr!(
                 r#"
                 UPDATE imdb_episodes
                 SET rating={},eptitle=$eptitle,epurl=$epurl,airdate=$airdate,last_modified=now()
@@ -154,10 +154,10 @@ impl ImdbEpisodes {
         vec![
             self.show.clone(),
             self.title.clone(),
-            StackString::from_display(self.season).unwrap(),
-            StackString::from_display(self.episode).unwrap(),
-            StackString::from_display(self.airdate).unwrap(),
-            StackString::from_display(self.rating).unwrap(),
+            StackString::from_display(self.season),
+            StackString::from_display(self.episode),
+            StackString::from_display(self.airdate),
+            StackString::from_display(self.rating),
             self.eptitle.clone(),
             self.epurl.clone(),
         ]

@@ -2,9 +2,8 @@ use anyhow::{format_err, Error};
 use chrono_tz::Tz;
 use derive_more::Into;
 use serde::{Deserialize, Serialize};
-use std::{convert::TryFrom, ops::Deref, str::FromStr};
-
 use stack_string::StackString;
+use std::{convert::TryFrom, ops::Deref, str::FromStr};
 
 /// Direction in degrees
 #[derive(Into, Debug, PartialEq, Copy, Clone, Eq, Serialize, Deserialize)]

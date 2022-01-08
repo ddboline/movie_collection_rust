@@ -8,7 +8,7 @@ use select::{
     predicate::{Class, Name},
 };
 use serde::Deserialize;
-use stack_string::StackString;
+use stack_string::{format_sstr, StackString};
 use std::{fmt, fmt::Write};
 
 use crate::utils::{option_string_wrapper, ExponentialRetry};
@@ -169,7 +169,7 @@ impl ImdbConnection {
         imdb_id: &str,
         season: Option<i32>,
     ) -> Result<Vec<ImdbEpisodeResult>, Error> {
-        let endpoint: String = format!("http://m.imdb.com/title/{}/episodes", imdb_id);
+        let endpoint = format_sstr!("http://m.imdb.com/title/{}/episodes", imdb_id);
         let url = Url::parse(&endpoint)?;
         let body = self.get(&url).await?.text().await?;
 
@@ -179,13 +179,11 @@ impl ImdbConnection {
                 if let Some("season") = a.attr("class") {
                     let season_ = a.attr("season_number").unwrap_or("-1");
                     if let Some(link) = a.attr("href") {
-                        let mut episodes_url = StackString::new();
-                        write!(
-                            episodes_url,
+                        let episodes_url = format_sstr!(
                             "http://www.imdb.com/title/{}/episodes/{}",
-                            imdb_id, link,
-                        )
-                        .unwrap();
+                            imdb_id,
+                            link,
+                        );
                         Some((episodes_url, season_.into()))
                     } else {
                         None

@@ -8,7 +8,8 @@ use rweb::{
     openapi::{self, Info},
     Filter, Reply,
 };
-use std::{net::SocketAddr, sync::Arc, time::Duration};
+use stack_string::format_sstr;
+use std::{fmt::Write, net::SocketAddr, sync::Arc, time::Duration};
 use tokio::{
     fs::{create_dir, remove_dir_all},
     time::interval,
@@ -199,7 +200,7 @@ async fn run_app(config: Config, pool: PgPool, trakt: TraktConnection) -> Result
         .or(spec_json_path)
         .or(spec_yaml_path)
         .recover(error_response);
-    let addr: SocketAddr = format!("{}:{}", app.config.host, port).parse()?;
+    let addr: SocketAddr = format_sstr!("{}:{}", app.config.host, port).parse()?;
     rweb::serve(routes).bind(addr).await;
     Ok(())
 }
