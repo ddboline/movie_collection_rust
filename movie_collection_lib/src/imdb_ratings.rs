@@ -24,7 +24,7 @@ impl fmt::Display for ImdbRatings {
         let source_str = self
             .source
             .as_ref()
-            .map_or(StackString::new(), |s| StackString::from_display(s));
+            .map_or(StackString::new(), StackString::from_display);
         write!(
             f,
             "{} {} {} {} {} {} ",
@@ -40,7 +40,7 @@ impl fmt::Display for ImdbRatings {
 
 impl ImdbRatings {
     pub async fn insert_show(&self, pool: &PgPool) -> Result<(), Error> {
-        let source = self.source.as_ref().map(|s| StackString::from_display(s));
+        let source = self.source.as_ref().map(StackString::from_display);
         let query = query!(
             r#"
                 INSERT INTO imdb_ratings
@@ -128,7 +128,7 @@ impl ImdbRatings {
             StackString::from_display(self.istv.unwrap_or(false)),
             self.source
                 .as_ref()
-                .map_or(StackString::new(), |s| StackString::from_display(s)),
+                .map_or(StackString::new(), StackString::from_display),
         ]
     }
 }

@@ -78,7 +78,7 @@ impl fmt::Display for TvShowsResult {
             self.count,
             self.source
                 .as_ref()
-                .map_or(StackString::new(), |s| StackString::from_display(s)),
+                .map_or(StackString::new(), StackString::from_display),
         )
     }
 }
@@ -568,7 +568,7 @@ impl MovieCollection {
                         .extension()
                         .map(OsStr::to_string_lossy)
                         .ok_or_else(|| format_err!("extension fail"))?
-                        .to_string()
+                        .as_ref()
                         .into();
                     if self.config.suffixes.contains(&ext) {
                         self.stdout.send(format_sstr!("not in collection {}", f));
@@ -880,30 +880,32 @@ pub async fn find_new_episodes_http_worker(
 
     let queue: HashMap<(StackString, i32, i32), i32> = queue.into_iter().collect();
 
-    let output =
-        episodes
-            .into_iter()
-            .map(|epi| {
-                let season_str = StackString::from_display(epi.season);
-                let key = (epi.show.clone(), epi.season, epi.episode);
-                format_sstr!(
+    let output = episodes
+        .into_iter()
+        .map(|epi| {
+            let season_str = StackString::from_display(epi.season);
+            let key = (epi.show.clone(), epi.season, epi.episode);
+            format_sstr!(
                 "<tr><td>{}</td><td>{}</td><td>{}</td><td>{}</td><td>{}</td>{}</tr>",
                 format_sstr!(
                     r#"<a href="javascript:updateMainArticle('/trakt/watched/list/{}/{}')">{}</a>"#,
-                    epi.link, epi.season, epi.title
+                    epi.link,
+                    epi.season,
+                    epi.title
                 ),
                 match queue.get(&key) {
                     Some(idx) => format_sstr!(
                         r#"<a href="javascript:updateMainArticle('{}');">{}</a>"#,
                         &format_sstr!(r#"{}/{}"#, "/list/play", idx),
                         epi.eptitle
-                    )
-                    .into(),
+                    ),
                     None => epi.eptitle.clone(),
                 },
                 format_sstr!(
                     r#"<a href="https://www.imdb.com/title/{}" target="_blank">s{:02} ep{:02}</a>"#,
-                    epi.epurl, epi.season, epi.episode
+                    epi.epurl,
+                    epi.season,
+                    epi.episode
                 ),
                 format_sstr!("rating: {:0.1} / {:0.1}", epi.eprating, epi.rating,),
                 epi.airdate,
@@ -912,9 +914,8 @@ pub async fn find_new_episodes_http_worker(
                     .replace("LINK", &epi.link)
                     .replace("SEASON", &season_str),
             )
-            .into()
-            })
-            .collect();
+        })
+        .collect();
 
     Ok(output)
 }

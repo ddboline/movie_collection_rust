@@ -98,7 +98,7 @@ async fn queue_body_resp(
 
 #[derive(RwebResponse)]
 #[response(description = "Movie Queue", content = "html")]
-struct MovieQueueResponse(HtmlBase<String, Error>);
+struct MovieQueueResponse(HtmlBase<StackString, Error>);
 
 #[get("/list/full_queue")]
 pub async fn movie_queue(
@@ -112,9 +112,7 @@ pub async fn movie_queue(
         patterns: Vec::new(),
     };
     let (queue, _) = req.handle(&state.db, &state.config).await?;
-    let body: String = queue_body_resp(&state.config, &[], &queue, &state.db)
-        .await?
-        .into();
+    let body = queue_body_resp(&state.config, &[], &queue, &state.db).await?;
     task.await.ok();
     Ok(HtmlBase::new(body).into())
 }
@@ -136,16 +134,14 @@ pub async fn movie_queue_show(
 
     let req = MovieQueueRequest { patterns };
     let (queue, patterns) = req.handle(&state.db, &state.config).await?;
-    let body: String = queue_body_resp(&state.config, &patterns, &queue, &state.db)
-        .await?
-        .into();
+    let body = queue_body_resp(&state.config, &patterns, &queue, &state.db).await?;
     task.await.ok();
     Ok(HtmlBase::new(body).into())
 }
 
 #[derive(RwebResponse)]
 #[response(description = "Delete Queue Entry", content = "html")]
-struct DeleteMovieQueueResponse(HtmlBase<String, Error>);
+struct DeleteMovieQueueResponse(HtmlBase<StackString, Error>);
 
 #[get("/list/delete/{path}")]
 pub async fn movie_queue_delete(
@@ -169,9 +165,8 @@ pub async fn movie_queue_delete(
             .await
             .map_err(Into::<Error>::into)?;
     }
-    let body: String = path.into();
     task.await.ok();
-    Ok(HtmlBase::new(body).into())
+    Ok(HtmlBase::new(path).into())
 }
 
 async fn transcode_worker(
@@ -197,14 +192,14 @@ async fn transcode_worker(
             .publish_transcode_job(&payload, |_| async move { Ok(()) })
             .await?;
         output.push(format_sstr!("{:?}", payload));
-        output.push(payload.publish_to_cli(config).await?.into());
+        output.push(payload.publish_to_cli(config).await?);
     }
     Ok(output.join("").into())
 }
 
 #[derive(RwebResponse)]
 #[response(description = "Transcode Queue Item", content = "html")]
-struct TranscodeQueueResponse(HtmlBase<String, Error>);
+struct TranscodeQueueResponse(HtmlBase<StackString, Error>);
 
 #[get("/list/transcode/queue/{path}")]
 pub async fn movie_queue_transcode(
@@ -223,9 +218,7 @@ pub async fn movie_queue_transcode(
 
     let req = MovieQueueRequest { patterns };
     let (entries, _) = req.handle(&state.db, &state.config).await?;
-    let body: String = transcode_worker(&state.config, None, &entries, &state.db)
-        .await?
-        .into();
+    let body = transcode_worker(&state.config, None, &entries, &state.db).await?;
     task.await.ok();
     Ok(HtmlBase::new(body).into())
 }
@@ -248,14 +241,13 @@ pub async fn movie_queue_transcode_directory(
 
     let req = MovieQueueRequest { patterns };
     let (entries, _) = req.handle(&state.db, &state.config).await?;
-    let body: String = transcode_worker(
+    let body = transcode_worker(
         &state.config,
         Some(path::Path::new(directory.as_str())),
         &entries,
         &state.db,
     )
-    .await?
-    .into();
+    .await?;
     task.await.ok();
     Ok(HtmlBase::new(body).into())
 }
@@ -659,7 +651,7 @@ pub async fn last_modified_route(
 
 #[derive(RwebResponse)]
 #[response(description = "Frontpage", content = "html")]
-struct FrontpageResponse(HtmlBase<String, Error>);
+struct FrontpageResponse(HtmlBase<StackString, Error>);
 
 #[get("/list/index.html")]
 pub async fn frontpage(
@@ -668,7 +660,7 @@ pub async fn frontpage(
     let body = HBR
         .render("index.html", &hashmap! {"BODY" => ""})
         .map_err(Into::<Error>::into)?;
-    Ok(HtmlBase::new(body).into())
+    Ok(HtmlBase::new(body.into()).into())
 }
 
 type TvShowsMap = HashMap<StackString, (StackString, WatchListShow, Option<TvShowSource>)>;
@@ -748,12 +740,11 @@ fn tvshows_worker(res1: TvShowsMap, tvshows: Vec<TvShowsResult>) -> StackString 
         previous,
         shows.join("")
     )
-    .into()
 }
 
 #[derive(RwebResponse)]
 #[response(description = "List TvShows", content = "html")]
-struct ListTvShowsResponse(HtmlBase<String, Error>);
+struct ListTvShowsResponse(HtmlBase<StackString, Error>);
 
 #[get("/list/tvshows")]
 pub async fn tvshows(
@@ -771,7 +762,7 @@ pub async fn tvshows(
     let show_map = get_watchlist_shows_db_map(&state.db)
         .await
         .map_err(Into::<Error>::into)?;
-    let body: String = tvshows_worker(show_map, shows).into();
+    let body = tvshows_worker(show_map, shows);
     task.await.ok();
     Ok(HtmlBase::new(body).into())
 }
@@ -822,7 +813,7 @@ fn process_shows(
                 } else {
                     button_add.replace("SHOW", &item.link)
                 },
-            ).into()
+            )
         })
         .collect()
 }
@@ -838,7 +829,7 @@ pub async fn user(#[filter = "LoggedUser::filter"] user: LoggedUser) -> WarpResu
 
 #[derive(RwebResponse)]
 #[response(description = "Transcode Status", content = "html")]
-struct TranscodeStatusResponse(HtmlBase<String, Error>);
+struct TranscodeStatusResponse(HtmlBase<StackString, Error>);
 
 #[get("/list/transcode/status")]
 pub async fn movie_queue_transcode_status(
@@ -862,12 +853,12 @@ pub async fn movie_queue_transcode_status(
         .map_or_else(|_| FileLists::default(), Result::unwrap);
     let body = status.get_html(&file_lists, &state.config).join("");
     url_task.await.ok();
-    Ok(HtmlBase::new(body).into())
+    Ok(HtmlBase::new(body.into()).into())
 }
 
 #[derive(RwebResponse)]
 #[response(description = "Transcode File", content = "html")]
-struct TranscodeFileResponse(HtmlBase<String, Error>);
+struct TranscodeFileResponse(HtmlBase<StackString, Error>);
 
 #[get("/list/transcode/file/{filename}")]
 pub async fn movie_queue_transcode_file(
@@ -903,11 +894,10 @@ pub async fn movie_queue_transcode_file(
         .publish_transcode_job(&req, |_| async move { Ok(()) })
         .await
         .map_err(Into::<Error>::into)?;
-    let body: String = req
+    let body = req
         .publish_to_cli(&state.config)
         .await
-        .map_err(Into::<Error>::into)?
-        .into();
+        .map_err(Into::<Error>::into)?;
     task.await.ok();
     Ok(HtmlBase::new(body).into())
 }
@@ -953,11 +943,10 @@ pub async fn movie_queue_remcom_file(
         .publish_transcode_job(&req, |_| async move { Ok(()) })
         .await
         .map_err(Into::<Error>::into)?;
-    let body: String = req
+    let body = req
         .publish_to_cli(&state.config)
         .await
-        .map_err(Into::<Error>::into)?
-        .into();
+        .map_err(Into::<Error>::into)?;
     task.await.ok();
     Ok(HtmlBase::new(body).into())
 }
@@ -1007,11 +996,10 @@ pub async fn movie_queue_remcom_directory_file(
         .publish_transcode_job(&req, |_| async move { Ok(()) })
         .await
         .map_err(Into::<Error>::into)?;
-    let body: String = req
+    let body = req
         .publish_to_cli(&state.config)
         .await
-        .map_err(Into::<Error>::into)?
-        .into();
+        .map_err(Into::<Error>::into)?;
     task.await.ok();
     Ok(HtmlBase::new(body).into())
 }
@@ -1124,12 +1112,12 @@ fn watchlist_worker(
         .join("");
 
     let previous = r#"<a href="javascript:updateMainArticle('/list/tvshows')">Go Back</a><br>"#;
-    format_sstr!(r#"{}<table border="0">{}</table>"#, previous, shows).into()
+    format_sstr!(r#"{}<table border="0">{}</table>"#, previous, shows)
 }
 
 #[derive(RwebResponse)]
 #[response(description = "Trakt Watchlist", content = "html")]
-struct TraktWatchlistResponse(HtmlBase<String, Error>);
+struct TraktWatchlistResponse(HtmlBase<StackString, Error>);
 
 #[get("/trakt/watchlist")]
 pub async fn trakt_watchlist(
@@ -1142,7 +1130,7 @@ pub async fn trakt_watchlist(
     let shows = get_watchlist_shows_db_map(&state.db)
         .await
         .map_err(Into::<Error>::into)?;
-    let body: String = watchlist_worker(shows).into();
+    let body = watchlist_worker(shows);
     task.await.ok();
     Ok(HtmlBase::new(body).into())
 }
@@ -1164,7 +1152,7 @@ async fn watchlist_action_worker(
 
 #[derive(RwebResponse)]
 #[response(description = "Trakt Watchlist Action", content = "html")]
-struct TraktWatchlistActionResponse(HtmlBase<String, Error>);
+struct TraktWatchlistActionResponse(HtmlBase<StackString, Error>);
 
 #[get("/trakt/watchlist/{action}/{imdb_url}")]
 pub async fn trakt_watchlist_action(
@@ -1185,9 +1173,7 @@ pub async fn trakt_watchlist_action(
         imdb_url,
     };
     let imdb_url = req.handle(&state.db, &state.trakt).await?;
-    let body: String = watchlist_action_worker(&state.trakt, action.into(), &imdb_url)
-        .await?
-        .into();
+    let body = watchlist_action_worker(&state.trakt, action.into(), &imdb_url).await?;
     task.await.ok();
     Ok(HtmlBase::new(body).into())
 }
@@ -1225,12 +1211,12 @@ fn trakt_watched_seasons_worker(link: &str, imdb_url: &str, entries: &[ImdbSeaso
         .join("");
 
     let previous = r#"<a href="javascript:updateMainArticle('/trakt/watchlist')">Go Back</a><br>"#;
-    format_sstr!(r#"{}<table border="0">{}</table>"#, previous, entries).into()
+    format_sstr!(r#"{}<table border="0">{}</table>"#, previous, entries)
 }
 
 #[derive(RwebResponse)]
 #[response(description = "Trakt Watchlist Show List", content = "html")]
-struct TraktWatchlistShowListResponse(HtmlBase<String, Error>);
+struct TraktWatchlistShowListResponse(HtmlBase<StackString, Error>);
 
 #[get("/trakt/watched/list/{imdb_url}")]
 pub async fn trakt_watched_seasons(
@@ -1255,14 +1241,14 @@ pub async fn trakt_watched_seasons(
         show_opt.map_or_else(empty, |(imdb_url, t)| (imdb_url, t.show, t.link));
     let req = ImdbSeasonsRequest { show };
     let entries = req.handle(&state.db, &state.config).await?;
-    let body: String = trakt_watched_seasons_worker(&link, &imdb_url, &entries).into();
+    let body = trakt_watched_seasons_worker(&link, &imdb_url, &entries);
     task.await.ok();
     Ok(HtmlBase::new(body).into())
 }
 
 #[derive(RwebResponse)]
 #[response(description = "Trakt Watchlist Show Season", content = "html")]
-struct TraktWatchlistShowSeasonResponse(HtmlBase<String, Error>);
+struct TraktWatchlistShowSeasonResponse(HtmlBase<StackString, Error>);
 
 #[get("/trakt/watched/list/{imdb_url}/{season}")]
 pub async fn trakt_watched_list(
@@ -1281,16 +1267,14 @@ pub async fn trakt_watched_list(
     let mock_stdout = MockStdout::new();
     let stdout = StdoutChannel::with_mock_stdout(mock_stdout.clone(), mock_stdout.clone());
 
-    let body: String = watch_list_http_worker(&state.config, &state.db, &stdout, &imdb_url, season)
-        .await?
-        .into();
+    let body = watch_list_http_worker(&state.config, &state.db, &stdout, &imdb_url, season).await?;
     task.await.ok();
     Ok(HtmlBase::new(body).into())
 }
 
 #[derive(RwebResponse)]
 #[response(description = "Trakt Watchlist Episode Action", content = "html")]
-struct TraktWatchlistEpisodeActionResponse(HtmlBase<String, Error>);
+struct TraktWatchlistEpisodeActionResponse(HtmlBase<StackString, Error>);
 
 #[get("/trakt/watched/{action}/{imdb_url}/{season}/{episode}")]
 pub async fn trakt_watched_action(
@@ -1317,7 +1301,7 @@ pub async fn trakt_watched_action(
     let mock_stdout = MockStdout::new();
     let stdout = StdoutChannel::with_mock_stdout(mock_stdout.clone(), mock_stdout.clone());
 
-    let body: String = watched_action_http_worker(
+    let body = watched_action_http_worker(
         &state.trakt,
         &state.db,
         action.into(),
@@ -1327,8 +1311,7 @@ pub async fn trakt_watched_action(
         &state.config,
         &stdout,
     )
-    .await?
-    .into();
+    .await?;
     task.await.ok();
     Ok(HtmlBase::new(body).into())
 }
@@ -1340,12 +1323,11 @@ fn trakt_cal_worker(entries: &[StackString]) -> StackString {
         previous,
         entries.join("")
     )
-    .into()
 }
 
 #[derive(RwebResponse)]
 #[response(description = "Trakt Calendar", content = "html")]
-struct TraktCalendarResponse(HtmlBase<String, Error>);
+struct TraktCalendarResponse(HtmlBase<StackString, Error>);
 
 #[get("/trakt/cal")]
 pub async fn trakt_cal(
@@ -1356,14 +1338,14 @@ pub async fn trakt_cal(
         .store_url_task(state.trakt.get_client(), &state.config, "/trakt/cal")
         .await;
     let entries = trakt_cal_http_worker(&state.trakt, &state.db).await?;
-    let body: String = trakt_cal_worker(&entries).into();
+    let body = trakt_cal_worker(&entries);
     task.await.ok();
     Ok(HtmlBase::new(body).into())
 }
 
 #[derive(RwebResponse)]
 #[response(description = "Trakt Auth Url", content = "html")]
-struct TraktAuthUrlResponse(HtmlBase<String, Error>);
+struct TraktAuthUrlResponse(HtmlBase<StackString, Error>);
 
 #[get("/trakt/auth_url")]
 pub async fn trakt_auth_url(
@@ -1374,14 +1356,13 @@ pub async fn trakt_auth_url(
         .store_url_task(state.trakt.get_client(), &state.config, "/trakt/auth_url")
         .await;
     state.trakt.init().await;
-    let url: String = state
+    let url = state
         .trakt
         .get_auth_url()
         .await
-        .map(Into::into)
         .map_err(Into::<Error>::into)?;
     task.await.ok();
-    Ok(HtmlBase::new(url).into())
+    Ok(HtmlBase::new(url.as_str().into()).into())
 }
 
 #[derive(Serialize, Deserialize, Schema)]
@@ -1656,8 +1637,7 @@ pub async fn watch_list_http_worker(
         previous,
         buttons,
         entries
-    )
-    .into();
+    );
     Ok(entries)
 }
 

@@ -712,12 +712,8 @@ async fn watchlist_rm(
 
 async fn watchlist_list(mc: &MovieCollection) -> Result<(), Error> {
     let show_map = get_watchlist_shows_db(&mc.pool).await?;
-    mc.stdout.send(
-        show_map
-            .iter()
-            .map(|w| StackString::from_display(w))
-            .join("\n"),
-    );
+    mc.stdout
+        .send(show_map.iter().map(StackString::from_display).join("\n"));
     Ok(())
 }
 
@@ -827,13 +823,13 @@ async fn watched_list(mc: &MovieCollection, show: &str, season: i32) -> Result<(
         mc.stdout.send(
             watched_shows
                 .iter()
-                .map(|w| StackString::from_display(w))
+                .map(StackString::from_display)
                 .join("\n"),
         );
         mc.stdout.send(
             watched_movies
                 .iter()
-                .map(|w| StackString::from_display(w))
+                .map(StackString::from_display)
                 .join("\n"),
         );
     }

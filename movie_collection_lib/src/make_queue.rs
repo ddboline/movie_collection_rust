@@ -94,7 +94,7 @@ pub async fn make_queue_worker(
             stdout.send(
                 movie_queue
                     .into_iter()
-                    .map(|x| StackString::from_display(x))
+                    .map(StackString::from_display)
                     .join("\n"),
             );
         }
@@ -194,7 +194,7 @@ pub async fn movie_queue_http(
             "{}\n{}",
             entry,
             button.replace("ID", &file_name).replace("SHOW", &file_name)
-        ).into();
+        );
 
         let entry = if ext == "mp4" {
             entry
@@ -202,7 +202,7 @@ pub async fn movie_queue_http(
             format_sstr!(
                 r#"{entry}<td><button type="submit" id="{file_name}" onclick="transcode_queue('{file_name}');"> transcode </button></td>"#,
                 entry=entry, file_name=file_name
-            ).into()
+            )
         } else {
             let entries: Vec<_> = row.path.split('/').collect();
             let len_entries = entries.len();
@@ -210,7 +210,7 @@ pub async fn movie_queue_http(
             format_sstr!(
                 r#"{entry}<td><button type="submit" id="{file_name}" onclick="transcode_queue_directory('{file_name}', '{directory}');"> transcode </button></td>"#,
                 entry=entry, file_name=file_name, directory=directory
-            ).into()
+            )
         };
         Ok(entry)
         }

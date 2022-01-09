@@ -172,12 +172,9 @@ impl ParseImdb {
                             opts.show,
                             s,
                             result.rating
-                        )
-                        .into()]);
+                        )]);
                     } else {
-                        output.push(vec![
-                            format_sstr!("not exists {} {}", opts.show, result).into()
-                        ]);
+                        output.push(vec![format_sstr!("not exists {} {}", opts.show, result)]);
                         let istv = result.title.contains("TV Series")
                             || result.title.contains("TV Mini-Series");
 
@@ -198,13 +195,13 @@ impl ParseImdb {
                 output.push(vec![StackString::from_display(result)]);
             }
         } else if let Some(link) = link {
-            output.push(vec![format_sstr!("Using {}", link).into()]);
+            output.push(vec![format_sstr!("Using {}", link)]);
             if let Some(result) = shows.get(&link) {
                 let episode_list = imdb_conn
                     .parse_imdb_episode_list(&link, opts.season)
                     .await?;
                 for episode in episode_list {
-                    output.push(vec![format_sstr!("{} {}", result, episode).into()]);
+                    output.push(vec![format_sstr!("{} {}", result, episode)]);
                     if opts.update_database {
                         let key = (episode.season, episode.episode);
                         if let Some(episodes) = &episodes {
@@ -229,16 +226,14 @@ impl ParseImdb {
                                     result,
                                     episode,
                                     e.rating
-                                )
-                                .into()]);
+                                )]);
                                 new.update_episode(&self.mc.pool).await?;
                             } else {
                                 output.push(vec![format_sstr!(
                                     "not exists {} {}",
                                     result,
                                     episode
-                                )
-                                .into()]);
+                                )]);
                                 ImdbEpisodes {
                                     show: opts.show.clone(),
                                     title: result.title.clone().unwrap_or_else(|| "".into()),
@@ -276,13 +271,13 @@ impl ParseImdb {
             r#"onclick="watchlist_rm('SHOW');">remove from watchlist</button></td>"#
         );
 
-        let output: Vec<_> = self
-            .parse_imdb_worker(opts)
-            .await?
-            .into_iter()
-            .map(|line| {
-                let mut imdb_url: StackString = "".into();
-                let tmp: Vec<_> =
+        let output: Vec<_> =
+            self.parse_imdb_worker(opts)
+                .await?
+                .into_iter()
+                .map(|line| {
+                    let mut imdb_url: StackString = "".into();
+                    let tmp: Vec<_> =
                     line.into_iter()
                         .map(|imdb_url_| {
                             if imdb_url_.starts_with("tt") {
@@ -290,23 +285,23 @@ impl ParseImdb {
                                 format_sstr!(
                                 r#"<a href="https://www.imdb.com/title/{}" target="_blank">{}</a>"#,
                                 imdb_url, imdb_url
-                            ).into()
+                            )
                             } else {
                                 imdb_url_
                             }
                         })
                         .collect();
-                format_sstr!(
-                    "<tr><td>{}</td><td>{}</td></tr>",
-                    tmp.join("</td><td>"),
-                    if watchlist.contains_key(&imdb_url) {
-                        button_rm.replace("SHOW", &imdb_url)
-                    } else {
-                        button_add.replace("SHOW", &imdb_url)
-                    }
-                )
-            })
-            .collect();
+                    format_sstr!(
+                        "<tr><td>{}</td><td>{}</td></tr>",
+                        tmp.join("</td><td>"),
+                        if watchlist.contains_key(&imdb_url) {
+                            button_rm.replace("SHOW", &imdb_url)
+                        } else {
+                            button_add.replace("SHOW", &imdb_url)
+                        }
+                    )
+                })
+                .collect();
 
         Ok(output.join("\n").into())
     }
