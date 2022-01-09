@@ -67,7 +67,7 @@ pub async fn make_queue_worker(
             .print_tv_shows()
             .await?
             .into_iter()
-            .map(|s| StackString::from_display(s))
+            .map(StackString::from_display)
             .join("\n");
         stdout.send(shows);
     } else if !del_files.is_empty() {
