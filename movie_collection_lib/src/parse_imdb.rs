@@ -176,7 +176,8 @@ impl ParseImdb {
                     } else {
                         output.push(vec![format_sstr!("not exists {} {}", opts.show, result)]);
                         let istv = result.title.contains("TV Series")
-                            || result.title.contains("TV Mini-Series");
+                            || result.title.contains("TV Mini-Series")
+                            || result.title.contains("TV Mini Series");
 
                         ImdbRatings {
                             show: opts.show.clone(),
