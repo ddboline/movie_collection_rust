@@ -635,57 +635,67 @@ impl TranscodeStatus {
         upcoming.chain(current).chain(finished).collect()
     }
 
-    pub fn get_html(&self, flists: &FileLists, config: &Config) -> Vec<StackString> {
-        let mut output: Vec<StackString> =
-            vec![r#"<button name="remcomout" id="remcomoutput"> &nbsp; </button><br>"#.into()];
-        if !flists.local_file_list.is_empty() {
-            let file_map = flists.get_file_map();
-            let proc_map = self.get_proc_map();
-            output.push("On-deck Media Files<br>".into());
-            output.push(r#"<table border="1" class="dataframe">"#.into());
-            output.push(r#"<thead><tr><th>File</th><th>Action</th></tr></thead>"#.into());
-            output.push(
-                format_sstr!(
-                    r#"<tbody><tr><td>{}</td></tr></tbody>"#,
-                    flists
-                        .local_file_list
-                        .iter()
-                        .map(|f| {
-                            let f_key = f.replace(".mkv", "").replace(".avi", "").replace(".mp4", "");
-                            if file_map.get(f_key.as_str()).is_some() {
-                                format_sstr!(
-                                    r#"{file_name}</td><td><button type="submit" id="{file_name}" onclick="cleanup_file('{file_name}');"> cleanup </button>"#,
-                                    file_name=f,
+    pub fn get_local_file_html(&self, flists: &FileLists, config: &Config) -> Vec<StackString> {
+        let mut output = Vec::new();
+        let file_map = flists.get_file_map();
+        let proc_map = self.get_proc_map();
+        output.push("On-deck Media Files<br>".into());
+        output.push(r#"<table border="1" class="dataframe">"#.into());
+        output.push(r#"<thead><tr><th>File</th><th>Action</th></tr></thead>"#.into());
+        output.push(
+            format_sstr!(
+                r#"<tbody><tr><td>{}</td></tr></tbody>"#,
+                flists
+                    .local_file_list
+                    .iter()
+                    .map(|f| {
+                        let f_key = f.replace(".mkv", "").replace(".avi", "").replace(".mp4", "");
+                        if file_map.get(f_key.as_str()).is_some() {
+                            format_sstr!(
+                                r#"{file_name}</td><td><button type="submit" id="{file_name}" onclick="cleanup_file('{file_name}');"> cleanup </button>"#,
+                                file_name=f,
 
-                                )
-                            } else if let Some(Some(status)) = proc_map.get(f_key.as_str()) {
-                                match status {
-                                    ProcStatus::Current => format_sstr!("{}</td><td>running", f),
-                                    ProcStatus::Upcoming => format_sstr!("{}</td><td>upcoming", f),
-                                    ProcStatus::Finished => {
-                                        let mut movie_dirs = movie_directories(config).unwrap_or_else(|_| Vec::new());
-                                        movie_dirs.insert(0, "".into());
-                                        let movie_dirs = movie_dirs.into_iter().map(|d| format_sstr!(r#"<option value="{d}">{d}</option>"#, d=d)).join("\n");
-                                        format_sstr!(
-                                        r#"{file_name}</td>
-                                            <td><select id="movie_dir">{movie_dirs}</select>
-                                            <button type="submit" id="{file_name}" onclick="remcom_file('{file_name}');"> move </button>"#,
-                                        file_name=f,
-                                        movie_dirs=movie_dirs,
-                                    )},
-                                }
-                            } else {
-                                format_sstr!(
-                                    r#"{file_name}</td><td><button type="submit" id="{file_name}" onclick="transcode_file('{file_name}');"> transcode </button>"#,
-                                    file_name=f
-                                )
+                            )
+                        } else if let Some(Some(status)) = proc_map.get(f_key.as_str()) {
+                            match status {
+                                ProcStatus::Current => format_sstr!("{}</td><td>running", f),
+                                ProcStatus::Upcoming => format_sstr!("{}</td><td>upcoming", f),
+                                ProcStatus::Finished => {
+                                    let mut movie_dirs = movie_directories(config).unwrap_or_else(|_| Vec::new());
+                                    movie_dirs.insert(0, "".into());
+                                    let movie_dirs = movie_dirs.into_iter().map(|d| format_sstr!(r#"<option value="{d}">{d}</option>"#, d=d)).join("\n");
+                                    format_sstr!(
+                                    r#"{file_name}</td>
+                                        <td><select id="movie_dir">{movie_dirs}</select>
+                                        <button type="submit" id="{file_name}" onclick="remcom_file('{file_name}');"> move </button>"#,
+                                    file_name=f,
+                                    movie_dirs=movie_dirs,
+                                )},
                             }
-                        })
-                        .join("</td></tr><tr><td>"),
-                )
-                ,
-            );
+                        } else {
+                            format_sstr!(
+                                r#"{file_name}</td><td><button type="submit" id="{file_name}" onclick="transcode_file('{file_name}');"> transcode </button>"#,
+                                file_name=f
+                            )
+                        }
+                    })
+                    .join("</td></tr><tr><td>"),
+            )
+            ,
+        );
+        output
+    }
+
+    pub fn get_html(&self, flists: &FileLists, config: &Config) -> Vec<StackString> {
+        let mut output: Vec<StackString> = vec![
+            r#"<button name="remcomout" id="remcomoutput">"#.into(),
+            r#"&nbsp; </button><br>"#.into(),
+            r#"<div id="local-file-table">"#.into(),
+        ];
+        if !flists.local_file_list.is_empty() {
+            output.extend_from_slice(&self.get_local_file_html(flists, config));
         }
+        output.push("</div>".into());
 
         if !self.procs.is_empty() {
             output.push("Running procs:<br>".into());
