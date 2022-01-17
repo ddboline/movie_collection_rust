@@ -862,14 +862,19 @@ struct TranscodeStatusFileListResponse(HtmlBase<StackString, Error>);
 
 #[get("/list/transcode/status/file_list")]
 pub async fn movie_queue_transcode_status_file_list(
-    #[filter="LoggedUser::filter"] _: LoggedUser,
+    #[filter = "LoggedUser::filter"] _: LoggedUser,
     #[data] state: AppState,
 ) -> WarpResult<TranscodeStatusFileListResponse> {
-    let file_lists = FileLists::get_file_lists(&state.config).await.map_err(Into::<Error>::into)?;
+    let file_lists = FileLists::get_file_lists(&state.config)
+        .await
+        .map_err(Into::<Error>::into)?;
     let status = transcode_status(&state.config)
         .await
         .map_err(Into::<Error>::into)?;
-    let body = status.get_local_file_html(&file_lists, &state.config).join("").into();
+    let body = status
+        .get_local_file_html(&file_lists, &state.config)
+        .join("")
+        .into();
     Ok(HtmlBase::new(body).into())
 }
 

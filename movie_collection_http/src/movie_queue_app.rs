@@ -29,10 +29,11 @@ use super::{
         movie_queue_delete, movie_queue_play, movie_queue_remcom_directory_file,
         movie_queue_remcom_file, movie_queue_route, movie_queue_show, movie_queue_transcode,
         movie_queue_transcode_cleanup, movie_queue_transcode_directory, movie_queue_transcode_file,
-        movie_queue_transcode_status, movie_queue_update, plex_events, plex_events_update,
-        plex_filename, plex_filename_update, plex_list, plex_webhook, refresh_auth, trakt_auth_url,
-        trakt_cal, trakt_callback, trakt_watched_action, trakt_watched_list, trakt_watched_seasons,
-        trakt_watchlist, trakt_watchlist_action, tvshows, user, movie_queue_transcode_status_file_list,
+        movie_queue_transcode_status, movie_queue_transcode_status_file_list, movie_queue_update,
+        plex_events, plex_events_update, plex_filename, plex_filename_update, plex_list,
+        plex_webhook, refresh_auth, trakt_auth_url, trakt_cal, trakt_callback,
+        trakt_watched_action, trakt_watched_list, trakt_watched_seasons, trakt_watchlist,
+        trakt_watchlist_action, tvshows, user,
     },
 };
 
@@ -78,7 +79,8 @@ fn get_full_path(app: &AppState) -> BoxedFilter<(impl Reply,)> {
     let tvshows_path = tvshows(app.clone()).boxed();
     let movie_queue_delete_path = movie_queue_delete(app.clone()).boxed();
     let movie_queue_transcode_status_path = movie_queue_transcode_status(app.clone()).boxed();
-    let movie_queue_transcode_status_file_list_path = movie_queue_transcode_status_file_list(app.clone()).boxed();
+    let movie_queue_transcode_status_file_list_path =
+        movie_queue_transcode_status_file_list(app.clone()).boxed();
     let movie_queue_transcode_file_path = movie_queue_transcode_file(app.clone()).boxed();
     let movie_queue_remcom_file_path = movie_queue_remcom_file(app.clone()).boxed();
     let movie_queue_remcom_directory_file_path =
