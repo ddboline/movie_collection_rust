@@ -844,16 +844,33 @@ pub async fn movie_queue_transcode_status(
         )
         .await;
     let config = state.config.clone();
-    let task = timeout(Duration::from_secs(10), FileLists::get_file_lists(&config));
+    let task = timeout(Duration::from_secs(1), FileLists::get_file_lists(&config));
     let status = transcode_status(&state.config)
         .await
         .map_err(Into::<Error>::into)?;
     let file_lists = task
         .await
         .map_or_else(|_| FileLists::default(), Result::unwrap);
-    let body = status.get_html(&file_lists, &state.config).join("");
+    let body = status.get_html(&file_lists, &state.config).join("").into();
     url_task.await.ok();
-    Ok(HtmlBase::new(body.into()).into())
+    Ok(HtmlBase::new(body).into())
+}
+
+#[derive(RwebResponse)]
+#[response(description = "Transcode Status File List", content = "html")]
+struct TranscodeStatusFileListResponse(HtmlBase<StackString, Error>);
+
+#[get("/list/transcode/status/file_list")]
+pub async fn movie_queue_transcode_status_file_list(
+    #[filter="LoggedUser::filter"] _: LoggedUser,
+    #[data] state: AppState,
+) -> WarpResult<TranscodeStatusFileListResponse> {
+    let file_lists = FileLists::get_file_lists(&state.config).await.map_err(Into::<Error>::into)?;
+    let status = transcode_status(&state.config)
+        .await
+        .map_err(Into::<Error>::into)?;
+    let body = status.get_local_file_html(&file_lists, &state.config).join("").into();
+    Ok(HtmlBase::new(body).into())
 }
 
 #[derive(RwebResponse)]
