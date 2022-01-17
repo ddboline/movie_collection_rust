@@ -177,6 +177,7 @@ footer {
         let xmlhttp = new XMLHttpRequest();
         xmlhttp.open("GET", url, true);
         xmlhttp.onload = function nothing() {
+            document.getElementById("remcomoutput").innerHTML = "&nbsp;";
         }
         xmlhttp.send(null);
         let out = "requested " + index
@@ -187,17 +188,38 @@ footer {
         let xmlhttp = new XMLHttpRequest();
         xmlhttp.open("GET", url, true);
         xmlhttp.onload = function nothing() {
+            document.getElementById("remcomoutput").innerHTML = "&nbsp;";
         }
         xmlhttp.send(null);
         let out = "requested " + index
         document.getElementById("remcomoutput").innerHTML = out;
+    }
+    function update_procs() {
+        let url = "/list/transcode/status/procs";
+        let xmlhttp = new XMLHttpRequest();
+        xmlhttp.open("GET", url, true);
+        xmlhttp.onload = function nothing() {
+            document.getElementById("procs-tables").innerHTML = xmlhttp.responseText;
+        }
+        xmlhttp.send(null);
+    }
+    function update_file_list() {
+        let url = "/list/transcode/status/file_list";
+        let xmlhttp = new XMLHttpRequest();
+        xmlhttp.open("GET", url, true);
+        xmlhttp.onload = function nothing() {
+            document.getElementById("local-file-table").innerHTML = xmlhttp.responseText;
+        }
+        xmlhttp.send(null);
     }
     function transcode_file(file) {
         let url = "/list/transcode/file/" + file
         let xmlhttp = new XMLHttpRequest();
         xmlhttp.open("GET", url, true);
         xmlhttp.onload = function nothing() {
-            updateMainArticle('/list/transcode/status');
+            update_procs();
+            update_file_list();
+            document.getElementById("remcomoutput").innerHTML = "&nbsp;";
         }
         xmlhttp.send(null);
         let out = "requested " + file
@@ -212,7 +234,9 @@ footer {
         let xmlhttp = new XMLHttpRequest();
         xmlhttp.open("GET", url, true);
         xmlhttp.onload = function nothing() {
-            updateMainArticle('/list/transcode/status');
+            update_procs();
+            update_file_list();
+            document.getElementById("remcomoutput").innerHTML = "&nbsp;";
         }
         xmlhttp.send(null);
         let out = "requested " + file
@@ -223,7 +247,9 @@ footer {
         let xmlhttp = new XMLHttpRequest();
         xmlhttp.open("GET", url, true);
         xmlhttp.onload = function nothing() {
-            updateMainArticle('/list/transcode/status');
+            update_procs();
+            update_file_list();
+            document.getElementById("remcomoutput").innerHTML = "&nbsp;";
         }
         xmlhttp.send(null);
         let out = "requested " + file

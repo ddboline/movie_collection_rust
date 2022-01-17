@@ -879,6 +879,22 @@ pub async fn movie_queue_transcode_status_file_list(
 }
 
 #[derive(RwebResponse)]
+#[response(description = "Transcode Status File List", content = "html")]
+struct TranscodeStatusProcsResponse(HtmlBase<StackString, Error>);
+
+#[get("/list/transcode/status/procs")]
+pub async fn movie_queue_transcode_status_procs(
+    #[filter = "LoggedUser::filter"] _: LoggedUser,
+    #[data] state: AppState,
+) -> WarpResult<TranscodeStatusProcsResponse> {
+    let status = transcode_status(&state.config)
+        .await
+        .map_err(Into::<Error>::into)?;
+    let body = status.get_procs_html().join("").into();
+    Ok(HtmlBase::new(body).into())
+}
+
+#[derive(RwebResponse)]
 #[response(description = "Transcode File", content = "html")]
 struct TranscodeFileResponse(HtmlBase<StackString, Error>);
 

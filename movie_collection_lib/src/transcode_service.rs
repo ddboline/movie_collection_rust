@@ -686,17 +686,8 @@ impl TranscodeStatus {
         output
     }
 
-    pub fn get_html(&self, flists: &FileLists, config: &Config) -> Vec<StackString> {
-        let mut output: Vec<StackString> = vec![
-            r#"<button name="remcomout" id="remcomoutput">"#.into(),
-            r#"&nbsp; </button><br>"#.into(),
-            r#"<div id="local-file-table">"#.into(),
-        ];
-        if !flists.local_file_list.is_empty() {
-            output.extend_from_slice(&self.get_local_file_html(flists, config));
-        }
-        output.push("</div>".into());
-
+    pub fn get_procs_html(&self) -> Vec<StackString> {
+        let mut output = Vec::new();
         if !self.procs.is_empty() {
             output.push("Running procs:<br>".into());
             output.push(r#"<table border="1" class="dataframe">"#.into());
@@ -754,6 +745,21 @@ impl TranscodeStatus {
             );
             output.push("</table>".into());
         }
+        output
+    }
+
+    pub fn get_html(&self, flists: &FileLists, config: &Config) -> Vec<StackString> {
+        let mut output: Vec<StackString> = vec![
+            r#"<button name="remcomout" id="remcomoutput">"#.into(),
+            r#"&nbsp; </button><br>"#.into(),
+            r#"<div id="local-file-table">"#.into(),
+        ];
+        if !flists.local_file_list.is_empty() {
+            output.extend_from_slice(&self.get_local_file_html(flists, config));
+        }
+        output.push(r#"</div><div id="procs-tables"> "#.into());
+        output.extend_from_slice(&self.get_procs_html());
+        output.push("</div>".into());
         output
     }
 }
