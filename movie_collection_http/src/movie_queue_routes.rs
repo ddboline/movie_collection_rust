@@ -871,10 +871,14 @@ pub async fn movie_queue_transcode_status_file_list(
     let status = transcode_status(&state.config)
         .await
         .map_err(Into::<Error>::into)?;
-    let body = status
-        .get_local_file_html(&file_lists, &state.config)
-        .join("")
-        .into();
+    let body = if !file_lists.local_file_list.is_empty() {
+        status
+            .get_local_file_html(&file_lists, &state.config)
+            .join("")
+            .into()
+    } else {
+        StackString::new()
+    };
     Ok(HtmlBase::new(body).into())
 }
 
