@@ -62,7 +62,7 @@ footer {
 <input type="button" name="trakt_cal" value="TraktCalendar" onclick="updateMainArticle('/trakt/cal');"/>
 <input type="button" name="list" value="FullQueue" onclick="updateMainArticle('/list/full_queue');"/>
 <input type="button" name="plex" value="PlexList" onclick="updateMainArticle('/list/plex?limit=100');"/>
-<input type="button" name="transocde_status" value="TranscodeStatus" onclick="updateMainArticle('/list/transcode/status');"/>
+<input type="button" name="transocde_status" value="TranscodeStatus" onclick="get_transcode_status();"/>
 <input type="button" name="refresh" value="RefreshAuth" onclick="refreshAuth();"/>
 <input type="button" name="auth" value="Auth" onclick="traktAuth();"/>
 </H3>
@@ -85,6 +85,11 @@ footer {
         }
         xmlhttp.open("GET", url, true);
         xmlhttp.send(null);
+    }
+    function get_transcode_status() {
+        updateMainArticle('/list/transcode/status');
+        update_file_list();
+        update_procs();
     }
     function watched_add(link, season, episode) {
         let url = "/trakt/watched/add/" + link + "/" + season + "/" + episode;

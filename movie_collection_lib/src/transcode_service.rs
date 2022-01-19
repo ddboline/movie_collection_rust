@@ -683,6 +683,7 @@ impl TranscodeStatus {
             )
             ,
         );
+        output.push("</table>".into());
         output
     }
 
