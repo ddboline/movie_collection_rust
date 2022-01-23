@@ -19,10 +19,9 @@ use std::{
     hash::{Hash, Hasher},
     path,
     path::PathBuf,
-    time::Duration,
 };
 use stdout_channel::{MockStdout, StdoutChannel};
-use tokio::{fs::remove_file, time::timeout};
+use tokio::fs::remove_file;
 use tokio_stream::StreamExt;
 use uuid::Uuid;
 
@@ -831,14 +830,8 @@ pub async fn movie_queue_transcode_status(
             "/list/transcode/status",
         )
         .await;
-    let config = state.config.clone();
-    let task = timeout(Duration::from_secs(1), FileLists::get_file_lists(&config));
-    let status = transcode_status(&state.config)
-        .await
-        .map_err(Into::<Error>::into)?;
-    let file_lists = task
-        .await
-        .map_or_else(|_| FileLists::default(), Result::unwrap);
+    let status = transcode_status(&state.config).await.map_err(Into::<Error>::into)?;
+    let file_lists = FileLists::default();
     let body = status.get_html(&file_lists, &state.config).join("").into();
     url_task.await.ok();
     Ok(HtmlBase::new(body).into())
