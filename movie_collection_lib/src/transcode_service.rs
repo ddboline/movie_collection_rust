@@ -153,9 +153,7 @@ impl TranscodeServiceRequest {
 
                 if season == -1 || episode == -1 {
                     return Err(format_err!(
-                        "Failed to parse show season {} episode {}",
-                        season,
-                        episode
+                        "Failed to parse show season {season} episode {episode}"
                     ));
                 }
 
@@ -164,7 +162,7 @@ impl TranscodeServiceRequest {
                     .join("Documents")
                     .join("television")
                     .join(show.as_str())
-                    .join(format_sstr!("season{}", season));
+                    .join(format_sstr!("season{season}"));
                 if !d.exists() {
                     fs::create_dir_all(&d).await?;
                 }
@@ -172,7 +170,7 @@ impl TranscodeServiceRequest {
             };
 
             let input_path = path.to_path_buf();
-            let output_path = output_dir.join(&format_sstr!("{}.mp4", prefix));
+            let output_path = output_dir.join(&format_sstr!("{prefix}.mp4"));
 
             Ok(Self {
                 job_type: JobType::Move,
@@ -212,10 +210,11 @@ impl TranscodeServiceRequest {
     }
 
     pub fn get_json_path(&self, config: &Config) -> PathBuf {
+        let prefix = &self.prefix;
         match self.job_type {
-            JobType::Transcode => job_dir(config).join(&self.prefix).with_extension("json"),
+            JobType::Transcode => job_dir(config).join(prefix).with_extension("json"),
             JobType::Move => job_dir(config)
-                .join(&format_sstr!("{}_copy", self.prefix))
+                .join(&format_sstr!("{prefix}_copy"))
                 .with_extension("json"),
         }
     }
@@ -230,7 +229,7 @@ impl TranscodeServiceRequest {
                 .await?;
             StackString::from_utf8(output.stdout).map_err(Into::into)
         } else {
-            Err(format_err!("{:?} does not exist", cmd_path))
+            Err(format_err!("{cmd_path:?} does not exist"))
         }
     }
 }
@@ -323,7 +322,7 @@ impl TranscodeService {
         }
 
         if !input_file.exists() {
-            return Err(format_err!("{:?} does not exist", input_file));
+            return Err(format_err!("{input_file:?} does not exist"));
         }
         let output_path = output_file
             .file_name()
@@ -334,7 +333,7 @@ impl TranscodeService {
             .join("Documents")
             .join("movies")
             .join(output_path);
-        let debug_output_path = log_dir(&self.config).join(&format_sstr!("{}_mp4", prefix));
+        let debug_output_path = log_dir(&self.config).join(&format_sstr!("{prefix}_mp4"));
         let stdout_path = debug_output_path.with_extension("out");
         let stderr_path = debug_output_path.with_extension("err");
 
@@ -382,7 +381,7 @@ impl TranscodeService {
                     f.write_all(&stdout).await?;
                 }
             }
-            let new_debug_output_path = tmp_avi_path.join(&format_sstr!("{}_mp4.out", prefix));
+            let new_debug_output_path = tmp_avi_path.join(&format_sstr!("{prefix}_mp4.out"));
             fs::rename(&stderr_path, &new_debug_output_path).await?;
             fs::remove_file(&stdout_path).await?;
         }
@@ -396,7 +395,7 @@ impl TranscodeService {
         output_file: &Path,
     ) -> Result<(), Error> {
         let script_file = job_dir(&self.config)
-            .join(&format_sstr!("{}_copy", show))
+            .join(&format_sstr!("{show}_copy"))
             .with_extension("json");
         if script_file.exists() {
             fs::remove_file(&script_file).await?;
@@ -412,10 +411,10 @@ impl TranscodeService {
                 .join(&input_file)
         };
         if !input_file.exists() {
-            return Err(format_err!("{:?} does not exist", input_file));
+            return Err(format_err!("{input_file:?} does not exist"));
         }
 
-        let debug_output_path = log_dir(&self.config).join(&format_sstr!("{}_copy.out", show));
+        let debug_output_path = log_dir(&self.config).join(&format_sstr!("{show}_copy.out"));
         let mut debug_output_file = File::create(&debug_output_path).await?;
 
         let show_path = self
@@ -423,7 +422,7 @@ impl TranscodeService {
             .home_dir
             .join("Documents")
             .join("movies")
-            .join(&format_sstr!("{}.mp4", show));
+            .join(&format_sstr!("{show}.mp4"));
         if !show_path.exists() {
             return Ok(());
         }
@@ -494,7 +493,7 @@ impl TranscodeService {
 
         if debug_output_path.exists() {
             let new_debug_output_path =
-                tmp_dir(&self.config).join(&format_sstr!("{}_copy.out", show));
+                tmp_dir(&self.config).join(&format_sstr!("{show}_copy.out"));
             fs::rename(&debug_output_path, &new_debug_output_path).await?;
         }
 
@@ -652,30 +651,25 @@ impl TranscodeStatus {
                         let f_key = f.replace(".mkv", "").replace(".avi", "").replace(".mp4", "");
                         if file_map.get(f_key.as_str()).is_some() {
                             format_sstr!(
-                                r#"{file_name}</td><td><button type="submit" id="{file_name}" onclick="cleanup_file('{file_name}');"> cleanup </button>"#,
-                                file_name=f,
-
+                                r#"{f}</td><td><button type="submit" id="{f}" onclick="cleanup_file('{f}');"> cleanup </button>"#
                             )
                         } else if let Some(Some(status)) = proc_map.get(f_key.as_str()) {
                             match status {
-                                ProcStatus::Current => format_sstr!("{}</td><td>running", f),
-                                ProcStatus::Upcoming => format_sstr!("{}</td><td>upcoming", f),
+                                ProcStatus::Current => format_sstr!("{f}</td><td>running"),
+                                ProcStatus::Upcoming => format_sstr!("{f}</td><td>upcoming"),
                                 ProcStatus::Finished => {
                                     let mut movie_dirs = movie_directories(config).unwrap_or_else(|_| Vec::new());
                                     movie_dirs.insert(0, "".into());
-                                    let movie_dirs = movie_dirs.into_iter().map(|d| format_sstr!(r#"<option value="{d}">{d}</option>"#, d=d)).join("\n");
+                                    let movie_dirs = movie_dirs.into_iter().map(|d| format_sstr!(r#"<option value="{d}">{d}</option>"#)).join("\n");
                                     format_sstr!(
-                                    r#"{file_name}</td>
+                                    r#"{f}</td>
                                         <td><select id="movie_dir">{movie_dirs}</select>
-                                        <button type="submit" id="{file_name}" onclick="remcom_file('{file_name}');"> move </button>"#,
-                                    file_name=f,
-                                    movie_dirs=movie_dirs,
+                                        <button type="submit" id="{f}" onclick="remcom_file('{f}');"> move </button>"#,
                                 )},
                             }
                         } else {
                             format_sstr!(
-                                r#"{file_name}</td><td><button type="submit" id="{file_name}" onclick="transcode_file('{file_name}');"> transcode </button>"#,
-                                file_name=f
+                                r#"{f}</td><td><button type="submit" id="{f}" onclick="transcode_file('{f}');"> transcode </button>"#,
                             )
                         }
                     })
@@ -771,7 +765,7 @@ impl fmt::Display for TranscodeStatus {
             write!(
                 f,
                 "Running procs:\n\n{}\n\n",
-                self.procs.iter().map(|p| format_sstr!("{}", p)).join("\n")
+                self.procs.iter().map(|p| format_sstr!("{p}")).join("\n")
             )?;
         }
         if !self.upcoming_jobs.is_empty() {

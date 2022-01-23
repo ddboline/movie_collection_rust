@@ -87,7 +87,8 @@ impl TraktConnection {
     }
 
     fn _get_auth_url(&self, state: &str) -> Result<Url, Error> {
-        let redirect_uri = format_sstr!("https://{}/trakt/callback", self.config.domain);
+        let domain = &self.config.domain;
+        let redirect_uri = format_sstr!("https://{domain}/trakt/callback");
         let parameters = &[
             ("response_type", "code"),
             ("client_id", self.config.trakt_client_id.as_str()),
@@ -110,8 +111,10 @@ impl TraktConnection {
             if state != current_state.as_str() {
                 return Err(format_err!("Incorrect state"));
             }
-            let redirect_uri = format_sstr!("https://{}/trakt/callback", self.config.domain);
-            let url = format_sstr!("{}/oauth/token", self.config.trakt_endpoint);
+            let domain = &self.config.domain;
+            let redirect_uri = format_sstr!("https://{domain}/trakt/callback");
+            let trakt_endpoint = &self.config.trakt_endpoint;
+            let url = format_sstr!("{trakt_endpoint}/oauth/token");
             let body = hashmap! {
                 "code" => code,
                 "client_id" => self.config.trakt_client_id.as_str(),
@@ -139,8 +142,10 @@ impl TraktConnection {
     async fn get_refresh_token(&self) -> Result<AccessTokenResponse, Error> {
         let current_auth_token = AUTH_TOKEN.read().await.clone();
         if let Some(current_auth_token) = current_auth_token {
-            let redirect_uri = format_sstr!("https://{}/trakt/callback", self.config.domain);
-            let url = format_sstr!("{}/oauth/token", self.config.trakt_endpoint);
+            let domain = &self.config.domain;
+            let redirect_uri = format_sstr!("https://{domain}/trakt/callback");
+            let trakt_endpoint = &self.config.trakt_endpoint;
+            let url = format_sstr!("{trakt_endpoint}/oauth/token");
             let body = hashmap! {
                 "refresh_token" => current_auth_token.refresh_token.as_str(),
                 "client_id" => self.config.trakt_client_id.as_str(),
@@ -194,7 +199,8 @@ impl TraktConnection {
             .await
             .clone()
             .ok_or_else(|| format_err!("No auth token"))?;
-        let bearer = format_sstr!("Bearer {}", auth_token.access_token);
+        let access_token = &auth_token.access_token;
+        let bearer = format_sstr!("Bearer {access_token}");
         headers.insert("Authorization", bearer.parse()?);
         Ok(headers)
     }
@@ -205,7 +211,8 @@ impl TraktConnection {
         limit: usize,
     ) -> Result<Vec<WatchListShowsResponse>, Error> {
         let headers = self.get_rw_headers().await?;
-        let url = format_sstr!("{}/sync/watchlist/shows", self.config.trakt_endpoint);
+        let trakt_endpoint = &self.config.trakt_endpoint;
+        let url = format_sstr!("{trakt_endpoint}/sync/watchlist/shows");
         let page_str = StackString::from_display(page);
         let limit_str = StackString::from_display(limit);
         let url = Url::parse_with_params(&url, &[("page", &page_str), ("limit", &limit_str)])?;
@@ -261,11 +268,8 @@ impl TraktConnection {
         imdb_id: &str,
     ) -> Result<Vec<TraktShowSearchResponse>, Error> {
         let headers = self.get_ro_headers()?;
-        let url = format_sstr!(
-            "{}/search/imdb/{}?type=show",
-            self.config.trakt_endpoint,
-            imdb_id
-        );
+        let trakt_endpoint = &self.config.trakt_endpoint;
+        let url = format_sstr!("{trakt_endpoint}/search/imdb/{imdb_id}?type=show");
         self.client
             .get(url.as_str())
             .headers(headers)
@@ -282,11 +286,8 @@ impl TraktConnection {
         imdb_id: &str,
     ) -> Result<Vec<TraktMovieSearchResponse>, Error> {
         let headers = self.get_ro_headers()?;
-        let url = format_sstr!(
-            "{}/search/imdb/{}?type=movie",
-            self.config.trakt_endpoint,
-            imdb_id
-        );
+        let trakt_endpoint = &self.config.trakt_endpoint;
+        let url = format_sstr!("{trakt_endpoint}/search/imdb/{imdb_id}?type=movie");
         self.client
             .get(url.as_str())
             .headers(headers)
@@ -305,13 +306,9 @@ impl TraktConnection {
         episode: i32,
     ) -> Result<TraktEpisodeObject, Error> {
         let headers = self.get_ro_headers()?;
-        let url = format_sstr!(
-            "{}/shows/{imdb}/seasons/{season}/episodes/{episode}",
-            self.config.trakt_endpoint,
-            imdb = imdb_id,
-            season = season,
-            episode = episode,
-        );
+        let trakt_endpoint = &self.config.trakt_endpoint;
+        let url =
+            format_sstr!("{trakt_endpoint}/shows/{imdb_id}/seasons/{season}/episodes/{episode}");
         self.client
             .get(url.as_str())
             .headers(headers)
@@ -330,7 +327,8 @@ impl TraktConnection {
             .pop()
             .ok_or_else(|| format_err!("No show returned"))?;
         let headers = self.get_rw_headers().await?;
-        let url = format_sstr!("{}/sync/watchlist", self.config.trakt_endpoint);
+        let trakt_endpoint = &self.config.trakt_endpoint;
+        let url = format_sstr!("{trakt_endpoint}/sync/watchlist");
         let data = hashmap! {
             "shows" => vec![show_obj.show],
         };
@@ -357,7 +355,8 @@ impl TraktConnection {
             .pop()
             .ok_or_else(|| format_err!("No show returned"))?;
         let headers = self.get_rw_headers().await?;
-        let url = format_sstr!("{}/sync/watchlist/remove", self.config.trakt_endpoint);
+        let trakt_endpoint = &self.config.trakt_endpoint;
+        let url = format_sstr!("{trakt_endpoint}/sync/watchlist/remove");
         let data = hashmap! {
             "shows" => vec![show_obj.show],
         };
@@ -380,7 +379,8 @@ impl TraktConnection {
         &self,
     ) -> Result<HashMap<(StackString, i32, i32), WatchedEpisode>, Error> {
         let headers = self.get_rw_headers().await?;
-        let url = format_sstr!("{}/sync/watched/shows", self.config.trakt_endpoint);
+        let trakt_endpoint = &self.config.trakt_endpoint;
+        let url = format_sstr!("{trakt_endpoint}/sync/watched/shows");
         let watched_episodes: Vec<TraktWatchedShowResponse> = self
             .client
             .get(url.as_str())
@@ -429,7 +429,8 @@ impl TraktConnection {
 
     pub async fn get_watched_movies(&self) -> Result<HashSet<WatchedMovie>, Error> {
         let headers = self.get_rw_headers().await?;
-        let url = format_sstr!("{}/sync/watched/movies", self.config.trakt_endpoint);
+        let trakt_endpoint = &self.config.trakt_endpoint;
+        let url = format_sstr!("{trakt_endpoint}/sync/watched/movies");
         let watched_movies: Vec<TraktWatchedMovieResponse> = self
             .client
             .get(url.as_str())
@@ -459,7 +460,8 @@ impl TraktConnection {
 
     pub async fn get_calendar(&self) -> Result<TraktCalEntryList, Error> {
         let headers = self.get_rw_headers().await?;
-        let url = format_sstr!("{}/calendars/my/shows", self.config.trakt_endpoint);
+        let trakt_endpoint = &self.config.trakt_endpoint;
+        let url = format_sstr!("{trakt_endpoint}/calendars/my/shows");
         let new_episodes: Vec<TraktCalendarResponse> = self
             .client
             .get(url.as_str())
@@ -494,7 +496,8 @@ impl TraktConnection {
     ) -> Result<TraktResult, Error> {
         let episode_obj = self.get_episode(imdb_id, season, episode).await?;
         let headers = self.get_rw_headers().await?;
-        let url = format_sstr!("{}/sync/history", self.config.trakt_endpoint);
+        let trakt_endpoint = &self.config.trakt_endpoint;
+        let url = format_sstr!("{trakt_endpoint}/sync/history");
         let data = hashmap! {
             "episodes" => vec![
                 WatchedEpisodeRequest {
@@ -524,7 +527,8 @@ impl TraktConnection {
                 .ok_or_else(|| format_err!("No show returned"))?
         };
         let headers = self.get_rw_headers().await?;
-        let url = format_sstr!("{}/sync/history", self.config.trakt_endpoint);
+        let trakt_endpoint = &self.config.trakt_endpoint;
+        let url = format_sstr!("{trakt_endpoint}/sync/history");
         let year = movie_obj.movie.year.expect("No year");
         let data = hashmap! {
             "movies" => vec![
@@ -556,7 +560,8 @@ impl TraktConnection {
     ) -> Result<TraktResult, Error> {
         let episode_obj = self.get_episode(imdb_id, season, episode).await?;
         let headers = self.get_rw_headers().await?;
-        let url = format_sstr!("{}/sync/history/remove", self.config.trakt_endpoint);
+        let trakt_endpoint = &self.config.trakt_endpoint;
+        let url = format_sstr!("{trakt_endpoint}/sync/history/remove");
         let data = hashmap! {
             "episodes" => vec![
                 WatchedEpisodeRequest {
@@ -585,7 +590,8 @@ impl TraktConnection {
             .find(|o| o.movie.year.is_some())
             .ok_or_else(|| format_err!("No show returned"))?;
         let headers = self.get_rw_headers().await?;
-        let url = format_sstr!("{}/sync/history/remove", self.config.trakt_endpoint);
+        let trakt_endpoint = &self.config.trakt_endpoint;
+        let url = format_sstr!("{trakt_endpoint}/sync/history/remove");
         let year = movie_obj.movie.year.expect("No year");
         let data = hashmap! {
             "movies" => vec![

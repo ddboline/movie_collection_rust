@@ -86,7 +86,7 @@ pub async fn make_queue_worker(
             let futures = movie_queue.into_iter().map(|result| async move {
                 let path = Path::new(result.path.as_str());
                 let timeval = get_video_runtime(path).await?;
-                Ok(format_sstr!("{} {}", result, timeval))
+                Ok(format_sstr!("{result} {timeval}"))
             });
             let results: Result<Vec<_>, Error> = try_join_all(futures).await;
             stdout.send(results?.join("\n"));
@@ -108,7 +108,7 @@ pub async fn make_queue_worker(
         }
     } else if add_files.len() == 2 {
         if let PathOrIndex::Index(idx) = &add_files[0] {
-            stdout.send(format_sstr!("inserting into {}", idx));
+            stdout.send(format_sstr!("inserting into {idx}"));
             if let PathOrIndex::Path(path) = &add_files[1] {
                 mq.insert_into_queue(*idx, &path.to_string_lossy()).await?;
             } else {
@@ -173,8 +173,7 @@ pub async fn movie_queue_http(
             format_sstr!(
                 r#"<a href="javascript:updateMainArticle('{play_url}');">{idx} {file_name}</a>"#,
                 idx=row.idx,
-                play_url=format_sstr!("{}/{}", "/list/play", collection_idx),
-                file_name=file_name,
+                play_url=format_sstr!("/list/play/{collection_idx}"),
             )
         } else {
             file_name.as_ref().into()
@@ -182,34 +181,30 @@ pub async fn movie_queue_http(
 
         let entry = if let Some(link) = row.link.as_ref() {
             format_sstr!(
-                r#"<tr><td>{}</td><td><a href={} target="_blank">imdb</a></td>"#,
-                entry,
-                &format_sstr!("https://www.imdb.com/title/{}", link)
+                r#"<tr><td>{entry}</td><td><a href={h} target="_blank">imdb</a></td>"#,
+                h=format_sstr!("https://www.imdb.com/title/{link}")
             )
         } else {
-            format_sstr!("<tr>\n<td>{}</td>\n", entry)
+            format_sstr!("<tr>\n<td>{entry}</td>\n")
         };
 
         let entry = format_sstr!(
-            "{}\n{}",
-            entry,
-            button.replace("ID", &file_name).replace("SHOW", &file_name)
+            "{entry}\n{b}",
+            b=button.replace("ID", &file_name).replace("SHOW", &file_name)
         );
 
         let entry = if ext == "mp4" {
             entry
         } else if season != -1 && episode != -1 {
             format_sstr!(
-                r#"{entry}<td><button type="submit" id="{file_name}" onclick="transcode_queue('{file_name}');"> transcode </button></td>"#,
-                entry=entry, file_name=file_name
+                r#"{entry}<td><button type="submit" id="{file_name}" onclick="transcode_queue('{file_name}');"> transcode </button></td>"#
             )
         } else {
             let entries: Vec<_> = row.path.split('/').collect();
             let len_entries = entries.len();
             let directory = entries[len_entries - 2];
             format_sstr!(
-                r#"{entry}<td><button type="submit" id="{file_name}" onclick="transcode_queue_directory('{file_name}', '{directory}');"> transcode </button></td>"#,
-                entry=entry, file_name=file_name, directory=directory
+                r#"{entry}<td><button type="submit" id="{file_name}" onclick="transcode_queue_directory('{file_name}', '{directory}');"> transcode </button></td>"#
             )
         };
         Ok(entry)

@@ -169,7 +169,7 @@ impl ImdbConnection {
         imdb_id: &str,
         season: Option<i32>,
     ) -> Result<Vec<ImdbEpisodeResult>, Error> {
-        let endpoint = format_sstr!("http://m.imdb.com/title/{}/episodes", imdb_id);
+        let endpoint = format_sstr!("http://m.imdb.com/title/{imdb_id}/episodes");
         let url = Url::parse(&endpoint)?;
         let body = self.get(&url).await?.text().await?;
 
@@ -179,11 +179,8 @@ impl ImdbConnection {
                 if let Some("season") = a.attr("class") {
                     let season_ = a.attr("season_number").unwrap_or("-1");
                     if let Some(link) = a.attr("href") {
-                        let episodes_url = format_sstr!(
-                            "http://www.imdb.com/title/{}/episodes/{}",
-                            imdb_id,
-                            link,
-                        );
+                        let episodes_url =
+                            format_sstr!("http://www.imdb.com/title/{imdb_id}/episodes/{link}");
                         Some((episodes_url, season_.into()))
                     } else {
                         None

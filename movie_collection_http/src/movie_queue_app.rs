@@ -207,7 +207,8 @@ async fn run_app(config: Config, pool: PgPool, trakt: TraktConnection) -> Result
         .or(spec_json_path)
         .or(spec_yaml_path)
         .recover(error_response);
-    let addr: SocketAddr = format_sstr!("{}:{}", app.config.host, port).parse()?;
+    let host = &app.config.host;
+    let addr: SocketAddr = format_sstr!("{host}:{port}").parse()?;
     rweb::serve(routes).bind(addr).await;
     Ok(())
 }

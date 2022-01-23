@@ -234,7 +234,7 @@ impl MovieQueueDB {
         }
         let constraints = patterns
             .iter()
-            .map(|p| format_sstr!("b.path like '%{}%'", p))
+            .map(|p| format_sstr!("b.path like '%{p}%'"))
             .join(" OR ");
         let mut where_str = StackString::new();
         if !constraints.is_empty() {
@@ -246,10 +246,9 @@ impl MovieQueueDB {
                 FROM movie_queue a
                 JOIN movie_collection b ON a.collection_idx = b.idx
                 LEFT JOIN imdb_ratings c ON b.show_id = c.index
-                {}
+                {where_str}
                 ORDER BY a.idx
-            "#,
-            where_str
+            "#
         ),)?;
         let conn = self.pool.get().await?;
         let results: Vec<PrintMovieQueue> = query.fetch(&conn).await?;

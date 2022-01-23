@@ -31,7 +31,7 @@ async fn remcom(
         )
         .await?;
         publish_single(remcom_service, &payload).await?;
-        stdout.send(format!("script {:?}", payload));
+        stdout.send(format!("script {payload:?}"));
     }
     stdout.close().await
 }

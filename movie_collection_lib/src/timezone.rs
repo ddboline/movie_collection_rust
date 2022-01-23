@@ -34,7 +34,7 @@ impl FromStr for TimeZone {
     fn from_str(s: &str) -> Result<Self, Self::Err> {
         s.parse()
             .map(Self)
-            .map_err(|e| format_err!("{} is not a valid timezone", e))
+            .map_err(|e| format_err!("{e} is not a valid timezone"))
     }
 }
 

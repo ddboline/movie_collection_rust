@@ -363,9 +363,10 @@ pub struct ImdbRatingsSetSourceRequest {
 
 impl ImdbRatingsSetSourceRequest {
     pub async fn handle(&self, pool: &PgPool) -> Result<(), Error> {
-        let mut imdb = ImdbRatings::get_show_by_link(self.link.as_ref(), pool)
+        let link = &self.link;
+        let mut imdb = ImdbRatings::get_show_by_link(link.as_str(), pool)
             .await?
-            .ok_or_else(|| format_err!("No show found for {}", self.link))?;
+            .ok_or_else(|| format_err!("No show found for {link}"))?;
         let source: TvShowSource = self.source.into();
         imdb.source = if source == TvShowSource::All {
             None
@@ -397,12 +398,13 @@ impl MovieQueueUpdateRequest {
                     .await?;
                 entry.collection_idx
             };
-            if cidx != entry.collection_idx {
-                return Err(format_err!("{} != {}", cidx, entry.collection_idx).into());
+            let collection_idx = entry.collection_idx;
+            if cidx != collection_idx {
+                return Err(format_err!("{cidx} != {collection_idx}").into());
             }
-            mq.remove_from_queue_by_collection_idx(entry.collection_idx)
+            mq.remove_from_queue_by_collection_idx(collection_idx)
                 .await?;
-            mq.insert_into_queue_by_collection_idx(entry.idx, entry.collection_idx)
+            mq.insert_into_queue_by_collection_idx(entry.idx, collection_idx)
                 .await?;
         }
         Ok(())

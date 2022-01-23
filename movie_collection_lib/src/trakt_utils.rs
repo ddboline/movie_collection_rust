@@ -398,10 +398,10 @@ pub async fn get_watched_shows_db(
 ) -> Result<Vec<WatchedEpisode>, Error> {
     let mut where_vec = Vec::new();
     if !show.is_empty() {
-        where_vec.push(format_sstr!("c.show='{}'", show));
+        where_vec.push(format_sstr!("c.show='{show}'"));
     }
     if let Some(season) = season {
-        where_vec.push(format_sstr!("a.season={}", season));
+        where_vec.push(format_sstr!("a.season={season}"));
     }
 
     let mut where_str = StackString::new();
@@ -419,10 +419,9 @@ pub async fn get_watched_shows_db(
             FROM trakt_watched_episodes a
             JOIN trakt_watchlist b ON a.link = b.link
             JOIN imdb_ratings c ON b.show = c.show
-            {}
+            {where_str}
             ORDER BY 3,4,5
-        "#,
-        where_str
+        "#
     ))?;
     let conn = pool.get().await?;
     query.fetch(&conn).await.map_err(Into::into)
@@ -545,7 +544,7 @@ pub async fn sync_trakt_with_db(
         async move {
             if !watchlist_shows_db.contains(link.as_str()) {
                 show.insert_show(&mc.pool).await?;
-                mc.stdout.send(format_sstr!("insert watchlist {}", show));
+                mc.stdout.send(format_sstr!("insert watchlist {show}"));
             }
             Ok(())
         }
@@ -569,7 +568,7 @@ pub async fn sync_trakt_with_db(
         async move {
             if !watched_shows_db.contains_key(&key) && episode.insert_episode(&mc.pool).await? > 0 {
                 mc.stdout
-                    .send(format_sstr!("insert watched episode {}", episode));
+                    .send(format_sstr!("insert watched episode {episode}"));
             }
             Ok(())
         }
@@ -591,8 +590,7 @@ pub async fn sync_trakt_with_db(
         async move {
             if !watched_movies_db.contains(movie.imdb_url.as_str()) {
                 movie.insert_movie(&mc.pool).await?;
-                mc.stdout
-                    .send(format_sstr!("insert watched movie {}", movie));
+                mc.stdout.send(format_sstr!("insert watched movie {movie}"));
             }
             Ok(())
         }
@@ -605,7 +603,7 @@ pub async fn sync_trakt_with_db(
         async move {
             if !watched_movies.contains(movie.imdb_url.as_str()) {
                 movie.delete_movie(&mc.pool).await?;
-                mc.stdout.send(format_sstr!("delete watched {}", movie));
+                mc.stdout.send(format_sstr!("delete watched {movie}"));
             }
             Ok(())
         }
@@ -653,7 +651,7 @@ async fn trakt_cal_list(trakt: &TraktConnection, mc: &MovieCollection) -> Result
             .is_some()
         };
         if !exists {
-            mc.stdout.send(format_sstr!("{} {}", show, cal));
+            mc.stdout.send(format_sstr!("{show} {cal}"));
         }
     }
     Ok(())
@@ -673,11 +671,8 @@ async fn watchlist_add(
     } else {
         return Ok(());
     };
-
-    mc.stdout.send(format_sstr!(
-        "result: {}",
-        trakt.add_watchlist_show(&imdb_url).await?
-    ));
+    let result = trakt.add_watchlist_show(&imdb_url).await?;
+    mc.stdout.send(format_sstr!("result: {result}"));
     debug!("GOT HERE");
     if let Some(show_obj) = trakt
         .get_watchlist_shows()
@@ -699,10 +694,8 @@ async fn watchlist_rm(
     if let Some(imdb_url) = get_imdb_url_from_show(mc, show).await? {
         let imdb_url_ = imdb_url.clone();
         trakt.init().await;
-        mc.stdout.send(format_sstr!(
-            "result: {}",
-            trakt.remove_watchlist_show(&imdb_url_).await?
-        ));
+        let result = trakt.remove_watchlist_show(&imdb_url_).await?;
+        mc.stdout.send(format_sstr!("result: {result}"));
         if let Some(show) = WatchListShow::get_show_by_link(&imdb_url, &mc.pool).await? {
             show.delete_show(&mc.pool).await?;
         }

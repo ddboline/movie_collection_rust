@@ -111,12 +111,12 @@ impl PlexEvent {
                 format_sstr!("WHERE {}", constraints.join(" AND "))
             },
             limit = if let Some(limit) = limit {
-                format_sstr!("LIMIT {}", limit)
+                format_sstr!("LIMIT {limit}")
             } else {
                 StackString::new()
             },
             offset = if let Some(offset) = offset {
-                format_sstr!("OFFSET {}", offset)
+                format_sstr!("OFFSET {offset}")
             } else {
                 StackString::new()
             }
@@ -209,12 +209,12 @@ impl PlexEvent {
                 format_sstr!("WHERE {}", constraints.join(" AND "))
             },
             limit = if let Some(limit) = limit {
-                format_sstr!("LIMIT {}", limit)
+                format_sstr!("LIMIT {limit}")
             } else {
                 StackString::new()
             },
             offset = if let Some(offset) = offset {
-                format_sstr!("OFFSET {}", offset)
+                format_sstr!("OFFSET {offset}")
             } else {
                 StackString::new()
             }
@@ -271,12 +271,7 @@ impl PlexEvent {
             .metadata_key
             .as_ref()
             .ok_or_else(|| format_err!("No metadata_key"))?;
-        let url = format_sstr!(
-            "http://{host}:32400{key}?X-Plex-Token={token}",
-            host = plex_host,
-            token = plex_token,
-            key = metadata_key,
-        );
+        let url = format_sstr!("http://{plex_host}:32400{metadata_key}?X-Plex-Token={plex_token}");
         let data = reqwest::get(url.as_str())
             .await?
             .error_for_status()?
@@ -463,12 +458,12 @@ impl PlexFilename {
                 format_sstr!("WHERE {}", constraints.join(" AND "))
             },
             limit = if let Some(limit) = limit {
-                format_sstr!("LIMIT {}", limit)
+                format_sstr!("LIMIT {limit}")
             } else {
                 StackString::new()
             },
             offset = if let Some(offset) = offset {
-                format_sstr!("OFFSET {}", offset)
+                format_sstr!("OFFSET {offset}")
             } else {
                 StackString::new()
             }

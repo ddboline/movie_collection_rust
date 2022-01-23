@@ -46,7 +46,7 @@ async fn make_collection() -> Result<(), Error> {
             let futures = shows.into_iter().map(|result| async move {
                 let path = Path::new(result.path.as_str());
                 let timeval = get_video_runtime(path).await?;
-                Ok(format!("{} {}", timeval, result))
+                Ok(format!("{timeval} {result}"))
             });
             let shows: Result<Vec<_>, Error> = try_join_all(futures).await;
             stdout.send(shows?.join("\n"));

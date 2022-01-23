@@ -124,17 +124,19 @@ pub async fn get_video_runtime(f: &Path) -> Result<StackString, Error> {
                 .trim_start_matches("frames=")
                 .trim_matches(',')
                 .parse()?;
-            let nsecs: f64 = nframes as f64 / fps;
-            let nmin = (nsecs / 60.) as u64;
+            let nsecs = (nframes as f64 / fps);
+            let nmin = (nsecs / 60.) as u64 % 60;
             let nhour = (nmin as f64 / 60.) as u64;
-            timeval = format_sstr!("{:02}:{:02}:{:02}", nhour, nmin % 60, nsecs as u64 % 60);
+            let nsecs = nsecs as u64 % 60;
+            timeval = format_sstr!("{nhour:02}:{nmin:02}:{nsecs:02}");
         }
         if items.len() > 1 && items[0] == "Duration:" {
             let its: SmallVec<[&str; 3]> = items[1].trim_matches(',').split(':').take(3).collect();
             let nhour: u64 = its[0].parse()?;
             let nmin: u64 = its[1].parse()?;
             let nsecs: f64 = its[2].parse()?;
-            timeval = format_sstr!("{:02}:{:02}:{:02}", nhour, nmin, nsecs as u64);
+            let nsecs = nsecs as u64;
+            timeval = format_sstr!("{nhour:02}:{nmin:02}:{nsecs:02}");
         }
     }
     Ok(timeval)

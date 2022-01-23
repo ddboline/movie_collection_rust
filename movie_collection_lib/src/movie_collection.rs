@@ -193,9 +193,9 @@ impl MovieCollection {
         show: &str,
         istv: bool,
     ) -> Result<Vec<ImdbRatings>, Error> {
-        let query = format_sstr!("SELECT show FROM imdb_ratings WHERE show like '%{}%'", show);
+        let query = format_sstr!("SELECT show FROM imdb_ratings WHERE show like '%{show}%'");
         let query = if istv {
-            format_sstr!("{} AND istv", query)
+            format_sstr!("{query} AND istv")
         } else {
             query
         };
@@ -275,10 +275,9 @@ impl MovieCollection {
                         a.eptitle, a.epurl
                     FROM imdb_episodes a
                     JOIN imdb_ratings b ON a.show=b.show
-                    WHERE a.show = $show {}
+                    WHERE a.show = $show {season_str}
                     ORDER BY a.season, a.episode
-                "#,
-                season_str,
+                "#
             ),
             show = show,
         )?;
@@ -320,7 +319,7 @@ impl MovieCollection {
                 .iter()
                 .map(|s| format_sstr!("a.path like '%{}%'", s.as_ref()))
                 .join(" OR ");
-            write!(search_constr, "AND ({})", search_strs)?;
+            write!(search_constr, "AND ({search_strs})")?;
         }
 
         let query = query_dyn!(&format_sstr!(
@@ -331,9 +330,8 @@ impl MovieCollection {
                 COALESCE(b.istv, FALSE) as istv
                 FROM movie_collection a
                 LEFT JOIN imdb_ratings b ON a.show_id = b.index
-                WHERE a.is_deleted = false {}
-            "#,
-            search_constr,
+                WHERE a.is_deleted = false {search_constr}
+            "#
         ),)?;
         let conn = self.pool.get().await?;
         let results: Vec<SearchMovieCollection> = query.fetch(&conn).await?;
@@ -571,7 +569,7 @@ impl MovieCollection {
                         .as_ref()
                         .into();
                     if self.config.suffixes.contains(&ext) {
-                        self.stdout.send(format_sstr!("not in collection {}", f));
+                        self.stdout.send(format_sstr!("not in collection {f}"));
                         self.insert_into_collection(f, true).await?;
                     }
                 }
@@ -585,12 +583,11 @@ impl MovieCollection {
             if !file_list.contains(key.as_str()) {
                 if let Some(v) = movie_queue.get(key) {
                     self.stdout
-                        .send(format_sstr!("in queue but not disk {} {}", key, v));
+                        .send(format_sstr!("in queue but not disk {key} {v}"));
                     let mq = MovieQueueDB::new(&self.config, &self.pool, &self.stdout);
                     mq.remove_from_queue_by_path(key).await?;
                 } else {
-                    self.stdout
-                        .send(format_sstr!("not on disk {} {}", key, val));
+                    self.stdout.send(format_sstr!("not on disk {key} {val}"));
                 }
                 self.remove_from_collection(key).await?;
             }
@@ -603,10 +600,9 @@ impl MovieCollection {
                 if !file_list.contains(key.as_str()) {
                     if movie_queue.contains_key(key.as_str()) {
                         self.stdout
-                            .send(format_sstr!("in queue but not disk {}", key));
+                            .send(format_sstr!("in queue but not disk {key}"));
                     } else {
-                        self.stdout
-                            .send(format_sstr!("not on disk {} {}", key, val));
+                        self.stdout.send(format_sstr!("not on disk {key} {val}"));
                     }
                 }
                 Ok(())
@@ -629,7 +625,7 @@ impl MovieCollection {
 
         for show in shows_not_in_db {
             self.stdout
-                .send(format_sstr!("show has episode not in db {} ", show));
+                .send(format_sstr!("show has episode not in db {show} "));
         }
         Ok(())
     }
@@ -739,11 +735,10 @@ impl MovieCollection {
                     WHERE c.link in (SELECT link FROM active_links GROUP BY link) AND
                         e.episode is null AND
                         c.istv AND d.airdate >= $mindate AND
-                        d.airdate <= $maxdate {}
+                        d.airdate <= $maxdate {source_str}
                     GROUP BY 1,2,3,4,5,6,7,8,9,10
                     ORDER BY d.airdate, c.show, d.season, d.episode
-                "#,
-                source_str
+                "#
             ),
             mindate = mindate,
             maxdate = maxdate
@@ -826,9 +821,8 @@ pub async fn find_new_episodes_http_worker(
         r#"<td><button type="submit" id="ID" "#,
         format_sstr!(
             r#"onclick="imdb_update('SHOW', 'LINK', SEASON,
-            '/list/cal{}');"
-            >update database</button></td>"#,
-            source_str,
+            '/list/cal{source_str}');"
+            >update database</button></td>"#
         ),
     )?;
 
@@ -884,34 +878,32 @@ pub async fn find_new_episodes_http_worker(
         .into_iter()
         .map(|epi| {
             let season_str = StackString::from_display(epi.season);
-            let key = (epi.show.clone(), epi.season, epi.episode);
+            let link_str = &epi.link;
+            let title = &epi.title;
+            let epurl = &epi.epurl;
+            let episode = epi.episode;
+            let key = (epi.show.clone(), epi.season, episode);
+            let airdate = epi.airdate;
             format_sstr!(
-                "<tr><td>{}</td><td>{}</td><td>{}</td><td>{}</td><td>{}</td>{}</tr>",
-                format_sstr!(
-                    r#"<a href="javascript:updateMainArticle('/trakt/watched/list/{}/{}')">{}</a>"#,
-                    epi.link,
-                    epi.season,
-                    epi.title
+                "<tr><td>{a}</td><td>{b}</td><td>{c}</td><td>{d}</td><td>{airdate}</td>{e}</tr>",
+                a=format_sstr!(
+                    r#"<a href="javascript:updateMainArticle('/trakt/watched/list/{link_str}/{season_str}')">{title}</a>"#
                 ),
-                match queue.get(&key) {
+                b=match queue.get(&key) {
                     Some(idx) => format_sstr!(
                         r#"<a href="javascript:updateMainArticle('{}');">{}</a>"#,
-                        &format_sstr!(r#"{}/{}"#, "/list/play", idx),
+                        &format_sstr!(r#"/list/play/{idx}"#),
                         epi.eptitle
                     ),
                     None => epi.eptitle.clone(),
                 },
-                format_sstr!(
-                    r#"<a href="https://www.imdb.com/title/{}" target="_blank">s{:02} ep{:02}</a>"#,
-                    epi.epurl,
-                    epi.season,
-                    epi.episode
+                c=format_sstr!(
+                    r#"<a href="https://www.imdb.com/title/{epurl}" target="_blank">s{season_str:02} ep{episode:02}</a>"#
                 ),
-                format_sstr!("rating: {:0.1} / {:0.1}", epi.eprating, epi.rating,),
-                epi.airdate,
-                button_add
+                d=format_sstr!("rating: {:0.1} / {:0.1}", epi.eprating, epi.rating,),
+                e=button_add
                     .replace("SHOW", &epi.show)
-                    .replace("LINK", &epi.link)
+                    .replace("LINK", link_str)
                     .replace("SEASON", &season_str),
             )
         })
@@ -938,7 +930,7 @@ impl LastModifiedResponse {
         ];
 
         let futures = tables.into_iter().map(|table| async move {
-            let query = query_dyn!(&format_sstr!("SELECT max(last_modified) FROM {}", table))?;
+            let query = query_dyn!(&format_sstr!("SELECT max(last_modified) FROM {table}"))?;
             let conn = pool.get().await?;
             if let Some((last_modified,)) = query.fetch_opt(&conn).await? {
                 let last_modified: DateTime<Utc> = last_modified;
