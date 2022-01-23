@@ -124,7 +124,7 @@ pub async fn get_video_runtime(f: &Path) -> Result<StackString, Error> {
                 .trim_start_matches("frames=")
                 .trim_matches(',')
                 .parse()?;
-            let nsecs = (nframes as f64 / fps);
+            let nsecs = nframes as f64 / fps;
             let nmin = (nsecs / 60.) as u64 % 60;
             let nhour = (nmin as f64 / 60.) as u64;
             let nsecs = nsecs as u64 % 60;
