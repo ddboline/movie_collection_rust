@@ -14,7 +14,7 @@ use std::{
     path::Path,
     sync::Arc,
 };
-use stdout_channel::StdoutChannel;
+use stdout_channel::{rate_limiter::RateLimiter, StdoutChannel};
 
 use crate::{
     config::Config,
@@ -557,9 +557,11 @@ impl MovieCollection {
             })
             .collect();
         let episodes_set = episodes_set?;
+        let rate_limiter = RateLimiter::new(10, 100);
 
         let futures = file_list.iter().map(|f| {
             let collection_map = collection_map.clone();
+            let rate_limiter = rate_limiter.clone();
             async move {
                 if collection_map.get(f.as_str()).is_none() {
                     let ext = Path::new(f)
@@ -570,6 +572,7 @@ impl MovieCollection {
                         .into();
                     if self.config.suffixes.contains(&ext) {
                         self.stdout.send(format_sstr!("not in collection {f}"));
+                        rate_limiter.acquire().await;
                         self.insert_into_collection(f, true).await?;
                     }
                 }
@@ -579,37 +582,39 @@ impl MovieCollection {
         let results: Result<Vec<_>, Error> = try_join_all(futures).await;
         results?;
 
-        for (key, val) in collection_map.iter() {
-            if !file_list.contains(key.as_str()) {
-                if let Some(v) = movie_queue.get(key) {
-                    self.stdout
-                        .send(format_sstr!("in queue but not disk {key} {v}"));
-                    let mq = MovieQueueDB::new(&self.config, &self.pool, &self.stdout);
-                    mq.remove_from_queue_by_path(key).await?;
-                } else {
-                    self.stdout.send(format_sstr!("not on disk {key} {val}"));
-                }
-                self.remove_from_collection(key).await?;
-            }
-        }
-
         let futures = collection_map.iter().map(|(key, val)| {
             let file_list = file_list.clone();
             let movie_queue = movie_queue.clone();
+            let rate_limiter = rate_limiter.clone();
             async move {
                 if !file_list.contains(key.as_str()) {
-                    if movie_queue.contains_key(key.as_str()) {
+                    if let Some(v) = movie_queue.get(key) {
                         self.stdout
-                            .send(format_sstr!("in queue but not disk {key}"));
+                            .send(format_sstr!("in queue but not disk {key} {v}"));
+                        let mq = MovieQueueDB::new(&self.config, &self.pool, &self.stdout);
+                        mq.remove_from_queue_by_path(key).await?;
                     } else {
                         self.stdout.send(format_sstr!("not on disk {key} {val}"));
                     }
+                    rate_limiter.acquire().await;
+                    self.remove_from_collection(key).await?;
                 }
                 Ok(())
             }
         });
         let results: Result<Vec<_>, Error> = try_join_all(futures).await;
         results?;
+
+        for (key, val) in collection_map.iter() {
+            if !file_list.contains(key.as_str()) {
+                if movie_queue.contains_key(key.as_str()) {
+                    self.stdout
+                        .send(format_sstr!("in queue but not disk {key}"));
+                } else {
+                    self.stdout.send(format_sstr!("not on disk {key} {val}"));
+                }
+            }
+        }
 
         let shows_not_in_db: HashSet<StackString> = episode_list
             .into_par_iter()
