@@ -830,7 +830,9 @@ pub async fn movie_queue_transcode_status(
             "/list/transcode/status",
         )
         .await;
-    let status = transcode_status(&state.config).await.map_err(Into::<Error>::into)?;
+    let status = transcode_status(&state.config)
+        .await
+        .map_err(Into::<Error>::into)?;
     let file_lists = FileLists::default();
     let body = status.get_html(&file_lists, &state.config).join("").into();
     url_task.await.ok();
