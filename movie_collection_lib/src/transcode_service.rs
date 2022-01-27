@@ -743,18 +743,14 @@ impl TranscodeStatus {
         output
     }
 
-    pub fn get_html(&self, flists: &FileLists, config: &Config) -> Vec<StackString> {
+    pub fn get_html(&self) -> Vec<StackString> {
         let mut output: Vec<StackString> = vec![
             r#"<button name="remcomout" id="remcomoutput">"#.into(),
             r#"&nbsp; </button><br>"#.into(),
-            r#"<div id="local-file-table">"#.into(),
+            r#"<div id="procs-tables">"#.into(),
         ];
-        if !flists.local_file_list.is_empty() {
-            output.extend_from_slice(&self.get_local_file_html(flists, config));
-        }
-        output.push(r#"</div><div id="procs-tables"> "#.into());
         output.extend_from_slice(&self.get_procs_html());
-        output.push("</div>".into());
+        output.push(r#"</div><div id="local-file-table"></div>"#.into());
         output
     }
 }
