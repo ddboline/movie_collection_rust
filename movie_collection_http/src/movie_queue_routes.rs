@@ -1476,7 +1476,7 @@ async fn trakt_cal_http_worker(
                 button,
                 "{}",
                 button_add
-                    .replace("SHOW", &show)
+                    .replace("SHOW", show)
                     .replace("LINK", cal_link)
                     .replace("SEASON", &season_str)
             )?;
