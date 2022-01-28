@@ -989,6 +989,7 @@ mod tests {
     use crate::{config::Config, movie_collection::MovieCollection, pgpool::PgPool};
 
     #[tokio::test]
+    #[ignore]
     async fn test_match_file_pattern() -> Result<(), Error> {
         let config = Config::with_config()?;
         let pool = PgPool::new(&config.pgurl);
