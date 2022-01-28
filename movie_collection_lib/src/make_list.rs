@@ -4,7 +4,12 @@ use itertools::Itertools;
 use log::debug;
 use rayon::iter::{IntoParallelRefIterator, ParallelIterator};
 use stack_string::StackString;
-use std::{collections::HashMap, ffi::OsStr, fmt::Write, path::PathBuf};
+use std::{
+    collections::HashMap,
+    ffi::OsStr,
+    fmt::Write,
+    path::{Path, PathBuf},
+};
 use stdout_channel::StdoutChannel;
 use tokio::{
     fs,
@@ -14,6 +19,8 @@ use tokio_stream::{wrappers::ReadDirStream, StreamExt};
 
 use crate::{
     config::Config,
+    movie_collection::MovieCollection,
+    pgpool::PgPool,
     transcode_service::transcode_status,
     utils::{get_video_runtime, walk_directory},
 };
@@ -25,7 +32,7 @@ pub struct FileLists {
 }
 
 impl FileLists {
-    pub async fn get_file_lists(config: &Config) -> Result<Self, Error> {
+    pub async fn get_local_file_list(config: &Config) -> Result<Vec<StackString>, Error> {
         let movies_dir = config.home_dir.join("Documents").join("movies");
 
         let mut local_file_list: Vec<StackString> =
@@ -43,11 +50,20 @@ impl FileLists {
                 .collect()
                 .await;
 
+        local_file_list.sort();
+        Ok(local_file_list)
+    }
+
+    pub async fn get_file_lists(
+        config: &Config,
+        pool: Option<&PgPool>,
+        stdout: &StdoutChannel<StackString>,
+    ) -> Result<Self, Error> {
+        let local_file_list = Self::get_local_file_list(config).await?;
+
         if local_file_list.is_empty() {
             return Ok(Self::default());
         }
-
-        local_file_list.sort();
 
         let patterns: Vec<_> = local_file_list
             .iter()
@@ -58,18 +74,34 @@ impl FileLists {
             })
             .collect();
 
-        let config = config.clone();
-        let file_list: Result<Vec<_>, Error> = spawn_blocking(move || {
-            config
-                .movie_dirs
-                .par_iter()
-                .filter(|d| d.exists())
-                .map(|d| walk_directory(d, &patterns))
-                .collect::<Result<Vec<_>, Error>>()
-                .map(|x| x.into_iter().flatten().sorted().collect())
-        })
-        .await?;
-        let file_list = file_list?;
+        let file_list = if let Some(pool) = pool {
+            let mc = MovieCollection::new(config, pool, stdout);
+            mc.match_file_pattern(&patterns)
+                .await?
+                .into_iter()
+                .filter_map(|p| {
+                    let path = Path::new(&p);
+                    if path.exists() {
+                        Some(path.to_path_buf())
+                    } else {
+                        None
+                    }
+                })
+                .collect()
+        } else {
+            let config = config.clone();
+            let file_list: Result<Vec<_>, Error> = spawn_blocking(move || {
+                config
+                    .movie_dirs
+                    .par_iter()
+                    .filter(|d| d.exists())
+                    .map(|d| walk_directory(d, &patterns))
+                    .collect::<Result<Vec<_>, Error>>()
+                    .map(|x| x.into_iter().flatten().sorted().collect())
+            })
+            .await?;
+            file_list?
+        };
 
         Ok(Self {
             local_file_list,
@@ -100,7 +132,7 @@ pub async fn make_list(stdout: &StdoutChannel<StackString>) -> Result<(), Error>
         spawn(async move { transcode_status(&config).await })
     };
 
-    let file_lists = FileLists::get_file_lists(&config).await?;
+    let file_lists = FileLists::get_file_lists(&config, None, stdout).await?;
     let file_map = file_lists.get_file_map();
 
     if file_lists.local_file_list.is_empty() {

@@ -847,7 +847,10 @@ pub async fn movie_queue_transcode_status_file_list(
     #[filter = "LoggedUser::filter"] _: LoggedUser,
     #[data] state: AppState,
 ) -> WarpResult<TranscodeStatusFileListResponse> {
-    let file_lists = FileLists::get_file_lists(&state.config)
+    let mock_stdout = MockStdout::new();
+    let stdout = StdoutChannel::with_mock_stdout(mock_stdout.clone(), mock_stdout.clone());
+
+    let file_lists = FileLists::get_file_lists(&state.config, Some(&state.db), &stdout)
         .await
         .map_err(Into::<Error>::into)?;
     let status = transcode_status(&state.config)

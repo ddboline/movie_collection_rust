@@ -1,5 +1,6 @@
 use anyhow::{format_err, Error};
 use chrono::{DateTime, Duration, Local, NaiveDate, Utc};
+use derive_more::Into;
 use futures::future::try_join_all;
 use itertools::Itertools;
 use postgres_query::{query, query_dyn, FromSqlRow};
@@ -806,6 +807,33 @@ impl MovieCollection {
         let conn = self.pool.get().await?;
         query.fetch(&conn).await.map_err(Into::into)
     }
+
+    pub async fn match_file_pattern(
+        &self,
+        patterns: &[impl AsRef<str>],
+    ) -> Result<Vec<StackString>, Error> {
+        #[derive(FromSqlRow, Into)]
+        struct Wrap(StackString);
+
+        let constr = patterns
+            .iter()
+            .map(|p| {
+                let p = p.as_ref();
+                format_sstr!("path like '%{p}%'")
+            })
+            .join(" OR ");
+        let where_str = if constr.is_empty() {
+            StackString::new()
+        } else {
+            format_sstr!("WHERE {constr}")
+        };
+        let query = query_dyn!(&format_sstr!(
+            "SELECT path FROM movie_collection {where_str}"
+        ))?;
+        let conn = self.pool.get().await?;
+        let wrap: Vec<Wrap> = query.fetch(&conn).await?;
+        Ok(wrap.into_iter().map(Into::into).collect())
+    }
 }
 
 pub async fn find_new_episodes_http_worker(
@@ -950,5 +978,31 @@ impl LastModifiedResponse {
         let results: Result<Vec<_>, Error> = try_join_all(futures).await;
         let results: Vec<_> = results?.into_iter().flatten().collect();
         Ok(results)
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use anyhow::Error;
+    use stdout_channel::{MockStdout, StdoutChannel};
+
+    use crate::{config::Config, movie_collection::MovieCollection, pgpool::PgPool};
+
+    #[tokio::test]
+    async fn test_match_file_pattern() -> Result<(), Error> {
+        let config = Config::with_config()?;
+        let pool = PgPool::new(&config.pgurl);
+        let mock_stdout = MockStdout::new();
+        let stdout = StdoutChannel::with_mock_stdout(mock_stdout.clone(), mock_stdout.clone());
+
+        let mc = MovieCollection::new(&config, &pool, &stdout);
+        let files = mc
+            .match_file_pattern(&[
+                "/media/seagate4000/Documents/movies/scifi/star_trek_2_the_wrath_of_khan.mp4",
+                "/media/western2000/Documents/movies/scifi/star_trek_2_the_wrath_of_khan.mp4",
+            ])
+            .await?;
+        assert_eq!(files.len(), 2);
+        Ok(())
     }
 }
