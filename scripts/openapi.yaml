@@ -3,7 +3,7 @@ openapi: 3.0.1
 info:
   title: Movie Queue WebApp
   description: Web Frontend for Movie Queue
-  version: 0.8.49
+  version: 0.8.63
 paths:
   /list/index.html:
     get:
@@ -104,6 +104,40 @@ paths:
       responses:
         "200":
           description: Transcode Status
+          content:
+            text/html:
+              schema:
+                type: string
+        "400":
+          description: Bad Request
+        "404":
+          description: Not Found
+        "405":
+          description: Method not allowed
+        "500":
+          description: Internal Server Error
+  /list/transcode/status/file_list:
+    get:
+      responses:
+        "200":
+          description: Transcode Status File List
+          content:
+            text/html:
+              schema:
+                type: string
+        "400":
+          description: Bad Request
+        "404":
+          description: Not Found
+        "405":
+          description: Method not allowed
+        "500":
+          description: Internal Server Error
+  /list/transcode/status/procs:
+    get:
+      responses:
+        "200":
+          description: Transcode Status File List
           content:
             text/html:
               schema:
