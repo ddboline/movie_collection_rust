@@ -87,9 +87,14 @@ footer {
         xmlhttp.send(null);
     }
     function get_transcode_status() {
-        updateMainArticle('/list/transcode/status');
-        update_file_list();
-        update_procs();
+        let xmlhttp = new XMLHttpRequest();
+        xmlhttp.onload = function f() {
+            document.getElementById("main_article").innerHTML = xmlhttp.responseText;
+            update_file_list();
+            update_procs();
+        }
+        xmlhttp.open("GET", '/list/transcode/status', true);
+        xmlhttp.send(null);
     }
     function watched_add(link, season, episode) {
         let url = "/trakt/watched/add/" + link + "/" + season + "/" + episode;
