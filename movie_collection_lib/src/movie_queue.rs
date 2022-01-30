@@ -167,6 +167,12 @@ impl MovieQueueDB {
         let mut conn = self.pool.get().await?;
         let tran = conn.transaction().await?;
 
+        let query = query!("SELECT idx FROM movie_queue WHERE idx=$idx", idx = idx);
+        let exists = tran
+            .query_opt(query.sql(), query.parameters())
+            .await?
+            .is_some();
+
         let query = r#"SELECT max(idx) FROM movie_queue"#;
         let max_idx: i32 = tran
             .query(query, &[])
@@ -176,16 +182,18 @@ impl MovieQueueDB {
         let diff = max_idx - idx + 2;
         debug!("{} {} {}", max_idx, idx, diff);
 
-        let query = query!(
-            r#"
-                UPDATE movie_queue
-                SET idx = idx + $diff, last_modified = now()
-                WHERE idx >= $idx
-            "#,
-            diff = diff,
-            idx = idx
-        );
-        tran.execute(query.sql(), query.parameters()).await?;
+        if exists {
+            let query = query!(
+                r#"
+                    UPDATE movie_queue
+                    SET idx = idx + $diff, last_modified = now()
+                    WHERE idx >= $idx
+                "#,
+                diff = diff,
+                idx = idx
+            );
+            tran.execute(query.sql(), query.parameters()).await?;
+        }
 
         let query = query!(
             r#"
@@ -197,16 +205,18 @@ impl MovieQueueDB {
         );
         tran.execute(query.sql(), query.parameters()).await?;
 
-        let query = query!(
-            r#"
-                UPDATE movie_queue
-                SET idx = idx - $diff + 1, last_modified = now()
-                WHERE idx > $idx
-            "#,
-            diff = diff,
-            idx = idx
-        );
-        tran.execute(query.sql(), query.parameters()).await?;
+        if exists {
+            let query = query!(
+                r#"
+                    UPDATE movie_queue
+                    SET idx = idx - $diff + 1, last_modified = now()
+                    WHERE idx > $idx
+                "#,
+                diff = diff,
+                idx = idx
+            );
+            tran.execute(query.sql(), query.parameters()).await?;
+        }
 
         tran.commit().await.map_err(Into::into)
     }

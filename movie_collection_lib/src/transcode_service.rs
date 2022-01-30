@@ -2,6 +2,7 @@ use anyhow::{format_err, Error};
 use futures::{future::try_join_all, try_join};
 use itertools::Itertools;
 use jwalk::WalkDir;
+use log::debug;
 use procfs::process;
 use serde::{Deserialize, Serialize};
 use smallvec::{smallvec, SmallVec};
@@ -23,7 +24,6 @@ use tokio::{
     process::Command,
     task::{spawn, spawn_blocking, JoinHandle},
 };
-use log::debug;
 
 use crate::{
     config::Config, make_list::FileLists, make_queue::make_queue_worker,
