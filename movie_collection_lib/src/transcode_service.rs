@@ -23,6 +23,7 @@ use tokio::{
     process::Command,
     task::{spawn, spawn_blocking, JoinHandle},
 };
+use log::debug;
 
 use crate::{
     config::Config, make_list::FileLists, make_queue::make_queue_worker,
@@ -649,15 +650,16 @@ impl TranscodeStatus {
                     .iter()
                     .map(|f| {
                         let f_key = f.replace(".mkv", "").replace(".avi", "").replace(".mp4", "");
+                        debug!("proc_map.keys {:?} {:?} {}", proc_map.keys(), file_map.keys(), f_key);
                         if file_map.get(f_key.as_str()).is_some() {
                             format_sstr!(
                                 r#"{f}</td><td><button type="submit" id="{f}" onclick="cleanup_file('{f}');"> cleanup </button>"#
                             )
-                        } else if let Some(Some(status)) = proc_map.get(f_key.as_str()) {
+                        } else if let Some(status) = proc_map.get(f_key.as_str()) {
                             match status {
-                                ProcStatus::Current => format_sstr!("{f}</td><td>running"),
-                                ProcStatus::Upcoming => format_sstr!("{f}</td><td>upcoming"),
-                                ProcStatus::Finished => {
+                                Some(ProcStatus::Current) => format_sstr!("{f}</td><td>running"),
+                                Some(ProcStatus::Upcoming) => format_sstr!("{f}</td><td>upcoming"),
+                                Some(ProcStatus::Finished) => {
                                     let mut movie_dirs = movie_directories(config).unwrap_or_else(|_| Vec::new());
                                     movie_dirs.insert(0, "".into());
                                     let movie_dirs = movie_dirs.into_iter().map(|d| format_sstr!(r#"<option value="{d}">{d}</option>"#)).join("\n");
@@ -665,7 +667,9 @@ impl TranscodeStatus {
                                     r#"{f}</td>
                                         <td><select id="movie_dir">{movie_dirs}</select>
                                         <button type="submit" id="{f}" onclick="remcom_file('{f}');"> move </button>"#,
-                                )},
+                                    )
+                                },
+                                None => format_sstr!("{f}</td><td>unknown"),
                             }
                         } else {
                             format_sstr!(
