@@ -632,7 +632,7 @@ impl TranscodeStatus {
             })
         });
 
-        upcoming.chain(finished).chain(current).collect()
+        finished.chain(upcoming).chain(current).collect()
     }
 
     pub fn get_local_file_html(&self, flists: &FileLists, config: &Config) -> Vec<StackString> {
