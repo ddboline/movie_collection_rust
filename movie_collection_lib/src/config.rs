@@ -6,6 +6,7 @@ use std::{
     sync::Arc,
 };
 use uuid::Uuid;
+use smallvec::{SmallVec, smallvec};
 
 use stack_string::StackString;
 
@@ -18,7 +19,7 @@ pub struct ConfigInner {
     pub pgurl: StackString,
     pub movie_dirs: Vec<PathBuf>,
     #[serde(default = "default_suffixes")]
-    pub suffixes: Vec<StackString>,
+    pub suffixes: SmallVec<[StackString; 3]>,
     #[serde(default = "default_preferred_dir")]
     pub preferred_dir: PathBuf,
     #[serde(default = "default_queue_table")]
@@ -59,8 +60,8 @@ pub struct ConfigInner {
     pub plex_host: Option<StackString>,
 }
 
-fn default_suffixes() -> Vec<StackString> {
-    vec!["avi".into(), "mp4".into(), "mkv".into()]
+fn default_suffixes() -> SmallVec<[StackString; 3]> {
+    smallvec!["avi".into(), "mp4".into(), "mkv".into()]
 }
 fn default_preferred_dir() -> PathBuf {
     "/tmp".into()
@@ -154,5 +155,36 @@ impl Deref for Config {
 
     fn deref(&self) -> &Self::Target {
         &self.0
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use anyhow::Error;
+    use std::path::Path;
+    use uuid::Uuid;
+    use std::ops::Deref;
+
+    use crate::config::Config;
+
+    #[test]
+    fn test_config() -> Result<(), Error> {
+        dotenv::from_path("../tests/data/test.env")?;
+        let config = Config::new()?;
+
+        let plex_webhook_key: Uuid = "6f609260-4fd2-4a2c-919c-9c7766bd6400".parse()?;
+
+        let temp_movie_dir = Path::new("/tmp/temp_movie_dir");
+        assert_eq!(&config.pgurl, "postgresql://test:test@localhost:5432/garmin_summary_test");
+        assert_eq!(&config.movie_dirs[0], temp_movie_dir);
+        assert_eq!(&config.preferred_dir, temp_movie_dir);
+        assert_eq!(&config.domain, "example.com");
+        assert_eq!(&config.trakt_client_id, "8675309");
+        assert_eq!(&config.trakt_client_secret, "8675309");
+        assert_eq!(&config.secret_path, Path::new("/tmp/secret.bin"));
+        assert_eq!(&config.jwt_secret_path, Path::new("/tmp/jwt_secret.bin"));
+        assert_eq!(config.video_playback_path.as_ref().map(Deref::deref), Some(Path::new("/tmp/html")));
+        assert_eq!(config.plex_webhook_key, plex_webhook_key);
+        Ok(())
     }
 }
