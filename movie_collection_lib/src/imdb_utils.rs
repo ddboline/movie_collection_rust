@@ -47,7 +47,7 @@ impl fmt::Display for ImdbEpisodeResult {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         write!(
             f,
-            "{} {} {} {} {} {} {} ",
+            "{} {} {} {} {} {} {}",
             self.season,
             self.episode,
             option_string_wrapper(self.epurl.as_ref()),
@@ -275,8 +275,13 @@ impl ImdbConnection {
 
 #[cfg(test)]
 mod tests {
-    use crate::imdb_utils::ImdbConnection;
     use anyhow::Error;
+    use chrono::{NaiveDate, Utc};
+    use log::debug;
+    use stack_string::format_sstr;
+    use std::fmt::Write;
+
+    use crate::imdb_utils::{ImdbConnection, ImdbEpisodeResult, ImdbTuple};
 
     #[test]
     fn test_parse_imdb_rating_body() -> Result<(), Error> {
@@ -293,6 +298,65 @@ mod tests {
         let rating = conn.parse_imdb_rating("tt14418068").await?;
         println!("{:?}", rating);
         assert!(rating.rating.is_some());
+        Ok(())
+    }
+
+    #[test]
+    fn test_imdb_tuple_display() -> Result<(), Error> {
+        let t = ImdbTuple {
+            title: "Test Title".into(),
+            link: "https://example.com/link".into(),
+            rating: 0.85,
+        };
+        assert_eq!(
+            format_sstr!("{t}"),
+            format_sstr!("Test Title https://example.com/link 0.85")
+        );
+        Ok(())
+    }
+
+    #[test]
+    fn test_imdb_episode_result_display() -> Result<(), Error> {
+        let t = ImdbEpisodeResult {
+            season: 2,
+            episode: 3,
+            epurl: Some("https://example.com/test".into()),
+            eptitle: Some("test_title".into()),
+            airdate: Some(Utc::now().date().naive_utc()),
+            rating: Some(4.5),
+            nrating: Some(10_000),
+        };
+        assert_eq!(
+            format_sstr!("{t}"),
+            format_sstr!("2 3 https://example.com/test test_title 2022-02-02 4.5 10000")
+        );
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn test_parse_imdb() -> Result<(), Error> {
+        let conn = ImdbConnection::new();
+        let results = conn.parse_imdb("the sopranos").await?;
+        let top_result = &results[0];
+        assert_eq!(&top_result.title, "The Sopranos (1999) (TV Series)");
+        assert_eq!(&top_result.link, "tt0141842");
+        debug!("results {results:#?}");
+        assert!(results.len() > 1);
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn test_parse_imdb_episode_list() -> Result<(), Error> {
+        let conn = ImdbConnection::new();
+        let results = conn.parse_imdb_episode_list("tt0141842", Some(1)).await?;
+        debug!("{results:#?}");
+        let first = &results[0];
+        assert_eq!(first.season, 1);
+        assert_eq!(first.episode, 1);
+        assert_eq!(first.epurl, Some("tt0705282".into()));
+        assert_eq!(first.eptitle, Some("Pilot".into()));
+        assert_eq!(first.airdate, Some(NaiveDate::from_ymd(1999, 1, 10)));
+        assert_eq!(results.len(), 13);
         Ok(())
     }
 }

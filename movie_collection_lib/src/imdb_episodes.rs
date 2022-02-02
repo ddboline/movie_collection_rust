@@ -59,10 +59,10 @@ impl ImdbEpisodes {
     pub async fn get_index(&self, pool: &PgPool) -> Result<Option<i32>, Error> {
         let query = query!(
             r#"
-            SELECT id
-            FROM imdb_episodes
-            WHERE show=$show AND season=$season AND episode=$episode
-        "#,
+                SELECT id
+                FROM imdb_episodes
+                WHERE show=$show AND season=$season AND episode=$episode
+            "#,
             show = self.show,
             season = self.season,
             episode = self.episode
@@ -75,11 +75,12 @@ impl ImdbEpisodes {
     pub async fn from_index(idx: i32, pool: &PgPool) -> Result<Option<Self>, Error> {
         let query = query!(
             r#"
-            SELECT a.show, b.title, a.season, a.episode, a.airdate,
-                   cast(a.rating as double precision) as rating, a.eptitle, a.epurl
-            FROM imdb_episodes a
-            JOIN imdb_ratings b ON a.show = b.show
-            WHERE a.id = $id"#,
+                SELECT a.show, b.title, a.season, a.episode, a.airdate,
+                       cast(a.rating as double precision) as rating, a.eptitle, a.epurl
+                FROM imdb_episodes a
+                JOIN imdb_ratings b ON a.show = b.show
+                WHERE a.id = $id
+            "#,
             id = idx
         );
         let conn = pool.get().await?;
@@ -92,12 +93,12 @@ impl ImdbEpisodes {
     ) -> Result<Vec<Self>, Error> {
         let query = query!(
             r#"
-            SELECT a.show, b.title, a.season, a.episode, a.airdate,
-                   cast(a.rating as double precision) as rating, a.eptitle, a.epurl
-            FROM imdb_episodes a
-            JOIN imdb_ratings b ON a.show = b.show
-            WHERE a.last_modified >= $timestamp
-        "#,
+                SELECT a.show, b.title, a.season, a.episode, a.airdate,
+                       cast(a.rating as double precision) as rating, a.eptitle, a.epurl
+                FROM imdb_episodes a
+                JOIN imdb_ratings b ON a.show = b.show
+                WHERE a.last_modified >= $timestamp
+            "#,
             timestamp = timestamp
         );
         let conn = pool.get().await?;
@@ -111,10 +112,11 @@ impl ImdbEpisodes {
         let query = query_dyn!(
             &format_sstr!(
                 r#"
-                    INSERT INTO imdb_episodes
-                    (show, season, episode, airdate, rating, eptitle, epurl, last_modified)
-                    VALUES
-                    ($show, $season, $episode, $airdate, {}, $eptitle, $epurl, now())
+                    INSERT INTO imdb_episodes (
+                        show, season, episode, airdate, rating, eptitle, epurl, last_modified
+                    ) VALUES (
+                        $show, $season, $episode, $airdate, {}, $eptitle, $epurl, now()
+                    )
                 "#,
                 self.rating
             ),
@@ -133,10 +135,10 @@ impl ImdbEpisodes {
         let query = query_dyn!(
             &format_sstr!(
                 r#"
-                UPDATE imdb_episodes
-                SET rating={},eptitle=$eptitle,epurl=$epurl,airdate=$airdate,last_modified=now()
-                WHERE show=$show AND season=$season AND episode=$episode
-            "#,
+                    UPDATE imdb_episodes
+                    SET rating={},eptitle=$eptitle,epurl=$epurl,airdate=$airdate,last_modified=now()
+                    WHERE show=$show AND season=$season AND episode=$episode
+                "#,
                 self.rating
             ),
             eptitle = self.eptitle,
