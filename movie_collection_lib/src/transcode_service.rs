@@ -228,7 +228,7 @@ impl TranscodeServiceRequest {
                 .args(&["-f", json_path.to_string_lossy().as_ref()])
                 .output()
                 .await?;
-            StackString::from_utf8(output.stdout).map_err(Into::into)
+            StackString::from_utf8_vec(output.stdout).map_err(Into::into)
         } else {
             Err(format_err!("{cmd_path:?} does not exist"))
         }

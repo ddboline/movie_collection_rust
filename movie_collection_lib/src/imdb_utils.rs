@@ -317,18 +317,19 @@ mod tests {
 
     #[test]
     fn test_imdb_episode_result_display() -> Result<(), Error> {
+        let today = Utc::now().date().naive_utc();
         let t = ImdbEpisodeResult {
             season: 2,
             episode: 3,
             epurl: Some("https://example.com/test".into()),
             eptitle: Some("test_title".into()),
-            airdate: Some(Utc::now().date().naive_utc()),
+            airdate: Some(today),
             rating: Some(4.5),
             nrating: Some(10_000),
         };
         assert_eq!(
             format_sstr!("{t}"),
-            format_sstr!("2 3 https://example.com/test test_title 2022-02-02 4.5 10000")
+            format_sstr!("2 3 https://example.com/test test_title {today} 4.5 10000")
         );
         Ok(())
     }
