@@ -164,23 +164,23 @@ mod tests {
     use std::{ops::Deref, path::Path};
     use uuid::Uuid;
 
-    use crate::config::Config;
+    use crate::{config::Config, init_env};
 
     #[test]
     fn test_config() -> Result<(), Error> {
-        dotenv::from_path("../tests/data/test.env")?;
+        init_env();
         let config = Config::new()?;
 
         let plex_webhook_key: Uuid = "6f609260-4fd2-4a2c-919c-9c7766bd6400".parse()?;
 
-        let temp_movie_dir = Path::new("/tmp/temp_movie_dir");
+        let temp_movie_dir = Path::new("/tmp");
         assert_eq!(
             &config.pgurl,
-            "postgresql://test:test@localhost:5432/garmin_summary_test"
+            "postgresql://USER:PASSWORD@localhost:5432/movie_queue"
         );
         assert_eq!(&config.movie_dirs[0], temp_movie_dir);
         assert_eq!(&config.preferred_dir, temp_movie_dir);
-        assert_eq!(&config.domain, "example.com");
+        assert_eq!(&config.domain, "DOMAIN");
         assert_eq!(&config.trakt_client_id, "8675309");
         assert_eq!(&config.trakt_client_secret, "8675309");
         assert_eq!(&config.secret_path, Path::new("/tmp/secret.bin"));

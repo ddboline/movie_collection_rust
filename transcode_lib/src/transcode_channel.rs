@@ -45,7 +45,7 @@ impl TranscodeChannel {
             "",
             queue,
             BasicPublishOptions::default(),
-            payload,
+            &payload,
             BasicProperties::default(),
         )
         .await?;
@@ -66,14 +66,14 @@ impl TranscodeChannel {
             )
             .await?;
         while let Some(delivery) = consumer.next().await {
-            let (channel, delivery) = delivery?;
-            match process_data(delivery.data).await {
+            let mut delivery = delivery?;
+            let mut data = Vec::new();
+            std::mem::swap(&mut delivery.data, &mut data);
+            match process_data(data).await {
                 Ok(_) => debug!("process_data succeeded"),
                 Err(e) => error!("process data failed {:?}", e),
             }
-            channel
-                .basic_ack(delivery.delivery_tag, BasicAckOptions::default())
-                .await?;
+            delivery.ack(BasicAckOptions::default()).await?;
         }
         Ok(())
     }
@@ -88,11 +88,9 @@ impl TranscodeChannel {
             )
             .await?;
         if let Some(delivery) = consumer.next().await {
-            let (channel, delivery) = delivery?;
+            let delivery = delivery?;
             let payload: T = serde_json::from_slice(&delivery.data)?;
-            channel
-                .basic_ack(delivery.delivery_tag, BasicAckOptions::default())
-                .await?;
+            delivery.ack(BasicAckOptions::default()).await?;
             Ok(payload)
         } else {
             Err(format_err!("No Messages?"))

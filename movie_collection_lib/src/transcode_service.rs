@@ -932,33 +932,16 @@ pub fn movie_directories(config: &Config) -> Result<Vec<StackString>, Error> {
 mod tests {
     use anyhow::Error;
     use stack_string::{format_sstr, StackString};
-    use std::{collections::HashSet, env::set_var, fmt::Write, fs::create_dir_all, path::Path};
+    use std::{collections::HashSet, fmt::Write, fs::create_dir_all, path::Path};
 
     use crate::{
         config::Config,
+        init_env,
         transcode_service::{
             get_current_jobs, get_last_line, get_paths, get_procs, get_upcoming_jobs,
             transcode_status, JobType, ProcInfo, TranscodeServiceRequest,
         },
     };
-
-    fn init_env() {
-        set_var(
-            "PGURL",
-            "postgresql://USER:PASSWORD@localhost:5432/movie_queue",
-        );
-        set_var("AUTHDB", "postgresql://USER:PASSWORD@localhost:5432/auth");
-        set_var("MOVIE_DIRS", "/tmp");
-        set_var("PREFERED_DISK", "/tmp");
-        set_var("JWT_SECRET", "JWT_SECRET");
-        set_var("SECRET_KEY", "SECRET_KEY");
-        set_var("DOMAIN", "DOMAIN");
-        set_var("SPARKPOST_API_KEY", "SPARKPOST_API_KEY");
-        set_var("SENDING_EMAIL_ADDRESS", "SENDING_EMAIL_ADDRESS");
-        set_var("CALLBACK_URL", "https://{DOMAIN}/auth/register.html");
-        set_var("TRAKT_CLIENT_ID", "");
-        set_var("TRAKT_CLIENT_SECRET", "");
-    }
 
     #[tokio::test]
     async fn test_create_move_script() -> Result<(), Error> {
