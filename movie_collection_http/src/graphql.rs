@@ -292,7 +292,7 @@ impl Loader<RatingsShowKey> for ItemLoader {
         for key in keys {
             if let Some(item) = ImdbRatings::get_show_by_link(key.as_str(), &self.0)
                 .await
-                .map_err(|e| Error::new_with_source(e))?
+                .map_err(Error::new_with_source)?
             {
                 shows.insert(key.clone(), item);
             }
@@ -318,7 +318,7 @@ impl Loader<ShowSeasonKey> for ItemLoader {
             let show = key.as_str();
             let values = ImdbSeason::get_seasons(show, &self.0)
                 .await
-                .map_err(|e| Error::new_with_source(e))?;
+                .map_err(Error::new_with_source)?;
             episodes.insert(key.clone(), values);
         }
         Ok(episodes)
@@ -348,11 +348,10 @@ impl Loader<EpisodesShowSeasonKey> for ItemLoader {
                 season,
                 episode,
             } = key;
-            let values = ImdbEpisodes::get_episodes_by_show_season_episode(
-                &show, *season, *episode, &self.0,
-            )
-            .await
-            .map_err(|e| Error::new_with_source(e))?;
+            let values =
+                ImdbEpisodes::get_episodes_by_show_season_episode(show, *season, *episode, &self.0)
+                    .await
+                    .map_err(Error::new_with_source)?;
             episodes.insert(key.clone(), values);
         }
         Ok(episodes)
@@ -381,7 +380,7 @@ impl<'a> QueryRoot {
         season: Option<i32>,
     ) -> Result<Vec<EpisodeItem>, Error> {
         let key = EpisodesShowSeasonKey {
-            show: show.into(),
+            show,
             season,
             episode: None,
         };
