@@ -1209,7 +1209,8 @@ mod tests {
 
     #[tokio::test]
     async fn test_get_current_jobs() -> Result<(), Error> {
-        let result = get_current_jobs("../tests/data").await?;
+        let mut result = get_current_jobs("../tests/data").await?;
+        result.sort();
         assert_eq!(
             result[0].1,
             "Encoding: task 1 of 1, 22.61 % (76.06 fps, avg 94.82 fps, ETA 00h12m06s)"
