@@ -246,7 +246,7 @@ impl TraktConnection {
                     WatchListShow {
                         link: imdb,
                         title: r.show.title,
-                        year: r.show.year,
+                        year: r.show.year.unwrap_or(-1),
                     },
                 )
             })
@@ -523,7 +523,7 @@ impl TraktConnection {
                 WatchedMovieRequest {
                     watched_at: Utc::now(),
                     title: movie_obj.movie.title.clone(),
-                    year: movie_obj.movie.year,
+                    year: movie_obj.movie.year.unwrap_or(-1),
                     ids: movie_obj.movie.ids,
                 }
             ]
@@ -582,7 +582,7 @@ impl TraktConnection {
                 WatchedMovieRequest {
                     watched_at: Utc::now(),
                     title: movie_obj.movie.title.clone(),
-                    year: movie_obj.movie.year,
+                    year: movie_obj.movie.year.unwrap_or(-1),
                     ids: movie_obj.movie.ids,
                 }
             ]
@@ -638,7 +638,7 @@ pub struct TraktIdObject {
 #[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct TraktShowObject {
     pub title: StackString,
-    pub year: i32,
+    pub year: Option<i32>,
     pub ids: TraktIdObject,
 }
 
