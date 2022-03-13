@@ -7,11 +7,10 @@ use stdout_channel::{MockStdout, StdoutChannel};
 
 use movie_collection_lib::{
     config::Config,
-    imdb_episodes::ImdbEpisodes,
+    imdb_episodes::{ImdbEpisodes, ImdbSeason},
     imdb_ratings::ImdbRatings,
     movie_collection::{
-        find_new_episodes_http_worker, ImdbSeason, LastModifiedResponse, MovieCollection,
-        MovieCollectionRow,
+        find_new_episodes_http_worker, LastModifiedResponse, MovieCollection, MovieCollectionRow,
     },
     movie_queue::{MovieQueueDB, MovieQueueResult, MovieQueueRow},
     parse_imdb::{ParseImdb, ParseImdbOptions},
