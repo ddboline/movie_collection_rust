@@ -19,7 +19,7 @@ use stdout_channel::{rate_limiter::RateLimiter, StdoutChannel};
 
 use crate::{
     config::Config,
-    imdb_episodes::ImdbEpisodes,
+    imdb_episodes::{ImdbEpisodes, ImdbSeason},
     imdb_ratings::ImdbRatings,
     movie_queue::MovieQueueDB,
     pgpool::PgPool,
@@ -131,35 +131,6 @@ impl fmt::Display for MovieCollectionResult {
     }
 }
 
-#[derive(Debug, Default, FromSqlRow)]
-pub struct ImdbSeason {
-    pub show: StackString,
-    pub title: StackString,
-    pub season: i32,
-    pub nepisodes: i64,
-}
-
-impl fmt::Display for ImdbSeason {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        write!(
-            f,
-            "{} {} {} {}",
-            self.show, self.title, self.season, self.nepisodes
-        )
-    }
-}
-
-impl ImdbSeason {
-    pub fn get_string_vec(&self) -> Vec<StackString> {
-        vec![
-            self.show.clone(),
-            self.title.clone(),
-            StackString::from_display(self.season),
-            StackString::from_display(self.nepisodes),
-        ]
-    }
-}
-
 #[derive(Debug, Clone)]
 pub struct MovieCollection {
     pub config: Config,
@@ -263,43 +234,11 @@ impl MovieCollection {
         show: &str,
         season: Option<i32>,
     ) -> Result<Vec<ImdbEpisodes>, Error> {
-        let mut season_str = StackString::new();
-        if let Some(season) = season {
-            write!(season_str, "AND a.season = {}", season)?;
-        }
-        let query = query_dyn!(
-            &format_sstr!(
-                r#"
-                    SELECT a.show, b.title, a.season, a.episode,
-                        a.airdate,
-                        cast(a.rating as double precision),
-                        a.eptitle, a.epurl
-                    FROM imdb_episodes a
-                    JOIN imdb_ratings b ON a.show=b.show
-                    WHERE a.show = $show {season_str}
-                    ORDER BY a.season, a.episode
-                "#
-            ),
-            show = show,
-        )?;
-        let conn = self.pool.get().await?;
-        query.fetch(&conn).await.map_err(Into::into)
+        ImdbEpisodes::get_episodes_by_show_season_episode(show, season, None, &self.pool).await
     }
 
     pub async fn print_imdb_all_seasons(&self, show: &str) -> Result<Vec<ImdbSeason>, Error> {
-        let query = query!(
-            r#"
-                SELECT a.show, b.title, a.season, count(distinct a.episode) as nepisodes
-                FROM imdb_episodes a
-                JOIN imdb_ratings b ON a.show=b.show
-                WHERE a.show = $show
-                GROUP BY a.show, b.title, a.season
-                ORDER BY a.season
-            "#,
-            show = show
-        );
-        let conn = self.pool.get().await?;
-        query.fetch(&conn).await.map_err(Into::into)
+        ImdbSeason::get_seasons(show, &self.pool).await
     }
 
     pub async fn search_movie_collection(
