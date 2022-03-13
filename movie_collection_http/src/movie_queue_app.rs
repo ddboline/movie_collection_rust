@@ -1,15 +1,21 @@
 #![allow(clippy::needless_pass_by_value)]
 
 use anyhow::Error;
+use async_graphql::{
+    dataloader::DataLoader,
+    http::{playground_source, GraphQLPlaygroundConfig},
+    EmptyMutation, EmptySubscription, Schema,
+};
+use async_graphql_warp::GraphQLResponse;
 use handlebars::Handlebars;
 use rweb::{
     filters::BoxedFilter,
-    http::header::CONTENT_TYPE,
+    http::{header::CONTENT_TYPE, Response as HttpResponse},
     openapi::{self, Info},
     Filter, Reply,
 };
 use stack_string::format_sstr;
-use std::{fmt::Write, net::SocketAddr, sync::Arc, time::Duration};
+use std::{convert::Infallible, fmt::Write, net::SocketAddr, sync::Arc, time::Duration};
 use tokio::{
     fs::{create_dir, remove_dir_all},
     time::interval,
@@ -21,6 +27,7 @@ use movie_collection_lib::{
 
 use super::{
     errors::error_response,
+    graphql::{ItemLoader, QueryRoot},
     logged_user::{fill_from_db, get_secrets, TRIGGER_DB_UPDATE},
     movie_queue_routes::{
         find_new_episodes, frontpage, imdb_episodes_route, imdb_episodes_update,
@@ -171,6 +178,32 @@ fn get_full_path(app: &AppState) -> BoxedFilter<(impl Reply,)> {
 }
 
 async fn run_app(config: Config, pool: PgPool, trakt: TraktConnection) -> Result<(), Error> {
+    let schema = Schema::build(QueryRoot, EmptyMutation, EmptySubscription)
+        .data(DataLoader::new(
+            ItemLoader::new(pool.clone()),
+            tokio::task::spawn,
+        ))
+        .finish();
+    let graphql_post = rweb::path!("list" / "graphql" / "graphql")
+        .and(async_graphql_warp::graphql(schema))
+        .and_then(
+            |(schema, request): (
+                Schema<QueryRoot, EmptyMutation, EmptySubscription>,
+                async_graphql::Request,
+            )| async move {
+                Ok::<_, Infallible>(GraphQLResponse::from(schema.execute(request).await))
+            },
+        );
+    let graphql_playground = rweb::path!("list" / "graphql" / "playground")
+        .and(rweb::path::end())
+        .and(rweb::get())
+        .map(|| {
+            HttpResponse::builder()
+                .header("content-type", "text/html")
+                .body(playground_source(GraphQLPlaygroundConfig::new("/")))
+        })
+        .boxed();
+
     let port = config.port;
     let app = AppState {
         config,
@@ -206,6 +239,8 @@ async fn run_app(config: Config, pool: PgPool, trakt: TraktConnection) -> Result
     let routes = full_path
         .or(spec_json_path)
         .or(spec_yaml_path)
+        .or(graphql_playground)
+        .or(graphql_post)
         .recover(error_response);
     let host = &app.config.host;
     let addr: SocketAddr = format_sstr!("{host}:{port}").parse()?;

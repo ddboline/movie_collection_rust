@@ -15,6 +15,7 @@
 #![allow(clippy::missing_panics_doc)]
 
 pub mod errors;
+pub mod graphql;
 pub mod logged_user;
 pub mod movie_queue_app;
 pub mod movie_queue_requests;

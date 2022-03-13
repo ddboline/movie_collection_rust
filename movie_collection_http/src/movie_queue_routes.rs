@@ -27,11 +27,11 @@ use uuid::Uuid;
 
 use movie_collection_lib::{
     config::Config,
-    imdb_episodes::ImdbEpisodes,
+    imdb_episodes::{ImdbEpisodes, ImdbSeason},
     imdb_ratings::ImdbRatings,
     make_list::FileLists,
     make_queue::movie_queue_http,
-    movie_collection::{ImdbSeason, MovieCollection, TvShowsResult},
+    movie_collection::{MovieCollection, TvShowsResult},
     movie_queue::{MovieQueueDB, MovieQueueResult},
     pgpool::PgPool,
     plex_events::{PlexEvent, PlexFilename},
