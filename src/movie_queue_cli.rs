@@ -136,16 +136,14 @@ impl MovieQueueCli {
                         let futures = rows.into_iter().map(|entry| {
                             let mc = mc.clone();
                             async move {
-                                if let Some(cidx) =
-                                    mc.get_collection_index(entry.path.as_ref()).await?
+                                if mc
+                                    .get_collection_index(entry.path.as_ref())
+                                    .await?
+                                    .is_none()
                                 {
-                                    if cidx == entry.idx {
-                                        return Ok(());
-                                    }
-                                    mc.remove_from_collection(entry.path.as_ref()).await?;
-                                };
-                                mc.insert_into_collection(entry.path.as_ref(), false)
-                                    .await?;
+                                    mc.insert_into_collection(entry.path.as_ref(), false)
+                                        .await?;
+                                }
                                 Ok(())
                             }
                         });

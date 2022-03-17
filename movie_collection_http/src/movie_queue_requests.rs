@@ -424,12 +424,11 @@ impl MovieCollectionUpdateRequest {
             if mc
                 .get_collection_index(entry.path.as_ref())
                 .await?
-                .is_some()
+                .is_none()
             {
-                continue;
-            };
-            mc.insert_into_collection(entry.path.as_ref(), false)
-                .await?;
+                mc.insert_into_collection(entry.path.as_ref(), false)
+                    .await?;
+            }
         }
         Ok(())
     }
