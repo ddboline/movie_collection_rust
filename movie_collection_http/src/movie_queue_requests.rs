@@ -383,13 +383,14 @@ pub struct MovieQueueUpdateRequest {
 }
 
 impl MovieQueueUpdateRequest {
-    pub async fn handle(&self, pool: &PgPool, config: &Config) -> Result<(), Error> {
+    pub async fn handle(self, pool: &PgPool, config: &Config) -> Result<(), Error> {
         let mock_stdout = MockStdout::new();
         let stdout = StdoutChannel::with_mock_stdout(mock_stdout.clone(), mock_stdout.clone());
 
         let mq = MovieQueueDB::new(config, pool, &stdout);
         let mc = MovieCollection::new(config, pool, &stdout);
-        for entry in &self.queue {
+        for entry in self.queue {
+            let mut entry: MovieQueueRow = entry.into();
             let cidx = if let Some(i) = mc.get_collection_index(entry.path.as_ref()).await? {
                 i
             } else {
@@ -397,14 +398,12 @@ impl MovieQueueUpdateRequest {
                     .await?;
                 entry.collection_idx
             };
-            let collection_idx = entry.collection_idx;
-            if cidx != collection_idx {
-                return Err(format_err!("{cidx} != {collection_idx}").into());
+            entry.collection_idx = cidx;
+
+            if mq.get_idx_from_collection_idx(cidx).await?.is_none() {
+                mq.insert_into_queue_by_collection_idx(entry.idx, entry.collection_idx)
+                    .await?;
             }
-            mq.remove_from_queue_by_collection_idx(collection_idx)
-                .await?;
-            mq.insert_into_queue_by_collection_idx(entry.idx, collection_idx)
-                .await?;
         }
         Ok(())
     }
@@ -422,11 +421,12 @@ impl MovieCollectionUpdateRequest {
 
         let mc = MovieCollection::new(config, pool, &stdout);
         for entry in &self.collection {
-            if let Some(cidx) = mc.get_collection_index(entry.path.as_ref()).await? {
-                if cidx == entry.idx {
-                    continue;
-                }
-                mc.remove_from_collection(entry.path.as_ref()).await?;
+            if mc
+                .get_collection_index(entry.path.as_ref())
+                .await?
+                .is_some()
+            {
+                continue;
             };
             mc.insert_into_collection(entry.path.as_ref(), false)
                 .await?;
