@@ -156,7 +156,7 @@ impl MovieQueueCli {
                         let mq = MovieQueueDB::new(&config, &pool, &stdout);
                         let mc = MovieCollection::new(&config, &pool, &stdout);
                         let entries: Vec<MovieQueueRow> = serde_json::from_slice(&data)?;
-                        let futures = entries.into_iter().map(|entry| {
+                        let futures = entries.into_iter().map(|mut entry| {
                             let mq = mq.clone();
                             let mc = mc.clone();
                             async move {
@@ -169,14 +169,14 @@ impl MovieQueueCli {
                                         .await?;
                                     entry.collection_idx
                                 };
-                                assert_eq!(cidx, entry.collection_idx);
-                                mq.remove_from_queue_by_collection_idx(entry.collection_idx)
+                                entry.collection_idx = cidx;
+                                if mq.get_idx_from_collection_idx(cidx).await?.is_none() {
+                                    mq.insert_into_queue_by_collection_idx(
+                                        entry.idx,
+                                        entry.collection_idx,
+                                    )
                                     .await?;
-                                mq.insert_into_queue_by_collection_idx(
-                                    entry.idx,
-                                    entry.collection_idx,
-                                )
-                                .await?;
+                                }
                                 Ok(())
                             }
                         });
