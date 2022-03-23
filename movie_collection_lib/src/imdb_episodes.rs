@@ -44,6 +44,7 @@ impl Default for ImdbEpisodes {
 }
 
 impl ImdbEpisodes {
+    #[must_use]
     pub fn new() -> Self {
         Self {
             show: "".into(),
@@ -57,6 +58,8 @@ impl ImdbEpisodes {
         }
     }
 
+    /// # Errors
+    /// Returns error if db query fails
     pub async fn get_index(&self, pool: &PgPool) -> Result<Option<i32>, Error> {
         let query = query!(
             r#"
@@ -73,6 +76,8 @@ impl ImdbEpisodes {
         Ok(id.map(|(x,)| x))
     }
 
+    /// # Errors
+    /// Returns error if db query fails
     pub async fn from_index(idx: i32, pool: &PgPool) -> Result<Option<Self>, Error> {
         let query = query!(
             r#"
@@ -88,6 +93,8 @@ impl ImdbEpisodes {
         query.fetch_opt(&conn).await.map_err(Into::into)
     }
 
+    /// # Errors
+    /// Returns error if db query fails
     pub async fn get_episodes_after_timestamp(
         timestamp: DateTime<Utc>,
         pool: &PgPool,
@@ -106,6 +113,8 @@ impl ImdbEpisodes {
         query.fetch(&conn).await.map_err(Into::into)
     }
 
+    /// # Errors
+    /// Returns error if db queries fail
     pub async fn get_episodes_by_show_season_episode(
         show: &str,
         season: Option<i32>,
@@ -141,6 +150,8 @@ impl ImdbEpisodes {
         query.fetch(&conn).await.map_err(Into::into)
     }
 
+    /// # Errors
+    /// Returns error if db query fails
     pub async fn insert_episode(&self, pool: &PgPool) -> Result<(), Error> {
         if self.get_index(pool).await?.is_some() {
             return self.update_episode(pool).await;
@@ -167,6 +178,8 @@ impl ImdbEpisodes {
         query.execute(&conn).await.map(|_| ()).map_err(Into::into)
     }
 
+    /// # Errors
+    /// Returns error if db query fails
     pub async fn update_episode(&self, pool: &PgPool) -> Result<(), Error> {
         let query = query_dyn!(
             &format_sstr!(
@@ -188,6 +201,7 @@ impl ImdbEpisodes {
         query.execute(&conn).await.map(|_| ()).map_err(Into::into)
     }
 
+    #[must_use]
     pub fn get_string_vec(&self) -> Vec<StackString> {
         vec![
             self.show.clone(),
@@ -221,6 +235,7 @@ impl fmt::Display for ImdbSeason {
 }
 
 impl ImdbSeason {
+    #[must_use]
     pub fn get_string_vec(&self) -> Vec<StackString> {
         vec![
             self.show.clone(),
@@ -232,6 +247,8 @@ impl ImdbSeason {
 }
 
 impl ImdbSeason {
+    /// # Errors
+    /// Returns error if db queries fail
     pub async fn get_seasons(show: &str, pool: &PgPool) -> Result<Vec<ImdbSeason>, Error> {
         let query = query!(
             r#"

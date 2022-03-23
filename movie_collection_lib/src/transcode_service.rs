@@ -81,10 +81,12 @@ impl fmt::Display for TranscodeServiceRequest {
 }
 
 impl TranscodeServiceRequest {
+    #[must_use]
     pub fn get_header() -> SmallVec<[&'static str; 4]> {
         smallvec!["Job Type", "Prefix", "Input Path", "Output Path"]
     }
 
+    #[must_use]
     pub fn new(job_type: JobType, prefix: &str, input_path: &Path, output_path: &Path) -> Self {
         Self {
             job_type,
@@ -94,6 +96,8 @@ impl TranscodeServiceRequest {
         }
     }
 
+    /// # Errors
+    /// Return error if db query fails
     pub fn create_transcode_request(config: &Config, input_path: &Path) -> Result<Self, Error> {
         let input_path = input_path.to_path_buf();
         let fstem = input_path
@@ -110,6 +114,8 @@ impl TranscodeServiceRequest {
         })
     }
 
+    /// # Errors
+    /// Return error if db query fails
     pub async fn create_remcom_request(
         config: &Config,
         path: impl AsRef<Path>,
@@ -184,6 +190,7 @@ impl TranscodeServiceRequest {
         }
     }
 
+    #[must_use]
     pub fn get_html(&self) -> Vec<StackString> {
         vec![
             self.job_type.to_str().into(),
@@ -203,6 +210,7 @@ impl TranscodeServiceRequest {
         ]
     }
 
+    #[must_use]
     pub fn get_cmd_path(&self) -> PathBuf {
         match self.job_type {
             JobType::Transcode => Path::new("/usr/bin/transcode-avi").to_path_buf(),
@@ -210,6 +218,7 @@ impl TranscodeServiceRequest {
         }
     }
 
+    #[must_use]
     pub fn get_json_path(&self, config: &Config) -> PathBuf {
         let prefix = &self.prefix;
         match self.job_type {
@@ -220,6 +229,8 @@ impl TranscodeServiceRequest {
         }
     }
 
+    /// # Errors
+    /// Return error if db query fails
     pub async fn publish_to_cli(&self, config: &Config) -> Result<StackString, Error> {
         let cmd_path = self.get_cmd_path();
         let json_path = self.get_json_path(config);
@@ -244,6 +255,7 @@ pub struct TranscodeService {
 }
 
 impl TranscodeService {
+    #[must_use]
     pub fn new(
         config: &Config,
         queue: &str,
@@ -258,6 +270,8 @@ impl TranscodeService {
         }
     }
 
+    /// # Errors
+    /// Return error if db query fails
     pub async fn publish_transcode_job<F, T>(
         &self,
         payload: &TranscodeServiceRequest,
@@ -276,6 +290,8 @@ impl TranscodeService {
         publish(payload).await
     }
 
+    /// # Errors
+    /// Return error if db query fails
     pub async fn process_data(&self, data: &[u8]) -> Result<(), Error> {
         let payload: TranscodeServiceRequest = serde_json::from_slice(data)?;
         match payload.job_type {
@@ -502,25 +518,32 @@ impl TranscodeService {
     }
 }
 
+#[must_use]
 pub fn movie_dir(config: &Config) -> PathBuf {
     config.home_dir.join("Documents").join("movies")
 }
+
+#[must_use]
 fn dvdrip_dir(config: &Config) -> PathBuf {
     config.home_dir.join("dvdrip")
 }
 
+#[must_use]
 fn avi_dir(config: &Config) -> PathBuf {
     dvdrip_dir(config).join("avi")
 }
 
+#[must_use]
 fn log_dir(config: &Config) -> PathBuf {
     dvdrip_dir(config).join("log")
 }
 
+#[must_use]
 pub fn job_dir(config: &Config) -> PathBuf {
     dvdrip_dir(config).join("jobs")
 }
 
+#[must_use]
 fn tmp_dir(config: &Config) -> PathBuf {
     config.home_dir.join("tmp_avi")
 }
@@ -534,10 +557,12 @@ pub struct ProcInfo {
 }
 
 impl ProcInfo {
+    #[must_use]
     pub fn get_header() -> SmallVec<[&'static str; 4]> {
         smallvec!["Pid", "Name", "Exe Path", "Cmdline Args"]
     }
 
+    #[must_use]
     pub fn get_html(&self) -> Vec<StackString> {
         vec![
             StackString::from_display(self.pid),
@@ -588,6 +613,7 @@ impl fmt::Display for ProcStatus {
 }
 
 impl TranscodeStatus {
+    #[must_use]
     pub fn get_proc_map(&self) -> HashMap<StackString, Option<ProcStatus>> {
         let upcoming = self.upcoming_jobs.iter().filter_map(|j| {
             j.input_path.file_name().map(|f| {
@@ -635,6 +661,7 @@ impl TranscodeStatus {
         finished.chain(upcoming).chain(current).collect()
     }
 
+    #[must_use]
     pub fn get_local_file_html(&self, flists: &FileLists, config: &Config) -> Vec<StackString> {
         let mut output = Vec::new();
         let file_map = flists.get_file_map();
@@ -685,6 +712,7 @@ impl TranscodeStatus {
         output
     }
 
+    #[must_use]
     pub fn get_procs_html(&self) -> Vec<StackString> {
         let mut output = Vec::new();
         if !self.procs.is_empty() {
@@ -747,6 +775,7 @@ impl TranscodeStatus {
         output
     }
 
+    #[must_use]
     pub fn get_html(&self) -> Vec<StackString> {
         let mut output: Vec<StackString> = vec![
             r#"<button name="remcomout" id="remcomoutput">"#.into(),
@@ -898,6 +927,8 @@ async fn get_current_jobs(p: impl AsRef<Path>) -> Result<Vec<(PathBuf, StackStri
     try_join_all(futures).await
 }
 
+/// # Errors
+/// Return error if db query fails
 pub async fn transcode_status(config: &Config) -> Result<TranscodeStatus, Error> {
     let procs = get_procs()?;
     let (upcoming_jobs, current_jobs, finished_jobs) = try_join!(
@@ -914,6 +945,8 @@ pub async fn transcode_status(config: &Config) -> Result<TranscodeStatus, Error>
     })
 }
 
+/// # Errors
+/// Return error if db query fails
 pub fn movie_directories(config: &Config) -> Result<Vec<StackString>, Error> {
     let movie_dir = config.preferred_dir.join("Documents").join("movies");
     std::fs::read_dir(&movie_dir)?

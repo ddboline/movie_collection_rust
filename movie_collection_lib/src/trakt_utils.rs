@@ -37,6 +37,7 @@ pub enum TraktActions {
 }
 
 impl TraktActions {
+    #[must_use]
     pub fn to_str(self) -> &'static str {
         match self {
             Self::List => "list",
@@ -170,6 +171,8 @@ impl fmt::Display for WatchListShow {
 }
 
 impl WatchListShow {
+    /// # Errors
+    /// Return error if db query fails
     pub async fn get_show_by_link(link: &str, pool: &PgPool) -> Result<Option<Self>, Error> {
         #[derive(FromSqlRow)]
         struct TitleYear {
@@ -198,6 +201,8 @@ impl WatchListShow {
         }))
     }
 
+    /// # Errors
+    /// Return error if db query fails
     pub async fn get_index(&self, pool: &PgPool) -> Result<Option<i32>, Error> {
         let query = query!(
             "
@@ -213,6 +218,8 @@ impl WatchListShow {
         Ok(id.map(|(x,)| x))
     }
 
+    /// # Errors
+    /// Return error if db query fails
     pub async fn insert_show(&self, pool: &PgPool) -> Result<(), Error> {
         let query = query!(
             "
@@ -228,6 +235,8 @@ impl WatchListShow {
         query.execute(&conn).await.map(|_| ()).map_err(Into::into)
     }
 
+    /// # Errors
+    /// Return error if db query fails
     pub async fn delete_show(&self, pool: &PgPool) -> Result<(), Error> {
         let query = query!(
             "
@@ -241,6 +250,8 @@ impl WatchListShow {
     }
 }
 
+/// # Errors
+/// Return error if db query fails
 pub async fn get_watchlist_shows_db(pool: &PgPool) -> Result<HashSet<WatchListShow>, Error> {
     let query = query!(
         r#"
@@ -255,6 +266,8 @@ pub async fn get_watchlist_shows_db(pool: &PgPool) -> Result<HashSet<WatchListSh
 
 pub type WatchListMap = HashMap<StackString, (StackString, WatchListShow, Option<TvShowSource>)>;
 
+/// # Errors
+/// Return error if db query fails
 pub async fn get_watchlist_shows_db_map(pool: &PgPool) -> Result<WatchListMap, Error> {
     #[derive(FromSqlRow)]
     struct WatchlistShowDbMap {
@@ -319,6 +332,8 @@ impl fmt::Display for WatchedEpisode {
 }
 
 impl WatchedEpisode {
+    /// # Errors
+    /// Return error if db query fails
     pub async fn get_index(&self, pool: &PgPool) -> Result<Option<i32>, Error> {
         let query = query!(
             r#"
@@ -335,6 +350,8 @@ impl WatchedEpisode {
         Ok(id.map(|(x,)| x))
     }
 
+    /// # Errors
+    /// Return error if db query fails
     pub async fn get_watched_episode(
         pool: &PgPool,
         link: &str,
@@ -361,6 +378,8 @@ impl WatchedEpisode {
         query.fetch_opt(&conn).await.map_err(Into::into)
     }
 
+    /// # Errors
+    /// Return error if db query fails
     pub async fn insert_episode(&self, pool: &PgPool) -> Result<u64, Error> {
         let query = query!(
             r#"
@@ -376,6 +395,8 @@ impl WatchedEpisode {
         query.execute(&conn).await.map_err(Into::into)
     }
 
+    /// # Errors
+    /// Return error if db query fails
     pub async fn delete_episode(&self, pool: &PgPool) -> Result<(), Error> {
         let query = query!(
             r#"
@@ -391,6 +412,8 @@ impl WatchedEpisode {
     }
 }
 
+/// # Errors
+/// Return error if db query fails
 pub async fn get_watched_shows_db(
     pool: &PgPool,
     show: &str,
@@ -461,6 +484,8 @@ impl fmt::Display for WatchedMovie {
 }
 
 impl WatchedMovie {
+    /// # Errors
+    /// Return error if db query fails
     pub async fn get_index(&self, pool: &PgPool) -> Result<Option<i32>, Error> {
         let query = query!(
             r#"
@@ -475,6 +500,8 @@ impl WatchedMovie {
         Ok(id.map(|(x,)| x))
     }
 
+    /// # Errors
+    /// Return error if db query fails
     pub async fn get_watched_movie(pool: &PgPool, link: &str) -> Result<Option<Self>, Error> {
         let query = query!(
             r#"
@@ -490,6 +517,8 @@ impl WatchedMovie {
         query.fetch_opt(&conn).await.map_err(Into::into)
     }
 
+    /// # Errors
+    /// Return error if db query fails
     pub async fn insert_movie(&self, pool: &PgPool) -> Result<(), Error> {
         let query = query!(
             r#"
@@ -502,6 +531,8 @@ impl WatchedMovie {
         query.execute(&conn).await.map(|_| ()).map_err(Into::into)
     }
 
+    /// # Errors
+    /// Return error if db query fails
     pub async fn delete_movie(&self, pool: &PgPool) -> Result<(), Error> {
         let query = query!(
             r#"
@@ -515,6 +546,8 @@ impl WatchedMovie {
     }
 }
 
+/// # Errors
+/// Return error if db query fails
 pub async fn get_watched_movies_db(pool: &PgPool) -> Result<Vec<WatchedMovie>, Error> {
     let query = query!(
         r#"
@@ -528,6 +561,8 @@ pub async fn get_watched_movies_db(pool: &PgPool) -> Result<Vec<WatchedMovie>, E
     query.fetch(&conn).await.map_err(Into::into)
 }
 
+/// # Errors
+/// Return error if db query fails
 pub async fn sync_trakt_with_db(
     trakt: &TraktConnection,
     mc: &MovieCollection,
@@ -829,6 +864,8 @@ async fn watched_list(mc: &MovieCollection, show: &str, season: i32) -> Result<(
     Ok(())
 }
 
+/// # Errors
+/// Return error if db query fails
 #[allow(clippy::too_many_arguments)]
 pub async fn trakt_app_parse(
     config: &Config,

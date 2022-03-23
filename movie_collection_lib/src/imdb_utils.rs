@@ -77,12 +77,15 @@ impl ExponentialRetry for ImdbConnection {
 }
 
 impl ImdbConnection {
+    #[must_use]
     pub fn new() -> Self {
         Self {
             client: Client::new(),
         }
     }
 
+    /// # Errors
+    /// Returns error if `parse_imdb_rating` fails
     #[allow(clippy::needless_collect)]
     pub async fn parse_imdb(&self, title: &str) -> Result<Vec<ImdbTuple>, Error> {
         let endpoint = "http://www.imdb.com/find?";
@@ -120,6 +123,8 @@ impl ImdbConnection {
         try_join_all(futures).await
     }
 
+    /// # Errors
+    /// Returns error if `parse_imdb_rating_body` fails
     pub async fn parse_imdb_rating(&self, title: &str) -> Result<RatingOutput, Error> {
         if !title.starts_with("tt") {
             return Ok(RatingOutput::default());
@@ -163,6 +168,8 @@ impl ImdbConnection {
         Ok(RatingOutput::default())
     }
 
+    /// # Errors
+    /// Returns error if `parse_episodes_url` fails
     #[allow(clippy::needless_collect)]
     pub async fn parse_imdb_episode_list(
         &self,

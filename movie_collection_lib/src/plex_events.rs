@@ -65,6 +65,8 @@ impl TryFrom<WebhookPayload> for PlexEvent {
 }
 
 impl PlexEvent {
+    /// # Errors
+    /// Return error if deserialization fails
     pub fn get_from_payload(buf: &[u8]) -> Result<Self, Error> {
         info!(
             "buf {}",
@@ -79,6 +81,8 @@ impl PlexEvent {
         object.try_into()
     }
 
+    /// # Errors
+    /// Return error if db query fails
     pub async fn get_events(
         pool: &PgPool,
         start_timestamp: Option<DateTime<Utc>>,
@@ -126,6 +130,8 @@ impl PlexEvent {
         query.fetch(&conn).await.map_err(Into::into)
     }
 
+    /// # Errors
+    /// Return error if db query fails
     pub async fn write_event(&self, pool: &PgPool) -> Result<(), Error> {
         let query = query!(
             "
@@ -161,6 +167,8 @@ impl PlexEvent {
         Ok(())
     }
 
+    /// # Errors
+    /// Return error if db query fails
     pub async fn get_event_http(
         pool: &PgPool,
         config: &Config,
@@ -258,6 +266,8 @@ impl PlexEvent {
         Ok(body)
     }
 
+    /// # Errors
+    /// Return error if db query fails
     pub async fn get_filename(&self, config: &Config) -> Result<PlexFilename, Error> {
         let plex_host = config
             .plex_host
@@ -371,6 +381,7 @@ pub enum PlexEventType {
 }
 
 impl PlexEventType {
+    #[must_use]
     pub fn to_str(self) -> &'static str {
         match self {
             Self::LibraryOnDeck => "library.on.deck",
@@ -432,6 +443,8 @@ pub struct PlexFilename {
 }
 
 impl PlexFilename {
+    /// # Errors
+    /// Return error if db query fails
     pub async fn get_filenames(
         pool: &PgPool,
         start_timestamp: Option<DateTime<Utc>>,
@@ -473,6 +486,8 @@ impl PlexFilename {
         query.fetch(&conn).await.map_err(Into::into)
     }
 
+    /// # Errors
+    /// Return error if db query fails
     pub async fn get_by_key(pool: &PgPool, key: &str) -> Result<Option<Self>, Error> {
         let query = query!(
             "SELECT * FROM plex_filename WHERE metadata_key = $key",
@@ -482,6 +497,8 @@ impl PlexFilename {
         query.fetch_opt(&conn).await.map_err(Into::into)
     }
 
+    /// # Errors
+    /// Return error if db query fails
     pub async fn insert(&self, pool: &PgPool) -> Result<(), Error> {
         let query = query!(
             "INSERT INTO plex_filename (metadata_key, filename)

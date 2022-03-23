@@ -1,5 +1,3 @@
-#![allow(clippy::used_underscore_binding)]
-
 use anyhow::Error;
 use stack_string::StackString;
 use std::path::{Path, PathBuf};

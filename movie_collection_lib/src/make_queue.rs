@@ -48,6 +48,8 @@ impl From<&Path> for PathOrIndex {
     }
 }
 
+/// # Errors
+/// Return error on file system errors
 #[allow(clippy::cognitive_complexity)]
 pub async fn make_queue_worker(
     config: &Config,
@@ -140,6 +142,8 @@ pub async fn make_queue_worker(
     Ok(())
 }
 
+/// # Errors
+/// Return error on file system errors
 pub async fn movie_queue_http(
     queue: &[MovieQueueResult],
     pool: &PgPool,

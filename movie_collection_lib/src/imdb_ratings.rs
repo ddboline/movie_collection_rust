@@ -39,6 +39,8 @@ impl fmt::Display for ImdbRatings {
 }
 
 impl ImdbRatings {
+    /// # Errors
+    /// Returns error if db query fails
     pub async fn insert_show(&self, pool: &PgPool) -> Result<(), Error> {
         let source = self.source.as_ref().map(StackString::from_display);
         let query = query!(
@@ -60,6 +62,8 @@ impl ImdbRatings {
         query.execute(&conn).await.map(|_| ()).map_err(Into::into)
     }
 
+    /// # Errors
+    /// Returns error if db query fails
     pub async fn update_show(&self, pool: &PgPool) -> Result<(), Error> {
         let mut bindings = Vec::new();
         let query = format_sstr!(
@@ -90,6 +94,8 @@ impl ImdbRatings {
         query.execute(&conn).await.map(|_| ()).map_err(Into::into)
     }
 
+    /// # Errors
+    /// Returns error if db query fails
     pub async fn get_show_by_link(link: &str, pool: &PgPool) -> Result<Option<Self>, Error> {
         let query = query!(
             r#"
@@ -103,6 +109,8 @@ impl ImdbRatings {
         query.fetch_opt(&conn).await.map_err(Into::into)
     }
 
+    /// # Errors
+    /// Returns error if db query fails
     pub async fn get_shows_after_timestamp(
         timestamp: DateTime<Utc>,
         pool: &PgPool,
@@ -119,6 +127,7 @@ impl ImdbRatings {
         query.fetch(&conn).await.map_err(Into::into)
     }
 
+    #[must_use]
     pub fn get_string_vec(&self) -> Vec<StackString> {
         vec![
             self.show.clone(),

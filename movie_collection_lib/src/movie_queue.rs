@@ -48,6 +48,7 @@ pub struct MovieQueueDB {
 }
 
 impl MovieQueueDB {
+    #[must_use]
     pub fn new(config: &Config, pool: &PgPool, stdout: &StdoutChannel<StackString>) -> Self {
         Self {
             config: config.clone(),
@@ -56,6 +57,8 @@ impl MovieQueueDB {
         }
     }
 
+    /// # Errors
+    /// Return error if db queries fail
     pub async fn remove_from_queue_by_idx(&self, idx: i32) -> Result<(), Error> {
         let mut conn = self.pool.get().await?;
         let tran = conn.transaction().await?;
@@ -99,6 +102,8 @@ impl MovieQueueDB {
         tran.commit().await.map_err(Into::into)
     }
 
+    /// # Errors
+    /// Return error if db queries fail
     pub async fn remove_from_queue_by_collection_idx(
         &self,
         collection_idx: i32,
@@ -109,6 +114,8 @@ impl MovieQueueDB {
         Ok(())
     }
 
+    /// # Errors
+    /// Return error if db queries fail
     pub async fn get_idx_from_collection_idx(
         &self,
         collection_idx: i32,
@@ -122,6 +129,8 @@ impl MovieQueueDB {
         Ok(x.map(|(x,)| x))
     }
 
+    /// # Errors
+    /// Return error if db queries fail
     pub async fn remove_from_queue_by_path(&self, path: &str) -> Result<(), Error> {
         let mc = MovieCollection::new(&self.config, &self.pool, &self.stdout);
         if let Some(collection_idx) = mc.get_collection_index(path).await? {
@@ -132,6 +141,8 @@ impl MovieQueueDB {
         }
     }
 
+    /// # Errors
+    /// Return error if db queries fail
     pub async fn insert_into_queue(&self, idx: i32, path: &str) -> Result<(), Error> {
         if !Path::new(path).exists() {
             return Err(format_err!("File doesn't exist"));
@@ -150,6 +161,8 @@ impl MovieQueueDB {
             .await
     }
 
+    /// # Errors
+    /// Return error if db queries fail
     pub async fn insert_into_queue_by_collection_idx(
         &self,
         idx: i32,
@@ -221,6 +234,8 @@ impl MovieQueueDB {
         tran.commit().await.map_err(Into::into)
     }
 
+    /// # Errors
+    /// Return error if db queries fail
     pub async fn get_max_queue_index(&self) -> Result<i32, Error> {
         let query = r#"SELECT max(idx) FROM movie_queue"#;
         if let Some(row) = self.pool.get().await?.query(query, &[]).await?.get(0) {
@@ -231,6 +246,8 @@ impl MovieQueueDB {
         }
     }
 
+    /// # Errors
+    /// Return error if db queries fail
     pub async fn print_movie_queue(
         &self,
         patterns: &[&str],
@@ -306,6 +323,8 @@ impl MovieQueueDB {
         Ok(results)
     }
 
+    /// # Errors
+    /// Return error if db queries fail
     pub async fn get_queue_after_timestamp(
         &self,
         timestamp: DateTime<Utc>,

@@ -26,6 +26,8 @@ lazy_static! {
     pub static ref HBR: Handlebars<'static> = get_templates().expect("Failed to parse templates");
 }
 
+/// # Errors
+/// Return error if db query fails
 pub fn get_templates() -> Result<Handlebars<'static>, Error> {
     let mut h = Handlebars::new();
     h.register_template_string("index.html", include_str!("../../templates/index.html"))?;
@@ -38,6 +40,8 @@ pub fn option_string_wrapper<'a>(s: Option<&'a impl AsRef<str>>) -> &'a str {
     s.map_or("", AsRef::as_ref)
 }
 
+/// # Errors
+/// Return error if db query fails
 pub fn walk_directory(path: &Path, match_strs: &[impl AsRef<str>]) -> Result<Vec<PathBuf>, Error> {
     WalkDir::new(path)
         .into_iter()
@@ -65,6 +69,7 @@ struct ScriptStruct {
     script: PathBuf,
 }
 
+#[must_use]
 pub fn parse_file_stem(file_stem: &str) -> (StackString, i32, i32) {
     let entries: Vec<_> = file_stem.split('_').collect();
 
@@ -95,6 +100,8 @@ pub fn parse_file_stem(file_stem: &str) -> (StackString, i32, i32) {
     }
 }
 
+/// # Errors
+/// Return error if db query fails
 pub async fn get_video_runtime(f: &Path) -> Result<StackString, Error> {
     let ext = f
         .extension()
@@ -164,6 +171,8 @@ pub trait ExponentialRetry {
     }
 }
 
+/// # Errors
+/// Return error if db query fails
 pub async fn get_authorized_users(pool: &PgPool) -> Result<Vec<StackString>, Error> {
     let query = "SELECT email FROM authorized_users";
     pool.get()

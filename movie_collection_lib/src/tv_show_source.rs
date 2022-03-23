@@ -27,6 +27,7 @@ impl TvShowSource {
         }
     }
 
+    #[must_use]
     pub fn to_str(self) -> &'static str {
         match self {
             Self::Netflix => "netflix",

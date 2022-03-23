@@ -1,5 +1,3 @@
-#![allow(clippy::used_underscore_binding)]
-
 use anyhow::Error;
 use futures::future::try_join_all;
 use stack_string::StackString;

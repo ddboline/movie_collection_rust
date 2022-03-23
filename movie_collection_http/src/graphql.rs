@@ -264,6 +264,7 @@ impl From<EpisodeItem> for ImdbEpisodes {
 pub struct ItemLoader(PgPool);
 
 impl ItemLoader {
+    #[must_use]
     pub fn new(pool: PgPool) -> Self {
         Self(pool)
     }

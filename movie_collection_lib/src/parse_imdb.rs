@@ -49,12 +49,15 @@ pub struct ParseImdb {
 }
 
 impl ParseImdb {
+    #[must_use]
     pub fn new(config: &Config, pool: &PgPool, stdout: &StdoutChannel<StackString>) -> Self {
         Self {
             mc: MovieCollection::new(config, pool, stdout),
         }
     }
 
+    /// # Errors
+    /// Return error if db queries fail
     pub async fn parse_imdb_worker(
         &self,
         opts: &ParseImdbOptions,
@@ -247,6 +250,8 @@ impl ParseImdb {
         Ok(())
     }
 
+    /// # Errors
+    /// Return error if db queries fail
     pub async fn parse_imdb_http_worker(
         &self,
         opts: &ParseImdbOptions,

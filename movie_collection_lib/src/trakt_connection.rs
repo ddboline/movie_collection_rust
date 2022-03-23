@@ -47,6 +47,7 @@ impl Default for TraktConnection {
 }
 
 impl TraktConnection {
+    #[must_use]
     pub fn new(config: Config) -> Self {
         Self {
             config,
@@ -54,10 +55,13 @@ impl TraktConnection {
         }
     }
 
+    #[must_use]
     pub fn get_client(&self) -> &Client {
         &self.client
     }
 
+    /// # Errors
+    /// Return error if `read_auth_token` fails
     pub async fn init(&self) {
         if let Ok(auth_token) = self.read_auth_token().await {
             AUTH_TOKEN.write().await.replace(Arc::new(auth_token));
@@ -98,6 +102,8 @@ impl TraktConnection {
         Url::parse_with_params("https://trakt.tv/oauth/authorize", parameters).map_err(Into::into)
     }
 
+    /// # Errors
+    /// Return error if parsing url fails
     pub async fn get_auth_url(&self) -> Result<Url, Error> {
         let state = Self::get_random_string();
         let url = self._get_auth_url(&state)?;
@@ -170,6 +176,8 @@ impl TraktConnection {
         }
     }
 
+    /// # Errors
+    /// Return error if `get_auth_token` or `write_auth_token` fail
     pub async fn exchange_code_for_auth_token(&self, code: &str, state: &str) -> Result<(), Error> {
         let auth_token = self.get_auth_token(code, state).await?;
         self.write_auth_token(&auth_token).await?;
@@ -177,6 +185,8 @@ impl TraktConnection {
         Ok(())
     }
 
+    /// # Errors
+    /// Return error if `get_refresh_token` or `write_auth_token` fail
     pub async fn exchange_refresh_token(&self) -> Result<(), Error> {
         let auth_token = self.get_refresh_token().await?;
         self.write_auth_token(&auth_token).await?;
@@ -231,6 +241,8 @@ impl TraktConnection {
         resp.json().await.map_err(Into::into)
     }
 
+    /// # Errors
+    /// Return error if `get_watchlist_shows_page` fails
     pub async fn get_watchlist_shows(&self) -> Result<HashMap<StackString, WatchListShow>, Error> {
         let mut current_page = 1;
         let mut results = Vec::new();
@@ -263,6 +275,8 @@ impl TraktConnection {
         Ok(watchlist)
     }
 
+    /// # Errors
+    /// Return error if api call fails
     pub async fn get_show_by_imdb_id(
         &self,
         imdb_id: &str,
@@ -281,6 +295,8 @@ impl TraktConnection {
             .map_err(Into::into)
     }
 
+    /// # Errors
+    /// Return error if api call fails
     pub async fn get_movie_by_imdb_id(
         &self,
         imdb_id: &str,
@@ -299,6 +315,8 @@ impl TraktConnection {
             .map_err(Into::into)
     }
 
+    /// # Errors
+    /// Return error if api call fails
     pub async fn get_episode(
         &self,
         imdb_id: &str,
@@ -320,6 +338,8 @@ impl TraktConnection {
             .map_err(Into::into)
     }
 
+    /// # Errors
+    /// Return error if api call fails
     pub async fn add_watchlist_show(&self, imdb_id: &str) -> Result<TraktResult, Error> {
         let show_obj = self
             .get_show_by_imdb_id(imdb_id)
@@ -348,6 +368,8 @@ impl TraktConnection {
         })
     }
 
+    /// # Errors
+    /// Return error if api call fails
     pub async fn remove_watchlist_show(&self, imdb_id: &str) -> Result<TraktResult, Error> {
         let show_obj = self
             .get_show_by_imdb_id(imdb_id)
@@ -375,6 +397,8 @@ impl TraktConnection {
         })
     }
 
+    /// # Errors
+    /// Return error if api call fails
     pub async fn get_watched_shows(
         &self,
     ) -> Result<HashMap<(StackString, i32, i32), WatchedEpisode>, Error> {
@@ -427,6 +451,8 @@ impl TraktConnection {
         Ok(episode_map)
     }
 
+    /// # Errors
+    /// Return error if api call fails
     pub async fn get_watched_movies(&self) -> Result<HashSet<WatchedMovie>, Error> {
         let headers = self.get_rw_headers().await?;
         let trakt_endpoint = &self.config.trakt_endpoint;
@@ -458,6 +484,8 @@ impl TraktConnection {
         Ok(movie_map)
     }
 
+    /// # Errors
+    /// Return error if api call fails
     pub async fn get_calendar(&self) -> Result<TraktCalEntryList, Error> {
         let headers = self.get_rw_headers().await?;
         let trakt_endpoint = &self.config.trakt_endpoint;
@@ -488,6 +516,8 @@ impl TraktConnection {
         Ok(cal_entries)
     }
 
+    /// # Errors
+    /// Return error if api call fails
     pub async fn add_episode_to_watched(
         &self,
         imdb_id: &str,
@@ -518,6 +548,8 @@ impl TraktConnection {
         })
     }
 
+    /// # Errors
+    /// Return error if api call fails
     pub async fn add_movie_to_watched(&self, imdb_id: &str) -> Result<TraktResult, Error> {
         let movie_obj = {
             self.get_movie_by_imdb_id(imdb_id)
@@ -552,6 +584,8 @@ impl TraktConnection {
         })
     }
 
+    /// # Errors
+    /// Return error if api call fails
     pub async fn remove_episode_to_watched(
         &self,
         imdb_id: &str,
@@ -582,6 +616,8 @@ impl TraktConnection {
         })
     }
 
+    /// # Errors
+    /// Return error if api call fails
     pub async fn remove_movie_to_watched(&self, imdb_id: &str) -> Result<TraktResult, Error> {
         let movie_obj = self
             .get_movie_by_imdb_id(imdb_id)

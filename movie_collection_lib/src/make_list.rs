@@ -32,6 +32,8 @@ pub struct FileLists {
 }
 
 impl FileLists {
+    /// # Errors
+    /// Return error on file system errors
     pub async fn get_local_file_list(config: &Config) -> Result<Vec<StackString>, Error> {
         let movies_dir = config.home_dir.join("Documents").join("movies");
 
@@ -54,6 +56,8 @@ impl FileLists {
         Ok(local_file_list)
     }
 
+    /// # Errors
+    /// Return error on file system errors
     pub async fn get_file_lists(
         config: &Config,
         pool: Option<&PgPool>,
@@ -109,6 +113,7 @@ impl FileLists {
         })
     }
 
+    #[must_use]
     pub fn get_file_map(&self) -> HashMap<StackString, &PathBuf> {
         self.file_list
             .iter()
@@ -125,6 +130,8 @@ impl FileLists {
     }
 }
 
+/// # Errors
+/// Return error on file system errors
 pub async fn make_list(stdout: &StdoutChannel<StackString>) -> Result<(), Error> {
     let config = Config::with_config()?;
     let transcode_task = {

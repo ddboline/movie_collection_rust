@@ -645,6 +645,7 @@ pub async fn last_modified_route(
 struct FrontpageResponse(HtmlBase<StackString, Error>);
 
 #[get("/list/index.html")]
+#[allow(clippy::unused_async)]
 pub async fn frontpage(
     #[filter = "LoggedUser::filter"] _: LoggedUser,
 ) -> WarpResult<FrontpageResponse> {
@@ -1507,7 +1508,7 @@ async fn trakt_cal_http_worker(
     Ok(lines)
 }
 
-pub async fn watch_list_http_worker(
+async fn watch_list_http_worker(
     config: &Config,
     pool: &PgPool,
     stdout: &StdoutChannel<StackString>,
@@ -1619,7 +1620,7 @@ pub async fn watch_list_http_worker(
 }
 
 #[allow(clippy::too_many_arguments)]
-pub async fn watched_action_http_worker(
+async fn watched_action_http_worker(
     trakt: &TraktConnection,
     pool: &PgPool,
     action: TraktActions,

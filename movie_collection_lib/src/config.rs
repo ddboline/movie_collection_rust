@@ -116,6 +116,7 @@ fn default_plex_webhook_key() -> Uuid {
 pub struct Config(Arc<ConfigInner>);
 
 impl ConfigInner {
+    #[must_use]
     pub fn new() -> Self {
         Self {
             home_dir: default_home_dir(),
@@ -129,11 +130,15 @@ impl ConfigInner {
 }
 
 impl Config {
+    /// # Errors
+    /// Return error if parsing environment variables fails
     pub fn new() -> Result<Self, Error> {
         let config: ConfigInner = envy::from_env()?;
         Ok(Self(Arc::new(config)))
     }
 
+    /// # Errors
+    /// Return error if parsing environment variables fails
     pub fn with_config() -> Result<Self, Error> {
         let config_dir = dirs::config_dir().ok_or_else(|| format_err!("No CONFIG directory"))?;
         let env_file = config_dir.join("movie_collection_rust").join("config.env");

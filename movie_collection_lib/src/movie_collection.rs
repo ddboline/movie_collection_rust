@@ -149,17 +149,20 @@ impl Default for MovieCollection {
 }
 
 impl MovieCollection {
+    #[must_use]
     pub fn new(config: &Config, pool: &PgPool, stdout: &StdoutChannel<StackString>) -> Self {
         let config = config.clone();
         let pool = pool.clone();
         let stdout = stdout.clone();
         Self {
-            pool,
             config,
+            pool,
             stdout,
         }
     }
 
+    /// # Errors
+    /// Returns error if db queries fail
     pub async fn print_imdb_shows(
         &self,
         show: &str,
@@ -229,6 +232,8 @@ impl MovieCollection {
         Ok(results?.into_iter().flatten().collect())
     }
 
+    /// # Errors
+    /// Returns error if db queries fail
     pub async fn print_imdb_episodes(
         &self,
         show: &str,
@@ -237,10 +242,14 @@ impl MovieCollection {
         ImdbEpisodes::get_episodes_by_show_season_episode(show, season, None, &self.pool).await
     }
 
+    /// # Errors
+    /// Returns error if db queries fail
     pub async fn print_imdb_all_seasons(&self, show: &str) -> Result<Vec<ImdbSeason>, Error> {
         ImdbSeason::get_seasons(show, &self.pool).await
     }
 
+    /// # Errors
+    /// Returns error if db queries fail
     pub async fn search_movie_collection(
         &self,
         search_strs: &[impl AsRef<str>],
@@ -328,6 +337,8 @@ impl MovieCollection {
         Ok(results)
     }
 
+    /// # Errors
+    /// Returns error if db queries fail
     pub async fn remove_from_collection(&self, path: &str) -> Result<(), Error> {
         let query = query!(
             r#"UPDATE movie_collection SET is_deleted=true WHERE path = $path"#,
@@ -337,6 +348,8 @@ impl MovieCollection {
         query.execute(&conn).await.map(|_| ()).map_err(Into::into)
     }
 
+    /// # Errors
+    /// Returns error if db queries fail
     pub async fn get_collection_index(&self, path: &str) -> Result<Option<i32>, Error> {
         let query = query!(
             r#"SELECT idx FROM movie_collection WHERE path = $path"#,
@@ -347,6 +360,8 @@ impl MovieCollection {
         Ok(id.map(|(x,)| x))
     }
 
+    /// # Errors
+    /// Returns error if db queries fail
     pub async fn get_collection_path(&self, idx: i32) -> Result<StackString, Error> {
         let query = query!(
             "SELECT path FROM movie_collection WHERE idx = $idx",
@@ -357,6 +372,8 @@ impl MovieCollection {
         Ok(path)
     }
 
+    /// # Errors
+    /// Returns error if db queries fail
     pub async fn insert_into_collection(&self, path: &str, check_path: bool) -> Result<(), Error> {
         if check_path && !Path::new(&path).exists() {
             return Err(format_err!("No such file"));
@@ -387,6 +404,8 @@ impl MovieCollection {
         Ok(())
     }
 
+    /// # Errors
+    /// Returns error if db queries fail
     pub async fn fix_collection_show_id(&self) -> Result<u64, Error> {
         let query = r#"
             WITH a AS (
@@ -404,6 +423,8 @@ impl MovieCollection {
         Ok(rows)
     }
 
+    /// # Errors
+    /// Returns error if db queries fail
     pub async fn make_collection(&self) -> Result<(), Error> {
         let file_list: Result<Vec<_>, Error> = self
             .config
@@ -575,6 +596,8 @@ impl MovieCollection {
         Ok(())
     }
 
+    /// # Errors
+    /// Returns error if db queries fail
     pub async fn get_imdb_show_map(&self) -> Result<HashMap<StackString, ImdbRatings>, Error> {
         #[derive(FromSqlRow)]
         struct ImdbShowMap {
@@ -622,6 +645,8 @@ impl MovieCollection {
             .collect()
     }
 
+    /// # Errors
+    /// Returns error if db queries fail
     pub async fn print_tv_shows(&self) -> Result<Vec<TvShowsResult>, Error> {
         let query = query!(
             r#"
@@ -638,6 +663,8 @@ impl MovieCollection {
         query.fetch(&conn).await.map_err(Into::into)
     }
 
+    /// # Errors
+    /// Returns error if db queries fail
     pub async fn get_new_episodes(
         &self,
         mindate: NaiveDate,
@@ -692,6 +719,8 @@ impl MovieCollection {
         query.fetch(&conn).await.map_err(Into::into)
     }
 
+    /// # Errors
+    /// Returns error if db queries fail
     pub async fn find_new_episodes(
         &self,
         source: Option<TvShowSource>,
@@ -731,6 +760,8 @@ impl MovieCollection {
         Ok(output)
     }
 
+    /// # Errors
+    /// Returns error if db queries fail
     pub async fn get_collection_after_timestamp(
         &self,
         timestamp: DateTime<Utc>,
@@ -747,6 +778,8 @@ impl MovieCollection {
         query.fetch(&conn).await.map_err(Into::into)
     }
 
+    /// # Errors
+    /// Returns error if db queries fail
     pub async fn match_file_pattern(
         &self,
         patterns: &[impl AsRef<str>],
@@ -775,6 +808,8 @@ impl MovieCollection {
     }
 }
 
+/// # Errors
+/// Returns error if db queries fail
 pub async fn find_new_episodes_http_worker(
     config: &Config,
     pool: &PgPool,
@@ -891,6 +926,8 @@ pub struct LastModifiedResponse {
 }
 
 impl LastModifiedResponse {
+    /// # Errors
+    /// Returns error if db queries fail
     pub async fn get_last_modified(pool: &PgPool) -> Result<Vec<Self>, Error> {
         let tables = vec![
             "imdb_episodes",
