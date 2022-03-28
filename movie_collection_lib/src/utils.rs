@@ -11,9 +11,7 @@ use reqwest::{Client, Response, Url};
 use serde::{Deserialize, Serialize};
 use smallvec::SmallVec;
 use stack_string::{format_sstr, StackString};
-use std::{
-    path::{Path, PathBuf},
-};
+use std::path::{Path, PathBuf};
 use tokio::{
     process::Command,
     time::{sleep, Duration},

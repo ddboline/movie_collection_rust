@@ -4,7 +4,7 @@ use postgres_query::{query, query_dyn, FromSqlRow, Parameter};
 use serde::{Deserialize, Serialize};
 use smallvec::{smallvec, SmallVec};
 use stack_string::{format_sstr, StackString};
-use std::{fmt};
+use std::fmt;
 
 use crate::pgpool::PgPool;
 

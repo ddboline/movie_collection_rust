@@ -9,7 +9,7 @@ use select::{
 };
 use serde::Deserialize;
 use stack_string::{format_sstr, StackString};
-use std::{fmt};
+use std::fmt;
 
 use crate::utils::{option_string_wrapper, ExponentialRetry};
 
