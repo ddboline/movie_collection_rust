@@ -2,7 +2,7 @@ use anyhow::Error;
 use chrono::NaiveDate;
 use itertools::Itertools;
 use stack_string::{format_sstr, StackString};
-use std::{collections::HashMap, fmt::Write};
+use std::{collections::HashMap};
 use stdout_channel::StdoutChannel;
 use structopt::StructOpt;
 

@@ -965,7 +965,7 @@ pub fn movie_directories(config: &Config) -> Result<Vec<StackString>, Error> {
 mod tests {
     use anyhow::Error;
     use stack_string::{format_sstr, StackString};
-    use std::{collections::HashSet, fmt::Write, fs::create_dir_all, path::Path};
+    use std::{collections::HashSet, fs::create_dir_all, path::Path};
 
     use crate::{
         config::Config,

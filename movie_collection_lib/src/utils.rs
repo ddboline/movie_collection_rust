@@ -12,7 +12,6 @@ use serde::{Deserialize, Serialize};
 use smallvec::SmallVec;
 use stack_string::{format_sstr, StackString};
 use std::{
-    fmt::Write,
     path::{Path, PathBuf},
 };
 use tokio::{

@@ -9,7 +9,7 @@ use select::{
 };
 use serde::Deserialize;
 use stack_string::{format_sstr, StackString};
-use std::{fmt, fmt::Write};
+use std::{fmt};
 
 use crate::utils::{option_string_wrapper, ExponentialRetry};
 
@@ -286,7 +286,6 @@ mod tests {
     use chrono::{NaiveDate, Utc};
     use log::debug;
     use stack_string::format_sstr;
-    use std::fmt::Write;
 
     use crate::imdb_utils::{ImdbConnection, ImdbEpisodeResult, ImdbTuple};
 

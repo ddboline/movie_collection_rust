@@ -115,20 +115,6 @@ fn default_plex_webhook_key() -> Uuid {
 #[derive(Debug, Default, Clone)]
 pub struct Config(Arc<ConfigInner>);
 
-impl ConfigInner {
-    #[must_use]
-    pub fn new() -> Self {
-        Self {
-            home_dir: default_home_dir(),
-            suffixes: default_suffixes(),
-            port: default_port(),
-            domain: default_domain(),
-            n_db_workers: default_n_db_workers(),
-            ..Self::default()
-        }
-    }
-}
-
 impl Config {
     /// # Errors
     /// Return error if parsing environment variables fails

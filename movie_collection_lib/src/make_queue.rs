@@ -5,7 +5,6 @@ use itertools::Itertools;
 use stack_string::{format_sstr, StackString};
 use std::{
     ffi::OsStr,
-    fmt::Write,
     path::{Path, PathBuf},
     sync::Arc,
 };

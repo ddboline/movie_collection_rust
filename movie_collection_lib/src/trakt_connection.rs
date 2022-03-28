@@ -11,7 +11,6 @@ use smallvec::SmallVec;
 use stack_string::{format_sstr, StackString};
 use std::{
     collections::{HashMap, HashSet},
-    fmt::Write,
     path::PathBuf,
     sync::Arc,
 };
@@ -752,7 +751,6 @@ mod tests {
     use crate::{config::Config, trakt_connection::TraktConnection};
     use anyhow::Error;
     use stack_string::format_sstr;
-    use std::fmt::Write;
 
     #[test]
     #[ignore]

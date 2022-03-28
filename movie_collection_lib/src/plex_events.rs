@@ -8,7 +8,6 @@ use serde::{Deserialize, Serialize};
 use stack_string::{format_sstr, StackString};
 use std::{
     convert::{TryFrom, TryInto},
-    fmt::Write,
     net::Ipv4Addr,
     str::FromStr,
 };
@@ -104,12 +103,12 @@ impl PlexEvent {
         let query = format_sstr!(
             "
                 SELECT * FROM plex_event
-                {where}
+                {where_str}
                 ORDER BY last_modified DESC
                 {limit}
                 {offset}
             ",
-            where = if constraints.is_empty() {
+            where_str = if constraints.is_empty() {
                 StackString::new()
             } else {
                 format_sstr!("WHERE {}", constraints.join(" AND "))
@@ -206,12 +205,12 @@ impl PlexEvent {
                        a.grandparent_title, b.filename, a.last_modified
                 FROM plex_event a
                 LEFT JOIN plex_filename b ON a.metadata_key = b.metadata_key
-                {where}
+                {where_str}
                 ORDER BY a.last_modified DESC
                 {limit}
                 {offset}
             ",
-            where = if constraints.is_empty() {
+            where_str = if constraints.is_empty() {
                 StackString::new()
             } else {
                 format_sstr!("WHERE {}", constraints.join(" AND "))
@@ -460,12 +459,12 @@ impl PlexFilename {
         let query = format_sstr!(
             "
                 SELECT * FROM plex_filename
-                {where}
+                {where_str}
                 ORDER BY last_modified DESC
                 {limit}
                 {offset}
             ",
-            where = if constraints.is_empty() {
+            where_str = if constraints.is_empty() {
                 StackString::new()
             } else {
                 format_sstr!("WHERE {}", constraints.join(" AND "))

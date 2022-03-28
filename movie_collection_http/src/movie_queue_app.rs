@@ -15,7 +15,7 @@ use rweb::{
     Filter, Reply,
 };
 use stack_string::format_sstr;
-use std::{convert::Infallible, fmt::Write, net::SocketAddr, sync::Arc, time::Duration};
+use std::{convert::Infallible, net::SocketAddr, sync::Arc, time::Duration};
 use tokio::{
     fs::{create_dir, remove_dir_all},
     time::interval,
