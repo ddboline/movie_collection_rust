@@ -1,10 +1,10 @@
 use anyhow::Error;
-use chrono::{DateTime, Utc};
 use log::debug;
 use postgres_query::{query, query_dyn, FromSqlRow, Parameter};
 use serde::{Deserialize, Serialize};
 use stack_string::{format_sstr, StackString};
 use std::fmt;
+use time::OffsetDateTime;
 
 use crate::{pgpool::PgPool, tv_show_source::TvShowSource, utils::option_string_wrapper};
 
@@ -112,7 +112,7 @@ impl ImdbRatings {
     /// # Errors
     /// Returns error if db query fails
     pub async fn get_shows_after_timestamp(
-        timestamp: DateTime<Utc>,
+        timestamp: OffsetDateTime,
         pool: &PgPool,
     ) -> Result<Vec<Self>, Error> {
         let query = query!(

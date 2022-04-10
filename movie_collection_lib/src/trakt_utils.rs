@@ -1,5 +1,4 @@
 use anyhow::Error;
-use chrono::NaiveDate;
 use futures::future::try_join_all;
 use itertools::Itertools;
 use log::debug;
@@ -16,6 +15,7 @@ use std::{
     sync::Arc,
 };
 use stdout_channel::StdoutChannel;
+use time::Date;
 
 use crate::{
     config::Config, imdb_episodes::ImdbEpisodes, imdb_ratings::ImdbRatings,
@@ -104,7 +104,7 @@ pub struct TraktCalEntry {
     pub link: StackString,
     pub season: i32,
     pub show: StackString,
-    pub airdate: NaiveDate,
+    pub airdate: Date,
 }
 
 impl fmt::Display for TraktCalEntry {

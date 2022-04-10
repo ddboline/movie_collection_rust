@@ -1,11 +1,12 @@
 use anyhow::Error;
-use chrono::{DateTime, Duration, Utc};
+use derive_more::{From, Into};
 use futures::future::try_join_all;
 use refinery::embed_migrations;
 use stack_string::StackString;
-use std::path::PathBuf;
+use std::{path::PathBuf, str::FromStr};
 use stdout_channel::StdoutChannel;
 use structopt::StructOpt;
+use time::{format_description::well_known::Rfc3339, Duration, OffsetDateTime};
 use tokio::{
     fs::{read, File},
     io::{self, stdin, AsyncReadExt, AsyncWrite, AsyncWriteExt},
@@ -23,6 +24,18 @@ use movie_collection_lib::{
 };
 
 embed_migrations!("migrations");
+
+#[derive(Into, From, Debug, PartialEq, Eq, PartialOrd, Ord)]
+pub struct DateTimeType(OffsetDateTime);
+
+impl FromStr for DateTimeType {
+    type Err = Error;
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        OffsetDateTime::parse(&s.replace('Z', "+00:00"), &Rfc3339)
+            .map(Into::into)
+            .map_err(Into::into)
+    }
+}
 
 #[derive(StructOpt)]
 enum MovieQueueCli {
@@ -43,7 +56,7 @@ enum MovieQueueCli {
         #[structopt(short, long)]
         filepath: Option<PathBuf>,
         #[structopt(short, long)]
-        start_timestamp: Option<DateTime<Utc>>,
+        start_timestamp: Option<DateTimeType>,
     },
     Status,
     /// Run refinery migrations
@@ -189,8 +202,8 @@ impl MovieQueueCli {
                 filepath,
                 start_timestamp,
             } => {
-                let start_timestamp =
-                    start_timestamp.unwrap_or_else(|| Utc::now() - Duration::days(7));
+                let start_timestamp = start_timestamp
+                    .map_or_else(|| OffsetDateTime::now_utc() - Duration::days(7), Into::into);
                 let mut file: Box<dyn AsyncWrite + Unpin> = if let Some(filepath) = filepath {
                     Box::new(File::create(&filepath).await?)
                 } else {

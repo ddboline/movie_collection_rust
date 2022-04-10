@@ -1,6 +1,4 @@
 use anyhow::{format_err, Error};
-use chrono::{DateTime, Local, NaiveDateTime, Utc};
-use chrono_tz::Tz;
 use log::info;
 use postgres_query::{query, query_dyn, FromSqlRow, Parameter, Query};
 use roxmltree::Document;
@@ -11,6 +9,8 @@ use std::{
     net::Ipv4Addr,
     str::FromStr,
 };
+use time::{macros::datetime, OffsetDateTime};
+use time_tz::{timezones::db::UTC, OffsetDateTimeExt};
 
 use crate::{config::Config, pgpool::PgPool};
 
@@ -24,9 +24,9 @@ pub struct PlexEvent {
     pub title: StackString,
     pub parent_title: Option<StackString>,
     pub grandparent_title: Option<StackString>,
-    pub added_at: DateTime<Utc>,
-    pub updated_at: Option<DateTime<Utc>>,
-    pub last_modified: DateTime<Utc>,
+    pub added_at: OffsetDateTime,
+    pub updated_at: Option<OffsetDateTime>,
+    pub last_modified: OffsetDateTime,
     pub metadata_type: Option<StackString>,
     pub section_type: Option<StackString>,
     pub section_title: Option<StackString>,
@@ -36,9 +36,9 @@ pub struct PlexEvent {
 impl TryFrom<WebhookPayload> for PlexEvent {
     type Error = Error;
     fn try_from(item: WebhookPayload) -> Result<Self, Self::Error> {
-        fn dt_from_tm(x: u64) -> DateTime<Utc> {
-            let dt = NaiveDateTime::from_timestamp(x as i64, 0);
-            DateTime::from_utc(dt, Utc)
+        fn dt_from_tm(x: u64) -> OffsetDateTime {
+            OffsetDateTime::from_unix_timestamp(x as i64)
+                .unwrap_or(datetime!(1970-01-01 00:00:00 +00:00))
         }
         let event = item.event.to_str().into();
         let player_address = StackString::from_display(item.player.public_address);
@@ -53,7 +53,7 @@ impl TryFrom<WebhookPayload> for PlexEvent {
             grandparent_title: item.metadata.grandparent_title,
             added_at: dt_from_tm(item.metadata.added_at),
             updated_at: item.metadata.updated_at.map(dt_from_tm),
-            last_modified: Utc::now(),
+            last_modified: OffsetDateTime::now_utc(),
             metadata_type: item.metadata.metadata_type,
             section_type: item.metadata.library_section_type,
             section_title: item.metadata.library_section_title,
@@ -84,7 +84,7 @@ impl PlexEvent {
     /// Return error if db query fails
     pub async fn get_events(
         pool: &PgPool,
-        start_timestamp: Option<DateTime<Utc>>,
+        start_timestamp: Option<OffsetDateTime>,
         event_type: Option<PlexEventType>,
         offset: Option<u64>,
         limit: Option<u64>,
@@ -171,7 +171,7 @@ impl PlexEvent {
     pub async fn get_event_http(
         pool: &PgPool,
         config: &Config,
-        start_timestamp: Option<DateTime<Utc>>,
+        start_timestamp: Option<OffsetDateTime>,
         event_type: Option<PlexEventType>,
         offset: Option<u64>,
         limit: Option<u64>,
@@ -185,7 +185,7 @@ impl PlexEvent {
             parent_title: Option<StackString>,
             grandparent_title: Option<StackString>,
             filename: Option<StackString>,
-            last_modified: DateTime<Utc>,
+            last_modified: OffsetDateTime,
         }
 
         let mut constraints = Vec::new();
@@ -229,15 +229,16 @@ impl PlexEvent {
         let query: Query = query_dyn!(&query, ..bindings)?;
         let conn = pool.get().await?;
         let output: Vec<EventOutput> = query.fetch(&conn).await?;
+        let local = time_tz::system::get_timezone().unwrap_or(UTC);
         let body = output
             .into_iter()
             .map(|event| {
                 let last_modified = match config.default_time_zone {
                     Some(tz) => {
-                        let tz: Tz = tz.into();
-                        StackString::from_display(event.last_modified.with_timezone(&tz))
+                        let tz = tz.into();
+                        event.last_modified.to_timezone(tz)
                     }
-                    None => StackString::from_display(event.last_modified.with_timezone(&Local)),
+                    None => event.last_modified.to_timezone(local),
                 };
                 format_sstr!(
                     r#"
@@ -446,7 +447,7 @@ impl PlexFilename {
     /// Return error if db query fails
     pub async fn get_filenames(
         pool: &PgPool,
-        start_timestamp: Option<DateTime<Utc>>,
+        start_timestamp: Option<OffsetDateTime>,
         offset: Option<u64>,
         limit: Option<u64>,
     ) -> Result<Vec<Self>, Error> {

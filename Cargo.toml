@@ -1,6 +1,6 @@
 [package]
 name = "movie_collection_rust"
-version = "0.8.73"
+version = "0.9.0"
 authors = ["Daniel Boline <ddboline@gmail.com>"]
 edition = "2018"
 
@@ -26,7 +26,9 @@ tokio = {version="1.17", features=["full"]}
 structopt = "0.3"
 futures = "0.3"
 serde_json = "1.0"
-chrono = "0.4"
+derive_more = "0.99"
+time = {version="0.3", features=["serde-human-readable", "macros", "formatting"]}
+time-tz = {version="0.5", features=["system"]}
 refinery = {version="0.8", features=["tokio-postgres"]}
 stack-string = { version="0.7", features=["postgres_types"] }
 stdout-channel = "0.5"

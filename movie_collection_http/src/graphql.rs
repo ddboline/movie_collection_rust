@@ -3,10 +3,10 @@ use async_graphql::{
     ComplexObject, Context, Enum, Error, Object, SimpleObject,
 };
 use async_trait::async_trait;
-use chrono::NaiveDate;
 use derive_more::{Deref, From, Into};
 use stack_string::StackString;
 use std::collections::HashMap;
+use time::Date;
 
 use movie_collection_lib::{
     imdb_episodes::{ImdbEpisodes, ImdbSeason},
@@ -222,7 +222,7 @@ pub struct EpisodeItem {
     /// Episode
     pub episode: i32,
     /// Airdate
-    pub airdate: NaiveDate,
+    pub airdate: Date,
     /// Imdb Episode Rating
     pub rating: f64,
     /// Episode Title
