@@ -1,10 +1,10 @@
 use anyhow::Error;
-use chrono::{DateTime, NaiveDate, Utc};
 use postgres_query::{query, query_dyn, FromSqlRow, Parameter};
 use serde::{Deserialize, Serialize};
 use smallvec::{smallvec, SmallVec};
 use stack_string::{format_sstr, StackString};
 use std::fmt;
+use time::{macros::date, Date, OffsetDateTime};
 
 use crate::pgpool::PgPool;
 
@@ -14,7 +14,7 @@ pub struct ImdbEpisodes {
     pub title: StackString,
     pub season: i32,
     pub episode: i32,
-    pub airdate: NaiveDate,
+    pub airdate: Date,
     pub rating: f64,
     pub eptitle: StackString,
     pub epurl: StackString,
@@ -51,7 +51,7 @@ impl ImdbEpisodes {
             title: "".into(),
             season: -1,
             episode: -1,
-            airdate: NaiveDate::from_ymd(1970, 1, 1),
+            airdate: date!(1970 - 01 - 01),
             rating: -1.0,
             eptitle: "".into(),
             epurl: "".into(),
@@ -96,7 +96,7 @@ impl ImdbEpisodes {
     /// # Errors
     /// Returns error if db query fails
     pub async fn get_episodes_after_timestamp(
-        timestamp: DateTime<Utc>,
+        timestamp: OffsetDateTime,
         pool: &PgPool,
     ) -> Result<Vec<Self>, Error> {
         let query = query!(

@@ -1,6 +1,6 @@
 use anyhow::format_err;
-use chrono::{DateTime, Utc};
 use rweb::Schema;
+use rweb_helper::DateTimeType;
 use serde::{Deserialize, Serialize};
 use stack_string::StackString;
 use stdout_channel::{MockStdout, StdoutChannel};
@@ -270,14 +270,14 @@ impl FindNewEpisodeRequest {
 #[derive(Serialize, Deserialize, Debug, Schema)]
 pub struct ImdbEpisodesSyncRequest {
     #[schema(description = "Start Timestamp")]
-    pub start_timestamp: DateTime<Utc>,
+    pub start_timestamp: DateTimeType,
 }
 
 impl ImdbEpisodesSyncRequest {
     /// # Errors
     /// Return error if `get_episodes_after_timestamp` fails
     pub async fn handle(&self, pool: &PgPool) -> Result<Vec<ImdbEpisodes>, Error> {
-        ImdbEpisodes::get_episodes_after_timestamp(self.start_timestamp, pool)
+        ImdbEpisodes::get_episodes_after_timestamp(self.start_timestamp.into(), pool)
             .await
             .map_err(Into::into)
     }
@@ -285,14 +285,14 @@ impl ImdbEpisodesSyncRequest {
 
 #[derive(Serialize, Deserialize, Schema)]
 pub struct ImdbRatingsSyncRequest {
-    pub start_timestamp: DateTime<Utc>,
+    pub start_timestamp: DateTimeType,
 }
 
 impl ImdbRatingsSyncRequest {
     /// # Errors
     /// Return error if `get_shows_after_timestamp` fails
     pub async fn handle(&self, pool: &PgPool) -> Result<Vec<ImdbRatings>, Error> {
-        ImdbRatings::get_shows_after_timestamp(self.start_timestamp, pool)
+        ImdbRatings::get_shows_after_timestamp(self.start_timestamp.into(), pool)
             .await
             .map_err(Into::into)
     }
@@ -300,7 +300,7 @@ impl ImdbRatingsSyncRequest {
 
 #[derive(Serialize, Deserialize, Schema)]
 pub struct MovieQueueSyncRequest {
-    pub start_timestamp: DateTime<Utc>,
+    pub start_timestamp: DateTimeType,
 }
 
 impl MovieQueueSyncRequest {
@@ -315,7 +315,7 @@ impl MovieQueueSyncRequest {
         let stdout = StdoutChannel::with_mock_stdout(mock_stdout.clone(), mock_stdout);
 
         let mq = MovieQueueDB::new(config, pool, &stdout);
-        mq.get_queue_after_timestamp(self.start_timestamp)
+        mq.get_queue_after_timestamp(self.start_timestamp.into())
             .await
             .map_err(Into::into)
     }
@@ -323,7 +323,7 @@ impl MovieQueueSyncRequest {
 
 #[derive(Serialize, Deserialize, Schema)]
 pub struct MovieCollectionSyncRequest {
-    pub start_timestamp: DateTime<Utc>,
+    pub start_timestamp: DateTimeType,
 }
 
 impl MovieCollectionSyncRequest {
@@ -338,7 +338,7 @@ impl MovieCollectionSyncRequest {
         let stdout = StdoutChannel::with_mock_stdout(mock_stdout.clone(), mock_stdout);
 
         let mc = MovieCollection::new(config, pool, &stdout);
-        mc.get_collection_after_timestamp(self.start_timestamp)
+        mc.get_collection_after_timestamp(self.start_timestamp.into())
             .await
             .map_err(Into::into)
     }

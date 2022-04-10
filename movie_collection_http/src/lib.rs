@@ -14,10 +14,9 @@ pub mod movie_queue_app;
 pub mod movie_queue_requests;
 pub mod movie_queue_routes;
 
-use chrono::{DateTime, NaiveDate, Utc};
 use derive_more::{Deref, Display, From, FromStr, Into};
 use rweb::Schema;
-use rweb_helper::derive_rweb_schema;
+use rweb_helper::{derive_rweb_schema, DateTimeType, DateType};
 use serde::{Deserialize, Serialize};
 use stack_string::StackString;
 
@@ -48,7 +47,7 @@ struct _ImdbEpisodesWrapper {
     #[schema(description = "Episode")]
     episode: i32,
     #[schema(description = "Airdate")]
-    airdate: NaiveDate,
+    airdate: DateType,
     #[schema(description = "Rating")]
     rating: f64,
     #[schema(description = "Episode Title")]
@@ -116,7 +115,7 @@ struct _MovieQueueRowWrapper {
     #[schema(description = "TV Show Name")]
     show: StackString,
     #[schema(description = "Last Modified")]
-    last_modified: Option<DateTime<Utc>>,
+    last_modified: Option<DateTimeType>,
 }
 
 #[derive(Default, Serialize, Deserialize, Into, From, Deref)]
@@ -146,7 +145,7 @@ struct _LastModifiedResponseWrapper {
     #[schema(description = "Table Name")]
     table: StackString,
     #[schema(description = "Last Modified")]
-    last_modified: DateTime<Utc>,
+    last_modified: DateTimeType,
 }
 
 #[derive(Debug, Serialize, Deserialize, Into, From)]
@@ -173,11 +172,11 @@ pub struct _PlexEventWrapper {
     #[schema(description = "Grandparent Title")]
     pub grandparent_title: Option<StackString>,
     #[schema(description = "Added At Timestamp")]
-    pub added_at: DateTime<Utc>,
+    pub added_at: DateTimeType,
     #[schema(description = "Updated At Timestamp")]
-    pub updated_at: Option<DateTime<Utc>>,
+    pub updated_at: Option<DateTimeType>,
     #[schema(description = "Last Modified")]
-    pub last_modified: DateTime<Utc>,
+    pub last_modified: DateTimeType,
     #[schema(description = "Metadata Type")]
     pub metadata_type: Option<StackString>,
     #[schema(description = "Section Type")]

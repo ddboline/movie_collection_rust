@@ -1,10 +1,10 @@
 use anyhow::Error;
-use chrono::NaiveDate;
 use itertools::Itertools;
 use stack_string::{format_sstr, StackString};
 use std::collections::HashMap;
 use stdout_channel::StdoutChannel;
 use structopt::StructOpt;
+use time::macros::date;
 
 use crate::{
     config::Config, imdb_episodes::ImdbEpisodes, imdb_ratings::ImdbRatings,
@@ -207,9 +207,7 @@ impl ParseImdb {
                     if opts.update_database {
                         let key = (episode.season, episode.episode);
                         if let Some(episodes) = &episodes {
-                            let airdate = episode
-                                .airdate
-                                .unwrap_or_else(|| NaiveDate::from_ymd(1970, 1, 1));
+                            let airdate = episode.airdate.unwrap_or_else(|| date!(1970 - 01 - 01));
 
                             if let Some(e) = episodes.get(&key) {
                                 let mut new = e.clone();

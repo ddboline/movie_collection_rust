@@ -2,13 +2,13 @@
 
 use anyhow::format_err;
 use bytes::Buf;
-use chrono::{DateTime, Utc};
 use itertools::Itertools;
 use log::error;
 use maplit::hashmap;
 use rweb::{get, multipart::FormData, post, Json, Query, Rejection, Schema};
 use rweb_helper::{
-    html_response::HtmlResponse as HtmlBase, json_response::JsonResponse as JsonBase, RwebResponse,
+    html_response::HtmlResponse as HtmlBase, json_response::JsonResponse as JsonBase, DateTimeType,
+    RwebResponse,
 };
 use serde::{Deserialize, Serialize};
 use stack_string::{format_sstr, StackString};
@@ -1694,7 +1694,7 @@ struct PlexEventResponse(JsonBase<Vec<PlexEventWrapper>, Error>);
 #[derive(Serialize, Deserialize, Debug, Schema)]
 pub struct PlexEventRequest {
     #[schema(description = "Start Timestamp")]
-    pub start_timestamp: Option<DateTime<Utc>>,
+    pub start_timestamp: Option<DateTimeType>,
     #[schema(description = "Event Type")]
     pub event_type: Option<PlexEventTypeWrapper>,
     #[schema(description = "Offset")]
@@ -1868,7 +1868,7 @@ struct PlexFilenameResponse(JsonBase<Vec<PlexFilenameWrapper>, Error>);
 #[derive(Serialize, Deserialize, Debug, Schema)]
 pub struct PlexFilenameRequest {
     #[schema(description = "Start Timestamp")]
-    pub start_timestamp: Option<DateTime<Utc>>,
+    pub start_timestamp: Option<DateTimeType>,
     #[schema(description = "Offset")]
     pub offset: Option<u64>,
     #[schema(description = "Limit")]

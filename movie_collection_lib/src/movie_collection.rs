@@ -1,5 +1,4 @@
 use anyhow::{format_err, Error};
-use chrono::{DateTime, Duration, Local, NaiveDate, Utc};
 use derive_more::Into;
 use futures::future::try_join_all;
 use itertools::Itertools;
@@ -16,6 +15,8 @@ use std::{
     sync::Arc,
 };
 use stdout_channel::{rate_limiter::RateLimiter, StdoutChannel};
+use time::{Date, Duration, OffsetDateTime};
+use time_tz::{timezones::db::UTC, OffsetDateTimeExt};
 
 use crate::{
     config::Config,
@@ -35,7 +36,7 @@ pub struct NewEpisodesResult {
     pub season: i32,
     pub episode: i32,
     pub epurl: StackString,
-    pub airdate: NaiveDate,
+    pub airdate: Date,
     pub rating: f64,
     pub eprating: f64,
     pub eptitle: StackString,
@@ -667,8 +668,8 @@ impl MovieCollection {
     /// Returns error if db queries fail
     pub async fn get_new_episodes(
         &self,
-        mindate: NaiveDate,
-        maxdate: NaiveDate,
+        mindate: Date,
+        maxdate: Date,
         source: Option<TvShowSource>,
     ) -> Result<Vec<NewEpisodesResult>, Error> {
         let mut source_str = StackString::new();
@@ -726,16 +727,19 @@ impl MovieCollection {
         source: Option<TvShowSource>,
         shows: &[impl AsRef<str>],
     ) -> Result<Vec<NewEpisodesResult>, Error> {
-        let mindate = Local::today() + Duration::days(-14);
-        let maxdate = Local::today() + Duration::days(7);
+        let local = time_tz::system::get_timezone().unwrap_or(UTC);
+        let mindate = (OffsetDateTime::now_utc() + Duration::days(-14))
+            .to_timezone(local)
+            .date();
+        let maxdate = (OffsetDateTime::now_utc() + Duration::days(7))
+            .to_timezone(local)
+            .date();
 
         let mq = MovieQueueDB::new(&self.config, &self.pool, &self.stdout);
 
         let mut output = Vec::new();
 
-        let episodes = self
-            .get_new_episodes(mindate.naive_local(), maxdate.naive_local(), source)
-            .await?;
+        let episodes = self.get_new_episodes(mindate, maxdate, source).await?;
         'outer: for epi in episodes {
             let movie_queue = mq.print_movie_queue(&[epi.show.as_str()]).await?;
             for s in movie_queue {
@@ -764,7 +768,7 @@ impl MovieCollection {
     /// Returns error if db queries fail
     pub async fn get_collection_after_timestamp(
         &self,
-        timestamp: DateTime<Utc>,
+        timestamp: OffsetDateTime,
     ) -> Result<Vec<MovieCollectionRow>, Error> {
         let query = query!(
             r#"
@@ -837,8 +841,13 @@ pub async fn find_new_episodes_http_worker(
     let shows_filter: Option<HashSet<StackString>> =
         shows.map(|s| s.as_ref().split(',').map(Into::into).collect());
 
-    let mindate = (Local::today() + Duration::days(-14)).naive_local();
-    let maxdate = (Local::today() + Duration::days(7)).naive_local();
+    let local = time_tz::system::get_timezone().unwrap_or(UTC);
+    let mindate = (OffsetDateTime::now_utc() + Duration::days(-14))
+        .to_timezone(local)
+        .date();
+    let maxdate = (OffsetDateTime::now_utc() + Duration::days(7))
+        .to_timezone(local)
+        .date();
 
     let mq = MovieQueueDB::new(config, pool, stdout);
 
@@ -922,7 +931,7 @@ pub async fn find_new_episodes_http_worker(
 #[derive(Serialize, Deserialize)]
 pub struct LastModifiedResponse {
     pub table: StackString,
-    pub last_modified: DateTime<Utc>,
+    pub last_modified: OffsetDateTime,
 }
 
 impl LastModifiedResponse {
@@ -942,7 +951,7 @@ impl LastModifiedResponse {
             let query = query_dyn!(&format_sstr!("SELECT max(last_modified) FROM {table}"))?;
             let conn = pool.get().await?;
             if let Some((last_modified,)) = query.fetch_opt(&conn).await? {
-                let last_modified: DateTime<Utc> = last_modified;
+                let last_modified: OffsetDateTime = last_modified;
                 Ok(Some(LastModifiedResponse {
                     table: (*table).into(),
                     last_modified,

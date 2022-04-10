@@ -1,5 +1,4 @@
 use anyhow::{format_err, Error};
-use chrono::{DateTime, Utc};
 use futures::future::try_join_all;
 use itertools::Itertools;
 use log::debug;
@@ -8,6 +7,7 @@ use serde::{Deserialize, Serialize};
 use stack_string::{format_sstr, StackString};
 use std::{fmt, fmt::Write, path::Path};
 use stdout_channel::StdoutChannel;
+use time::OffsetDateTime;
 
 use crate::{
     config::Config,
@@ -327,7 +327,7 @@ impl MovieQueueDB {
     /// Return error if db queries fail
     pub async fn get_queue_after_timestamp(
         &self,
-        timestamp: DateTime<Utc>,
+        timestamp: OffsetDateTime,
     ) -> Result<Vec<MovieQueueRow>, Error> {
         let query = query!(
             r#"
@@ -349,5 +349,5 @@ pub struct MovieQueueRow {
     pub collection_idx: i32,
     pub path: StackString,
     pub show: StackString,
-    pub last_modified: Option<DateTime<Utc>>,
+    pub last_modified: Option<OffsetDateTime>,
 }

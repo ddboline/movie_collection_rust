@@ -1,6 +1,5 @@
 use anyhow::{format_err, Error};
 use base64::{encode_config, URL_SAFE_NO_PAD};
-use chrono::{DateTime, Utc};
 use lazy_static::lazy_static;
 use log::debug;
 use maplit::hashmap;
@@ -14,6 +13,8 @@ use std::{
     path::PathBuf,
     sync::Arc,
 };
+use time::OffsetDateTime;
+use time_tz::{timezones::db::UTC, OffsetDateTimeExt};
 use tokio::{
     fs::{read, write},
     sync::{Mutex, RwLock},
@@ -486,6 +487,7 @@ impl TraktConnection {
     /// # Errors
     /// Return error if api call fails
     pub async fn get_calendar(&self) -> Result<TraktCalEntryList, Error> {
+        let local = time_tz::system::get_timezone().unwrap_or(UTC);
         let headers = self.get_rw_headers().await?;
         let trakt_endpoint = &self.config.trakt_endpoint;
         let url = format_sstr!("{trakt_endpoint}/calendars/my/shows");
@@ -508,7 +510,7 @@ impl TraktConnection {
                     link: imdb,
                     season: entry.episode.season,
                     show: entry.show.title,
-                    airdate: entry.first_aired.naive_local().date(),
+                    airdate: entry.first_aired.to_timezone(local).date(),
                 }
             })
             .collect();
@@ -530,7 +532,7 @@ impl TraktConnection {
         let data = hashmap! {
             "episodes" => vec![
                 WatchedEpisodeRequest {
-                    watched_at: Utc::now(),
+                    watched_at: OffsetDateTime::now_utc(),
                     ids: episode_obj.ids,
                 }
             ]
@@ -564,7 +566,7 @@ impl TraktConnection {
         let data = hashmap! {
             "movies" => vec![
                 WatchedMovieRequest {
-                    watched_at: Utc::now(),
+                    watched_at: OffsetDateTime::now_utc(),
                     title: movie_obj.movie.title.clone(),
                     year,
                     ids: movie_obj.movie.ids,
@@ -598,7 +600,7 @@ impl TraktConnection {
         let data = hashmap! {
             "episodes" => vec![
                 WatchedEpisodeRequest {
-                    watched_at: Utc::now(),
+                    watched_at: OffsetDateTime::now_utc(),
                     ids: episode_obj.ids,
                 }
             ]
@@ -631,7 +633,7 @@ impl TraktConnection {
         let data = hashmap! {
             "movies" => vec![
                 WatchedMovieRequest {
-                    watched_at: Utc::now(),
+                    watched_at: OffsetDateTime::now_utc(),
                     title: movie_obj.movie.title.clone(),
                     year,
                     ids: movie_obj.movie.ids,
@@ -654,7 +656,7 @@ impl TraktConnection {
 #[derive(Serialize, Deserialize, Debug)]
 struct WatchedMovieRequest {
     #[serde(with = "iso_8601_datetime")]
-    pub watched_at: DateTime<Utc>,
+    pub watched_at: OffsetDateTime,
     pub title: StackString,
     pub year: i32,
     pub ids: TraktIdObject,
@@ -663,7 +665,7 @@ struct WatchedMovieRequest {
 #[derive(Serialize, Deserialize, Debug)]
 struct WatchedEpisodeRequest {
     #[serde(with = "iso_8601_datetime")]
-    pub watched_at: DateTime<Utc>,
+    pub watched_at: OffsetDateTime,
     pub ids: TraktIdObject,
 }
 
@@ -741,7 +743,7 @@ pub struct TraktWatchedMovieResponse {
 #[derive(Serialize, Deserialize, Debug)]
 pub struct TraktCalendarResponse {
     #[serde(with = "iso_8601_datetime")]
-    pub first_aired: DateTime<Utc>,
+    pub first_aired: OffsetDateTime,
     pub episode: TraktEpisodeObject,
     pub show: TraktShowObject,
 }

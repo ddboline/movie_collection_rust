@@ -1,5 +1,4 @@
 use anyhow::Error;
-use chrono::NaiveDate;
 use futures::future::try_join_all;
 use log::debug;
 use reqwest::{Client, Url};
@@ -10,6 +9,10 @@ use select::{
 use serde::Deserialize;
 use stack_string::{format_sstr, StackString};
 use std::fmt;
+use time::{
+    macros::{date, format_description},
+    Date,
+};
 
 use crate::utils::{option_string_wrapper, ExponentialRetry};
 
@@ -38,7 +41,7 @@ pub struct ImdbEpisodeResult {
     pub episode: i32,
     pub epurl: Option<StackString>,
     pub eptitle: Option<StackString>,
-    pub airdate: Option<NaiveDate>,
+    pub airdate: Option<Date>,
     pub rating: Option<f64>,
     pub nrating: Option<u64>,
 }
@@ -52,8 +55,7 @@ impl fmt::Display for ImdbEpisodeResult {
             self.episode,
             option_string_wrapper(self.epurl.as_ref()),
             option_string_wrapper(self.eptitle.as_ref()),
-            self.airdate
-                .unwrap_or_else(|| NaiveDate::from_ymd(1970, 1, 1)),
+            self.airdate.unwrap_or_else(|| date!(1970 - 01 - 01)),
             self.rating.unwrap_or(-1.0),
             self.nrating.unwrap_or(0),
         )
@@ -239,13 +241,17 @@ impl ImdbConnection {
                     }
                     for div_ in div.find(Name("div")) {
                         if let Some("airdate") = div_.attr("class") {
-                            if let Ok(date) =
-                                NaiveDate::parse_from_str(div_.text().trim(), "%d %b. %Y")
-                            {
+                            let s = div_.text();
+                            let s = s.trim();
+                            if let Ok(date) = Date::parse(
+                                s,
+                                format_description!("[day] [month repr:short]. [year]"),
+                            ) {
                                 result.airdate = Some(date);
-                            } else if let Ok(date) =
-                                NaiveDate::parse_from_str(div_.text().trim(), "%d %b %Y")
-                            {
+                            } else if let Ok(date) = Date::parse(
+                                s,
+                                format_description!("[day] [month repr:short]. [year]"),
+                            ) {
                                 result.airdate = Some(date);
                             }
                         }
@@ -283,9 +289,9 @@ impl ImdbConnection {
 #[cfg(test)]
 mod tests {
     use anyhow::Error;
-    use chrono::{NaiveDate, Utc};
     use log::debug;
     use stack_string::format_sstr;
+    use time::{macros::date, OffsetDateTime};
 
     use crate::imdb_utils::{ImdbConnection, ImdbEpisodeResult, ImdbTuple};
 
@@ -323,7 +329,7 @@ mod tests {
 
     #[test]
     fn test_imdb_episode_result_display() -> Result<(), Error> {
-        let today = Utc::now().date().naive_utc();
+        let today = OffsetDateTime::now_utc().date();
         let t = ImdbEpisodeResult {
             season: 2,
             episode: 3,
@@ -362,7 +368,7 @@ mod tests {
         assert_eq!(first.episode, 1);
         assert_eq!(first.epurl, Some("tt0705282".into()));
         assert_eq!(first.eptitle, Some("Pilot".into()));
-        assert_eq!(first.airdate, Some(NaiveDate::from_ymd(1999, 1, 10)));
+        assert_eq!(first.airdate, Some(date!(1999 - 01 - 10)));
         assert_eq!(results.len(), 13);
         Ok(())
     }

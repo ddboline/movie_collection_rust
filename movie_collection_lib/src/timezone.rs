@@ -1,19 +1,19 @@
 use anyhow::{format_err, Error};
-use chrono_tz::Tz;
 use derive_more::Into;
 use serde::{Deserialize, Serialize};
 use stack_string::StackString;
 use std::{convert::TryFrom, ops::Deref, str::FromStr};
+use time_tz::{timezones::get_by_name, TimeZone as TzTimeZone, Tz};
 
 /// Direction in degrees
 #[derive(Into, Debug, PartialEq, Copy, Clone, Eq, Serialize, Deserialize)]
 #[serde(into = "StackString", try_from = "StackString")]
-pub struct TimeZone(Tz);
+pub struct TimeZone(&'static Tz);
 
 impl Deref for TimeZone {
     type Target = Tz;
     fn deref(&self) -> &Self::Target {
-        &self.0
+        self.0
     }
 }
 
@@ -32,9 +32,9 @@ impl From<TimeZone> for StackString {
 impl FromStr for TimeZone {
     type Err = Error;
     fn from_str(s: &str) -> Result<Self, Self::Err> {
-        s.parse()
+        get_by_name(s)
             .map(Self)
-            .map_err(|e| format_err!("{e} is not a valid timezone"))
+            .ok_or_else(|| format_err!("{s} is not a valid timezone"))
     }
 }
 
