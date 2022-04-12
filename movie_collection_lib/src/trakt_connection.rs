@@ -13,7 +13,6 @@ use std::{
     path::PathBuf,
     sync::Arc,
 };
-use time::OffsetDateTime;
 use time_tz::{timezones::db::UTC, OffsetDateTimeExt};
 use tokio::{
     fs::{read, write},
@@ -22,7 +21,7 @@ use tokio::{
 
 use crate::{
     config::Config,
-    iso_8601_datetime,
+    date_time_wrapper::DateTimeWrapper,
     trakt_utils::{
         TraktCalEntry, TraktCalEntryList, TraktResult, WatchListShow, WatchedEpisode, WatchedMovie,
     },
@@ -532,7 +531,7 @@ impl TraktConnection {
         let data = hashmap! {
             "episodes" => vec![
                 WatchedEpisodeRequest {
-                    watched_at: OffsetDateTime::now_utc(),
+                    watched_at: DateTimeWrapper::now(),
                     ids: episode_obj.ids,
                 }
             ]
@@ -566,7 +565,7 @@ impl TraktConnection {
         let data = hashmap! {
             "movies" => vec![
                 WatchedMovieRequest {
-                    watched_at: OffsetDateTime::now_utc(),
+                    watched_at: DateTimeWrapper::now(),
                     title: movie_obj.movie.title.clone(),
                     year,
                     ids: movie_obj.movie.ids,
@@ -600,7 +599,7 @@ impl TraktConnection {
         let data = hashmap! {
             "episodes" => vec![
                 WatchedEpisodeRequest {
-                    watched_at: OffsetDateTime::now_utc(),
+                    watched_at: DateTimeWrapper::now(),
                     ids: episode_obj.ids,
                 }
             ]
@@ -633,7 +632,7 @@ impl TraktConnection {
         let data = hashmap! {
             "movies" => vec![
                 WatchedMovieRequest {
-                    watched_at: OffsetDateTime::now_utc(),
+                    watched_at: DateTimeWrapper::now(),
                     title: movie_obj.movie.title.clone(),
                     year,
                     ids: movie_obj.movie.ids,
@@ -655,8 +654,7 @@ impl TraktConnection {
 
 #[derive(Serialize, Deserialize, Debug)]
 struct WatchedMovieRequest {
-    #[serde(with = "iso_8601_datetime")]
-    pub watched_at: OffsetDateTime,
+    pub watched_at: DateTimeWrapper,
     pub title: StackString,
     pub year: i32,
     pub ids: TraktIdObject,
@@ -664,8 +662,7 @@ struct WatchedMovieRequest {
 
 #[derive(Serialize, Deserialize, Debug)]
 struct WatchedEpisodeRequest {
-    #[serde(with = "iso_8601_datetime")]
-    pub watched_at: OffsetDateTime,
+    pub watched_at: DateTimeWrapper,
     pub ids: TraktIdObject,
 }
 
@@ -742,8 +739,7 @@ pub struct TraktWatchedMovieResponse {
 
 #[derive(Serialize, Deserialize, Debug)]
 pub struct TraktCalendarResponse {
-    #[serde(with = "iso_8601_datetime")]
-    pub first_aired: OffsetDateTime,
+    pub first_aired: DateTimeWrapper,
     pub episode: TraktEpisodeObject,
     pub show: TraktShowObject,
 }

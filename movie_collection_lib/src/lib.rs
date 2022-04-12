@@ -11,7 +11,6 @@ pub mod config;
 pub mod imdb_episodes;
 pub mod imdb_ratings;
 pub mod imdb_utils;
-pub mod iso_8601_datetime;
 pub mod make_list;
 pub mod make_queue;
 pub mod movie_collection;
@@ -25,6 +24,7 @@ pub mod trakt_utils;
 pub mod transcode_service;
 pub mod tv_show_source;
 pub mod utils;
+pub mod date_time_wrapper;
 
 pub fn init_env() {
     use std::env::set_var;

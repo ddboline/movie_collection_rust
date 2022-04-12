@@ -27,7 +27,7 @@ use movie_collection_lib::{
     movie_queue::MovieQueueRow,
     plex_events::{PlexEvent, PlexEventType, PlexFilename},
     trakt_utils::TraktActions,
-    tv_show_source::TvShowSource,
+    tv_show_source::TvShowSource, date_time_wrapper::DateTimeWrapper,
 };
 
 #[derive(Clone, Serialize, Deserialize, Into, From)]
@@ -153,38 +153,39 @@ pub struct PlexEventWrapper(PlexEvent);
 
 derive_rweb_schema!(PlexEventWrapper, _PlexEventWrapper);
 
+#[allow(dead_code)]
 #[derive(Schema)]
-pub struct _PlexEventWrapper {
+struct _PlexEventWrapper {
     #[schema(description = "Event")]
-    pub event: StackString,
+    event: StackString,
     #[schema(description = "Account")]
-    pub account: StackString,
+    account: StackString,
     #[schema(description = "Server")]
-    pub server: StackString,
+    server: StackString,
     #[schema(description = "Player Title")]
-    pub player_title: StackString,
+    player_title: StackString,
     #[schema(description = "Player Address")]
-    pub player_address: StackString,
+    player_address: StackString,
     #[schema(description = "Title")]
-    pub title: StackString,
+    title: StackString,
     #[schema(description = "Parent Title")]
-    pub parent_title: Option<StackString>,
+    parent_title: Option<StackString>,
     #[schema(description = "Grandparent Title")]
-    pub grandparent_title: Option<StackString>,
+    grandparent_title: Option<StackString>,
     #[schema(description = "Added At Timestamp")]
-    pub added_at: DateTimeType,
+    added_at: DateTimeType,
     #[schema(description = "Updated At Timestamp")]
-    pub updated_at: Option<DateTimeType>,
+    updated_at: Option<DateTimeType>,
     #[schema(description = "Last Modified")]
-    pub last_modified: DateTimeType,
+    last_modified: DateTimeType,
     #[schema(description = "Metadata Type")]
-    pub metadata_type: Option<StackString>,
+    metadata_type: Option<StackString>,
     #[schema(description = "Section Type")]
-    pub section_type: Option<StackString>,
+    section_type: Option<StackString>,
     #[schema(description = "Section Title")]
-    pub section_title: Option<StackString>,
+    section_title: Option<StackString>,
     #[schema(description = "Metadata Key")]
-    pub metadata_key: Option<StackString>,
+    metadata_key: Option<StackString>,
 }
 
 #[derive(Default, Debug, Serialize, Deserialize, Into, From, Deref)]
@@ -250,6 +251,49 @@ pub enum _PlexEventTypeWrapper {
     DeviceNew,
     #[serde(rename = "playback-started")]
     PlaybackStarted,
+}
+
+#[derive(Serialize, Deserialize, Debug)]
+pub struct PlexEventRequest {
+    pub start_timestamp: Option<DateTimeWrapper>,
+    pub event_type: Option<PlexEventTypeWrapper>,
+    pub offset: Option<u64>,
+    pub limit: Option<u64>,
+}
+
+derive_rweb_schema!(PlexEventRequest, _PlexEventRequest);
+
+#[allow(dead_code)]
+#[derive(Schema)]
+struct _PlexEventRequest {
+    #[schema(description = "Start Timestamp")]
+    start_timestamp: Option<DateTimeType>,
+    #[schema(description = "Event Type")]
+    event_type: Option<PlexEventTypeWrapper>,
+    #[schema(description = "Offset")]
+    offset: Option<u64>,
+    #[schema(description = "Limit")]
+    limit: Option<u64>,
+}
+
+#[derive(Serialize, Deserialize, Debug)]
+pub struct PlexFilenameRequest {
+    pub start_timestamp: Option<DateTimeWrapper>,
+    pub offset: Option<u64>,
+    pub limit: Option<u64>,
+}
+
+derive_rweb_schema!(PlexFilenameRequest, _PlexFilenameRequest);
+
+#[allow(dead_code)]
+#[derive(Schema)]
+struct _PlexFilenameRequest {
+    #[schema(description = "Start Timestamp")]
+    start_timestamp: Option<DateTimeType>,
+    #[schema(description = "Offset")]
+    offset: Option<u64>,
+    #[schema(description = "Limit")]
+    limit: Option<u64>,
 }
 
 #[cfg(test)]

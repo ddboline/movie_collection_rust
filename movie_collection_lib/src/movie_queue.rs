@@ -13,7 +13,7 @@ use crate::{
     config::Config,
     movie_collection::MovieCollection,
     pgpool::PgPool,
-    utils::{option_string_wrapper, parse_file_stem},
+    utils::{option_string_wrapper, parse_file_stem}, date_time_wrapper::DateTimeWrapper,
 };
 
 #[derive(Default, Serialize)]
@@ -349,5 +349,5 @@ pub struct MovieQueueRow {
     pub collection_idx: i32,
     pub path: StackString,
     pub show: StackString,
-    pub last_modified: Option<OffsetDateTime>,
+    pub last_modified: Option<DateTimeWrapper>,
 }

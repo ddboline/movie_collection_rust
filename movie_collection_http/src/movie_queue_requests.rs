@@ -1,6 +1,6 @@
 use anyhow::format_err;
 use rweb::Schema;
-use rweb_helper::DateTimeType;
+use rweb_helper::{DateTimeType, derive_rweb_schema};
 use serde::{Deserialize, Serialize};
 use stack_string::StackString;
 use stdout_channel::{MockStdout, StdoutChannel};
@@ -21,6 +21,7 @@ use movie_collection_lib::{
         WatchListShow, WatchedEpisode,
     },
     tv_show_source::TvShowSource,
+    date_time_wrapper::DateTimeWrapper,
 };
 
 use crate::{
@@ -267,10 +268,19 @@ impl FindNewEpisodeRequest {
     }
 }
 
-#[derive(Serialize, Deserialize, Debug, Schema)]
+#[derive(Serialize, Deserialize, Debug)]
 pub struct ImdbEpisodesSyncRequest {
+    pub start_timestamp: DateTimeWrapper,
+}
+
+derive_rweb_schema!(ImdbEpisodesSyncRequest, _ImdbEpisodesSyncRequest);
+
+#[derive(Schema)]
+#[allow(dead_code)]
+struct _ImdbEpisodesSyncRequest {
     #[schema(description = "Start Timestamp")]
     pub start_timestamp: DateTimeType,
+
 }
 
 impl ImdbEpisodesSyncRequest {
@@ -283,10 +293,12 @@ impl ImdbEpisodesSyncRequest {
     }
 }
 
-#[derive(Serialize, Deserialize, Schema)]
+#[derive(Serialize, Deserialize)]
 pub struct ImdbRatingsSyncRequest {
-    pub start_timestamp: DateTimeType,
+    pub start_timestamp: DateTimeWrapper,
 }
+
+derive_rweb_schema!(ImdbRatingsSyncRequest, _ImdbEpisodesSyncRequest);
 
 impl ImdbRatingsSyncRequest {
     /// # Errors
@@ -298,10 +310,12 @@ impl ImdbRatingsSyncRequest {
     }
 }
 
-#[derive(Serialize, Deserialize, Schema)]
+#[derive(Serialize, Deserialize)]
 pub struct MovieQueueSyncRequest {
-    pub start_timestamp: DateTimeType,
+    pub start_timestamp: DateTimeWrapper,
 }
+
+derive_rweb_schema!(MovieQueueSyncRequest, _ImdbEpisodesSyncRequest);
 
 impl MovieQueueSyncRequest {
     /// # Errors
@@ -321,10 +335,12 @@ impl MovieQueueSyncRequest {
     }
 }
 
-#[derive(Serialize, Deserialize, Schema)]
+#[derive(Serialize, Deserialize)]
 pub struct MovieCollectionSyncRequest {
-    pub start_timestamp: DateTimeType,
+    pub start_timestamp: DateTimeWrapper,
 }
+
+derive_rweb_schema!(MovieCollectionSyncRequest, _ImdbEpisodesSyncRequest);
 
 impl MovieCollectionSyncRequest {
     /// # Errors

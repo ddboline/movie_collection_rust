@@ -12,7 +12,7 @@ use std::{
 use time::{macros::datetime, OffsetDateTime};
 use time_tz::{timezones::db::UTC, OffsetDateTimeExt};
 
-use crate::{config::Config, pgpool::PgPool};
+use crate::{config::Config, pgpool::PgPool, date_time_wrapper::DateTimeWrapper};
 
 #[derive(FromSqlRow, Debug, Serialize, Deserialize)]
 pub struct PlexEvent {
@@ -24,9 +24,9 @@ pub struct PlexEvent {
     pub title: StackString,
     pub parent_title: Option<StackString>,
     pub grandparent_title: Option<StackString>,
-    pub added_at: OffsetDateTime,
-    pub updated_at: Option<OffsetDateTime>,
-    pub last_modified: OffsetDateTime,
+    pub added_at: DateTimeWrapper,
+    pub updated_at: Option<DateTimeWrapper>,
+    pub last_modified: DateTimeWrapper,
     pub metadata_type: Option<StackString>,
     pub section_type: Option<StackString>,
     pub section_title: Option<StackString>,
@@ -51,9 +51,9 @@ impl TryFrom<WebhookPayload> for PlexEvent {
             title: item.metadata.title,
             parent_title: item.metadata.parent_title,
             grandparent_title: item.metadata.grandparent_title,
-            added_at: dt_from_tm(item.metadata.added_at),
-            updated_at: item.metadata.updated_at.map(dt_from_tm),
-            last_modified: OffsetDateTime::now_utc(),
+            added_at: dt_from_tm(item.metadata.added_at).into(),
+            updated_at: item.metadata.updated_at.map(dt_from_tm).map(Into::into),
+            last_modified: DateTimeWrapper::now(),
             metadata_type: item.metadata.metadata_type,
             section_type: item.metadata.library_section_type,
             section_title: item.metadata.library_section_title,

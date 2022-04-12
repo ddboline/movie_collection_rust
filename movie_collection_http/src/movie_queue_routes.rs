@@ -7,7 +7,7 @@ use log::error;
 use maplit::hashmap;
 use rweb::{get, multipart::FormData, post, Json, Query, Rejection, Schema};
 use rweb_helper::{
-    html_response::HtmlResponse as HtmlBase, json_response::JsonResponse as JsonBase, DateTimeType,
+    html_response::HtmlResponse as HtmlBase, json_response::JsonResponse as JsonBase,
     RwebResponse,
 };
 use serde::{Deserialize, Serialize};
@@ -57,8 +57,9 @@ use crate::{
         MovieQueueUpdateRequest, ParseImdbRequest, WatchlistActionRequest,
     },
     ImdbEpisodesWrapper, ImdbRatingsWrapper, LastModifiedResponseWrapper,
-    MovieCollectionRowWrapper, MovieQueueRowWrapper, PlexEventTypeWrapper, PlexEventWrapper,
+    MovieCollectionRowWrapper, MovieQueueRowWrapper, PlexEventWrapper,
     PlexFilenameWrapper, TraktActionsWrapper,
+    PlexEventRequest, PlexFilenameRequest,
 };
 
 pub type WarpResult<T> = Result<T, Rejection>;
@@ -1691,18 +1692,6 @@ async fn watched_action_http_worker(
 #[response(description = "Plex Events")]
 struct PlexEventResponse(JsonBase<Vec<PlexEventWrapper>, Error>);
 
-#[derive(Serialize, Deserialize, Debug, Schema)]
-pub struct PlexEventRequest {
-    #[schema(description = "Start Timestamp")]
-    pub start_timestamp: Option<DateTimeType>,
-    #[schema(description = "Event Type")]
-    pub event_type: Option<PlexEventTypeWrapper>,
-    #[schema(description = "Offset")]
-    pub offset: Option<u64>,
-    #[schema(description = "Limit")]
-    pub limit: Option<u64>,
-}
-
 #[get("/list/plex_event")]
 pub async fn plex_events(
     query: Query<PlexEventRequest>,
@@ -1864,16 +1853,6 @@ pub async fn plex_list(
 #[derive(RwebResponse)]
 #[response(description = "Plex Filenames")]
 struct PlexFilenameResponse(JsonBase<Vec<PlexFilenameWrapper>, Error>);
-
-#[derive(Serialize, Deserialize, Debug, Schema)]
-pub struct PlexFilenameRequest {
-    #[schema(description = "Start Timestamp")]
-    pub start_timestamp: Option<DateTimeType>,
-    #[schema(description = "Offset")]
-    pub offset: Option<u64>,
-    #[schema(description = "Limit")]
-    pub limit: Option<u64>,
-}
 
 #[get("/list/plex_filename")]
 pub async fn plex_filename(

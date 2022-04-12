@@ -26,6 +26,7 @@ use crate::{
     pgpool::PgPool,
     tv_show_source::TvShowSource,
     utils::{option_string_wrapper, parse_file_stem, walk_directory},
+    date_time_wrapper::DateTimeWrapper,
 };
 
 #[derive(FromSqlRow)]
@@ -931,7 +932,7 @@ pub async fn find_new_episodes_http_worker(
 #[derive(Serialize, Deserialize)]
 pub struct LastModifiedResponse {
     pub table: StackString,
-    pub last_modified: OffsetDateTime,
+    pub last_modified: DateTimeWrapper,
 }
 
 impl LastModifiedResponse {
@@ -954,7 +955,7 @@ impl LastModifiedResponse {
                 let last_modified: OffsetDateTime = last_modified;
                 Ok(Some(LastModifiedResponse {
                     table: (*table).into(),
-                    last_modified,
+                    last_modified: last_modified.into(),
                 }))
             } else {
                 Ok(None)
