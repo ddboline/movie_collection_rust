@@ -280,7 +280,6 @@ derive_rweb_schema!(ImdbEpisodesSyncRequest, _ImdbEpisodesSyncRequest);
 struct _ImdbEpisodesSyncRequest {
     #[schema(description = "Start Timestamp")]
     pub start_timestamp: DateTimeType,
-
 }
 
 impl ImdbEpisodesSyncRequest {
