@@ -1,9 +1,15 @@
 use bytes::BytesMut;
 use derive_more::{Deref, DerefMut, From, Into};
+use lazy_static::lazy_static;
 use postgres_types::{FromSql, IsNull, ToSql, Type};
 use serde::{Deserialize, Serialize};
 use std::fmt;
 use time::{macros::datetime, OffsetDateTime};
+use time_tz::{timezones::db::UTC, Tz};
+
+lazy_static! {
+    static ref LOCAL_TZ: &'static Tz = time_tz::system::get_timezone().unwrap_or(UTC);
+}
 
 #[derive(
     Serialize,
@@ -46,6 +52,11 @@ impl DateTimeWrapper {
     pub fn sentinel_datetime() -> Self {
         datetime!(0000-01-01 00:00:00).assume_utc().into()
     }
+
+    #[must_use]
+    pub fn local_tz() -> &'static Tz {
+        &LOCAL_TZ
+    }
 }
 
 impl fmt::Display for DateTimeWrapper {
@@ -70,7 +81,7 @@ pub mod iso8601 {
         datetime
             .to_offset(UtcOffset::UTC)
             .format(format_description!(
-                "[year]-[month]-[day]T[hour]:[minute]:[second]Z"
+                "[year]-[month]-[day]T[hour]:[minute]:[second].[subsecond]Z"
             ))
             .unwrap_or_else(|_| "".into())
             .into()

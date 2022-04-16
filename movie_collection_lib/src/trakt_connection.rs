@@ -13,7 +13,7 @@ use std::{
     path::PathBuf,
     sync::Arc,
 };
-use time_tz::{timezones::db::UTC, OffsetDateTimeExt};
+use time_tz::OffsetDateTimeExt;
 use tokio::{
     fs::{read, write},
     sync::{Mutex, RwLock},
@@ -486,7 +486,7 @@ impl TraktConnection {
     /// # Errors
     /// Return error if api call fails
     pub async fn get_calendar(&self) -> Result<TraktCalEntryList, Error> {
-        let local = time_tz::system::get_timezone().unwrap_or(UTC);
+        let local = DateTimeWrapper::local_tz();
         let headers = self.get_rw_headers().await?;
         let trakt_endpoint = &self.config.trakt_endpoint;
         let url = format_sstr!("{trakt_endpoint}/calendars/my/shows");

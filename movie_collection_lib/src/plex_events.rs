@@ -10,9 +10,9 @@ use std::{
     str::FromStr,
 };
 use time::{macros::datetime, OffsetDateTime};
-use time_tz::{timezones::db::UTC, OffsetDateTimeExt};
+use time_tz::OffsetDateTimeExt;
 
-use crate::{config::Config, pgpool::PgPool, date_time_wrapper::DateTimeWrapper};
+use crate::{config::Config, date_time_wrapper::DateTimeWrapper, pgpool::PgPool};
 
 #[derive(FromSqlRow, Debug, Serialize, Deserialize)]
 pub struct PlexEvent {
@@ -229,7 +229,7 @@ impl PlexEvent {
         let query: Query = query_dyn!(&query, ..bindings)?;
         let conn = pool.get().await?;
         let output: Vec<EventOutput> = query.fetch(&conn).await?;
-        let local = time_tz::system::get_timezone().unwrap_or(UTC);
+        let local = DateTimeWrapper::local_tz();
         let body = output
             .into_iter()
             .map(|event| {
@@ -526,8 +526,12 @@ mod tests {
         let event = PlexEvent::get_events(&pool, None, None, None, None)
             .await?
             .into_iter()
-            .find(|event| event.metadata_key.is_some())
+            .find(|event| {
+                event.metadata_key.is_some()
+                    && event.metadata_key != Some("/library/metadata/22897".into())
+            })
             .unwrap();
+        println!("{:?}", event.metadata_key);
         let filename = event.get_filename(&config).await?;
         assert!(filename.filename.starts_with("/shares/"));
         Ok(())

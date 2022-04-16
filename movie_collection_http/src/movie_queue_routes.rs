@@ -7,8 +7,7 @@ use log::error;
 use maplit::hashmap;
 use rweb::{get, multipart::FormData, post, Json, Query, Rejection, Schema};
 use rweb_helper::{
-    html_response::HtmlResponse as HtmlBase, json_response::JsonResponse as JsonBase,
-    RwebResponse,
+    html_response::HtmlResponse as HtmlBase, json_response::JsonResponse as JsonBase, RwebResponse,
 };
 use serde::{Deserialize, Serialize};
 use stack_string::{format_sstr, StackString};
@@ -57,9 +56,8 @@ use crate::{
         MovieQueueUpdateRequest, ParseImdbRequest, WatchlistActionRequest,
     },
     ImdbEpisodesWrapper, ImdbRatingsWrapper, LastModifiedResponseWrapper,
-    MovieCollectionRowWrapper, MovieQueueRowWrapper, PlexEventWrapper,
-    PlexFilenameWrapper, TraktActionsWrapper,
-    PlexEventRequest, PlexFilenameRequest,
+    MovieCollectionRowWrapper, MovieQueueRowWrapper, PlexEventRequest, PlexEventWrapper,
+    PlexFilenameRequest, PlexFilenameWrapper, TraktActionsWrapper,
 };
 
 pub type WarpResult<T> = Result<T, Rejection>;

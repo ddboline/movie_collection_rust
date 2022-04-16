@@ -16,17 +16,17 @@ use std::{
 };
 use stdout_channel::{rate_limiter::RateLimiter, StdoutChannel};
 use time::{Date, Duration, OffsetDateTime};
-use time_tz::{timezones::db::UTC, OffsetDateTimeExt};
+use time_tz::OffsetDateTimeExt;
 
 use crate::{
     config::Config,
+    date_time_wrapper::DateTimeWrapper,
     imdb_episodes::{ImdbEpisodes, ImdbSeason},
     imdb_ratings::ImdbRatings,
     movie_queue::MovieQueueDB,
     pgpool::PgPool,
     tv_show_source::TvShowSource,
     utils::{option_string_wrapper, parse_file_stem, walk_directory},
-    date_time_wrapper::DateTimeWrapper,
 };
 
 #[derive(FromSqlRow)]
@@ -728,7 +728,7 @@ impl MovieCollection {
         source: Option<TvShowSource>,
         shows: &[impl AsRef<str>],
     ) -> Result<Vec<NewEpisodesResult>, Error> {
-        let local = time_tz::system::get_timezone().unwrap_or(UTC);
+        let local = DateTimeWrapper::local_tz();
         let mindate = (OffsetDateTime::now_utc() + Duration::days(-14))
             .to_timezone(local)
             .date();
@@ -842,7 +842,7 @@ pub async fn find_new_episodes_http_worker(
     let shows_filter: Option<HashSet<StackString>> =
         shows.map(|s| s.as_ref().split(',').map(Into::into).collect());
 
-    let local = time_tz::system::get_timezone().unwrap_or(UTC);
+    let local = DateTimeWrapper::local_tz();
     let mindate = (OffsetDateTime::now_utc() + Duration::days(-14))
         .to_timezone(local)
         .date();
