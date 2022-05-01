@@ -1,6 +1,6 @@
 use anyhow::Error;
 use futures::future::try_join_all;
-use log::debug;
+use log::{debug, error};
 use reqwest::{Client, Url};
 use select::{
     document::Document,
@@ -245,14 +245,16 @@ impl ImdbConnection {
                             let s = s.trim();
                             if let Ok(date) = Date::parse(
                                 s,
-                                format_description!("[day] [month repr:short]. [year]"),
+                                format_description!("[day padding:none] [month repr:short]. [year]"),
                             ) {
                                 result.airdate = Some(date);
                             } else if let Ok(date) = Date::parse(
                                 s,
-                                format_description!("[day] [month repr:short]. [year]"),
+                                format_description!("[day padding:none] [month repr:short] [year]"),
                             ) {
                                 result.airdate = Some(date);
+                            } else {
+                                error!("3: {s}");
                             }
                         }
                     }
