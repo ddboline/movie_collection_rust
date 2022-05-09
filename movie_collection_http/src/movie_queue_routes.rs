@@ -1764,7 +1764,6 @@ pub async fn plex_webhook(
     #[data] state: AppState,
     webhook_key: UuidWrapper,
 ) -> WarpResult<PlexWebhookResponse> {
-    let webhook_key = webhook_key.into();
     if state.config.plex_webhook_key == webhook_key {
         process_payload(form, &state.db, &state.config)
             .await
