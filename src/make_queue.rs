@@ -47,7 +47,7 @@ async fn make_queue() -> Result<(), Error> {
         &stdout,
     )
     .await?;
-    stdout.close().await
+    stdout.close().await.map_err(Into::into)
 }
 
 #[tokio::main]

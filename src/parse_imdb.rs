@@ -28,7 +28,7 @@ async fn parse_imdb_parser() -> Result<(), Error> {
 
     mc.stdout.send(output.join("\n"));
 
-    mc.stdout.close().await
+    mc.stdout.close().await.map_err(Into::into)
 }
 
 #[tokio::main]

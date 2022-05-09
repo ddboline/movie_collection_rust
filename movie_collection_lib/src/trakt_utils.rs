@@ -916,5 +916,5 @@ pub async fn trakt_app_parse(
         },
         TraktCommands::None => {}
     }
-    mc.stdout.close().await
+    mc.stdout.close().await.map_err(Into::into)
 }

@@ -19,5 +19,5 @@ async fn main() -> Result<(), Error> {
             }
         }
     }
-    stdout.close().await
+    stdout.close().await.map_err(Into::into)
 }

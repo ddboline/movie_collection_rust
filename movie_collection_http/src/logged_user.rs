@@ -5,6 +5,7 @@ pub use authorized_users::{
 use log::debug;
 use reqwest::{header::HeaderValue, Client};
 use rweb::{filters::cookie::cookie, Filter, Rejection, Schema};
+use rweb_helper::UuidWrapper;
 use serde::{Deserialize, Serialize};
 use stack_string::{format_sstr, StackString};
 use std::{
@@ -29,7 +30,7 @@ pub struct LoggedUser {
     #[schema(description = "Email Address")]
     pub email: StackString,
     #[schema(description = "Session UUID")]
-    pub session: Uuid,
+    pub session: UuidWrapper,
     #[schema(description = "Secret Key")]
     pub secret_key: StackString,
 }
@@ -38,6 +39,7 @@ impl LoggedUser {
     /// # Errors
     /// Return error if `session_id` does not match `self.session`
     pub fn verify_session_id(&self, session_id: Uuid) -> Result<(), Error> {
+        let session_id = session_id.into();
         if self.session == session_id {
             Ok(())
         } else {
@@ -65,7 +67,8 @@ impl LoggedUser {
     ) -> Result<Option<StackString>, anyhow::Error> {
         let domain = &config.domain;
         let url = format_sstr!("https://{domain}/api/session/movie-queue");
-        let session_str = StackString::from_display(self.session);
+        let session: Uuid = self.session.into();
+        let session_str = StackString::from_display(session);
         let value = HeaderValue::from_str(&session_str)?;
         let key = HeaderValue::from_str(&self.secret_key)?;
         let session: Option<SessionData> = client
@@ -90,7 +93,8 @@ impl LoggedUser {
     ) -> Result<(), anyhow::Error> {
         let domain = &config.domain;
         let url = format_sstr!("https://{domain}/api/session/movie-queue");
-        let session_str = StackString::from_display(self.session);
+        let session: Uuid = self.session.into();
+        let session_str = StackString::from_display(session);
         let value = HeaderValue::from_str(&session_str)?;
         let key = HeaderValue::from_str(&self.secret_key)?;
         let session = SessionData {
@@ -126,7 +130,7 @@ impl From<AuthorizedUser> for LoggedUser {
     fn from(user: AuthorizedUser) -> Self {
         Self {
             email: user.email,
-            session: user.session,
+            session: user.session.into(),
             secret_key: user.secret_key,
         }
     }

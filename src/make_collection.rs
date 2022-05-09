@@ -54,7 +54,7 @@ async fn make_collection() -> Result<(), Error> {
             }
         }
     }
-    stdout.close().await
+    stdout.close().await.map_err(Into::into)
 }
 
 #[tokio::main]

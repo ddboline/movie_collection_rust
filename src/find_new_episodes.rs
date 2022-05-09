@@ -37,7 +37,7 @@ async fn find_new_episodes() -> Result<(), Error> {
     for epi in output {
         stdout.send(StackString::from_display(epi));
     }
-    stdout.close().await
+    stdout.close().await.map_err(Into::into)
 }
 
 #[tokio::main]

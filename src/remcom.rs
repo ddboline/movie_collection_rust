@@ -31,7 +31,7 @@ async fn remcom(
         publish_single(remcom_service, &payload).await?;
         stdout.send(format!("script {payload:?}"));
     }
-    stdout.close().await
+    stdout.close().await.map_err(Into::into)
 }
 
 async fn publish_single(

@@ -8,6 +8,7 @@ use maplit::hashmap;
 use rweb::{get, multipart::FormData, post, Json, Query, Rejection, Schema};
 use rweb_helper::{
     html_response::HtmlResponse as HtmlBase, json_response::JsonResponse as JsonBase, RwebResponse,
+    UuidWrapper,
 };
 use serde::{Deserialize, Serialize};
 use stack_string::{format_sstr, StackString};
@@ -22,7 +23,6 @@ use std::{
 use stdout_channel::{MockStdout, StdoutChannel};
 use tokio::fs::remove_file;
 use tokio_stream::StreamExt;
-use uuid::Uuid;
 
 use movie_collection_lib::{
     config::Config,
@@ -1762,8 +1762,9 @@ struct PlexWebhookResponse(HtmlBase<&'static str, Error>);
 pub async fn plex_webhook(
     #[filter = "rweb::multipart::form"] form: FormData,
     #[data] state: AppState,
-    webhook_key: Uuid,
+    webhook_key: UuidWrapper,
 ) -> WarpResult<PlexWebhookResponse> {
+    let webhook_key = webhook_key.into();
     if state.config.plex_webhook_key == webhook_key {
         process_payload(form, &state.db, &state.config)
             .await

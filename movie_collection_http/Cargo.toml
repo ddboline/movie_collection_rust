@@ -1,13 +1,13 @@
 [package]
 name = "movie_collection_http"
-version = "0.9.3"
+version = "0.9.4"
 authors = ["Daniel Boline <ddboline@gmail.com>"]
 edition = "2018"
 
 [dependencies]
 movie_collection_lib = {path = "../movie_collection_lib"}
 futures = "0.3"
-rweb = {version="0.15", features=["openapi", "uuid"], default-features=false}
+rweb = {version="0.15", features=["openapi"], default-features=false}
 http = "0.2"
 serde = "1.0"
 serde_derive = "1.0"
@@ -27,7 +27,7 @@ handlebars = "4.0"
 itertools = "0.10"
 indexmap = "1.6"
 serde_yaml = "0.8"
-uuid = "0.8"
+uuid = "1.0"
 derive_more = "0.99"
 bytes = "1.0"
 postgres-types = "0.2"
@@ -36,6 +36,6 @@ stdout-channel = "0.5"
 async-graphql = {version="3.0", features=["dataloader", "time"]}
 async-graphql-warp = "3.0"
 reqwest = {version="0.11", features=["cookies", "json", "rustls-tls"], default_features=false}
-rweb-helper = { git = "https://github.com/ddboline/rweb_helper.git", tag="0.4.9" }
-authorized_users = { git = "https://github.com/ddboline/auth_server_rust.git", tag="0.8.1"}
+rweb-helper = { git = "https://github.com/ddboline/rweb_helper.git", tag="0.4.12" }
+authorized_users = { git = "https://github.com/ddboline/auth_server_rust.git", tag="0.8.3"}
 stack-string = { version="0.7", features=["postgres_types", "rweb-openapi", "async_graphql"] }
