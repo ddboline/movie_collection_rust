@@ -7,8 +7,8 @@ use log::error;
 use maplit::hashmap;
 use rweb::{get, multipart::FormData, post, Json, Query, Rejection, Schema};
 use rweb_helper::{
-    html_response::HtmlResponse as HtmlBase, json_response::JsonResponse as JsonBase, RwebResponse,
-    UuidWrapper,
+    derive_rweb_schema, html_response::HtmlResponse as HtmlBase,
+    json_response::JsonResponse as JsonBase, DateTimeType, RwebResponse, UuidWrapper,
 };
 use serde::{Deserialize, Serialize};
 use stack_string::{format_sstr, StackString};
@@ -26,11 +26,14 @@ use tokio_stream::StreamExt;
 
 use movie_collection_lib::{
     config::Config,
+    date_time_wrapper::DateTimeWrapper,
     imdb_episodes::{ImdbEpisodes, ImdbSeason},
     imdb_ratings::ImdbRatings,
     make_list::FileLists,
     make_queue::movie_queue_http,
-    movie_collection::{MovieCollection, TvShowsResult},
+    movie_collection::{
+        find_new_episodes_http_worker, LastModifiedResponse, MovieCollection, TvShowsResult,
+    },
     movie_queue::{MovieQueueDB, MovieQueueResult},
     pgpool::PgPool,
     plex_events::{PlexEvent, PlexFilename},
@@ -49,15 +52,14 @@ use crate::{
     logged_user::LoggedUser,
     movie_queue_app::AppState,
     movie_queue_requests::{
-        FindNewEpisodeRequest, ImdbEpisodesSyncRequest, ImdbEpisodesUpdateRequest,
-        ImdbRatingsSetSourceRequest, ImdbRatingsSyncRequest, ImdbRatingsUpdateRequest,
-        ImdbSeasonsRequest, ImdbShowRequest, LastModifiedRequest, MovieCollectionSyncRequest,
-        MovieCollectionUpdateRequest, MoviePathRequest, MovieQueueRequest, MovieQueueSyncRequest,
+        ImdbEpisodesUpdateRequest, ImdbRatingsSetSourceRequest, ImdbRatingsUpdateRequest,
+        ImdbSeasonsRequest, ImdbShowRequest, MovieCollectionSyncRequest,
+        MovieCollectionUpdateRequest, MovieQueueRequest, MovieQueueSyncRequest,
         MovieQueueUpdateRequest, ParseImdbRequest, WatchlistActionRequest,
     },
     ImdbEpisodesWrapper, ImdbRatingsWrapper, LastModifiedResponseWrapper,
     MovieCollectionRowWrapper, MovieQueueRowWrapper, PlexEventRequest, PlexEventWrapper,
-    PlexFilenameRequest, PlexFilenameWrapper, TraktActionsWrapper,
+    PlexFilenameRequest, PlexFilenameWrapper, TraktActionsWrapper, TvShowSourceWrapper,
 };
 
 pub type WarpResult<T> = Result<T, Rejection>;
@@ -107,7 +109,7 @@ pub async fn movie_queue(
     let req = MovieQueueRequest {
         patterns: Vec::new(),
     };
-    let (queue, _) = req.handle(&state.db, &state.config).await?;
+    let (queue, _) = req.process(&state.db, &state.config).await?;
     let body = queue_body_resp(&state.config, &[], &queue, &state.db).await?;
     task.await.ok();
     Ok(HtmlBase::new(body).into())
@@ -129,7 +131,7 @@ pub async fn movie_queue_show(
     let patterns = vec![path];
 
     let req = MovieQueueRequest { patterns };
-    let (queue, patterns) = req.handle(&state.db, &state.config).await?;
+    let (queue, patterns) = req.process(&state.db, &state.config).await?;
     let body = queue_body_resp(&state.config, &patterns, &queue, &state.db).await?;
     task.await.ok();
     Ok(HtmlBase::new(body).into())
@@ -213,7 +215,7 @@ pub async fn movie_queue_transcode(
     let patterns = vec![path];
 
     let req = MovieQueueRequest { patterns };
-    let (entries, _) = req.handle(&state.db, &state.config).await?;
+    let (entries, _) = req.process(&state.db, &state.config).await?;
     let body = transcode_worker(&state.config, None, &entries, &state.db).await?;
     task.await.ok();
     Ok(HtmlBase::new(body).into())
@@ -236,7 +238,7 @@ pub async fn movie_queue_transcode_directory(
     let patterns = vec![file];
 
     let req = MovieQueueRequest { patterns };
-    let (entries, _) = req.handle(&state.db, &state.config).await?;
+    let (entries, _) = req.process(&state.db, &state.config).await?;
     let body = transcode_worker(
         &state.config,
         Some(path::Path::new(directory.as_str())),
@@ -314,8 +316,15 @@ pub async fn movie_queue_play(
             &format_sstr!("/list/play/{idx}"),
         )
         .await;
-    let req = MoviePathRequest { idx };
-    let movie_path = req.handle(&state.db, &state.config).await?;
+
+    let mock_stdout = MockStdout::new();
+    let stdout = StdoutChannel::with_mock_stdout(mock_stdout.clone(), mock_stdout);
+
+    let movie_path = MovieCollection::new(&state.config, &state.db, &stdout)
+        .get_collection_path(idx)
+        .await
+        .map_err(Into::<Error>::into)?;
+
     let movie_path = path::Path::new(movie_path.as_str());
     let body = play_worker(
         &state.config,
@@ -346,7 +355,7 @@ pub async fn imdb_show(
         .await;
     let query = query.into_inner();
     let req = ImdbShowRequest { show, query };
-    let body = req.handle(&state.db, &state.config).await?;
+    let body = req.process(&state.db, &state.config).await?;
     task.await.ok();
     Ok(HtmlBase::new(body).into())
 }
@@ -364,6 +373,14 @@ fn new_episode_worker(entries: &[StackString]) -> StackString {
     format_sstr!(r#"{previous}<table border="0">{entries}</table>"#)
 }
 
+#[derive(Serialize, Deserialize, Schema)]
+pub struct FindNewEpisodeRequest {
+    #[schema(description = "TV Show Source")]
+    pub source: Option<TvShowSourceWrapper>,
+    #[schema(description = "TV Show")]
+    pub shows: Option<StackString>,
+}
+
 #[derive(RwebResponse)]
 #[response(description = "List Calendar", content = "html")]
 struct ListCalendarResponse(HtmlBase<StackString, Error>);
@@ -374,13 +391,42 @@ pub async fn find_new_episodes(
     #[filter = "LoggedUser::filter"] user: LoggedUser,
     #[data] state: AppState,
 ) -> WarpResult<ListCalendarResponse> {
+    let query = query.into_inner();
+
     let task = user
         .store_url_task(state.trakt.get_client(), &state.config, "/list/cal")
         .await;
-    let entries = query.into_inner().handle(&state.db, &state.config).await?;
+
+    let mock_stdout = MockStdout::new();
+    let stdout = StdoutChannel::with_mock_stdout(mock_stdout.clone(), mock_stdout);
+
+    let entries = find_new_episodes_http_worker(
+        &state.config,
+        &state.db,
+        &stdout,
+        query.shows,
+        query.source.map(Into::into),
+    )
+    .await
+    .map_err(Into::<Error>::into)?;
+
     let body = new_episode_worker(&entries);
     task.await.ok();
     Ok(HtmlBase::new(body).into())
+}
+
+#[derive(Serialize, Deserialize, Debug)]
+pub struct ImdbEpisodesSyncRequest {
+    pub start_timestamp: DateTimeWrapper,
+}
+
+derive_rweb_schema!(ImdbEpisodesSyncRequest, _ImdbEpisodesSyncRequest);
+
+#[derive(Schema)]
+#[allow(dead_code)]
+struct _ImdbEpisodesSyncRequest {
+    #[schema(description = "Start Timestamp")]
+    pub start_timestamp: DateTimeType,
 }
 
 #[derive(RwebResponse)]
@@ -393,6 +439,8 @@ pub async fn imdb_episodes_route(
     #[filter = "LoggedUser::filter"] user: LoggedUser,
     #[data] state: AppState,
 ) -> WarpResult<ListImdbEpisodesResponse> {
+    let query = query.into_inner();
+
     let task = user
         .store_url_task(
             state.trakt.get_client(),
@@ -400,15 +448,16 @@ pub async fn imdb_episodes_route(
             "/list/imdb_episodes",
         )
         .await;
-    let x = query
-        .into_inner()
-        .handle(&state.db)
-        .await?
-        .into_iter()
-        .map(Into::into)
-        .collect();
+
+    let episodes =
+        ImdbEpisodes::get_episodes_after_timestamp(query.start_timestamp.into(), &state.db)
+            .await
+            .map_err(Into::<Error>::into)?
+            .into_iter()
+            .map(Into::into)
+            .collect();
     task.await.ok();
-    Ok(JsonBase::new(x).into())
+    Ok(JsonBase::new(episodes).into())
 }
 
 #[derive(RwebResponse)]
@@ -432,10 +481,17 @@ pub async fn imdb_episodes_update(
             "/list/imdb_episodes",
         )
         .await;
-    episodes.into_inner().handle(&state.db).await?;
+    episodes.into_inner().run_update(&state.db).await?;
     task.await.ok();
     Ok(HtmlBase::new("Success").into())
 }
+
+#[derive(Serialize, Deserialize)]
+pub struct ImdbRatingsSyncRequest {
+    pub start_timestamp: DateTimeWrapper,
+}
+
+derive_rweb_schema!(ImdbRatingsSyncRequest, _ImdbEpisodesSyncRequest);
 
 #[derive(RwebResponse)]
 #[response(description = "List Imdb Shows")]
@@ -447,6 +503,8 @@ pub async fn imdb_ratings_route(
     #[filter = "LoggedUser::filter"] user: LoggedUser,
     #[data] state: AppState,
 ) -> WarpResult<ListImdbShowsResponse> {
+    let query = query.into_inner();
+
     let task = user
         .store_url_task(
             state.trakt.get_client(),
@@ -454,15 +512,15 @@ pub async fn imdb_ratings_route(
             "/list/imdb_ratings",
         )
         .await;
-    let x = query
-        .into_inner()
-        .handle(&state.db)
-        .await?
+
+    let ratings = ImdbRatings::get_shows_after_timestamp(query.start_timestamp.into(), &state.db)
+        .await
+        .map_err(Into::<Error>::into)?
         .into_iter()
         .map(Into::into)
         .collect();
     task.await.ok();
-    Ok(JsonBase::new(x).into())
+    Ok(JsonBase::new(ratings).into())
 }
 
 #[derive(RwebResponse)]
@@ -486,7 +544,7 @@ pub async fn imdb_ratings_update(
             "/list/imdb_ratings",
         )
         .await;
-    shows.into_inner().handle(&state.db).await?;
+    shows.into_inner().run_update(&state.db).await?;
     task.await.ok();
     Ok(HtmlBase::new("Success").into())
 }
@@ -508,7 +566,7 @@ pub async fn imdb_ratings_set_source(
             "/list/imdb_ratings/set_source",
         )
         .await;
-    query.into_inner().handle(&state.db).await?;
+    query.into_inner().set_source(&state.db).await?;
     task.await.ok();
     Ok(HtmlBase::new("Success").into())
 }
@@ -528,7 +586,7 @@ pub async fn movie_queue_route(
         .await;
     let x = query
         .into_inner()
-        .handle(&state.db, &state.config)
+        .get_queue(&state.db, &state.config)
         .await?
         .into_iter()
         .map(Into::into)
@@ -554,7 +612,10 @@ pub async fn movie_queue_update(
     let task = user
         .store_url_task(state.trakt.get_client(), &state.config, "/list/movie_queue")
         .await;
-    queue.into_inner().handle(&state.db, &state.config).await?;
+    queue
+        .into_inner()
+        .run_update(&state.db, &state.config)
+        .await?;
     task.await.ok();
     Ok(HtmlBase::new("Success").into())
 }
@@ -574,7 +635,7 @@ pub async fn movie_collection_route(
         .await;
     let x = query
         .into_inner()
-        .handle(&state.db, &state.config)
+        .get_collection(&state.db, &state.config)
         .await?
         .into_iter()
         .map(Into::into)
@@ -606,7 +667,7 @@ pub async fn movie_collection_update(
         .await;
     collection
         .into_inner()
-        .handle(&state.db, &state.config)
+        .run_update(&state.db, &state.config)
         .await?;
     task.await.ok();
     Ok(HtmlBase::new("Success").into())
@@ -628,15 +689,14 @@ pub async fn last_modified_route(
             "/list/last_modified",
         )
         .await;
-    let req = LastModifiedRequest {};
-    let x = req
-        .handle(&state.db)
-        .await?
+    let last_modified = LastModifiedResponse::get_last_modified(&state.db)
+        .await
+        .map_err(Into::<Error>::into)?
         .into_iter()
         .map(Into::into)
         .collect();
     task.await.ok();
-    Ok(JsonBase::new(x).into())
+    Ok(JsonBase::new(last_modified).into())
 }
 
 #[derive(RwebResponse)]
@@ -1194,7 +1254,7 @@ pub async fn trakt_watchlist_action(
         action: action.into(),
         imdb_url,
     };
-    let imdb_url = req.handle(&state.db, &state.trakt).await?;
+    let imdb_url = req.process(&state.db, &state.trakt).await?;
     let body = watchlist_action_worker(&state.trakt, action.into(), &imdb_url).await?;
     task.await.ok();
     Ok(HtmlBase::new(body).into())
@@ -1256,7 +1316,7 @@ pub async fn trakt_watched_seasons(
     let (imdb_url, show, link) =
         show_opt.map_or_else(empty, |(imdb_url, t)| (imdb_url, t.show, t.link));
     let req = ImdbSeasonsRequest { show };
-    let entries = req.handle(&state.db, &state.config).await?;
+    let entries = req.process(&state.db, &state.config).await?;
     let body = trakt_watched_seasons_worker(&link, &imdb_url, &entries);
     task.await.ok();
     Ok(HtmlBase::new(body).into())
