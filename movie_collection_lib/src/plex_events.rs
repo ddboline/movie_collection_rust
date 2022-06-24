@@ -1,6 +1,6 @@
 use anyhow::{format_err, Error};
 use log::info;
-use postgres_query::{query, query_dyn, FromSqlRow, Parameter, Query};
+use postgres_query::{client::GenericClient, query, query_dyn, FromSqlRow, Parameter, Query};
 use roxmltree::Document;
 use serde::{Deserialize, Serialize};
 use stack_string::{format_sstr, StackString};
@@ -12,7 +12,11 @@ use std::{
 use time::{macros::datetime, OffsetDateTime};
 use time_tz::OffsetDateTimeExt;
 
-use crate::{config::Config, date_time_wrapper::DateTimeWrapper, pgpool::PgPool};
+use crate::{
+    config::Config,
+    date_time_wrapper::DateTimeWrapper,
+    pgpool::{PgPool, PgTransaction},
+};
 
 #[derive(FromSqlRow, Debug, Serialize, Deserialize)]
 pub struct PlexEvent {
@@ -486,28 +490,51 @@ impl PlexFilename {
         query.fetch(&conn).await.map_err(Into::into)
     }
 
-    /// # Errors
-    /// Return error if db query fails
-    pub async fn get_by_key(pool: &PgPool, key: &str) -> Result<Option<Self>, Error> {
+    async fn _get_by_key<C>(conn: &C, key: &str) -> Result<Option<Self>, Error>
+    where
+        C: GenericClient + Sync,
+    {
         let query = query!(
             "SELECT * FROM plex_filename WHERE metadata_key = $key",
             key = key,
         );
-        let conn = pool.get().await?;
         query.fetch_opt(&conn).await.map_err(Into::into)
     }
 
     /// # Errors
     /// Return error if db query fails
-    pub async fn insert(&self, pool: &PgPool) -> Result<(), Error> {
+    pub async fn get_by_key(pool: &PgPool, key: &str) -> Result<Option<Self>, Error> {
+        let conn = pool.get().await?;
+        Self::_get_by_key(&conn, key).await.map_err(Into::into)
+    }
+
+    async fn _insert<C>(&self, conn: &C) -> Result<(), Error>
+    where
+        C: GenericClient + Sync,
+    {
         let query = query!(
             "INSERT INTO plex_filename (metadata_key, filename)
             VALUES ($metadata_key, $filename)",
             metadata_key = self.metadata_key,
             filename = self.filename,
         );
-        let conn = pool.get().await?;
         query.execute(&conn).await?;
+        Ok(())
+    }
+
+    /// # Errors
+    /// Return error if db query fails
+    pub async fn insert(&self, pool: &PgPool) -> Result<(), Error> {
+        let mut conn = pool.get().await?;
+        let tran = conn.transaction().await?;
+        let conn: &PgTransaction = &tran;
+
+        if Self::_get_by_key(&conn, &self.metadata_key)
+            .await?
+            .is_none()
+        {
+            self._insert(&conn).await?;
+        }
         Ok(())
     }
 }
