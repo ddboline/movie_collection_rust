@@ -275,6 +275,7 @@ impl MovieQueueCli {
                 }
             }
         }
+        stdout.close().await?;
         Ok(())
     }
 }

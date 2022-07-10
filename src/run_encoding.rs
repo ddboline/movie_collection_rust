@@ -38,6 +38,7 @@ async fn main() -> Result<(), Error> {
 
     transcode_task.await??;
     remcom_task.await??;
+    stdout.close().await?;
 
     Ok(())
 }
