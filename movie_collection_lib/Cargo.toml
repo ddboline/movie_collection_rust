@@ -37,7 +37,7 @@ jwalk = "0.6"
 itertools = "0.10"
 handlebars = "4.0"
 smallvec = {version="1.6", features=["serde", "write"]}
-procfs = "0.12"
+procfs = "0.13"
 uuid = "1.0"
 roxmltree = "0.14"
 stack-string = { version="0.7", features=["postgres_types"] }

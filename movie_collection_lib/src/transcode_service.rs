@@ -839,6 +839,7 @@ fn get_procs() -> Result<Vec<ProcInfo>, Error> {
     let procs = process::all_processes()?
         .into_iter()
         .filter_map(|p| {
+            let p = p.ok()?;
             let exe = p.exe().ok()?;
             if accept_paths.iter().any(|x| &exe == x) {
                 let cmdline: Vec<_> = p
