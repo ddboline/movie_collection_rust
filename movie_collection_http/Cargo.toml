@@ -1,6 +1,6 @@
 [package]
 name = "movie_collection_http"
-version = "0.9.9"
+version = "0.9.10"
 authors = ["Daniel Boline <ddboline@gmail.com>"]
 edition = "2018"
 
@@ -26,7 +26,7 @@ maplit = "1.0"
 handlebars = "4.0"
 itertools = "0.10"
 indexmap = "1.6"
-serde_yaml = "0.8"
+serde_yaml = "0.9"
 uuid = "1.0"
 derive_more = "0.99"
 bytes = "1.0"
@@ -37,5 +37,5 @@ async-graphql = {version="4.0", features=["dataloader", "time"]}
 async-graphql-warp = "4.0"
 reqwest = {version="0.11", features=["cookies", "json", "rustls-tls"], default_features=false}
 rweb-helper = { git = "https://github.com/ddboline/rweb_helper.git", tag="0.4.13" }
-authorized_users = { git = "https://github.com/ddboline/auth_server_rust.git", tag="0.8.9"}
+authorized_users = { git = "https://github.com/ddboline/auth_server_rust.git", tag="0.9.1"}
 stack-string = { version="0.7", features=["postgres_types", "rweb-openapi", "async_graphql"] }

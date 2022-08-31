@@ -11,7 +11,10 @@ use reqwest::{Client, Response, Url};
 use serde::{Deserialize, Serialize};
 use smallvec::SmallVec;
 use stack_string::{format_sstr, StackString};
-use std::path::{Path, PathBuf};
+use std::{
+    collections::HashSet,
+    path::{Path, PathBuf},
+};
 use tokio::{
     process::Command,
     time::{sleep, Duration},
@@ -170,7 +173,7 @@ pub trait ExponentialRetry {
 
 /// # Errors
 /// Return error if db query fails
-pub async fn get_authorized_users(pool: &PgPool) -> Result<Vec<StackString>, Error> {
+pub async fn get_authorized_users(pool: &PgPool) -> Result<HashSet<StackString>, Error> {
     let query = "SELECT email FROM authorized_users";
     pool.get()
         .await?

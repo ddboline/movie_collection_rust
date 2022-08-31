@@ -1,6 +1,6 @@
 [package]
 name = "movie_collection_lib"
-version = "0.9.9"
+version = "0.9.10"
 authors = ["Daniel Boline <ddboline@gmail.com>"]
 edition = "2018"
 
@@ -37,9 +37,9 @@ jwalk = "0.6"
 itertools = "0.10"
 handlebars = "4.0"
 smallvec = {version="1.6", features=["serde", "write"]}
-procfs = "0.13"
+procfs = "0.14"
 uuid = "1.0"
-roxmltree = "0.14"
+roxmltree = "0.15"
 stack-string = { version="0.7", features=["postgres_types"] }
 stdout-channel = "0.5"
 postgres_query = {git = "https://github.com/ddboline/rust-postgres-query", tag = "0.3.4", features=["deadpool"]}

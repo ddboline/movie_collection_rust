@@ -42,7 +42,7 @@ enum MovieQueueCli {
     Import {
         #[structopt(short, long)]
         /// table -- possible values:
-        /// ['imdb_ratings', 'imdb_episodes', 'movie_collection', 'movie_queue']
+        /// [`imdb_ratings`, `imdb_episodes`, `movie_collection`, `movie_queue`]
         table: StackString,
         #[structopt(short, long)]
         filepath: Option<PathBuf>,
@@ -50,8 +50,8 @@ enum MovieQueueCli {
     Export {
         #[structopt(short, long)]
         /// table -- possible values:
-        /// ['last_modified', 'imdb_ratings', 'imdb_episodes',
-        /// 'movie_collection', 'movie_queue']
+        /// [`last_modified`, `imdb_ratings`, `imdb_episodes`,
+        /// `movie_collection`, `movie_queue`]
         table: StackString,
         #[structopt(short, long)]
         filepath: Option<PathBuf>,

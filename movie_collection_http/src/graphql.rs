@@ -362,10 +362,10 @@ impl Loader<EpisodesShowSeasonKey> for ItemLoader {
 pub struct QueryRoot;
 
 #[Object]
-impl<'a> QueryRoot {
+impl QueryRoot {
     async fn imdb_show(
         &self,
-        ctx: &Context<'a>,
+        ctx: &Context<'_>,
         show: StackString,
     ) -> Result<Option<ImdbItem>, Error> {
         let key: RatingsShowKey = show.as_str().into();
@@ -376,7 +376,7 @@ impl<'a> QueryRoot {
 
     async fn episodes(
         &self,
-        ctx: &Context<'a>,
+        ctx: &Context<'_>,
         show: StackString,
         season: Option<i32>,
     ) -> Result<Vec<EpisodeItem>, Error> {

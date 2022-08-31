@@ -30,7 +30,7 @@ use crate::{
     movie_collection::MovieCollection, pgpool::PgPool, utils::parse_file_stem,
 };
 
-#[derive(Serialize, Deserialize, Debug, PartialEq, Clone, Copy)]
+#[derive(Serialize, Deserialize, Debug, PartialEq, Clone, Copy, Eq)]
 pub enum JobType {
     Transcode,
     Move,
@@ -51,7 +51,7 @@ impl fmt::Display for JobType {
     }
 }
 
-#[derive(Serialize, Deserialize, Debug, PartialEq, Clone)]
+#[derive(Serialize, Deserialize, Debug, PartialEq, Clone, Eq)]
 pub struct TranscodeServiceRequest {
     pub job_type: JobType,
     pub prefix: StackString,
