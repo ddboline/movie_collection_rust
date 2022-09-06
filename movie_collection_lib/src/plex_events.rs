@@ -535,6 +535,7 @@ impl PlexFilename {
         {
             self._insert(&conn).await?;
         }
+        tran.commit().await?;
         Ok(())
     }
 }

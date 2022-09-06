@@ -1,6 +1,7 @@
 use anyhow::Error;
 use derive_more::{From, Into};
 use futures::future::try_join_all;
+use log::error;
 use refinery::embed_migrations;
 use stack_string::StackString;
 use std::{path::PathBuf, str::FromStr};
@@ -269,8 +270,14 @@ impl MovieQueueCli {
                         .await?
                         .is_none()
                     {
-                        let filename = event.get_filename(&config).await?;
-                        filename.insert(&pool).await?;
+                        match event.get_filename(&config).await {
+                            Ok(filename) => {
+                                filename.insert(&pool).await?;
+                            }
+                            Err(e) => {
+                                error!("Got error {e}");
+                            }
+                        }
                     }
                 }
             }
