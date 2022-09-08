@@ -688,7 +688,9 @@ impl TranscodeStatus {
                                 Some(ProcStatus::Upcoming) => format_sstr!("{f}</td><td>upcoming"),
                                 Some(ProcStatus::Finished) => {
                                     let mut movie_dirs = movie_directories(config).unwrap_or_else(|_| Vec::new());
-                                    movie_dirs.insert(0, "".into());
+                                    if f_key.contains("_s") && f_key.contains("_ep") {
+                                        movie_dirs.insert(0, "".into());
+                                    }
                                     let movie_dirs = movie_dirs.into_iter().map(|d| format_sstr!(r#"<option value="{d}">{d}</option>"#)).join("\n");
                                     format_sstr!(
                                     r#"{f}</td>
