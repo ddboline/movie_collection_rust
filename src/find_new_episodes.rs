@@ -1,17 +1,17 @@
 use anyhow::Error;
 use stack_string::StackString;
 use stdout_channel::StdoutChannel;
-use structopt::StructOpt;
+use clap::Parser;
 
 use movie_collection_lib::{
     config::Config, movie_collection::MovieCollection, pgpool::PgPool, tv_show_source::TvShowSource,
 };
 
-#[derive(StructOpt)]
+#[derive(Parser)]
 /// Query and Parse Video Collection
 struct FindNewEpisodesOpt {
     /// Restrict Source (possible values: all, netflix, hulu, amazon)
-    #[structopt(long, short)]
+    #[clap(long, short)]
     source: Option<TvShowSource>,
 
     /// Only Show Some Shows

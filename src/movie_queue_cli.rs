@@ -6,7 +6,7 @@ use refinery::embed_migrations;
 use stack_string::StackString;
 use std::{path::PathBuf, str::FromStr};
 use stdout_channel::StdoutChannel;
-use structopt::StructOpt;
+use clap::Parser;
 use time::{format_description::well_known::Rfc3339, Duration, OffsetDateTime};
 use tokio::{
     fs::{read, File},
@@ -38,25 +38,25 @@ impl FromStr for DateTimeType {
     }
 }
 
-#[derive(StructOpt)]
+#[derive(Parser)]
 enum MovieQueueCli {
     Import {
-        #[structopt(short, long)]
+        #[clap(short, long)]
         /// table -- possible values:
         /// [`imdb_ratings`, `imdb_episodes`, `movie_collection`, `movie_queue`]
         table: StackString,
-        #[structopt(short, long)]
+        #[clap(short, long)]
         filepath: Option<PathBuf>,
     },
     Export {
-        #[structopt(short, long)]
+        #[clap(short, long)]
         /// table -- possible values:
         /// [`last_modified`, `imdb_ratings`, `imdb_episodes`,
         /// `movie_collection`, `movie_queue`]
         table: StackString,
-        #[structopt(short, long)]
+        #[clap(short, long)]
         filepath: Option<PathBuf>,
-        #[structopt(short, long)]
+        #[clap(short, long)]
         start_timestamp: Option<DateTimeType>,
     },
     Status,

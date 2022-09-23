@@ -1,30 +1,30 @@
 use anyhow::Error;
 use stack_string::StackString;
 use stdout_channel::StdoutChannel;
-use structopt::StructOpt;
+use clap::Parser;
 
 use movie_collection_lib::{
     config::Config,
     make_queue::{make_queue_worker, PathOrIndex},
 };
 
-#[derive(StructOpt)]
+#[derive(Parser)]
 /// Manage Video Queue
 struct MakeQueueOpts {
     /// Add files(s) to queue
-    #[structopt(long, short, parse(from_os_str))]
+    #[clap(long, short, parse(from_os_str))]
     add: Vec<PathOrIndex>,
 
     /// Remove entries by index OR filename
-    #[structopt(long, short, parse(from_os_str))]
+    #[clap(long, short, parse(from_os_str))]
     remove: Vec<PathOrIndex>,
 
     /// Compute Runtime of Files
-    #[structopt(long, short)]
+    #[clap(long, short)]
     time: bool,
 
     /// Display information about tv shows in queue
-    #[structopt(long, short)]
+    #[clap(long, short)]
     shows: bool,
 
     /// String patterns to filter on

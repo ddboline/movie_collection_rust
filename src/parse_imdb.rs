@@ -1,7 +1,7 @@
 use anyhow::Error;
 use stack_string::StackString;
 use stdout_channel::StdoutChannel;
-use structopt::StructOpt;
+use clap::Parser;
 
 use movie_collection_lib::{
     config::Config,

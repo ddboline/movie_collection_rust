@@ -2,7 +2,7 @@ use anyhow::Error;
 use stack_string::StackString;
 use std::path::{Path, PathBuf};
 use stdout_channel::StdoutChannel;
-use structopt::StructOpt;
+use clap::Parser;
 use tokio::fs;
 
 use movie_collection_lib::{
@@ -58,17 +58,17 @@ async fn remcom_single(
     Ok(())
 }
 
-#[derive(StructOpt)]
+#[derive(Parser)]
 /// Create script to copy files, push job to queue
 struct RemcomOpts {
-    #[structopt(short = "f", long)]
+    #[clap(short = 'f', long)]
     request_file: Option<PathBuf>,
 
     /// Directory
-    #[structopt(long, short)]
+    #[clap(long, short)]
     directory: Option<PathBuf>,
 
-    #[structopt(long, short)]
+    #[clap(long, short)]
     unwatched: bool,
 
     files: Vec<PathBuf>,

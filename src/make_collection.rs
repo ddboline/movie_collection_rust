@@ -3,23 +3,23 @@ use futures::future::try_join_all;
 use stack_string::StackString;
 use std::path::Path;
 use stdout_channel::StdoutChannel;
-use structopt::StructOpt;
+use clap::Parser;
 
 use movie_collection_lib::{
     config::Config, movie_collection::MovieCollection, pgpool::PgPool, utils::get_video_runtime,
 };
 
-#[derive(StructOpt)]
+#[derive(Parser)]
 /// Collection Query/Parser
 ///
 /// Query and Parse Video Collection
 struct MakeCollectionOpts {
     /// Parse collection for new videos
-    #[structopt(short, long)]
+    #[clap(short, long)]
     parse: bool,
 
     /// Compute Runtime
-    #[structopt(short, long)]
+    #[clap(short, long)]
     time: bool,
 
     /// Shows to display

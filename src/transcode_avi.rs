@@ -2,7 +2,7 @@ use anyhow::Error;
 use stack_string::StackString;
 use std::path::{Path, PathBuf};
 use stdout_channel::StdoutChannel;
-use structopt::StructOpt;
+use clap::Parser;
 use tokio::fs;
 
 use movie_collection_lib::{
@@ -65,9 +65,9 @@ async fn transcode_single(
     Ok(())
 }
 
-#[derive(StructOpt)]
+#[derive(Parser)]
 struct TranscodeAviOpts {
-    #[structopt(short = "f", long)]
+    #[clap(short = 'f', long)]
     request_file: Option<PathBuf>,
     files: Vec<PathBuf>,
 }

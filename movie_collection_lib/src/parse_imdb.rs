@@ -3,7 +3,7 @@ use itertools::Itertools;
 use stack_string::{format_sstr, StackString};
 use std::collections::HashMap;
 use stdout_channel::StdoutChannel;
-use structopt::StructOpt;
+use clap::Parser;
 use time::macros::date;
 
 use crate::{
@@ -12,31 +12,31 @@ use crate::{
     trakt_utils::WatchListMap,
 };
 
-#[derive(StructOpt, Default, Debug)]
+#[derive(Parser, Default, Debug)]
 /// Parse IMDB.com
 pub struct ParseImdbOptions {
     /// Entry is TV
-    #[structopt(long, short)]
+    #[clap(long, short)]
     pub tv: bool,
 
     /// Season Number
-    #[structopt(long, short)]
+    #[clap(long, short)]
     pub season: Option<i32>,
 
     /// List Seasons
-    #[structopt(long, short)]
+    #[clap(long, short)]
     pub all_seasons: bool,
 
     /// Pull from IMDB
-    #[structopt(long = "update", short = "u")]
+    #[clap(long = "update", short = 'u')]
     pub do_update: bool,
 
     /// Manually over-ride imdb link
-    #[structopt(long = "imdblink", short)]
+    #[clap(long = "imdblink", short)]
     pub imdb_link: Option<StackString>,
 
     /// Update database
-    #[structopt(long = "database", short = "d")]
+    #[clap(long = "database", short = 'd')]
     pub update_database: bool,
 
     /// Show
