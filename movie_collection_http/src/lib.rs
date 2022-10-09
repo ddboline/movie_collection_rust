@@ -201,6 +201,8 @@ struct _PlexFilenameWrapper {
     metadata_key: StackString,
     #[schema(description = "Filename")]
     filename: StackString,
+    #[schema(description = "Collection Id")]
+    collection_id: Option<i32>,
 }
 
 #[derive(Clone, Copy, Deserialize, Serialize, Into, From, Deref, FromStr, Display)]
