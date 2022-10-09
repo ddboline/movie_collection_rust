@@ -1,7 +1,7 @@
 use anyhow::Error;
+use clap::Parser;
 use stack_string::StackString;
 use stdout_channel::StdoutChannel;
-use clap::Parser;
 
 use movie_collection_lib::{
     config::Config, movie_collection::MovieCollection, pgpool::PgPool, tv_show_source::TvShowSource,

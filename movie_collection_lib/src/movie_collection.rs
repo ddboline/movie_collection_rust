@@ -364,6 +364,18 @@ impl MovieCollection {
 
     /// # Errors
     /// Returns error if db queries fail
+    pub async fn get_plex_metadata_key(&self, idx: i32) -> Result<Option<StackString>, Error> {
+        let query = query!(
+            r#"SELECT metadata_key FROM plex_filename WHERE collection_id = $idx"#,
+            idx = idx,
+        );
+        let conn = self.pool.get().await?;
+        let id = query.fetch_opt(&conn).await?;
+        Ok(id.map(|(x,)| x))
+    }
+
+    /// # Errors
+    /// Returns error if db queries fail
     pub async fn get_collection_path(&self, idx: i32) -> Result<StackString, Error> {
         let query = query!(
             "SELECT path FROM movie_collection WHERE idx = $idx",
@@ -420,6 +432,22 @@ impl MovieCollection {
             SET show_id=(SELECT c.index FROM imdb_ratings c WHERE b.show=c.show),
                 last_modified=now()
             WHERE idx in (SELECT a.idx FROM a)
+        "#;
+        let rows = self.pool.get().await?.execute(query, &[]).await?;
+        Ok(rows)
+    }
+
+    /// # Errors
+    /// Returns error if db queries fail
+    pub async fn fix_plex_filename_collection_id(&self) -> Result<u64, Error> {
+        let query = r#"
+            UPDATE plex_filename
+            SET collection_id = (
+                SELECT m.idx
+                FROM movie_collection m
+                WHERE m.path = replace(plex_filename.filename, '/shares/', '/media/')
+            )
+            WHERE collection_id IS NULL
         "#;
         let rows = self.pool.get().await?.execute(query, &[]).await?;
         Ok(rows)
@@ -877,19 +905,30 @@ pub async fn find_new_episodes_http_worker(
         let movie_queue = mq.print_movie_queue(&[&show]).await?;
         for s in movie_queue {
             if let Some(u) = mc.get_collection_index(&s.path).await? {
+                let metadata_key = mc.get_plex_metadata_key(u).await?;
+                let host = config.plex_host.clone();
+                let server = config.plex_server.clone();
                 queue.push((
                     (
                         s.show.clone().unwrap_or_else(|| "".into()),
                         s.season.unwrap_or(-1),
                         s.episode.unwrap_or(-1),
                     ),
-                    u,
+                    (u, metadata_key, host, server),
                 ));
             }
         }
     }
 
-    let queue: HashMap<(StackString, i32, i32), i32> = queue.into_iter().collect();
+    let queue: HashMap<
+        (StackString, i32, i32),
+        (
+            i32,
+            Option<StackString>,
+            Option<StackString>,
+            Option<StackString>,
+        ),
+    > = queue.into_iter().collect();
 
     let output = episodes
         .into_iter()
@@ -907,11 +946,19 @@ pub async fn find_new_episodes_http_worker(
                     r#"<a href="javascript:updateMainArticle('/trakt/watched/list/{link_str}/{season_str}')">{title}</a>"#
                 ),
                 b=match queue.get(&key) {
-                    Some(idx) => format_sstr!(
-                        r#"<a href="javascript:updateMainArticle('{}');">{}</a>"#,
-                        &format_sstr!(r#"/list/play/{idx}"#),
-                        epi.eptitle
-                    ),
+                    Some((_, Some(metadata_key), Some(host), Some(server))) => {
+                        format_sstr!(
+                            r#"<a href="http://{host}:32400/web/index.html#!/server/{server}/details?key={metadata_key}" target="_blank">{t}</a>"#,
+                            t=epi.eptitle
+                        )
+                    },
+                    Some((idx, _, _, _)) => {
+                        format_sstr!(
+                            r#"<a href="javascript:updateMainArticle('{}');">{}</a>"#,
+                            &format_sstr!(r#"/list/play/{idx}"#),
+                            epi.eptitle
+                        )
+                    },
                     None => epi.eptitle.clone(),
                 },
                 c=format_sstr!(

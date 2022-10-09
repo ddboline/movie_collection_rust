@@ -1,8 +1,8 @@
 use anyhow::Error;
+use clap::Parser;
 use stack_string::StackString;
 use std::path::{Path, PathBuf};
 use stdout_channel::StdoutChannel;
-use clap::Parser;
 use tokio::fs;
 
 use movie_collection_lib::{

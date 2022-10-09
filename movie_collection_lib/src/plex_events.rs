@@ -295,6 +295,7 @@ impl PlexEvent {
         Ok(PlexFilename {
             metadata_key: metadata_key.clone(),
             filename,
+            collection_id: None,
         })
     }
 
@@ -444,6 +445,7 @@ pub struct WebhookPayload {
 pub struct PlexFilename {
     pub metadata_key: StackString,
     pub filename: StackString,
+    pub collection_id: Option<i32>,
 }
 
 impl PlexFilename {

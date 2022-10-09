@@ -58,6 +58,7 @@ pub struct ConfigInner {
     pub default_time_zone: Option<TimeZone>,
     pub plex_token: Option<StackString>,
     pub plex_host: Option<StackString>,
+    pub plex_server: Option<StackString>,
 }
 
 fn default_suffixes() -> SmallVec<[StackString; 3]> {

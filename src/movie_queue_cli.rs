@@ -1,4 +1,5 @@
 use anyhow::Error;
+use clap::Parser;
 use derive_more::{From, Into};
 use futures::future::try_join_all;
 use log::error;
@@ -6,7 +7,6 @@ use refinery::embed_migrations;
 use stack_string::StackString;
 use std::{path::PathBuf, str::FromStr};
 use stdout_channel::StdoutChannel;
-use clap::Parser;
 use time::{format_description::well_known::Rfc3339, Duration, OffsetDateTime};
 use tokio::{
     fs::{read, File},

@@ -170,14 +170,24 @@ pub async fn movie_queue_http(
             .ok_or_else(|| format_err!("Invalid path"))?
             .to_string_lossy();
         let (_, season, episode) = parse_file_stem(&file_stem);
+        let host = config.plex_host.as_ref();
+        let server = config.plex_server.as_ref();
 
         let entry = if ext == "mp4" {
             let collection_idx = mc.get_collection_index(&row.path).await?.unwrap_or(-1);
-            format_sstr!(
-                r#"<a href="javascript:updateMainArticle('{play_url}');">{idx} {file_name}</a>"#,
-                idx=row.idx,
-                play_url=format_sstr!("/list/play/{collection_idx}"),
-            )
+            let metadata_key = mc.get_plex_metadata_key(collection_idx).await?;
+            if let (Some(metadata_key), Some(host), Some(server)) = (metadata_key, host, server) {
+                format_sstr!(
+                    r#"<a href="http://{host}:32400/web/index.html#!/server/{server}/details?key={metadata_key}" target="_blank">{idx} {file_name}</a>"#,
+                    idx=row.idx,
+                )
+            } else {
+                format_sstr!(
+                    r#"<a href="javascript:updateMainArticle('{play_url}');">{idx} {file_name}</a>"#,
+                    idx=row.idx,
+                    play_url=format_sstr!("/list/play/{collection_idx}"),
+                )
+            }
         } else {
             file_name.as_ref().into()
         };

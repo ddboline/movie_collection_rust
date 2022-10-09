@@ -1,9 +1,9 @@
 use anyhow::Error;
+use clap::Parser;
 use itertools::Itertools;
 use stack_string::{format_sstr, StackString};
 use std::collections::HashMap;
 use stdout_channel::StdoutChannel;
-use clap::Parser;
 use time::macros::date;
 
 use crate::{

@@ -1613,10 +1613,14 @@ async fn watch_list_http_worker(
     let entries: Vec<_> = mc.print_imdb_episodes(show_str, Some(season)).await?;
 
     let mut collection_idx_map = HashMap::new();
+    let mut collection_metadata_map = HashMap::new();
     for r in &entries {
         if let Some(row) = queue.get(&(show_str.clone(), season, r.episode)) {
             if let Some(index) = mc.get_collection_index(&row.path).await? {
                 collection_idx_map.insert(r.episode, index);
+                if let Some(metadata_key) = mc.get_plex_metadata_key(index).await? {
+                    collection_metadata_map.insert(index, metadata_key);
+                }
             }
         }
     }
@@ -1626,10 +1630,18 @@ async fn watch_list_http_worker(
         .map(|s| {
             let eptitle = &s.eptitle;
             let entry = if let Some(collection_idx) = collection_idx_map.get(&s.episode) {
-                format_sstr!(
-                    r#"<a href="javascript:updateMainArticle('{a}');">{eptitle}</a>"#,
-                    a=format_sstr!("/list/play/{collection_idx}"),
-                )
+                let host = config.plex_host.as_ref();
+                let server = config.plex_server.as_ref();
+                if let (Some(metadata_key), Some(host), Some(server)) = (collection_metadata_map.get(&collection_idx), host, server) {
+                    format_sstr!(
+                        r#"<a href="http://{host}:32400/web/index.html#!/server/{server}/details?key={metadata_key}" target="_blank">{eptitle}</a>"#,
+                    )
+                } else {
+                    format_sstr!(
+                        r#"<a href="javascript:updateMainArticle('{a}');">{eptitle}</a>"#,
+                        a=format_sstr!("/list/play/{collection_idx}"),
+                    )
+                }
             } else {
                 format_sstr!("{eptitle}")
             };
