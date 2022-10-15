@@ -850,6 +850,14 @@ pub async fn find_new_episodes_http_worker(
     shows: Option<impl AsRef<str>>,
     source: Option<TvShowSource>,
 ) -> Result<Vec<StackString>, Error> {
+    type QueueKey = (StackString, i32, i32);
+    type QueueValue = (
+        i32,
+        Option<StackString>,
+        Option<StackString>,
+        Option<StackString>,
+    );
+
     let mut source_str = StackString::new();
     if let Some(s) = source.as_ref() {
         write!(source_str, "?source={}", s)?;
@@ -920,15 +928,7 @@ pub async fn find_new_episodes_http_worker(
         }
     }
 
-    let queue: HashMap<
-        (StackString, i32, i32),
-        (
-            i32,
-            Option<StackString>,
-            Option<StackString>,
-            Option<StackString>,
-        ),
-    > = queue.into_iter().collect();
+    let queue: HashMap<QueueKey, QueueValue> = queue.into_iter().collect();
 
     let output = episodes
         .into_iter()

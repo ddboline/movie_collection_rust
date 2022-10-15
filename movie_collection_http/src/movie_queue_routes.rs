@@ -1632,7 +1632,7 @@ async fn watch_list_http_worker(
             let entry = if let Some(collection_idx) = collection_idx_map.get(&s.episode) {
                 let host = config.plex_host.as_ref();
                 let server = config.plex_server.as_ref();
-                if let (Some(metadata_key), Some(host), Some(server)) = (collection_metadata_map.get(&collection_idx), host, server) {
+                if let (Some(metadata_key), Some(host), Some(server)) = (collection_metadata_map.get(collection_idx), host, server) {
                     format_sstr!(
                         r#"<a href="http://{host}:32400/web/index.html#!/server/{server}/details?key={metadata_key}" target="_blank">{eptitle}</a>"#,
                     )
