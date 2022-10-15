@@ -11,6 +11,15 @@ use movie_collection_lib::{
     trakt_utils::{sync_trakt_with_db, trakt_app_parse, TraktActions, TraktCommands},
 };
 
+#[allow(clippy::unnecessary_wraps)]
+fn parse_traktcommands(s: &str) -> Result<TraktCommands, String> {
+    Ok(s.into())
+}
+#[allow(clippy::unnecessary_wraps)]
+fn parse_traktactions(s: &str) -> Result<TraktActions, String> {
+    Ok(s.into())
+}
+
 #[derive(Parser)]
 /// Query and Parse Trakt.tv
 struct TraktAppOpts {
@@ -23,11 +32,11 @@ struct TraktAppOpts {
     imdb_link: Option<StackString>,
 
     /// cal, watchlist, watched
-    #[clap(parse(from_str))]
+    #[clap(value_parser = parse_traktcommands)]
     trakt_command: Option<TraktCommands>,
 
     /// list, add, rm
-    #[clap(parse(from_str))]
+    #[clap(value_parser = parse_traktactions)]
     trakt_action: Option<TraktActions>,
 
     /// show
@@ -41,7 +50,7 @@ struct TraktAppOpts {
 }
 
 async fn trakt_app() -> Result<(), Error> {
-    let opts = TraktAppOpts::from_args();
+    let opts = TraktAppOpts::parse();
     let config = Config::with_config()?;
     let do_parse = opts.parse;
     let pool = PgPool::new(&config.pgurl);

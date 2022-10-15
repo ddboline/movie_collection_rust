@@ -26,7 +26,7 @@ use movie_collection_lib::{
 
 embed_migrations!("migrations");
 
-#[derive(Into, From, Debug, PartialEq, Eq, PartialOrd, Ord)]
+#[derive(Into, From, Debug, PartialEq, Eq, PartialOrd, Ord, Clone, Copy)]
 pub struct DateTimeType(OffsetDateTime);
 
 impl FromStr for DateTimeType {
@@ -72,7 +72,7 @@ impl MovieQueueCli {
         let pool = PgPool::new(&config.pgurl);
         let stdout = StdoutChannel::new();
 
-        match Self::from_args() {
+        match Self::parse() {
             Self::Import { table, filepath } => {
                 let data = if let Some(filepath) = filepath {
                     read(&filepath).await?

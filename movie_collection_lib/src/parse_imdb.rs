@@ -12,7 +12,7 @@ use crate::{
     trakt_utils::WatchListMap,
 };
 
-#[derive(Parser, Default, Debug)]
+#[derive(Parser, Default, Debug, Clone)]
 /// Parse IMDB.com
 pub struct ParseImdbOptions {
     /// Entry is TV

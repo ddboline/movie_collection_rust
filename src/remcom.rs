@@ -77,7 +77,7 @@ struct RemcomOpts {
 #[tokio::main]
 async fn main() -> Result<(), Error> {
     env_logger::init();
-    let opts = RemcomOpts::from_args();
+    let opts = RemcomOpts::parse();
     let stdout = StdoutChannel::new();
     let config = Config::with_config()?;
     let pool = PgPool::new(&config.pgurl);

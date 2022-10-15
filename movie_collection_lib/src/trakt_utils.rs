@@ -72,6 +72,7 @@ impl FromStr for TraktActions {
     }
 }
 
+#[derive(Copy, Clone)]
 pub enum TraktCommands {
     None,
     Calendar,

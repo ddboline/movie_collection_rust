@@ -79,7 +79,7 @@ async fn main() -> Result<(), Error> {
     let config = Config::with_config()?;
     let pool = PgPool::new(&config.pgurl);
 
-    let opts = TranscodeAviOpts::from_args();
+    let opts = TranscodeAviOpts::parse();
 
     let transcode_service = TranscodeService::new(&config, &config.transcode_queue, &pool, &stdout);
 

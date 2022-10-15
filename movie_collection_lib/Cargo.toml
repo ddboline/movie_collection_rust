@@ -28,7 +28,7 @@ tokio = {version="1.21", features=["full"]}
 tokio-stream = {version="0.1", features=["fs"]}
 async-trait = "0.1"
 derive_more = "0.99"
-clap = {version="3.0", features=["derive"]}
+clap = {version="4.0", features=["derive"]}
 lazy_static = "1.4"
 base64 = "0.13"
 maplit = "1.0"

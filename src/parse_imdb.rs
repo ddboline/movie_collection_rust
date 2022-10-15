@@ -11,7 +11,7 @@ use movie_collection_lib::{
 };
 
 async fn parse_imdb_parser() -> Result<(), Error> {
-    let opts = ParseImdbOptions::from_args();
+    let opts = ParseImdbOptions::parse();
     let config = Config::with_config()?;
     let pool = PgPool::new(&config.pgurl);
     let stdout = StdoutChannel::new();

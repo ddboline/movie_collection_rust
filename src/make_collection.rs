@@ -27,7 +27,7 @@ struct MakeCollectionOpts {
 }
 
 async fn make_collection() -> Result<(), Error> {
-    let opts = MakeCollectionOpts::from_args();
+    let opts = MakeCollectionOpts::parse();
     let config = Config::with_config()?;
     let do_parse = opts.parse;
     let do_time = opts.time;

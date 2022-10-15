@@ -18,7 +18,7 @@ use crate::{
     utils::{get_video_runtime, parse_file_stem},
 };
 
-#[derive(Debug, Display)]
+#[derive(Debug, Display, Clone)]
 pub enum PathOrIndex {
     #[display(fmt = "{:?}", _0)]
     Path(PathBuf),

@@ -1,6 +1,7 @@
 use anyhow::Error;
 use clap::Parser;
 use stack_string::StackString;
+use std::ffi::OsStr;
 use stdout_channel::StdoutChannel;
 
 use movie_collection_lib::{
@@ -8,15 +9,21 @@ use movie_collection_lib::{
     make_queue::{make_queue_worker, PathOrIndex},
 };
 
-#[derive(Parser)]
+#[allow(clippy::unnecessary_wraps)]
+fn parse_path_or_index(s: &str) -> Result<PathOrIndex, String> {
+    let p: &OsStr = s.as_ref();
+    Ok(p.into())
+}
+
+#[derive(Parser, Clone)]
 /// Manage Video Queue
 struct MakeQueueOpts {
     /// Add files(s) to queue
-    #[clap(long, short, parse(from_os_str))]
+    #[clap(long, short, value_parser = parse_path_or_index)]
     add: Vec<PathOrIndex>,
 
     /// Remove entries by index OR filename
-    #[clap(long, short, parse(from_os_str))]
+    #[clap(long, short, value_parser = parse_path_or_index)]
     remove: Vec<PathOrIndex>,
 
     /// Compute Runtime of Files
@@ -32,7 +39,7 @@ struct MakeQueueOpts {
 }
 
 async fn make_queue() -> Result<(), Error> {
-    let opts = MakeQueueOpts::from_args();
+    let opts = MakeQueueOpts::parse();
     let config = Config::with_config()?;
     let stdout = StdoutChannel::new();
     let patterns: Vec<_> = opts.patterns.iter().map(StackString::as_str).collect();
