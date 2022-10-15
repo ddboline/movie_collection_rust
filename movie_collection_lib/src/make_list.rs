@@ -73,6 +73,7 @@ impl FileLists {
             .iter()
             .map(|f| {
                 f.replace(".mkv", "")
+                    .replace(".m4v", "")
                     .replace(".avi", "")
                     .replace(".mp4", "")
             })
@@ -151,14 +152,10 @@ pub async fn make_list(stdout: &StdoutChannel<StackString>) -> Result<(), Error>
 
     for f in &file_lists.local_file_list {
         let mut f_key = f.as_str();
-        if let Some(s) = f_key.strip_suffix(".mkv") {
-            f_key = s;
-        }
-        if let Some(s) = f_key.strip_suffix(".avi") {
-            f_key = s;
-        }
-        if let Some(s) = f_key.strip_suffix(".mp4") {
-            f_key = s;
+        for k in [".mkv", ".m4v", ".avi", ".mp4"] {
+            if let Some(s) = f_key.strip_suffix(k) {
+                f_key = s;
+            }
         }
         let mut fout = StackString::new();
         if let Some(full_path) = file_map.get(f_key) {

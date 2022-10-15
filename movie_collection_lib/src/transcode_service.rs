@@ -619,14 +619,10 @@ impl TranscodeStatus {
             j.input_path.file_name().map(|f| {
                 let f = f.to_string_lossy().into_owned();
                 let mut f_key = f.as_str();
-                if let Some(s) = f_key.strip_suffix(".mkv") {
-                    f_key = s;
-                }
-                if let Some(s) = f_key.strip_suffix(".avi") {
-                    f_key = s;
-                }
-                if let Some(s) = f_key.strip_suffix(".mp4") {
-                    f_key = s;
+                for k in [".mkv", ".m4v", ".avi", ".mp4"] {
+                    if let Some(s) = f_key.strip_suffix(k) {
+                        f_key = s;
+                    }
                 }
                 (f_key.into(), Some(ProcStatus::Upcoming))
             })
@@ -676,7 +672,7 @@ impl TranscodeStatus {
                     .local_file_list
                     .iter()
                     .map(|f| {
-                        let f_key = f.replace(".mkv", "").replace(".avi", "").replace(".mp4", "");
+                        let f_key = f.replace(".mkv", "").replace(".m4v", "").replace(".avi", "").replace(".mp4", "");
                         debug!("proc_map.keys {:?} {:?} {}", proc_map.keys(), file_map.keys(), f_key);
                         if file_map.get(f_key.as_str()).is_some() {
                             format_sstr!(

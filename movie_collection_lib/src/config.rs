@@ -62,7 +62,7 @@ pub struct ConfigInner {
 }
 
 fn default_suffixes() -> SmallVec<[StackString; 3]> {
-    smallvec!["avi".into(), "mp4".into(), "mkv".into()]
+    smallvec!["avi".into(), "mp4".into(), "mkv".into(), "m4v".into()]
 }
 fn default_preferred_dir() -> PathBuf {
     "/tmp".into()

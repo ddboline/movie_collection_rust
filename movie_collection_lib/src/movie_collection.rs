@@ -581,11 +581,11 @@ impl MovieCollection {
                 if !file_list.contains(key.as_str()) {
                     if let Some(v) = movie_queue.get(key) {
                         self.stdout
-                            .send(format_sstr!("in queue but not disk {key} {v}"));
+                            .send(format_sstr!("in queue but not disk 1 {key} {v}"));
                         let mq = MovieQueueDB::new(&self.config, &self.pool, &self.stdout);
                         mq.remove_from_queue_by_path(key).await?;
                     } else {
-                        self.stdout.send(format_sstr!("not on disk {key} {val}"));
+                        self.stdout.send(format_sstr!("not on disk 1 {key} {val}"));
                     }
                     rate_limiter.acquire().await;
                     self.remove_from_collection(key).await?;
@@ -600,9 +600,9 @@ impl MovieCollection {
             if !file_list.contains(key.as_str()) {
                 if movie_queue.contains_key(key.as_str()) {
                     self.stdout
-                        .send(format_sstr!("in queue but not disk {key}"));
+                        .send(format_sstr!("in queue but not disk 2 {key}"));
                 } else {
-                    self.stdout.send(format_sstr!("not on disk {key} {val}"));
+                    self.stdout.send(format_sstr!("not on disk 2 {key} {val}"));
                 }
             }
         }
