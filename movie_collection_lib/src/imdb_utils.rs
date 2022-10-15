@@ -351,6 +351,7 @@ mod tests {
     }
 
     #[tokio::test]
+    #[ignore]
     async fn test_parse_imdb() -> Result<(), Error> {
         let conn = ImdbConnection::new();
         let results = conn.parse_imdb("the sopranos").await?;
