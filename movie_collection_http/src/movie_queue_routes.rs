@@ -36,7 +36,7 @@ use movie_collection_lib::{
     },
     movie_queue::{MovieQueueDB, MovieQueueResult},
     pgpool::PgPool,
-    plex_events::{PlexEvent, PlexFilename},
+    plex_events::{PlexEvent, PlexFilename, PlexMetadata},
     trakt_connection::TraktConnection,
     trakt_utils::{
         get_watched_shows_db, get_watchlist_shows_db_map, TraktActions, WatchListShow,
@@ -59,7 +59,8 @@ use crate::{
     },
     ImdbEpisodesWrapper, ImdbRatingsWrapper, LastModifiedResponseWrapper,
     MovieCollectionRowWrapper, MovieQueueRowWrapper, PlexEventRequest, PlexEventWrapper,
-    PlexFilenameRequest, PlexFilenameWrapper, TraktActionsWrapper, TvShowSourceWrapper,
+    PlexFilenameRequest, PlexFilenameWrapper, PlexMetadataWrapper, TraktActionsWrapper,
+    TvShowSourceWrapper,
 };
 
 pub type WarpResult<T> = Result<T, Rejection>;
@@ -1988,6 +1989,83 @@ pub async fn plex_filename_update(
         {
             let filename: PlexFilename = filename.into();
             filename
+                .insert(&state.db)
+                .await
+                .map_err(Into::<Error>::into)?;
+        }
+    }
+    task.await.ok();
+    Ok(HtmlBase::new("Success").into())
+}
+
+#[derive(RwebResponse)]
+#[response(description = "Plex Metadata")]
+struct PlexMetadataResponse(JsonBase<Vec<PlexMetadataWrapper>, Error>);
+
+#[get("/list/plex_metadata")]
+pub async fn plex_metadata(
+    query: Query<PlexFilenameRequest>,
+    #[data] state: AppState,
+    #[filter = "LoggedUser::filter"] user: LoggedUser,
+) -> WarpResult<PlexMetadataResponse> {
+    let task = user
+        .store_url_task(
+            state.trakt.get_client(),
+            &state.config,
+            "/list/plex_metadata",
+        )
+        .await;
+    let query = query.into_inner();
+    let entries = PlexMetadata::get_entries(
+        &state.db,
+        query.start_timestamp.map(Into::into),
+        query.offset,
+        query.limit,
+    )
+    .await
+    .map_err(Into::<Error>::into)?
+    .into_iter()
+    .map(Into::into)
+    .collect();
+    task.await.ok();
+    Ok(JsonBase::new(entries).into())
+}
+
+#[derive(Serialize, Deserialize, Debug, Schema)]
+pub struct PlexMetadataUpdateRequest {
+    entries: Vec<PlexMetadataWrapper>,
+}
+
+#[derive(RwebResponse)]
+#[response(
+    description = "Update Plex Metadata",
+    content = "html",
+    status = "CREATED"
+)]
+struct PlexMetadataUpdateResponse(HtmlBase<&'static str, Error>);
+
+#[post("/list/plex_metadata")]
+pub async fn plex_metadata_update(
+    payload: Json<PlexMetadataUpdateRequest>,
+    #[data] state: AppState,
+    #[filter = "LoggedUser::filter"] user: LoggedUser,
+) -> WarpResult<PlexMetadataUpdateResponse> {
+    let task = user
+        .store_url_task(
+            state.trakt.get_client(),
+            &state.config,
+            "/list/plex_metadata",
+        )
+        .await;
+    let payload = payload.into_inner();
+    for metadata in payload.entries {
+        if PlexMetadata::get_by_key(&state.db, &metadata.metadata_key)
+            .await
+            .map_err(Into::<Error>::into)?
+            .is_none()
+        {
+            let metadata: PlexMetadata = metadata.into();
+            metadata
                 .insert(&state.db)
                 .await
                 .map_err(Into::<Error>::into)?;

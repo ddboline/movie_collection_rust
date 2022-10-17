@@ -1,0 +1,5 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<MediaContainer size="1" allowSync="1" identifier="com.plexapp.plugins.library" librarySectionID="2" librarySectionTitle="TV Shows" librarySectionUUID="08d5f606-748c-4570-b70d-d9ecb576594a" mediaTagPrefix="/system/bundle/media/flags/" mediaTagVersion="1661862985">
+<Directory ratingKey="27233" key="/library/metadata/27233/children" parentRatingKey="19341" guid="com.plexapp.agents.none://19341/13?lang=xn" parentGuid="com.plexapp.agents.none://19341?lang=xn" type="season" title="Season 13" parentKey="/library/metadata/19341" librarySectionTitle="TV Shows" librarySectionID="2" librarySectionKey="/library/sections/2" parentTitle="Archer" summary="" index="13" parentIndex="1" viewCount="4" lastViewedAt="1665948897" leafCount="8" viewedLeafCount="4" addedAt="1661428233">
+</Directory>
+</MediaContainer>

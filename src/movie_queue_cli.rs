@@ -20,7 +20,7 @@ use movie_collection_lib::{
     movie_collection::{LastModifiedResponse, MovieCollection, MovieCollectionRow},
     movie_queue::{MovieQueueDB, MovieQueueRow},
     pgpool::PgPool,
-    plex_events::{PlexEvent, PlexFilename},
+    plex_events::{PlexEvent, PlexFilename, PlexMetadata},
     transcode_service::transcode_status,
 };
 
@@ -144,6 +144,23 @@ impl MovieQueueCli {
                         let results: Result<Vec<_>, Error> = try_join_all(futures).await;
                         stdout.send(format!("plex_filename {}\n", results?.len()));
                     }
+                    "plex_metadata" => {
+                        let metadatas: Vec<PlexMetadata> = serde_json::from_slice(&data)?;
+                        let futures = metadatas.into_iter().map(|metadata| {
+                            let pool = pool.clone();
+                            async move {
+                                if PlexMetadata::get_by_key(&pool, &metadata.metadata_key)
+                                    .await?
+                                    .is_none()
+                                {
+                                    metadata.insert(&pool).await?;
+                                }
+                                Ok(())
+                            }
+                        });
+                        let results: Result<Vec<_>, Error> = try_join_all(futures).await;
+                        stdout.send(format!("plex_metadata {}\n", results?.len()));
+                    }
                     "movie_collection" => {
                         let rows: Vec<MovieCollectionRow> = serde_json::from_slice(&data)?;
                         let mc = MovieCollection::new(&config, &pool, &stdout);
@@ -237,6 +254,12 @@ impl MovieQueueCli {
                             PlexFilename::get_filenames(&pool, Some(start_timestamp), None, None)
                                 .await?;
                         file.write_all(&serde_json::to_vec(&filenames)?).await?;
+                    }
+                    "plex_metadata" => {
+                        let metadatas =
+                            PlexMetadata::get_entries(&pool, Some(start_timestamp), None, None)
+                                .await?;
+                        file.write_all(&serde_json::to_vec(&metadatas)?).await?;
                     }
                     "movie_collection" => {
                         let mc = MovieCollection::new(&config, &pool, &stdout);

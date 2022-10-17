@@ -26,7 +26,7 @@ use movie_collection_lib::{
     imdb_ratings::ImdbRatings,
     movie_collection::{LastModifiedResponse, MovieCollectionRow},
     movie_queue::MovieQueueRow,
-    plex_events::{PlexEvent, PlexEventType, PlexFilename},
+    plex_events::{PlexEvent, PlexEventType, PlexFilename, PlexMetadata},
     trakt_utils::TraktActions,
     tv_show_source::TvShowSource,
 };
@@ -203,6 +203,28 @@ struct _PlexFilenameWrapper {
     filename: StackString,
     #[schema(description = "Collection Id")]
     collection_id: Option<i32>,
+}
+
+#[derive(Default, Debug, Serialize, Deserialize, Into, From, Deref)]
+pub struct PlexMetadataWrapper(PlexMetadata);
+
+derive_rweb_schema!(PlexMetadataWrapper, _PlexMetadataWrapper);
+
+#[allow(dead_code)]
+#[derive(Schema)]
+struct _PlexMetadataWrapper {
+    #[schema(description = "Metadata Key")]
+    pub metadata_key: StackString,
+    #[schema(description = "Object Type")]
+    pub object_type: StackString,
+    #[schema(description = "Title")]
+    pub title: StackString,
+    #[schema(description = "Parent Key")]
+    pub parent_key: Option<StackString>,
+    #[schema(description = "Grandparent Key")]
+    pub grandparent_key: Option<StackString>,
+    #[schema(description = "show")]
+    pub show: Option<StackString>,
 }
 
 #[derive(Clone, Copy, Deserialize, Serialize, Into, From, Deref, FromStr, Display)]

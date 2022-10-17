@@ -7,6 +7,7 @@ use stack_string::{format_sstr, StackString};
 use std::{
     convert::{TryFrom, TryInto},
     net::Ipv4Addr,
+    path::Path,
     str::FromStr,
 };
 use time::{macros::datetime, OffsetDateTime};
@@ -507,7 +508,7 @@ impl PlexFilename {
     /// Return error if db query fails
     pub async fn get_by_key(pool: &PgPool, key: &str) -> Result<Option<Self>, Error> {
         let conn = pool.get().await?;
-        Self::_get_by_key(&conn, key).await.map_err(Into::into)
+        Self::_get_by_key(&conn, key).await
     }
 
     async fn _insert<C>(&self, conn: &C) -> Result<(), Error>
@@ -540,6 +541,241 @@ impl PlexFilename {
         tran.commit().await?;
         Ok(())
     }
+
+    /// # Errors
+    /// Return error if db query fails
+    pub async fn delete(&self, pool: &PgPool) -> Result<(), Error> {
+        let query = query!(
+            "DELETE FROM plex_filename WHERE metadata_key=$key",
+            key = self.metadata_key
+        );
+        let conn = pool.get().await?;
+        query.execute(&conn).await?;
+        Ok(())
+    }
+}
+
+#[derive(Default, Debug, FromSqlRow, Serialize, Deserialize)]
+pub struct PlexMetadata {
+    pub metadata_key: StackString,
+    pub object_type: StackString,
+    pub title: StackString,
+    pub parent_key: Option<StackString>,
+    pub grandparent_key: Option<StackString>,
+    pub show: Option<StackString>,
+}
+
+impl PlexMetadata {
+    /// # Errors
+    /// Return error if db query fails
+    pub async fn get_entries(
+        pool: &PgPool,
+        start_timestamp: Option<OffsetDateTime>,
+        offset: Option<u64>,
+        limit: Option<u64>,
+    ) -> Result<Vec<Self>, Error> {
+        let mut constraints = Vec::new();
+        let mut bindings = Vec::new();
+        if let Some(start_timestamp) = &start_timestamp {
+            constraints.push("last_modified > $start_timestamp");
+            bindings.push(("start_timestamp", start_timestamp as Parameter));
+        }
+        let query = format_sstr!(
+            "
+                SELECT * FROM plex_metadata
+                {where_str}
+                ORDER BY last_modified DESC
+                {limit}
+                {offset}
+            ",
+            where_str = if constraints.is_empty() {
+                StackString::new()
+            } else {
+                format_sstr!("WHERE {}", constraints.join(" AND "))
+            },
+            limit = if let Some(limit) = limit {
+                format_sstr!("LIMIT {limit}")
+            } else {
+                StackString::new()
+            },
+            offset = if let Some(offset) = offset {
+                format_sstr!("OFFSET {offset}")
+            } else {
+                StackString::new()
+            }
+        );
+        let query: Query = query_dyn!(&query, ..bindings)?;
+        let conn = pool.get().await?;
+        query.fetch(&conn).await.map_err(Into::into)
+    }
+
+    /// # Errors
+    /// Return error if db query fails
+    pub async fn get_by_key(pool: &PgPool, key: &str) -> Result<Option<Self>, Error> {
+        let conn = pool.get().await?;
+        Self::_get_by_key(&conn, key).await
+    }
+
+    async fn _get_by_key<C>(conn: &C, key: &str) -> Result<Option<Self>, Error>
+    where
+        C: GenericClient + Sync,
+    {
+        let query = query!(
+            "SELECT * FROM plex_metadata WHERE metadata_key = $key",
+            key = key,
+        );
+        query.fetch_opt(&conn).await.map_err(Into::into)
+    }
+
+    async fn _insert<C>(&self, conn: &C) -> Result<u64, Error>
+    where
+        C: GenericClient + Sync,
+    {
+        let query = query!(
+            r#"
+                INSERT INTO plex_metadata (
+                    metadata_key, object_type, title, parent_key, grandparent_key
+                ) VALUES (
+                    $metadata_key, $object_type, $title, $parent_key, $grandparent_key
+                )
+            "#,
+            metadata_key = self.metadata_key,
+            object_type = self.object_type,
+            title = self.title,
+            parent_key = self.parent_key,
+            grandparent_key = self.grandparent_key,
+        );
+        query.execute(&conn).await.map_err(Into::into)
+    }
+
+    async fn _update<C>(&self, conn: &C) -> Result<u64, Error>
+    where
+        C: GenericClient + Sync,
+    {
+        let query = query!(
+            r#"
+                UPDATE plex_metadata
+                SET object_type=$object_type,
+                    title=$title,
+                    parent_key=$parent_key,
+                    grandparent_key=$grandparent_key,
+                    show=$show
+                    last_modified=now()
+                WHERE metadata_key=$metadata_key
+            "#,
+            metadata_key = self.metadata_key,
+            object_type = self.object_type,
+            title = self.title,
+            parent_key = self.parent_key,
+            grandparent_key = self.grandparent_key,
+            show = self.show,
+        );
+        query.execute(&conn).await.map_err(Into::into)
+    }
+
+    /// # Errors
+    /// Return error if db query fails
+    pub async fn insert(&self, pool: &PgPool) -> Result<u64, Error> {
+        let mut conn = pool.get().await?;
+        let tran = conn.transaction().await?;
+        let conn: &PgTransaction = &tran;
+
+        let bytes = match Self::_get_by_key(&conn, &self.metadata_key).await? {
+            Some(_) => self._update(&conn).await?,
+            None => self._insert(&conn).await?,
+        };
+        tran.commit().await?;
+        Ok(bytes)
+    }
+
+    /// # Errors
+    /// Return error if db query fails
+    pub async fn get_metadata_by_key(config: &Config, key: &str) -> Result<Self, Error> {
+        let plex_host = config
+            .plex_host
+            .as_ref()
+            .ok_or_else(|| format_err!("No Host"))?;
+        let plex_token = config
+            .plex_token
+            .as_ref()
+            .ok_or_else(|| format_err!("No Token"))?;
+        let url = format_sstr!("http://{plex_host}:32400{key}?X-Plex-Token={plex_token}");
+        let data = reqwest::get(url.as_str())
+            .await?
+            .error_for_status()?
+            .text()
+            .await?;
+        let metadata = Self::extract_metadata_from_xml(&data)?;
+        Ok(metadata)
+    }
+
+    /// # Errors
+    /// Return error if db query fails
+    pub async fn fill_plex_metadata(pool: &PgPool, config: &Config) -> Result<(), Error> {
+        for plex_filename in PlexFilename::get_filenames(pool, None, None, None).await? {
+            if Self::get_by_key(pool, &plex_filename.metadata_key)
+                .await?
+                .is_some()
+            {
+                continue;
+            }
+            let true_filename = plex_filename.filename.replace("/shares/", "/media/");
+            if !Path::new(&true_filename).exists() {
+                println!("file doesnt exist {true_filename}");
+                plex_filename.delete(pool).await?;
+                continue;
+            }
+            match Self::get_metadata_by_key(config, &plex_filename.metadata_key).await {
+                Ok(metadata) => {
+                    metadata.insert(pool).await?;
+                    println!("insert {metadata:?}");
+                }
+                Err(e) => {
+                    println!(
+                        "encounterd error {e} key {} filename {}",
+                        plex_filename.metadata_key, plex_filename.filename
+                    );
+                    plex_filename.delete(pool).await?;
+                }
+            }
+        }
+        Ok(())
+    }
+
+    /// # Errors
+    /// Return error if db query fails
+    pub fn extract_metadata_from_xml(xml: &str) -> Result<Self, Error> {
+        let doc = Document::parse(xml)?;
+        for d in doc.descendants() {
+            let object_type = match d.tag_name().name() {
+                "Video" => "video",
+                "Directory" => "directory",
+                "Track" => "track",
+                _ => continue,
+            }
+            .into();
+            let metadata_key = d
+                .attribute("key")
+                .ok_or_else(|| format_err!("no key"))?
+                .trim_end_matches("/children")
+                .into();
+            let title = d
+                .attribute("title")
+                .ok_or_else(|| format_err!("no title"))?
+                .into();
+            let parent_key = d.attribute("parentKey").map(Into::into);
+            let grandparent_key = d.attribute("grandparentKey").map(Into::into);
+            return Ok(PlexMetadata {
+                metadata_key,
+                object_type,
+                title,
+                parent_key,
+                grandparent_key,
+                ..PlexMetadata::default()
+            });
+        }
+        Err(format_err!("No metadata found"))
+    }
 }
 
 #[cfg(test)]
@@ -547,6 +783,8 @@ mod tests {
     use anyhow::Error;
 
     use crate::{config::Config, pgpool::PgPool, plex_events::PlexEvent};
+
+    use super::PlexMetadata;
 
     #[tokio::test]
     #[ignore]
@@ -574,6 +812,40 @@ mod tests {
         assert_eq!(
             output.as_str(),
             "/shares/seagate4000/Documents/movies/scifi/galaxy_quest.mp4"
+        );
+        Ok(())
+    }
+
+    #[test]
+    fn test_extract_metadata_from_xml() -> Result<(), Error> {
+        let data = include_str!("../../tests/data/plex_archer_s13_ep05.xml");
+        let metadata = PlexMetadata::extract_metadata_from_xml(&data).unwrap();
+        assert_eq!(
+            metadata.title.as_str(),
+            "RARBG - Archer.S13E04.WEBRip.x264-ION10"
+        );
+        assert_eq!(metadata.metadata_key.as_str(), "/library/metadata/27678");
+        let data = include_str!("../../tests/data/plex_archer_s13.xml");
+        let metadata = PlexMetadata::extract_metadata_from_xml(&data).unwrap();
+        assert_eq!(metadata.title.as_str(), "Season 13");
+        assert_eq!(metadata.metadata_key.as_str(), "/library/metadata/27233");
+        let data = include_str!("../../tests/data/plex_archer.xml");
+        let metadata = PlexMetadata::extract_metadata_from_xml(&data).unwrap();
+        assert_eq!(metadata.title.as_str(), "Archer");
+        assert_eq!(metadata.metadata_key.as_str(), "/library/metadata/19341");
+        Ok(())
+    }
+
+    #[tokio::test]
+    #[ignore]
+    async fn test_get_metadata_by_key() -> Result<(), Error> {
+        let config = Config::with_config()?;
+        let metadata = PlexMetadata::get_metadata_by_key(&config, "/library/metadata/27678")
+            .await
+            .unwrap();
+        assert_eq!(
+            metadata.title.as_str(),
+            "RARBG - Archer.S13E04.WEBRip.x264-ION10"
         );
         Ok(())
     }

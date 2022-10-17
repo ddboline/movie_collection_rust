@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<MediaContainer size="1" allowSync="1" identifier="com.plexapp.plugins.library" librarySectionID="2" librarySectionTitle="TV Shows" librarySectionUUID="08d5f606-748c-4570-b70d-d9ecb576594a" mediaTagPrefix="/system/bundle/media/flags/" mediaTagVersion="1661862985">
+<Directory ratingKey="19341" key="/library/metadata/19341/children" guid="com.plexapp.agents.none://19341?lang=xn" type="show" title="Archer" librarySectionTitle="TV Shows" librarySectionID="2" librarySectionKey="/library/sections/2" summary="" index="1" viewCount="12" skipCount="1" lastViewedAt="1665948927" originallyAvailableAt="2009-09-17" leafCount="22" viewedLeafCount="4" childCount="3" addedAt="1643009734" updatedAt="1661428277" audienceRatingImage="thetvdb://image.rating">
+<Guid id="imdb://tt1486217" />
+<Guid id="tmdb://10283" />
+<Guid id="tvdb://110381" />
+<Location path="/shares/dileptonnas/Documents/television/archer" />
+</Directory>
+</MediaContainer>

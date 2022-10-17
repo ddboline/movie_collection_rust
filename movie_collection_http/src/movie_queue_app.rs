@@ -38,9 +38,10 @@ use super::{
         movie_queue_transcode_cleanup, movie_queue_transcode_directory, movie_queue_transcode_file,
         movie_queue_transcode_status, movie_queue_transcode_status_file_list,
         movie_queue_transcode_status_procs, movie_queue_update, plex_events, plex_events_update,
-        plex_filename, plex_filename_update, plex_list, plex_webhook, refresh_auth, trakt_auth_url,
-        trakt_cal, trakt_callback, trakt_watched_action, trakt_watched_list, trakt_watched_seasons,
-        trakt_watchlist, trakt_watchlist_action, tvshows, user,
+        plex_filename, plex_filename_update, plex_list, plex_metadata, plex_metadata_update,
+        plex_webhook, refresh_auth, trakt_auth_url, trakt_cal, trakt_callback,
+        trakt_watched_action, trakt_watched_list, trakt_watched_seasons, trakt_watchlist,
+        trakt_watchlist_action, tvshows, user,
     },
 };
 
@@ -134,6 +135,8 @@ fn get_full_path(app: &AppState) -> BoxedFilter<(impl Reply,)> {
     let plex_list_path = plex_list(app.clone()).boxed();
     let plex_filename_path = plex_filename(app.clone()).boxed();
     let plex_filename_update_path = plex_filename_update(app.clone()).boxed();
+    let plex_metadata_path = plex_metadata(app.clone()).boxed();
+    let plex_metadata_update_path = plex_metadata_update(app.clone()).boxed();
     let list_path = frontpage_path
         .or(find_new_episodes_path)
         .or(tvshows_path)
@@ -155,7 +158,9 @@ fn get_full_path(app: &AppState) -> BoxedFilter<(impl Reply,)> {
         .or(plex_events_update_path)
         .or(plex_list_path)
         .or(plex_filename_path)
-        .or(plex_filename_update_path);
+        .or(plex_filename_update_path)
+        .or(plex_metadata_path)
+        .or(plex_metadata_update_path);
     let auth_url_path = trakt_auth_url(app.clone()).boxed();
     let trakt_callback_path = trakt_callback(app.clone()).boxed();
     let refresh_auth_path = refresh_auth(app.clone()).boxed();

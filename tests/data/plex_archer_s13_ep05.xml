@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<MediaContainer size="1" allowSync="1" identifier="com.plexapp.plugins.library" librarySectionID="2" librarySectionTitle="TV Shows" librarySectionUUID="08d5f606-748c-4570-b70d-d9ecb576594a" mediaTagPrefix="/system/bundle/media/flags/" mediaTagVersion="1661862985">
+<Video ratingKey="27678" key="/library/metadata/27678" parentRatingKey="27233" grandparentRatingKey="19341" guid="com.plexapp.agents.none://19341/13/4?lang=xn" parentGuid="com.plexapp.agents.none://19341/13?lang=xn" grandparentGuid="com.plexapp.agents.none://19341?lang=xn" type="episode" title="RARBG - Archer.S13E04.WEBRip.x264-ION10" grandparentKey="/library/metadata/19341" parentKey="/library/metadata/27233" librarySectionTitle="TV Shows" librarySectionID="2" librarySectionKey="/library/sections/2" grandparentTitle="Archer" parentTitle="Season 13" summary="" index="4" parentIndex="13" viewCount="1" lastViewedAt="1665876964" thumb="/library/metadata/27678/thumb/1665629506" duration="1337941" addedAt="1665629397" updatedAt="1665629506">
+<Media id="35659" duration="1337941" bitrate="734" width="720" height="400" aspectRatio="1.78" audioChannels="2" audioCodec="aac" videoCodec="h264" videoResolution="sd" container="mp4" videoFrameRate="24p" optimizedForStreaming="0" audioProfile="lc" has64bitOffsets="0" videoProfile="main">
+<Part id="43209" key="/library/parts/43209/1665628905/file.mp4" duration="1337941" file="/shares/dileptonnas/Documents/television/archer/season13/archer_s13_ep04.mp4" size="123799657" audioProfile="lc" container="mp4" has64bitOffsets="0" optimizedForStreaming="0" videoProfile="main">
+<Stream id="87574" streamType="1" default="1" codec="h264" index="0" bitrate="606" anamorphic="0" bitDepth="8" chromaLocation="left" chromaSubsampling="4:2:0" codedHeight="400" codedWidth="720" colorPrimaries="smpte170m" colorRange="tv" colorSpace="smpte170m" colorTrc="bt709" frameRate="23.976" hasScalingMatrix="0" height="400" level="30" pixelAspectRatio="80:81" profile="main" refFrames="4" streamIdentifier="1" width="720" displayTitle="SD (H.264)" extendedDisplayTitle="SD (H.264)">
+</Stream>
+<Stream id="87575" streamType="2" selected="1" default="1" codec="aac" index="1" channels="2" bitrate="128" language="English" languageTag="en" languageCode="eng" audioChannelLayout="stereo" profile="lc" samplingRate="48000" streamIdentifier="2" displayTitle="English (AAC Stereo)" extendedDisplayTitle="English (AAC Stereo)">
+</Stream>
+<Stream id="87576" key="/library/streams/87576" streamType="3" selected="1" codec="srt" language="xx" languageTag="xx" languageCode="" format="srt" displayTitle="xx (SRT External)" extendedDisplayTitle="xx (SRT External)">
+</Stream>
+</Part>
+</Media>
+</Video>
+</MediaContainer>
