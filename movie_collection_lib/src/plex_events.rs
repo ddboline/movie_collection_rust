@@ -720,7 +720,7 @@ impl PlexMetadata {
                 continue;
             }
             let true_filename = plex_filename.filename.replace("/shares/", "/media/");
-            if !Path::new(&true_filename).exists() {
+            if !config.movie_dirs.is_empty() && !Path::new(&true_filename).exists() {
                 println!("file doesnt exist {true_filename}");
                 plex_filename.delete(pool).await?;
                 continue;
