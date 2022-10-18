@@ -7,6 +7,7 @@ use movie_collection_lib::{
     config::Config,
     movie_collection::MovieCollection,
     pgpool::PgPool,
+    plex_events::PlexMetadata,
     trakt_connection::TraktConnection,
     trakt_utils::{sync_trakt_with_db, trakt_app_parse, TraktActions, TraktCommands},
 };
@@ -66,7 +67,9 @@ async fn trakt_app() -> Result<(), Error> {
     let trakt = TraktConnection::new(config.clone());
 
     let result = if do_parse {
-        sync_trakt_with_db(&trakt, &mc).await
+        sync_trakt_with_db(&trakt, &mc).await?;
+        mc.fix_plex_filename_collection_id().await?;
+        PlexMetadata::fill_plex_metadata(&pool, &config).await
     } else {
         trakt_app_parse(
             &config,
