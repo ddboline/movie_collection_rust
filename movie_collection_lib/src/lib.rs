@@ -25,6 +25,7 @@ pub mod trakt_utils;
 pub mod transcode_service;
 pub mod tv_show_source;
 pub mod utils;
+pub mod music_collection;
 
 pub fn init_env() {
     use std::env::set_var;
