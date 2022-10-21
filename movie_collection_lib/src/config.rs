@@ -18,6 +18,7 @@ pub struct ConfigInner {
     pub home_dir: PathBuf,
     pub pgurl: StackString,
     pub movie_dirs: Vec<PathBuf>,
+    pub music_dirs: Vec<PathBuf>,
     #[serde(default = "default_suffixes")]
     pub suffixes: SmallVec<[StackString; 3]>,
     #[serde(default = "default_preferred_dir")]
