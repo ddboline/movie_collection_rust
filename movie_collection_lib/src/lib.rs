@@ -36,6 +36,7 @@ pub fn init_env() {
     );
     set_var("AUTHDB", "postgresql://USER:PASSWORD@localhost:5432/auth");
     set_var("MOVIE_DIRS", "/tmp");
+    set_var("MUSIC_DIRS", "/tmp");
     set_var("PREFERED_DISK", "/tmp");
     set_var("JWT_SECRET", "JWT_SECRET");
     set_var("SECRET_KEY", "SECRET_KEY");
