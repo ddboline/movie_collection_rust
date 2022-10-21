@@ -23,6 +23,8 @@ pub struct MusicCollection {
 }
 
 impl MusicCollection {
+    /// # Errors
+    /// Return error if db query fails
     pub async fn get_count(pool: &PgPool) -> Result<i64, Error> {
         #[derive(FromSqlRow)]
         struct Count {
@@ -34,13 +36,15 @@ impl MusicCollection {
         Ok(count.count)
     }
 
+    /// # Errors
+    /// Return error if db query fails
     pub async fn get_max_id(pool: &PgPool) -> Result<Option<i32>, Error> {
-        if Self::get_count(pool).await? == 0 {
-            return Ok(None);
-        }
         #[derive(FromSqlRow)]
         struct MaxId {
             max_id: i32,
+        }
+        if Self::get_count(pool).await? == 0 {
+            return Ok(None);
         }
         let query = query!("SELECT max(id) as max_id FROM music_collection");
         let conn = pool.get().await?;
@@ -94,12 +98,16 @@ impl MusicCollection {
         query.fetch(&conn).await.map_err(Into::into)
     }
 
+    /// # Errors
+    /// Return error if db query fails
     pub async fn get_by_id(pool: &PgPool, id: Uuid) -> Result<Option<Self>, Error> {
         let query = query!("SELECT * FROM music_collection WHERE id = $id", id = id);
         let conn = pool.get().await?;
         query.fetch_opt(&conn).await.map_err(Into::into)
     }
 
+    /// # Errors
+    /// Return error if db query fails
     pub async fn insert(&self, pool: &PgPool) -> Result<u64, Error> {
         if Self::get_by_id(pool, self.id).await?.is_some() {
             return Err(format_err!("Cannot insert, object exists"));
@@ -122,6 +130,8 @@ impl MusicCollection {
         query.execute(&conn).await.map_err(Into::into)
     }
 
+    /// # Errors
+    /// Return error if db query fails
     pub async fn update(&self, pool: &PgPool) -> Result<u64, Error> {
         if Self::get_by_id(pool, self.id).await?.is_none() {
             return Err(format_err!("Cannot update, object doesn't exists"));
@@ -142,6 +152,8 @@ impl MusicCollection {
         query.execute(&conn).await.map_err(Into::into)
     }
 
+    /// # Errors
+    /// Return error if db query fails
     pub async fn make_collection(config: &Config, pool: &PgPool) -> Result<Vec<Self>, Error> {
         let music_dict: HashMap<StackString, Self> = Self::get_entries(pool, None, None, None)
             .await?
@@ -198,12 +210,12 @@ impl MusicCollection {
         });
         let results: Result<Vec<_>, Error> = try_join_all(futures).await;
         let results = results?;
-        let count = results.iter().filter_map(|x| x.as_ref()).count();
+        let count = results.iter().filter_map(Option::as_ref).count();
         println!("new entries {count}");
         let music_dict = Arc::try_unwrap(music_dict).unwrap_or_else(|_| HashMap::new());
         let all_entries: Vec<_> = results
             .into_iter()
-            .filter_map(|x| x)
+            .flatten()
             .chain(music_dict.into_iter().map(|(_, v)| v))
             .collect();
         println!("all entries {}", all_entries.len());
