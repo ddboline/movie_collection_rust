@@ -16,6 +16,7 @@ pub mod make_list;
 pub mod make_queue;
 pub mod movie_collection;
 pub mod movie_queue;
+pub mod music_collection;
 pub mod parse_imdb;
 pub mod pgpool;
 pub mod plex_events;
@@ -25,7 +26,6 @@ pub mod trakt_utils;
 pub mod transcode_service;
 pub mod tv_show_source;
 pub mod utils;
-pub mod music_collection;
 
 pub fn init_env() {
     use std::env::set_var;
