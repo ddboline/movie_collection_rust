@@ -6,8 +6,8 @@ use std::path::Path;
 use stdout_channel::StdoutChannel;
 
 use movie_collection_lib::{
-    config::Config, movie_collection::MovieCollection, pgpool::PgPool, plex_events::PlexMetadata,
-    utils::get_video_runtime,
+    config::Config, movie_collection::MovieCollection, music_collection::MusicCollection,
+    pgpool::PgPool, plex_events::PlexMetadata, utils::get_video_runtime,
 };
 
 #[derive(Parser)]
@@ -41,6 +41,8 @@ async fn make_collection() -> Result<(), Error> {
         mc.fix_collection_show_id().await?;
         PlexMetadata::fill_plex_metadata(&pool, &config).await?;
         mc.fix_plex_filename_collection_id().await?;
+        MusicCollection::make_collection(&config, &pool).await?;
+        MusicCollection::fix_plex_filename_music_collection_id(&pool).await?;
     } else {
         let shows = mc.search_movie_collection(&opts.shows).await?;
         if do_time {

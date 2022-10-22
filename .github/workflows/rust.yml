@@ -47,6 +47,7 @@ jobs:
       env:
         PGURL: postgresql://postgres:2UtcMAAvNuBHPqK9@localhost:5432/movie_queue
         MOVIE_DIRS: /tmp
+        MUSIC_DIRS: /tmp
 
     - name: Run tests
       run: |
