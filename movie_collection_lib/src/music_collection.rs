@@ -152,6 +152,8 @@ impl MusicCollection {
         query.execute(&conn).await.map_err(Into::into)
     }
 
+    /// # Errors
+    /// Return error if db query fails
     pub async fn fix_plex_filename_music_collection_id(pool: &PgPool) -> Result<u64, Error> {
         let query = r#"
             UPDATE plex_filename
