@@ -19,6 +19,7 @@ use movie_collection_lib::{
     imdb_ratings::ImdbRatings,
     movie_collection::{LastModifiedResponse, MovieCollection, MovieCollectionRow},
     movie_queue::{MovieQueueDB, MovieQueueRow},
+    music_collection::MusicCollection,
     pgpool::PgPool,
     plex_events::{PlexEvent, PlexFilename, PlexMetadata},
     transcode_service::transcode_status,
@@ -181,6 +182,20 @@ impl MovieQueueCli {
                         let results: Result<Vec<_>, Error> = try_join_all(futures).await;
                         stdout.send(format!("movie_collection {}\n", results?.len()));
                     }
+                    "music_collection" => {
+                        let rows: Vec<MusicCollection> = serde_json::from_slice(&data)?;
+                        let futures = rows.into_iter().map(|entry| {
+                            let pool = pool.clone();
+                            async move {
+                                if MusicCollection::get_by_id(&pool, entry.id).await?.is_none() {
+                                    entry.insert(&pool).await?;
+                                }
+                                Ok(())
+                            }
+                        });
+                        let results: Result<Vec<_>, Error> = try_join_all(futures).await;
+                        stdout.send(format!("music_collection {}\n", results?.len()));
+                    }
                     "movie_queue" => {
                         let mq = MovieQueueDB::new(&config, &pool, &stdout);
                         let mc = MovieCollection::new(&config, &pool, &stdout);
@@ -264,6 +279,12 @@ impl MovieQueueCli {
                     "movie_collection" => {
                         let mc = MovieCollection::new(&config, &pool, &stdout);
                         let entries = mc.get_collection_after_timestamp(start_timestamp).await?;
+                        file.write_all(&serde_json::to_vec(&entries)?).await?;
+                    }
+                    "music_collection" => {
+                        let entries =
+                            MusicCollection::get_entries(&pool, Some(start_timestamp), None, None)
+                                .await?;
                         file.write_all(&serde_json::to_vec(&entries)?).await?;
                     }
                     "movie_queue" => {
