@@ -609,6 +609,28 @@ impl PlexMetadata {
         query.fetch(&conn).await.map_err(Into::into)
     }
 
+    async fn get_parents(pool: &PgPool) -> Result<Vec<Self>, Error> {
+        let query = query!(
+            r#"
+                SELECT *
+                FROM plex_metadata
+                WHERE metadata_key IN (
+                    SELECT distinct parent_key
+                    FROM plex_metadata
+                    WHERE object_type = 'video'
+                      AND parent_key IS NOT NULL
+                    UNION
+                    SELECT distinct grandparent_key
+                    FROM plex_metadata
+                    WHERE object_type = 'video'
+                      AND grandparent_key IS NOT NULL
+                )
+            "#
+        );
+        let conn = pool.get().await?;
+        query.fetch(&conn).await.map_err(Into::into)
+    }
+
     /// # Errors
     /// Return error if db query fails
     pub async fn get_by_key(pool: &PgPool, key: &str) -> Result<Option<Self>, Error> {
@@ -711,12 +733,116 @@ impl PlexMetadata {
 
     /// # Errors
     /// Return error if db query fails
+    pub async fn get_children(
+        &self,
+        config: &Config,
+    ) -> Result<Vec<(Self, Option<PlexFilename>)>, Error> {
+        let plex_host = config
+            .plex_host
+            .as_ref()
+            .ok_or_else(|| format_err!("No Host"))?;
+        let plex_token = config
+            .plex_token
+            .as_ref()
+            .ok_or_else(|| format_err!("No Token"))?;
+        let key = &self.metadata_key;
+        let url = format_sstr!("http://{plex_host}:32400{key}/children?X-Plex-Token={plex_token}");
+        let data = reqwest::get(url.as_str())
+            .await?
+            .error_for_status()?
+            .text()
+            .await?;
+        Self::extract_children_from_xml(&data)
+    }
+
+    async fn fill_plex_metadata_show(pool: &PgPool) -> Result<u64, Error> {
+        let query = query!(
+            r#"
+                UPDATE plex_metadata
+                SET show = (
+                    SELECT mc.show
+                    FROM plex_filename pf
+                    JOIN movie_collection mc ON mc.idx = pf.collection_id
+                    JOIN plex_metadata pm ON pm.metadata_key = pf.metadata_key
+                    JOIN imdb_ratings ir ON ir.show = mc.show
+                    WHERE pf.metadata_key = plex_metadata.metadata_key
+                )
+                WHERE show IS NULL
+            "#
+        );
+        let conn = pool.get().await?;
+        query.execute(&conn).await.map_err(Into::into)
+    }
+
+    async fn fill_plex_parent_metadata_show(pool: &PgPool) -> Result<u64, Error> {
+        let query = query!(
+            r#"
+                UPDATE plex_metadata
+                SET show = (
+                    SELECT distinct mc.show
+                    FROM plex_metadata pmp
+                    JOIN plex_metadata pm ON pm.parent_key = pmp.metadata_key
+                    JOIN plex_filename pf ON pf.metadata_key = pm.metadata_key
+                    JOIN movie_collection mc ON mc.idx = pf.collection_id
+                    WHERE pmp.metadata_key = plex_metadata.metadata_key
+                )
+                WHERE show IS NULL
+                AND object_type = 'directory'
+            "#
+        );
+        let conn = pool.get().await?;
+        query.execute(&conn).await.map_err(Into::into)
+    }
+
+    async fn fill_plex_grandparent_metadata_show(pool: &PgPool) -> Result<u64, Error> {
+        let query = query!(
+            r#"
+                UPDATE plex_metadata
+                SET show = (
+                    SELECT distinct mc.show
+                    FROM plex_metadata pmgp
+                    JOIN plex_metadata pm ON pm.grandparent_key = pmgp.metadata_key
+                    JOIN plex_filename pf ON pf.metadata_key = pm.metadata_key
+                    JOIN movie_collection mc ON mc.idx = pf.collection_id
+                    WHERE pmgp.metadata_key = plex_metadata.metadata_key
+                )
+                WHERE show IS NULL
+                AND object_type = 'directory'
+            "#
+        );
+        let conn = pool.get().await?;
+        query.execute(&conn).await.map_err(Into::into)
+    }
+
+    /// # Errors
+    /// Return error if db query fails
     pub async fn fill_plex_metadata(pool: &PgPool, config: &Config) -> Result<(), Error> {
+        let bytes_written = Self::fill_plex_metadata_show(pool).await?;
+        println!("update metadata {bytes_written}");
+        let bytes_written = Self::fill_plex_parent_metadata_show(pool).await?;
+        println!("update parent {bytes_written}");
+        let bytes_written = Self::fill_plex_grandparent_metadata_show(pool).await?;
+        println!("update grandparent {bytes_written}");
         for plex_filename in PlexFilename::get_filenames(pool, None, None, None).await? {
-            if Self::get_by_key(pool, &plex_filename.metadata_key)
-                .await?
-                .is_some()
-            {
+            if let Some(metadata) = Self::get_by_key(pool, &plex_filename.metadata_key).await? {
+                if let Some(parent_key) = &metadata.parent_key {
+                    if Self::get_by_key(pool, parent_key).await?.is_none() {
+                        let mut parent_metadata =
+                            Self::get_metadata_by_key(config, parent_key).await?;
+                        parent_metadata.show = metadata.show.clone();
+                        parent_metadata.insert(pool).await?;
+                        println!("insert parent {parent_metadata:?}");
+                    }
+                }
+                if let Some(grandparent_key) = &metadata.grandparent_key {
+                    if Self::get_by_key(pool, grandparent_key).await?.is_none() {
+                        let mut grandparent_metadata =
+                            Self::get_metadata_by_key(config, grandparent_key).await?;
+                        grandparent_metadata.show = metadata.show.clone();
+                        grandparent_metadata.insert(pool).await?;
+                        println!("insert grandparent {grandparent_metadata:?}");
+                    }
+                }
                 continue;
             }
             let true_filename = plex_filename.filename.replace("/shares/", "/media/");
@@ -739,12 +865,30 @@ impl PlexMetadata {
                 }
             }
         }
+        for parent in Self::get_parents(pool).await? {
+            for (metadata, filename) in parent.get_children(config).await? {
+                if Self::get_by_key(pool, &metadata.metadata_key)
+                    .await?
+                    .is_none()
+                {
+                    metadata.insert(pool).await?;
+                    println!("insert {metadata:?}");
+                }
+                if let Some(filename) = filename {
+                    if PlexFilename::get_by_key(pool, &filename.metadata_key)
+                        .await?
+                        .is_none()
+                    {
+                        filename.insert(pool).await?;
+                        println!("insert {filename:?}");
+                    }
+                }
+            }
+        }
         Ok(())
     }
 
-    /// # Errors
-    /// Return error if db query fails
-    pub fn extract_metadata_from_xml(xml: &str) -> Result<Self, Error> {
+    fn extract_metadata_from_xml(xml: &str) -> Result<Self, Error> {
         let doc = Document::parse(xml)?;
         for d in doc.descendants() {
             let object_type = match d.tag_name().name() {
@@ -775,6 +919,50 @@ impl PlexMetadata {
             });
         }
         Err(format_err!("No metadata found"))
+    }
+
+    fn extract_children_from_xml(xml: &str) -> Result<Vec<(Self, Option<PlexFilename>)>, Error> {
+        let doc = Document::parse(xml)?;
+        doc.descendants()
+            .map(|d| {
+                let object_type = match d.tag_name().name() {
+                    "Video" => "video",
+                    "Directory" => "directory",
+                    "Track" => "track",
+                    _ => return Ok(None),
+                }
+                .into();
+                let metadata_key = d
+                    .attribute("key")
+                    .ok_or_else(|| format_err!("no key"))?
+                    .trim_end_matches("/children")
+                    .into();
+                let title = d
+                    .attribute("title")
+                    .ok_or_else(|| format_err!("no title"))?
+                    .into();
+                let parent_key = d.attribute("parentKey").map(Into::into);
+                let grandparent_key = d.attribute("grandparentKey").map(Into::into);
+                let plex_metadata = PlexMetadata {
+                    metadata_key,
+                    object_type,
+                    title,
+                    parent_key,
+                    grandparent_key,
+                    ..PlexMetadata::default()
+                };
+                let plex_filename =
+                    d.descendants()
+                        .find_map(|n| n.attribute("file"))
+                        .map(|f| PlexFilename {
+                            metadata_key: plex_metadata.metadata_key.clone(),
+                            filename: f.into(),
+                            collection_id: None,
+                        });
+                Ok(Some((plex_metadata, plex_filename)))
+            })
+            .filter_map(Result::transpose)
+            .collect()
     }
 }
 
@@ -846,6 +1034,21 @@ mod tests {
         assert_eq!(
             metadata.title.as_str(),
             "RARBG - Archer.S13E04.WEBRip.x264-ION10"
+        );
+        Ok(())
+    }
+
+    #[test]
+    fn test_extract_children_from_xml() -> Result<(), Error> {
+        let data = include_str!("../../tests/data/archer_s13_children.xml");
+        let children = PlexMetadata::extract_children_from_xml(&data)?;
+        assert_eq!(children.len(), 8);
+        let (metadata, filename) = &children[0];
+        assert_eq!(metadata.metadata_key, "/library/metadata/27234");
+        assert!(filename.is_some());
+        assert_eq!(
+            filename.as_ref().unwrap().filename,
+            "/shares/dileptonnas/Documents/television/archer/season13/archer_s13_ep01.mp4"
         );
         Ok(())
     }
