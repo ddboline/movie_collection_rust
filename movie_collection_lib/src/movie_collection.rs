@@ -990,6 +990,7 @@ impl LastModifiedResponse {
             "imdb_episodes",
             "imdb_ratings",
             "movie_collection",
+            "music_collection",
             "movie_queue",
             "plex_event",
             "plex_filename",
@@ -997,8 +998,17 @@ impl LastModifiedResponse {
         ];
 
         let futures = tables.into_iter().map(|table| async move {
-            let query = query_dyn!(&format_sstr!("SELECT max(last_modified) FROM {table}"))?;
+            #[derive(FromSqlRow)]
+            struct Count {
+                count: i64,
+            }
+            let query = query_dyn!(&format_sstr!("SELECT count(*) AS count FROM {table}"))?;
             let conn = pool.get().await?;
+            let count: Count = query.fetch_one(&conn).await?;
+            if count.count == 0 {
+                return Ok(None);
+            }
+            let query = query_dyn!(&format_sstr!("SELECT max(last_modified) FROM {table}"))?;
             if let Some((last_modified,)) = query.fetch_opt(&conn).await? {
                 let last_modified: OffsetDateTime = last_modified;
                 Ok(Some(LastModifiedResponse {
