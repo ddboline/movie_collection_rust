@@ -12,7 +12,7 @@ use crate::{
     config::Config, date_time_wrapper::DateTimeWrapper, pgpool::PgPool, utils::walk_directory,
 };
 
-#[derive(FromSqlRow, Serialize, Deserialize)]
+#[derive(FromSqlRow, Serialize, Deserialize, Debug)]
 pub struct MusicCollection {
     pub id: Uuid,
     pub path: StackString,
@@ -20,6 +20,19 @@ pub struct MusicCollection {
     pub album: Option<StackString>,
     pub title: Option<StackString>,
     pub last_modified: DateTimeWrapper,
+}
+
+impl Default for MusicCollection {
+    fn default() -> Self {
+        MusicCollection {
+            id: Uuid::new_v4(),
+            path: StackString::new(),
+            artist: None,
+            album: None,
+            title: None,
+            last_modified: DateTimeWrapper::now(),
+        }
+    }
 }
 
 impl MusicCollection {
