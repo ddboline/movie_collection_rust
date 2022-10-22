@@ -152,6 +152,20 @@ impl MusicCollection {
         query.execute(&conn).await.map_err(Into::into)
     }
 
+    pub async fn fix_plex_filename_music_collection_id(pool: &PgPool) -> Result<u64, Error> {
+        let query = r#"
+            UPDATE plex_filename
+            SET music_collection_id = (
+                SELECT m.id
+                FROM music_collection m
+                WHERE m.path = replace(plex_filename.filename, '/shares/', '/media/')
+            )
+            WHERE music_collection_id IS NULL
+        "#;
+        let rows = pool.get().await?.execute(query, &[]).await?;
+        Ok(rows)
+    }
+
     /// # Errors
     /// Return error if db query fails
     pub async fn make_collection(config: &Config, pool: &PgPool) -> Result<Vec<Self>, Error> {

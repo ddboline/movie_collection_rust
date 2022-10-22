@@ -10,3 +10,5 @@ CREATE TABLE IF NOT EXISTS music_collection (
     title TEXT,
     last_modified timestamp with time zone
 );
+
+ALTER TABLE plex_filename ADD COLUMN music_collection_id UUID;

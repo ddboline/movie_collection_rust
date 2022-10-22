@@ -42,6 +42,7 @@ async fn make_collection() -> Result<(), Error> {
         PlexMetadata::fill_plex_metadata(&pool, &config).await?;
         mc.fix_plex_filename_collection_id().await?;
         MusicCollection::make_collection(&config, &pool).await?;
+        MusicCollection::fix_plex_filename_music_collection_id(&pool).await?;
     } else {
         let shows = mc.search_movie_collection(&opts.shows).await?;
         if do_time {
