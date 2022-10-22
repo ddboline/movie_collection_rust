@@ -16,7 +16,7 @@ pub mod movie_queue_routes;
 
 use derive_more::{Deref, Display, From, FromStr, Into};
 use rweb::Schema;
-use rweb_helper::{derive_rweb_schema, DateTimeType, DateType};
+use rweb_helper::{derive_rweb_schema, DateTimeType, DateType, UuidWrapper};
 use serde::{Deserialize, Serialize};
 use stack_string::StackString;
 
@@ -26,6 +26,7 @@ use movie_collection_lib::{
     imdb_ratings::ImdbRatings,
     movie_collection::{LastModifiedResponse, MovieCollectionRow},
     movie_queue::MovieQueueRow,
+    music_collection::MusicCollection,
     plex_events::{PlexEvent, PlexEventType, PlexFilename, PlexMetadata},
     trakt_utils::TraktActions,
     tv_show_source::TvShowSource,
@@ -214,17 +215,39 @@ derive_rweb_schema!(PlexMetadataWrapper, _PlexMetadataWrapper);
 #[derive(Schema)]
 struct _PlexMetadataWrapper {
     #[schema(description = "Metadata Key")]
-    pub metadata_key: StackString,
+    metadata_key: StackString,
     #[schema(description = "Object Type")]
-    pub object_type: StackString,
+    object_type: StackString,
     #[schema(description = "Title")]
-    pub title: StackString,
+    title: StackString,
     #[schema(description = "Parent Key")]
-    pub parent_key: Option<StackString>,
+    parent_key: Option<StackString>,
     #[schema(description = "Grandparent Key")]
-    pub grandparent_key: Option<StackString>,
+    grandparent_key: Option<StackString>,
     #[schema(description = "show")]
-    pub show: Option<StackString>,
+    show: Option<StackString>,
+}
+
+#[derive(Default, Debug, Serialize, Deserialize, Into, From, Deref)]
+pub struct MusicCollectionWrapper(MusicCollection);
+
+derive_rweb_schema!(MusicCollectionWrapper, _MusicCollectionWrapper);
+
+#[allow(dead_code)]
+#[derive(Schema)]
+struct _MusicCollectionWrapper {
+    #[schema(description = "Id")]
+    id: UuidWrapper,
+    #[schema(description = "Path")]
+    path: StackString,
+    #[schema(description = "Artist")]
+    artist: Option<StackString>,
+    #[schema(description = "Album")]
+    album: Option<StackString>,
+    #[schema(description = "Title")]
+    title: Option<StackString>,
+    #[schema(description = "Last Modified")]
+    last_modified: DateTimeType,
 }
 
 #[derive(Clone, Copy, Deserialize, Serialize, Into, From, Deref, FromStr, Display)]

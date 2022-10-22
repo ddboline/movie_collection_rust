@@ -35,6 +35,7 @@ use movie_collection_lib::{
         find_new_episodes_http_worker, LastModifiedResponse, MovieCollection, TvShowsResult,
     },
     movie_queue::{MovieQueueDB, MovieQueueResult},
+    music_collection::MusicCollection,
     pgpool::PgPool,
     plex_events::{PlexEvent, PlexFilename, PlexMetadata},
     trakt_connection::TraktConnection,
@@ -58,9 +59,9 @@ use crate::{
         MovieQueueUpdateRequest, ParseImdbRequest, WatchlistActionRequest,
     },
     ImdbEpisodesWrapper, ImdbRatingsWrapper, LastModifiedResponseWrapper,
-    MovieCollectionRowWrapper, MovieQueueRowWrapper, PlexEventRequest, PlexEventWrapper,
-    PlexFilenameRequest, PlexFilenameWrapper, PlexMetadataWrapper, TraktActionsWrapper,
-    TvShowSourceWrapper,
+    MovieCollectionRowWrapper, MovieQueueRowWrapper, MusicCollectionWrapper, PlexEventRequest,
+    PlexEventWrapper, PlexFilenameRequest, PlexFilenameWrapper, PlexMetadataWrapper,
+    TraktActionsWrapper, TvShowSourceWrapper,
 };
 
 pub type WarpResult<T> = Result<T, Rejection>;
@@ -2069,6 +2070,80 @@ pub async fn plex_metadata_update(
                 .insert(&state.db)
                 .await
                 .map_err(Into::<Error>::into)?;
+        }
+    }
+    task.await.ok();
+    Ok(HtmlBase::new("Success").into())
+}
+
+#[derive(RwebResponse)]
+#[response(description = "Music Collection")]
+struct MusicCollectionResponse(JsonBase<Vec<MusicCollectionWrapper>, Error>);
+
+#[get("/list/music_collection")]
+pub async fn music_collection(
+    query: Query<PlexFilenameRequest>,
+    #[data] state: AppState,
+    #[filter = "LoggedUser::filter"] user: LoggedUser,
+) -> WarpResult<MusicCollectionResponse> {
+    let task = user
+        .store_url_task(
+            state.trakt.get_client(),
+            &state.config,
+            "/list/music_collection",
+        )
+        .await;
+    let query = query.into_inner();
+    let entries = MusicCollection::get_entries(
+        &state.db,
+        query.start_timestamp.map(Into::into),
+        query.offset,
+        query.limit,
+    )
+    .await
+    .map_err(Into::<Error>::into)?
+    .into_iter()
+    .map(Into::into)
+    .collect();
+    task.await.ok();
+    Ok(JsonBase::new(entries).into())
+}
+
+#[derive(Serialize, Deserialize, Debug, Schema)]
+pub struct MusicCollectionUpdateRequest {
+    entries: Vec<MusicCollectionWrapper>,
+}
+
+#[derive(RwebResponse)]
+#[response(
+    description = "Update Music Collection",
+    content = "html",
+    status = "CREATED"
+)]
+struct MusicCollectionUpdateResponse(HtmlBase<&'static str, Error>);
+
+#[post("/list/music_collection")]
+pub async fn music_collection_update(
+    payload: Json<MusicCollectionUpdateRequest>,
+    #[data] state: AppState,
+    #[filter = "LoggedUser::filter"] user: LoggedUser,
+) -> WarpResult<MusicCollectionUpdateResponse> {
+    let task = user
+        .store_url_task(
+            state.trakt.get_client(),
+            &state.config,
+            "/list/music_collection",
+        )
+        .await;
+    let payload = payload.into_inner();
+    for entry in payload.entries {
+        if MusicCollection::get_by_id(&state.db, entry.id)
+            .await
+            .map_err(Into::<Error>::into)?
+            .is_none()
+        {
+            let entry: MusicCollection = entry.into();
+            entry.insert(&state.db).await.map_err(Into::<Error>::into)?;
         }
     }
     task.await.ok();
