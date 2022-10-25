@@ -9,6 +9,7 @@ use std::{
     sync::Arc,
 };
 use stdout_channel::StdoutChannel;
+use uuid::Uuid;
 
 use crate::{
     config::Config,
@@ -174,7 +175,7 @@ pub async fn movie_queue_http(
         let server = config.plex_server.as_ref();
 
         let entry = if ext == "mp4" {
-            let collection_idx = mc.get_collection_index(&row.path).await?.unwrap_or(-1);
+            let collection_idx = mc.get_collection_index(&row.path).await?.unwrap_or_else(Uuid::new_v4);
             let metadata_key = mc.get_plex_metadata_key(collection_idx).await?;
             if let (Some(metadata_key), Some(host), Some(server)) = (metadata_key, host, server) {
                 format_sstr!(

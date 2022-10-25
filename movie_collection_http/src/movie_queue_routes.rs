@@ -303,7 +303,7 @@ struct PlayQueueResponse(HtmlBase<StackString, Error>);
 
 #[get("/list/play/{idx}")]
 pub async fn movie_queue_play(
-    idx: i32,
+    idx: UuidWrapper,
     #[filter = "LoggedUser::filter"] user: LoggedUser,
     #[data] state: AppState,
 ) -> WarpResult<PlayQueueResponse> {
@@ -323,7 +323,7 @@ pub async fn movie_queue_play(
     let stdout = StdoutChannel::with_mock_stdout(mock_stdout.clone(), mock_stdout);
 
     let movie_path = MovieCollection::new(&state.config, &state.db, &stdout)
-        .get_collection_path(idx)
+        .get_collection_path(idx.into())
         .await
         .map_err(Into::<Error>::into)?;
 

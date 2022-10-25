@@ -12,6 +12,7 @@ use std::{
 };
 use time::{macros::datetime, OffsetDateTime};
 use time_tz::OffsetDateTimeExt;
+use uuid::Uuid;
 
 use crate::{
     config::Config,
@@ -446,7 +447,7 @@ pub struct WebhookPayload {
 pub struct PlexFilename {
     pub metadata_key: StackString,
     pub filename: StackString,
-    pub collection_id: Option<i32>,
+    pub collection_id: Option<Uuid>,
 }
 
 impl PlexFilename {

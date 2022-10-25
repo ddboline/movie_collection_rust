@@ -17,6 +17,7 @@ use std::{
 use stdout_channel::{rate_limiter::RateLimiter, StdoutChannel};
 use time::{Date, Duration, OffsetDateTime};
 use time_tz::OffsetDateTimeExt;
+use uuid::Uuid;
 
 use crate::{
     config::Config,
@@ -88,7 +89,7 @@ impl fmt::Display for TvShowsResult {
 
 #[derive(Default, Serialize, Deserialize, FromSqlRow)]
 pub struct MovieCollectionRow {
-    pub idx: i32,
+    pub idx: Uuid,
     pub path: StackString,
     pub show: StackString,
 }
@@ -195,7 +196,7 @@ impl MovieCollection {
         let futures = shows.into_iter().map(|show| async move {
             #[derive(FromSqlRow)]
             struct TempImdbRating {
-                index: i32,
+                index: Uuid,
                 show: StackString,
                 title: StackString,
                 link: StackString,
@@ -352,7 +353,7 @@ impl MovieCollection {
 
     /// # Errors
     /// Returns error if db queries fail
-    pub async fn get_collection_index(&self, path: &str) -> Result<Option<i32>, Error> {
+    pub async fn get_collection_index(&self, path: &str) -> Result<Option<Uuid>, Error> {
         let query = query!(
             r#"SELECT idx FROM movie_collection WHERE path = $path"#,
             path = path
@@ -364,7 +365,7 @@ impl MovieCollection {
 
     /// # Errors
     /// Returns error if db queries fail
-    pub async fn get_plex_metadata_key(&self, idx: i32) -> Result<Option<StackString>, Error> {
+    pub async fn get_plex_metadata_key(&self, idx: Uuid) -> Result<Option<StackString>, Error> {
         let query = query!(
             r#"SELECT metadata_key FROM plex_filename WHERE collection_id = $idx"#,
             idx = idx,
@@ -376,7 +377,7 @@ impl MovieCollection {
 
     /// # Errors
     /// Returns error if db queries fail
-    pub async fn get_collection_path(&self, idx: i32) -> Result<StackString, Error> {
+    pub async fn get_collection_path(&self, idx: Uuid) -> Result<StackString, Error> {
         let query = query!(
             "SELECT path FROM movie_collection WHERE idx = $idx",
             idx = idx
@@ -852,7 +853,7 @@ pub async fn find_new_episodes_http_worker(
 ) -> Result<Vec<StackString>, Error> {
     type QueueKey = (StackString, i32, i32);
     type QueueValue = (
-        i32,
+        Uuid,
         Option<StackString>,
         Option<StackString>,
         Option<StackString>,

@@ -51,22 +51,6 @@ impl MusicCollection {
 
     /// # Errors
     /// Return error if db query fails
-    pub async fn get_max_id(pool: &PgPool) -> Result<Option<i32>, Error> {
-        #[derive(FromSqlRow)]
-        struct MaxId {
-            max_id: i32,
-        }
-        if Self::get_count(pool).await? == 0 {
-            return Ok(None);
-        }
-        let query = query!("SELECT max(id) as max_id FROM music_collection");
-        let conn = pool.get().await?;
-        let max_id: MaxId = query.fetch_one(&conn).await?;
-        Ok(Some(max_id.max_id))
-    }
-
-    /// # Errors
-    /// Return error if db query fails
     pub async fn get_entries(
         pool: &PgPool,
         start_timestamp: Option<OffsetDateTime>,

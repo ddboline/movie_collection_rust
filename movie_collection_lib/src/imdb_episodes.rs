@@ -5,6 +5,7 @@ use smallvec::{smallvec, SmallVec};
 use stack_string::{format_sstr, StackString};
 use std::fmt;
 use time::{macros::date, Date, OffsetDateTime};
+use uuid::Uuid;
 
 use crate::pgpool::PgPool;
 
@@ -60,7 +61,7 @@ impl ImdbEpisodes {
 
     /// # Errors
     /// Returns error if db query fails
-    pub async fn get_index(&self, pool: &PgPool) -> Result<Option<i32>, Error> {
+    pub async fn get_index(&self, pool: &PgPool) -> Result<Option<Uuid>, Error> {
         let query = query!(
             r#"
                 SELECT id
@@ -78,7 +79,7 @@ impl ImdbEpisodes {
 
     /// # Errors
     /// Returns error if db query fails
-    pub async fn from_index(idx: i32, pool: &PgPool) -> Result<Option<Self>, Error> {
+    pub async fn from_index(idx: Uuid, pool: &PgPool) -> Result<Option<Self>, Error> {
         let query = query!(
             r#"
                 SELECT a.show, b.title, a.season, a.episode, a.airdate,

@@ -16,6 +16,7 @@ use std::{
 };
 use stdout_channel::StdoutChannel;
 use time::Date;
+use uuid::Uuid;
 
 use crate::{
     config::Config, imdb_episodes::ImdbEpisodes, imdb_ratings::ImdbRatings,
@@ -204,7 +205,7 @@ impl WatchListShow {
 
     /// # Errors
     /// Return error if db query fails
-    pub async fn get_index(&self, pool: &PgPool) -> Result<Option<i32>, Error> {
+    pub async fn get_index(&self, pool: &PgPool) -> Result<Option<Uuid>, Error> {
         let query = query!(
             "
                 SELECT a.id
@@ -335,7 +336,7 @@ impl fmt::Display for WatchedEpisode {
 impl WatchedEpisode {
     /// # Errors
     /// Return error if db query fails
-    pub async fn get_index(&self, pool: &PgPool) -> Result<Option<i32>, Error> {
+    pub async fn get_index(&self, pool: &PgPool) -> Result<Option<Uuid>, Error> {
         let query = query!(
             r#"
                 SELECT id
@@ -487,7 +488,7 @@ impl fmt::Display for WatchedMovie {
 impl WatchedMovie {
     /// # Errors
     /// Return error if db query fails
-    pub async fn get_index(&self, pool: &PgPool) -> Result<Option<i32>, Error> {
+    pub async fn get_index(&self, pool: &PgPool) -> Result<Option<Uuid>, Error> {
         let query = query!(
             r#"
                 SELECT id

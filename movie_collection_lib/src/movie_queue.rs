@@ -8,6 +8,7 @@ use stack_string::{format_sstr, StackString};
 use std::{fmt, fmt::Write, path::Path};
 use stdout_channel::StdoutChannel;
 use time::OffsetDateTime;
+use uuid::Uuid;
 
 use crate::{
     config::Config,
@@ -39,6 +40,15 @@ impl fmt::Display for MovieQueueResult {
             option_string_wrapper(self.eplink.as_ref()),
         )
     }
+}
+
+#[derive(Default, Debug, Serialize, Deserialize, FromSqlRow)]
+pub struct MovieQueueRow {
+    pub idx: i32,
+    pub collection_idx: Uuid,
+    pub path: StackString,
+    pub show: StackString,
+    pub last_modified: Option<DateTimeWrapper>,
 }
 
 #[derive(Clone, Default)]
@@ -107,7 +117,7 @@ impl MovieQueueDB {
     /// Return error if db queries fail
     pub async fn remove_from_queue_by_collection_idx(
         &self,
-        collection_idx: i32,
+        collection_idx: Uuid,
     ) -> Result<(), Error> {
         if let Some(idx) = self.get_idx_from_collection_idx(collection_idx).await? {
             self.remove_from_queue_by_idx(idx).await?;
@@ -119,7 +129,7 @@ impl MovieQueueDB {
     /// Return error if db queries fail
     pub async fn get_idx_from_collection_idx(
         &self,
-        collection_idx: i32,
+        collection_idx: Uuid,
     ) -> Result<Option<i32>, Error> {
         let query = query!(
             "SELECT idx FROM movie_queue WHERE collection_idx=$collection_idx",
@@ -167,7 +177,7 @@ impl MovieQueueDB {
     pub async fn insert_into_queue_by_collection_idx(
         &self,
         idx: i32,
-        collection_idx: i32,
+        collection_idx: Uuid,
     ) -> Result<(), Error> {
         let query = query!(
             r#"SELECT idx FROM movie_queue WHERE collection_idx = $idx"#,
@@ -342,13 +352,4 @@ impl MovieQueueDB {
         let conn = self.pool.get().await?;
         query.fetch(&conn).await.map_err(Into::into)
     }
-}
-
-#[derive(Default, Debug, Serialize, Deserialize, FromSqlRow)]
-pub struct MovieQueueRow {
-    pub idx: i32,
-    pub collection_idx: i32,
-    pub path: StackString,
-    pub show: StackString,
-    pub last_modified: Option<DateTimeWrapper>,
 }

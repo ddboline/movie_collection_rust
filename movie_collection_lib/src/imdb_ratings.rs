@@ -5,12 +5,13 @@ use serde::{Deserialize, Serialize};
 use stack_string::{format_sstr, StackString};
 use std::fmt;
 use time::OffsetDateTime;
+use uuid::Uuid;
 
 use crate::{pgpool::PgPool, tv_show_source::TvShowSource, utils::option_string_wrapper};
 
 #[derive(Default, Clone, Debug, Serialize, Deserialize, FromSqlRow)]
 pub struct ImdbRatings {
-    pub index: i32,
+    pub index: Uuid,
     pub show: StackString,
     pub title: Option<StackString>,
     pub link: StackString,

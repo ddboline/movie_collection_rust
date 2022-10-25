@@ -85,7 +85,7 @@ derive_rweb_schema!(ImdbRatingsWrapper, _ImdbRatingsWrapper);
 #[derive(Schema)]
 struct _ImdbRatingsWrapper {
     #[schema(description = "Index")]
-    index: i32,
+    index: UuidWrapper,
     #[schema(description = "TV Show Name")]
     show: StackString,
     #[schema(description = "Title")]
@@ -111,7 +111,7 @@ struct _MovieQueueRowWrapper {
     #[schema(description = "Queue Index")]
     idx: i32,
     #[schema(description = "Collection Index")]
-    collection_idx: i32,
+    collection_idx: UuidWrapper,
     #[schema(description = "Collection Path")]
     path: StackString,
     #[schema(description = "TV Show Name")]
@@ -129,7 +129,7 @@ derive_rweb_schema!(MovieCollectionRowWrapper, _MovieCollectionRowWrapper);
 #[derive(Schema)]
 struct _MovieCollectionRowWrapper {
     #[schema(description = "Collection Index")]
-    idx: i32,
+    idx: UuidWrapper,
     #[schema(description = "Collection Path")]
     path: StackString,
     #[schema(description = "TV Show Name")]
@@ -203,7 +203,7 @@ struct _PlexFilenameWrapper {
     #[schema(description = "Filename")]
     filename: StackString,
     #[schema(description = "Collection Id")]
-    collection_id: Option<i32>,
+    collection_id: Option<UuidWrapper>,
 }
 
 #[derive(Default, Debug, Serialize, Deserialize, Into, From, Deref)]
