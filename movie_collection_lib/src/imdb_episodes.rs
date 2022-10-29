@@ -1,5 +1,6 @@
 use anyhow::Error;
-use postgres_query::{query, query_dyn, FromSqlRow, Parameter};
+use futures::Stream;
+use postgres_query::{query, query_dyn, Error as PqError, FromSqlRow, Parameter};
 use serde::{Deserialize, Serialize};
 use smallvec::{smallvec, SmallVec};
 use stack_string::{format_sstr, StackString};
@@ -99,7 +100,7 @@ impl ImdbEpisodes {
     pub async fn get_episodes_after_timestamp(
         timestamp: OffsetDateTime,
         pool: &PgPool,
-    ) -> Result<Vec<Self>, Error> {
+    ) -> Result<impl Stream<Item = Result<Self, PqError>>, Error> {
         let query = query!(
             r#"
                 SELECT a.show, b.title, a.season, a.episode, a.airdate,
@@ -111,7 +112,7 @@ impl ImdbEpisodes {
             timestamp = timestamp
         );
         let conn = pool.get().await?;
-        query.fetch(&conn).await.map_err(Into::into)
+        query.fetch_streaming(&conn).await.map_err(Into::into)
     }
 
     /// # Errors
@@ -121,7 +122,7 @@ impl ImdbEpisodes {
         season: Option<i32>,
         episode: Option<i32>,
         pool: &PgPool,
-    ) -> Result<Vec<Self>, Error> {
+    ) -> Result<impl Stream<Item = Result<Self, PqError>>, Error> {
         let mut constraints: SmallVec<[_; 3]> = smallvec!["a.show = $show"];
         let mut bindings: SmallVec<[_; 3]> = smallvec![("show", &show as Parameter)];
         if let Some(season) = &season {
@@ -148,7 +149,7 @@ impl ImdbEpisodes {
             ..bindings
         )?;
         let conn = pool.get().await?;
-        query.fetch(&conn).await.map_err(Into::into)
+        query.fetch_streaming(&conn).await.map_err(Into::into)
     }
 
     /// # Errors
@@ -250,7 +251,10 @@ impl ImdbSeason {
 impl ImdbSeason {
     /// # Errors
     /// Returns error if db queries fail
-    pub async fn get_seasons(show: &str, pool: &PgPool) -> Result<Vec<ImdbSeason>, Error> {
+    pub async fn get_seasons(
+        show: &str,
+        pool: &PgPool,
+    ) -> Result<impl Stream<Item = Result<ImdbSeason, PqError>>, Error> {
         let query = query!(
             r#"
                 SELECT a.show, b.title, a.season, count(distinct a.episode) as nepisodes
@@ -263,6 +267,6 @@ impl ImdbSeason {
             show = show
         );
         let conn = pool.get().await?;
-        query.fetch(&conn).await.map_err(Into::into)
+        query.fetch_streaming(&conn).await.map_err(Into::into)
     }
 }

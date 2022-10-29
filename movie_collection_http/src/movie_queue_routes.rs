@@ -2,6 +2,7 @@
 
 use anyhow::format_err;
 use bytes::Buf;
+use futures::TryStreamExt;
 use itertools::Itertools;
 use log::error;
 use maplit::hashmap;
@@ -455,9 +456,10 @@ pub async fn imdb_episodes_route(
         ImdbEpisodes::get_episodes_after_timestamp(query.start_timestamp.into(), &state.db)
             .await
             .map_err(Into::<Error>::into)?
-            .into_iter()
-            .map(Into::into)
-            .collect();
+            .map_ok(Into::into)
+            .try_collect()
+            .await
+            .map_err(Into::<Error>::into)?;
     task.await.ok();
     Ok(JsonBase::new(episodes).into())
 }
@@ -518,9 +520,10 @@ pub async fn imdb_ratings_route(
     let ratings = ImdbRatings::get_shows_after_timestamp(query.start_timestamp.into(), &state.db)
         .await
         .map_err(Into::<Error>::into)?
-        .into_iter()
-        .map(Into::into)
-        .collect();
+        .map_ok(Into::into)
+        .try_collect()
+        .await
+        .map_err(Into::<Error>::into)?;
     task.await.ok();
     Ok(JsonBase::new(ratings).into())
 }
@@ -807,7 +810,13 @@ pub async fn tvshows(
     let stdout = StdoutChannel::with_mock_stdout(mock_stdout.clone(), mock_stdout.clone());
 
     let mc = MovieCollection::new(&state.config, &state.db, &stdout);
-    let shows = mc.print_tv_shows().await.map_err(Into::<Error>::into)?;
+    let shows: Vec<_> = mc
+        .print_tv_shows()
+        .await
+        .map_err(Into::<Error>::into)?
+        .try_collect()
+        .await
+        .map_err(Into::<Error>::into)?;
     let show_map = get_watchlist_shows_db_map(&state.db)
         .await
         .map_err(Into::<Error>::into)?;
@@ -1592,9 +1601,9 @@ async fn watch_list_http_worker(
 
     let watched_episodes_db: HashSet<i32> = get_watched_shows_db(pool, show_str, Some(season))
         .await?
-        .into_iter()
-        .map(|s| s.episode)
-        .collect();
+        .map_ok(|s| s.episode)
+        .try_collect()
+        .await?;
 
     let queue: HashMap<(StackString, i32, i32), _> = mq
         .print_movie_queue(&[show_str.as_str()])
@@ -1787,9 +1796,10 @@ pub async fn plex_events(
     )
     .await
     .map_err(Into::<Error>::into)?
-    .into_iter()
-    .map(Into::into)
-    .collect();
+    .map_ok(Into::into)
+    .try_collect()
+    .await
+    .map_err(Into::<Error>::into)?;
     task.await.ok();
     Ok(JsonBase::new(events).into())
 }
@@ -1948,9 +1958,10 @@ pub async fn plex_filename(
     )
     .await
     .map_err(Into::<Error>::into)?
-    .into_iter()
-    .map(Into::into)
-    .collect();
+    .map_ok(Into::into)
+    .try_collect()
+    .await
+    .map_err(Into::<Error>::into)?;
     task.await.ok();
     Ok(JsonBase::new(filenames).into())
 }
@@ -2025,9 +2036,10 @@ pub async fn plex_metadata(
     )
     .await
     .map_err(Into::<Error>::into)?
-    .into_iter()
-    .map(Into::into)
-    .collect();
+    .map_ok(Into::into)
+    .try_collect()
+    .await
+    .map_err(Into::<Error>::into)?;
     task.await.ok();
     Ok(JsonBase::new(entries).into())
 }
@@ -2102,9 +2114,10 @@ pub async fn music_collection(
     )
     .await
     .map_err(Into::<Error>::into)?
-    .into_iter()
-    .map(Into::into)
-    .collect();
+    .map_ok(Into::into)
+    .try_collect()
+    .await
+    .map_err(Into::<Error>::into)?;
     task.await.ok();
     Ok(JsonBase::new(entries).into())
 }

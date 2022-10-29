@@ -3,6 +3,7 @@ use handlebars::RenderError;
 use http::StatusCode;
 use indexmap::IndexMap;
 use log::error;
+use postgres_query::Error as PqError;
 use rweb::{
     openapi::{
         ComponentDescriptor, ComponentOrInlineSchema, Entity, Response, ResponseEntity, Responses,
@@ -39,6 +40,8 @@ pub enum ServiceError {
     IoError(#[from] IoError),
     #[error("FmtError {0}")]
     FmtError(#[from] FmtError),
+    #[error("PqError {0}")]
+    PqError(#[from] PqError),
 }
 
 impl Reject for ServiceError {}

@@ -1,6 +1,9 @@
 use anyhow::{format_err, Error};
+use futures::{Stream, TryStreamExt};
 use log::info;
-use postgres_query::{client::GenericClient, query, query_dyn, FromSqlRow, Parameter, Query};
+use postgres_query::{
+    client::GenericClient, query, query_dyn, Error as PqError, FromSqlRow, Parameter, Query,
+};
 use roxmltree::Document;
 use serde::{Deserialize, Serialize};
 use stack_string::{format_sstr, StackString};
@@ -94,7 +97,7 @@ impl PlexEvent {
         event_type: Option<PlexEventType>,
         offset: Option<u64>,
         limit: Option<u64>,
-    ) -> Result<Vec<Self>, Error> {
+    ) -> Result<impl Stream<Item = Result<Self, PqError>>, Error> {
         let mut constraints = Vec::new();
         let mut bindings = Vec::new();
         if let Some(start_timestamp) = &start_timestamp {
@@ -132,7 +135,7 @@ impl PlexEvent {
         );
         let query: Query = query_dyn!(&query, ..bindings)?;
         let conn = pool.get().await?;
-        query.fetch(&conn).await.map_err(Into::into)
+        query.fetch_streaming(&conn).await.map_err(Into::into)
     }
 
     /// # Errors
@@ -458,7 +461,7 @@ impl PlexFilename {
         start_timestamp: Option<OffsetDateTime>,
         offset: Option<u64>,
         limit: Option<u64>,
-    ) -> Result<Vec<Self>, Error> {
+    ) -> Result<impl Stream<Item = Result<Self, PqError>>, Error> {
         let mut constraints = Vec::new();
         let mut bindings = Vec::new();
         if let Some(start_timestamp) = &start_timestamp {
@@ -491,7 +494,7 @@ impl PlexFilename {
         );
         let query: Query = query_dyn!(&query, ..bindings)?;
         let conn = pool.get().await?;
-        query.fetch(&conn).await.map_err(Into::into)
+        query.fetch_streaming(&conn).await.map_err(Into::into)
     }
 
     async fn _get_by_key<C>(conn: &C, key: &str) -> Result<Option<Self>, Error>
@@ -574,7 +577,7 @@ impl PlexMetadata {
         start_timestamp: Option<OffsetDateTime>,
         offset: Option<u64>,
         limit: Option<u64>,
-    ) -> Result<Vec<Self>, Error> {
+    ) -> Result<impl Stream<Item = Result<Self, PqError>>, Error> {
         let mut constraints = Vec::new();
         let mut bindings = Vec::new();
         if let Some(start_timestamp) = &start_timestamp {
@@ -607,10 +610,12 @@ impl PlexMetadata {
         );
         let query: Query = query_dyn!(&query, ..bindings)?;
         let conn = pool.get().await?;
-        query.fetch(&conn).await.map_err(Into::into)
+        query.fetch_streaming(&conn).await.map_err(Into::into)
     }
 
-    async fn get_parents(pool: &PgPool) -> Result<Vec<Self>, Error> {
+    async fn get_parents(
+        pool: &PgPool,
+    ) -> Result<impl Stream<Item = Result<Self, PqError>>, Error> {
         let query = query!(
             r#"
                 SELECT *
@@ -629,7 +634,7 @@ impl PlexMetadata {
             "#
         );
         let conn = pool.get().await?;
-        query.fetch(&conn).await.map_err(Into::into)
+        query.fetch_streaming(&conn).await.map_err(Into::into)
     }
 
     /// # Errors
@@ -824,7 +829,8 @@ impl PlexMetadata {
         println!("update parent {bytes_written}");
         let bytes_written = Self::fill_plex_grandparent_metadata_show(pool).await?;
         println!("update grandparent {bytes_written}");
-        for plex_filename in PlexFilename::get_filenames(pool, None, None, None).await? {
+        let mut stream = Box::pin(PlexFilename::get_filenames(pool, None, None, None).await?);
+        while let Some(plex_filename) = stream.try_next().await? {
             if let Some(metadata) = Self::get_by_key(pool, &plex_filename.metadata_key).await? {
                 if let Some(parent_key) = &metadata.parent_key {
                     if Self::get_by_key(pool, parent_key).await?.is_none() {
@@ -866,7 +872,8 @@ impl PlexMetadata {
                 }
             }
         }
-        for parent in Self::get_parents(pool).await? {
+        let mut stream = Box::pin(Self::get_parents(pool).await?);
+        while let Some(parent) = stream.try_next().await? {
             for (metadata, filename) in parent.get_children(config).await? {
                 if Self::get_by_key(pool, &metadata.metadata_key)
                     .await?
@@ -970,6 +977,7 @@ impl PlexMetadata {
 #[cfg(test)]
 mod tests {
     use anyhow::Error;
+    use futures::TryStreamExt;
 
     use crate::{config::Config, pgpool::PgPool, plex_events::PlexEvent};
 
@@ -980,8 +988,11 @@ mod tests {
     async fn test_get_plex_filename() -> Result<(), Error> {
         let config = Config::with_config()?;
         let pool = PgPool::new(&config.pgurl);
-        let event = PlexEvent::get_events(&pool, None, None, None, None)
+        let events: Vec<_> = PlexEvent::get_events(&pool, None, None, None, None)
             .await?
+            .try_collect()
+            .await?;
+        let event = events
             .into_iter()
             .find(|event| {
                 event.metadata_key.is_some()

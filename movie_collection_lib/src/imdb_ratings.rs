@@ -1,6 +1,7 @@
 use anyhow::Error;
+use futures::Stream;
 use log::debug;
-use postgres_query::{query, query_dyn, FromSqlRow, Parameter};
+use postgres_query::{query, query_dyn, Error as PqError, FromSqlRow, Parameter};
 use serde::{Deserialize, Serialize};
 use stack_string::{format_sstr, StackString};
 use std::fmt;
@@ -115,7 +116,7 @@ impl ImdbRatings {
     pub async fn get_shows_after_timestamp(
         timestamp: OffsetDateTime,
         pool: &PgPool,
-    ) -> Result<Vec<Self>, Error> {
+    ) -> Result<impl Stream<Item = Result<Self, PqError>>, Error> {
         let query = query!(
             r#"
                 SELECT index, show, title, link, rating, istv, source
@@ -125,7 +126,7 @@ impl ImdbRatings {
             timestamp = timestamp
         );
         let conn = pool.get().await?;
-        query.fetch(&conn).await.map_err(Into::into)
+        query.fetch_streaming(&conn).await.map_err(Into::into)
     }
 
     #[must_use]

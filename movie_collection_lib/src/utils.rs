@@ -1,8 +1,10 @@
 use anyhow::{format_err, Error};
 use async_trait::async_trait;
+use futures::TryStreamExt;
 use handlebars::Handlebars;
 use jwalk::WalkDir;
 use lazy_static::lazy_static;
+use postgres_query::{query, Error as PqError};
 use rand::{
     distributions::{Distribution, Uniform},
     thread_rng,
@@ -174,15 +176,16 @@ pub trait ExponentialRetry {
 /// # Errors
 /// Return error if db query fails
 pub async fn get_authorized_users(pool: &PgPool) -> Result<HashSet<StackString>, Error> {
-    let query = "SELECT email FROM authorized_users";
-    pool.get()
+    let query = query!("SELECT email FROM authorized_users");
+    let conn = pool.get().await?;
+    query
+        .query_streaming(&conn)
         .await?
-        .query(query, &[])
-        .await?
-        .into_iter()
-        .map(|row| {
-            let email: StackString = row.try_get(0)?;
+        .and_then(|row| async move {
+            let email: StackString = row.try_get(0).map_err(PqError::BeginTransaction)?;
             Ok(email)
         })
-        .collect()
+        .try_collect()
+        .await
+        .map_err(Into::into)
 }

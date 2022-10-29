@@ -4,6 +4,7 @@ use async_graphql::{
 };
 use async_trait::async_trait;
 use derive_more::{Deref, From, Into};
+use futures::TryStreamExt;
 use stack_string::StackString;
 use std::collections::HashMap;
 use time::Date;
@@ -317,9 +318,11 @@ impl Loader<ShowSeasonKey> for ItemLoader {
         let mut episodes = HashMap::new();
         for key in keys {
             let show = key.as_str();
-            let values = ImdbSeason::get_seasons(show, &self.0)
+            let values: Vec<_> = ImdbSeason::get_seasons(show, &self.0)
                 .await
-                .map_err(Error::new_with_source)?;
+                .map_err(Error::new_with_source)?
+                .try_collect()
+                .await?;
             episodes.insert(key.clone(), values);
         }
         Ok(episodes)
@@ -349,10 +352,12 @@ impl Loader<EpisodesShowSeasonKey> for ItemLoader {
                 season,
                 episode,
             } = key;
-            let values =
+            let values: Vec<_> =
                 ImdbEpisodes::get_episodes_by_show_season_episode(show, *season, *episode, &self.0)
                     .await
-                    .map_err(Error::new_with_source)?;
+                    .map_err(Error::new_with_source)?
+                    .try_collect()
+                    .await?;
             episodes.insert(key.clone(), values);
         }
         Ok(episodes)

@@ -1,8 +1,8 @@
 use anyhow::{format_err, Error};
 use derive_more::Into;
-use futures::future::try_join_all;
+use futures::{future::try_join_all, stream::FuturesUnordered, Stream, TryStreamExt};
 use itertools::Itertools;
-use postgres_query::{query, query_dyn, FromSqlRow};
+use postgres_query::{query, query_dyn, Error as PqError, FromSqlRow};
 use rayon::iter::{IntoParallelIterator, IntoParallelRefIterator, ParallelIterator};
 use serde::{Deserialize, Serialize};
 use stack_string::{format_sstr, StackString};
@@ -242,13 +242,21 @@ impl MovieCollection {
         show: &str,
         season: Option<i32>,
     ) -> Result<Vec<ImdbEpisodes>, Error> {
-        ImdbEpisodes::get_episodes_by_show_season_episode(show, season, None, &self.pool).await
+        ImdbEpisodes::get_episodes_by_show_season_episode(show, season, None, &self.pool)
+            .await?
+            .try_collect()
+            .await
+            .map_err(Into::into)
     }
 
     /// # Errors
     /// Returns error if db queries fail
     pub async fn print_imdb_all_seasons(&self, show: &str) -> Result<Vec<ImdbSeason>, Error> {
-        ImdbSeason::get_seasons(show, &self.pool).await
+        ImdbSeason::get_seasons(show, &self.pool)
+            .await?
+            .try_collect()
+            .await
+            .map_err(Into::into)
     }
 
     /// # Errors
@@ -322,9 +330,8 @@ impl MovieCollection {
                     episode = episode
                 );
                 let conn = self.pool.get().await?;
-                let results: Vec<TempImdbEpisodes> = query.fetch(&conn).await?;
-
-                for row in results {
+                let row: Option<TempImdbEpisodes> = query.fetch_opt(&conn).await?;
+                if let Some(row) = row {
                     result.season = Some(season);
                     result.episode = Some(episode);
                     result.eprating = row.eprating;
@@ -551,50 +558,56 @@ impl MovieCollection {
         let episodes_set = episodes_set?;
         let rate_limiter = RateLimiter::new(10, 100);
 
-        let futures = file_list.iter().map(|f| {
-            let collection_map = collection_map.clone();
-            let rate_limiter = rate_limiter.clone();
-            async move {
-                if collection_map.get(f.as_str()).is_none() {
-                    let ext = Path::new(f)
-                        .extension()
-                        .map(OsStr::to_string_lossy)
-                        .ok_or_else(|| format_err!("extension fail"))?
-                        .as_ref()
-                        .into();
-                    if self.config.suffixes.contains(&ext) {
-                        self.stdout.send(format_sstr!("not in collection {f}"));
-                        rate_limiter.acquire().await;
-                        self.insert_into_collection(f, true).await?;
+        let futures: FuturesUnordered<_> = file_list
+            .iter()
+            .map(|f| {
+                let collection_map = collection_map.clone();
+                let rate_limiter = rate_limiter.clone();
+                async move {
+                    if collection_map.get(f.as_str()).is_none() {
+                        let ext = Path::new(f)
+                            .extension()
+                            .map(OsStr::to_string_lossy)
+                            .ok_or_else(|| format_err!("extension fail"))?
+                            .as_ref()
+                            .into();
+                        if self.config.suffixes.contains(&ext) {
+                            self.stdout.send(format_sstr!("not in collection {f}"));
+                            rate_limiter.acquire().await;
+                            self.insert_into_collection(f, true).await?;
+                        }
                     }
+                    Ok(())
                 }
-                Ok(())
-            }
-        });
-        let results: Result<Vec<_>, Error> = try_join_all(futures).await;
+            })
+            .collect();
+        let results: Result<(), Error> = futures.try_collect().await;
         results?;
 
-        let futures = collection_map.iter().map(|(key, val)| {
-            let file_list = file_list.clone();
-            let movie_queue = movie_queue.clone();
-            let rate_limiter = rate_limiter.clone();
-            async move {
-                if !file_list.contains(key.as_str()) {
-                    if let Some(v) = movie_queue.get(key) {
-                        self.stdout
-                            .send(format_sstr!("in queue but not disk 1 {key} {v}"));
-                        let mq = MovieQueueDB::new(&self.config, &self.pool, &self.stdout);
-                        mq.remove_from_queue_by_path(key).await?;
-                    } else {
-                        self.stdout.send(format_sstr!("not on disk 1 {key} {val}"));
+        let futures: FuturesUnordered<_> = collection_map
+            .iter()
+            .map(|(key, val)| {
+                let file_list = file_list.clone();
+                let movie_queue = movie_queue.clone();
+                let rate_limiter = rate_limiter.clone();
+                async move {
+                    if !file_list.contains(key.as_str()) {
+                        if let Some(v) = movie_queue.get(key) {
+                            self.stdout
+                                .send(format_sstr!("in queue but not disk 1 {key} {v}"));
+                            let mq = MovieQueueDB::new(&self.config, &self.pool, &self.stdout);
+                            mq.remove_from_queue_by_path(key).await?;
+                        } else {
+                            self.stdout.send(format_sstr!("not on disk 1 {key} {val}"));
+                        }
+                        rate_limiter.acquire().await;
+                        self.remove_from_collection(key).await?;
                     }
-                    rate_limiter.acquire().await;
-                    self.remove_from_collection(key).await?;
+                    Ok(())
                 }
-                Ok(())
-            }
-        });
-        let results: Result<Vec<_>, Error> = try_join_all(futures).await;
+            })
+            .collect();
+        let results: Result<(), Error> = futures.try_collect().await;
         results?;
 
         for (key, val) in collection_map.iter() {
@@ -678,7 +691,9 @@ impl MovieCollection {
 
     /// # Errors
     /// Returns error if db queries fail
-    pub async fn print_tv_shows(&self) -> Result<Vec<TvShowsResult>, Error> {
+    pub async fn print_tv_shows(
+        &self,
+    ) -> Result<impl Stream<Item = Result<TvShowsResult, PqError>>, Error> {
         let query = query!(
             r#"
             SELECT b.show, c.link, c.title, c.source, count(*) as count
@@ -691,7 +706,7 @@ impl MovieCollection {
         "#
         );
         let conn = self.pool.get().await?;
-        query.fetch(&conn).await.map_err(Into::into)
+        query.fetch_streaming(&conn).await.map_err(Into::into)
     }
 
     /// # Errors

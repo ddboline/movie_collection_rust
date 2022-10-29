@@ -1,7 +1,7 @@
 use anyhow::Error;
 use clap::Parser;
 use derive_more::{From, Into};
-use futures::future::try_join_all;
+use futures::{future, future::try_join_all, TryStreamExt};
 use log::error;
 use refinery::embed_migrations;
 use stack_string::StackString;
@@ -248,31 +248,42 @@ impl MovieQueueCli {
                         file.write_all(&serde_json::to_vec(&last_modified)?).await?;
                     }
                     "imdb_ratings" => {
-                        let shows =
-                            ImdbRatings::get_shows_after_timestamp(start_timestamp, &pool).await?;
+                        let shows: Vec<_> =
+                            ImdbRatings::get_shows_after_timestamp(start_timestamp, &pool)
+                                .await?
+                                .try_collect()
+                                .await?;
                         file.write_all(&serde_json::to_vec(&shows)?).await?;
                     }
                     "imdb_episodes" => {
-                        let episodes =
+                        let episodes: Vec<_> =
                             ImdbEpisodes::get_episodes_after_timestamp(start_timestamp, &pool)
+                                .await?
+                                .try_collect()
                                 .await?;
                         file.write_all(&serde_json::to_vec(&episodes)?).await?;
                     }
                     "plex_event" => {
-                        let events =
+                        let events: Vec<_> =
                             PlexEvent::get_events(&pool, Some(start_timestamp), None, None, None)
+                                .await?
+                                .try_collect()
                                 .await?;
                         file.write_all(&serde_json::to_vec(&events)?).await?;
                     }
                     "plex_filename" => {
-                        let filenames =
+                        let filenames: Vec<_> =
                             PlexFilename::get_filenames(&pool, Some(start_timestamp), None, None)
+                                .await?
+                                .try_collect()
                                 .await?;
                         file.write_all(&serde_json::to_vec(&filenames)?).await?;
                     }
                     "plex_metadata" => {
-                        let metadatas =
+                        let metadatas: Vec<_> =
                             PlexMetadata::get_entries(&pool, Some(start_timestamp), None, None)
+                                .await?
+                                .try_collect()
                                 .await?;
                         file.write_all(&serde_json::to_vec(&metadatas)?).await?;
                     }
@@ -282,8 +293,10 @@ impl MovieQueueCli {
                         file.write_all(&serde_json::to_vec(&entries)?).await?;
                     }
                     "music_collection" => {
-                        let entries =
+                        let entries: Vec<_> =
                             MusicCollection::get_entries(&pool, Some(start_timestamp), None, None)
+                                .await?
+                                .try_collect()
                                 .await?;
                         file.write_all(&serde_json::to_vec(&entries)?).await?;
                     }
@@ -304,11 +317,12 @@ impl MovieQueueCli {
                 migrations::runner().run_async(&mut **conn).await?;
             }
             Self::FillPlex => {
-                for event in PlexEvent::get_events(&pool, None, None, None, None)
-                    .await?
-                    .into_iter()
-                    .filter(|event| event.metadata_key.is_some())
-                {
+                let mut stream = Box::pin(
+                    PlexEvent::get_events(&pool, None, None, None, None)
+                        .await?
+                        .try_filter(|event| future::ready(event.metadata_key.is_some())),
+                );
+                while let Some(event) = stream.try_next().await? {
                     let metadata_key = event.metadata_key.as_ref().expect("Unexpected failure");
                     if PlexFilename::get_by_key(&pool, metadata_key)
                         .await?

@@ -1,8 +1,8 @@
 use anyhow::Error;
-use futures::future::try_join_all;
+use futures::{stream::FuturesUnordered, Stream, TryStreamExt};
 use itertools::Itertools;
 use log::debug;
-use postgres_query::{query, query_dyn, FromSqlRow};
+use postgres_query::{query, query_dyn, Error as PqError, FromSqlRow};
 use serde::{Deserialize, Serialize};
 use stack_string::{format_sstr, StackString};
 use std::{
@@ -262,7 +262,7 @@ pub async fn get_watchlist_shows_db(pool: &PgPool) -> Result<HashSet<WatchListSh
     "#
     );
     let conn = pool.get().await?;
-    let shows = query.fetch(&conn).await?.into_iter().collect();
+    let shows = query.fetch_streaming(&conn).await?.try_collect().await?;
     Ok(shows)
 }
 
@@ -279,25 +279,28 @@ pub async fn get_watchlist_shows_db_map(pool: &PgPool) -> Result<WatchListMap, E
         year: i32,
         source: Option<StackString>,
     }
-    let query = r#"
-        SELECT b.show, b.link, a.title, a.year, b.source
-        FROM trakt_watchlist a
-        JOIN imdb_ratings b ON a.show=b.show
-    "#;
-    pool.get()
+    async fn _get_watchlist_shows_db_map(
+        pool: &PgPool,
+    ) -> Result<impl Stream<Item = Result<WatchlistShowDbMap, PqError>>, Error> {
+        let query = query!(
+            r#"
+            SELECT b.show, b.link, a.title, a.year, b.source
+            FROM trakt_watchlist a
+            JOIN imdb_ratings b ON a.show=b.show
+        "#
+        );
+        let conn = pool.get().await?;
+        query.fetch_streaming(&conn).await.map_err(Into::into)
+    }
+    _get_watchlist_shows_db_map(pool)
         .await?
-        .query(query, &[])
-        .await?
-        .iter()
-        .map(|row| {
-            let row = WatchlistShowDbMap::from_row(row)?;
-
+        .map_ok(|row| {
             let source: Option<TvShowSource> = match row.source {
                 Some(s) => s.parse().ok(),
                 None => None,
             };
 
-            Ok((
+            (
                 row.link.clone(),
                 (
                     row.show.clone(),
@@ -309,9 +312,11 @@ pub async fn get_watchlist_shows_db_map(pool: &PgPool) -> Result<WatchListMap, E
                     },
                     source,
                 ),
-            ))
+            )
         })
-        .collect()
+        .try_collect()
+        .await
+        .map_err(Into::into)
 }
 
 #[derive(Serialize, Deserialize, Debug, Default, PartialEq, Eq, Hash, FromSqlRow)]
@@ -420,7 +425,7 @@ pub async fn get_watched_shows_db(
     pool: &PgPool,
     show: &str,
     season: Option<i32>,
-) -> Result<Vec<WatchedEpisode>, Error> {
+) -> Result<impl Stream<Item = Result<WatchedEpisode, PqError>>, Error> {
     let mut where_vec = Vec::new();
     if !show.is_empty() {
         where_vec.push(format_sstr!("c.show='{show}'"));
@@ -449,7 +454,7 @@ pub async fn get_watched_shows_db(
         "#
     ))?;
     let conn = pool.get().await?;
-    query.fetch(&conn).await.map_err(Into::into)
+    query.fetch_streaming(&conn).await.map_err(Into::into)
 }
 
 #[derive(Serialize, Deserialize, Debug, Default, Eq, FromSqlRow)]
@@ -550,7 +555,9 @@ impl WatchedMovie {
 
 /// # Errors
 /// Return error if db query fails
-pub async fn get_watched_movies_db(pool: &PgPool) -> Result<Vec<WatchedMovie>, Error> {
+pub async fn get_watched_movies_db(
+    pool: &PgPool,
+) -> Result<impl Stream<Item = Result<WatchedMovie, PqError>>, Error> {
     let query = query!(
         r#"
             SELECT a.link as imdb_url, b.title
@@ -560,7 +567,7 @@ pub async fn get_watched_movies_db(pool: &PgPool) -> Result<Vec<WatchedMovie>, E
         "#
     );
     let conn = pool.get().await?;
-    query.fetch(&conn).await.map_err(Into::into)
+    query.fetch_streaming(&conn).await.map_err(Into::into)
 }
 
 /// # Errors
@@ -576,45 +583,53 @@ pub async fn sync_trakt_with_db(
         return Ok(());
     }
 
-    let futures = watchlist_shows.into_iter().map(|(link, show)| {
-        let watchlist_shows_db = watchlist_shows_db.clone();
-        async move {
-            if !watchlist_shows_db.contains(link.as_str()) {
-                show.insert_show(&mc.pool).await?;
-                mc.stdout.send(format_sstr!("insert watchlist {show}"));
+    let futures: FuturesUnordered<_> = watchlist_shows
+        .into_iter()
+        .map(|(link, show)| {
+            let watchlist_shows_db = watchlist_shows_db.clone();
+            async move {
+                if !watchlist_shows_db.contains(link.as_str()) {
+                    show.insert_show(&mc.pool).await?;
+                    mc.stdout.send(format_sstr!("insert watchlist {show}"));
+                }
+                Ok(())
             }
-            Ok(())
-        }
-    });
-    let results: Result<Vec<_>, Error> = try_join_all(futures).await;
+        })
+        .collect();
+    let results: Result<(), Error> = futures.try_collect().await;
     results?;
 
     let watched_shows_db: HashMap<(StackString, i32, i32), _> =
         get_watched_shows_db(&mc.pool, "", None)
             .await?
-            .into_iter()
-            .map(|s| ((s.imdb_url.clone(), s.season, s.episode), s))
-            .collect();
+            .map_ok(|s| ((s.imdb_url.clone(), s.season, s.episode), s))
+            .try_collect()
+            .await?;
     let watched_shows_db = Arc::new(watched_shows_db);
     let watched_shows = trakt.get_watched_shows().await?;
     if watched_shows.is_empty() {
         return Ok(());
     }
-    let futures = watched_shows.into_iter().map(|(key, episode)| {
-        let watched_shows_db = watched_shows_db.clone();
-        async move {
-            if !watched_shows_db.contains_key(&key) && episode.insert_episode(&mc.pool).await? > 0 {
-                mc.stdout
-                    .send(format_sstr!("insert watched episode {episode}"));
+    let futures: FuturesUnordered<_> = watched_shows
+        .into_iter()
+        .map(|(key, episode)| {
+            let watched_shows_db = watched_shows_db.clone();
+            async move {
+                if !watched_shows_db.contains_key(&key)
+                    && episode.insert_episode(&mc.pool).await? > 0
+                {
+                    mc.stdout
+                        .send(format_sstr!("insert watched episode {episode}"));
+                }
+                Ok(())
             }
-            Ok(())
-        }
-    });
-    let results: Result<Vec<_>, Error> = try_join_all(futures).await;
+        })
+        .collect();
+    let results: Result<(), Error> = futures.try_collect().await;
     results?;
 
     let watched_movies_db: HashSet<_> =
-        get_watched_movies_db(&mc.pool).await?.into_iter().collect();
+        get_watched_movies_db(&mc.pool).await?.try_collect().await?;
     let watched_movies_db = Arc::new(watched_movies_db);
     let watched_movies = trakt.get_watched_movies().await?;
     let watched_movies = Arc::new(watched_movies);
@@ -622,32 +637,36 @@ pub async fn sync_trakt_with_db(
         return Ok(());
     }
 
-    let futures = watched_movies.iter().map(|movie: &WatchedMovie| {
-        let watched_movies_db = watched_movies_db.clone();
-        async move {
-            if !watched_movies_db.contains(movie.imdb_url.as_str()) {
-                movie.insert_movie(&mc.pool).await?;
-                mc.stdout.send(format_sstr!("insert watched movie {movie}"));
+    let futures: FuturesUnordered<_> = watched_movies
+        .iter()
+        .map(|movie: &WatchedMovie| {
+            let watched_movies_db = watched_movies_db.clone();
+            async move {
+                if !watched_movies_db.contains(movie.imdb_url.as_str()) {
+                    movie.insert_movie(&mc.pool).await?;
+                    mc.stdout.send(format_sstr!("insert watched movie {movie}"));
+                }
+                Ok(())
             }
-            Ok(())
-        }
-    });
-    let results: Result<Vec<_>, Error> = try_join_all(futures).await;
+        })
+        .collect();
+    let results: Result<(), Error> = futures.try_collect().await;
     results?;
 
-    let futures = watched_movies_db.iter().map(|movie| {
-        let watched_movies = watched_movies.clone();
-        async move {
-            if !watched_movies.contains(movie.imdb_url.as_str()) {
-                movie.delete_movie(&mc.pool).await?;
-                mc.stdout.send(format_sstr!("delete watched {movie}"));
+    let futures: FuturesUnordered<_> = watched_movies_db
+        .iter()
+        .map(|movie| {
+            let watched_movies = watched_movies.clone();
+            async move {
+                if !watched_movies.contains(movie.imdb_url.as_str()) {
+                    movie.delete_movie(&mc.pool).await?;
+                    mc.stdout.send(format_sstr!("delete watched {movie}"));
+                }
+                Ok(())
             }
-            Ok(())
-        }
-    });
-    let results: Result<Vec<_>, Error> = try_join_all(futures).await;
-    results?;
-    Ok(())
+        })
+        .collect();
+    futures.try_collect().await
 }
 
 async fn get_imdb_url_from_show(
@@ -820,8 +839,11 @@ async fn watched_rm(
 }
 
 async fn watched_list(mc: &MovieCollection, show: &str, season: i32) -> Result<(), Error> {
-    let watched_shows = get_watched_shows_db(&mc.pool, "", None).await?;
-    let watched_movies = get_watched_movies_db(&mc.pool).await?;
+    let watched_shows: Vec<_> = get_watched_shows_db(&mc.pool, "", None)
+        .await?
+        .try_collect()
+        .await?;
+    let watched_movies: Vec<_> = get_watched_movies_db(&mc.pool).await?.try_collect().await?;
 
     if let Some(imdb_url) = get_imdb_url_from_show(mc, show).await? {
         let lines = watched_shows

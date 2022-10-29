@@ -1,4 +1,5 @@
 use anyhow::format_err;
+use futures::TryStreamExt;
 use rweb::Schema;
 use rweb_helper::{derive_rweb_schema, DateTimeType};
 use serde::{Deserialize, Serialize};
@@ -138,9 +139,11 @@ impl WatchedShowsRequest {
     /// # Errors
     /// Return error if `get_watched_shows_db` fails
     pub async fn handle(&self, pool: &PgPool) -> Result<Vec<WatchedEpisode>, Error> {
-        get_watched_shows_db(pool, &self.show, Some(self.season))
-            .await
-            .map_err(Into::into)
+        let episodes = get_watched_shows_db(pool, &self.show, Some(self.season))
+            .await?
+            .try_collect()
+            .await?;
+        Ok(episodes)
     }
 }
 

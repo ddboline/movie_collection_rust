@@ -1,6 +1,6 @@
 use anyhow::{format_err, Error};
 use derive_more::Display;
-use futures::future::try_join_all;
+use futures::{future::try_join_all, TryStreamExt};
 use itertools::Itertools;
 use stack_string::{format_sstr, StackString};
 use std::{
@@ -65,12 +65,13 @@ pub async fn make_queue_worker(
     let mq = MovieQueueDB::new(config, &pool, stdout);
 
     if do_shows {
-        let shows = mc
+        let shows: Vec<_> = mc
             .print_tv_shows()
             .await?
-            .into_iter()
-            .map(StackString::from_display)
-            .join("\n");
+            .map_ok(StackString::from_display)
+            .try_collect()
+            .await?;
+        let shows = shows.join("\n");
         stdout.send(shows);
     } else if !del_files.is_empty() {
         for file in del_files {

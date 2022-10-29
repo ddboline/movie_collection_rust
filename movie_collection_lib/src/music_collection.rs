@@ -1,6 +1,6 @@
 use anyhow::{format_err, Error};
-use futures::future::try_join_all;
-use postgres_query::{query, query_dyn, FromSqlRow, Parameter, Query};
+use futures::{future::try_join_all, Stream, TryStreamExt};
+use postgres_query::{query, query_dyn, Error as PqError, FromSqlRow, Parameter, Query};
 use rayon::iter::{IntoParallelRefIterator, ParallelIterator};
 use serde::{Deserialize, Serialize};
 use stack_string::{format_sstr, StackString};
@@ -56,9 +56,11 @@ impl MusicCollection {
         start_timestamp: Option<OffsetDateTime>,
         offset: Option<u64>,
         limit: Option<u64>,
-    ) -> Result<Vec<Self>, Error> {
+    ) -> Result<impl Stream<Item = Result<Self, PqError>>, Error> {
         if Self::get_count(pool).await? == 0 {
-            return Ok(Vec::new());
+            let query = query!("SELECT * FROM music_collection LIMIT 0");
+            let conn = pool.get().await?;
+            return query.fetch_streaming(&conn).await.map_err(Into::into);
         }
         let mut constraints = Vec::new();
         let mut bindings = Vec::new();
@@ -92,7 +94,7 @@ impl MusicCollection {
         );
         let query: Query = query_dyn!(&query, ..bindings)?;
         let conn = pool.get().await?;
-        query.fetch(&conn).await.map_err(Into::into)
+        query.fetch_streaming(&conn).await.map_err(Into::into)
     }
 
     /// # Errors
@@ -170,12 +172,12 @@ impl MusicCollection {
     pub async fn make_collection(config: &Config, pool: &PgPool) -> Result<Vec<Self>, Error> {
         let music_dict: HashMap<StackString, Self> = Self::get_entries(pool, None, None, None)
             .await?
-            .into_iter()
-            .map(|m| {
+            .map_ok(|m| {
                 let key: StackString = m.path.clone();
                 (key, m)
             })
-            .collect();
+            .try_collect()
+            .await?;
         let music_dict = Arc::new(music_dict);
 
         let music_list: Result<Vec<_>, Error> = config
