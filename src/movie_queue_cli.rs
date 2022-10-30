@@ -317,12 +317,12 @@ impl MovieQueueCli {
                 migrations::runner().run_async(&mut **conn).await?;
             }
             Self::FillPlex => {
-                let mut stream = Box::pin(
-                    PlexEvent::get_events(&pool, None, None, None, None)
-                        .await?
-                        .try_filter(|event| future::ready(event.metadata_key.is_some())),
-                );
-                while let Some(event) = stream.try_next().await? {
+                let events: Vec<_> = PlexEvent::get_events(&pool, None, None, None, None)
+                    .await?
+                    .try_filter(|event| future::ready(event.metadata_key.is_some()))
+                    .try_collect()
+                    .await?;
+                for event in events {
                     let metadata_key = event.metadata_key.as_ref().expect("Unexpected failure");
                     if PlexFilename::get_by_key(&pool, metadata_key)
                         .await?

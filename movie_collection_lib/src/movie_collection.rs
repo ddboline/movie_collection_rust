@@ -584,28 +584,26 @@ impl MovieCollection {
         let results: Result<(), Error> = futures.try_collect().await;
         results?;
 
-        let futures = collection_map
-            .iter()
-            .map(|(key, val)| {
-                let file_list = file_list.clone();
-                let movie_queue = movie_queue.clone();
-                let rate_limiter = rate_limiter.clone();
-                async move {
-                    if !file_list.contains(key.as_str()) {
-                        if let Some(v) = movie_queue.get(key) {
-                            self.stdout
-                                .send(format_sstr!("in queue but not disk 1 {key} {v}"));
-                            let mq = MovieQueueDB::new(&self.config, &self.pool, &self.stdout);
-                            mq.remove_from_queue_by_path(key).await?;
-                        } else {
-                            self.stdout.send(format_sstr!("not on disk 1 {key} {val}"));
-                        }
-                        rate_limiter.acquire().await;
-                        self.remove_from_collection(key).await?;
+        let futures = collection_map.iter().map(|(key, val)| {
+            let file_list = file_list.clone();
+            let movie_queue = movie_queue.clone();
+            let rate_limiter = rate_limiter.clone();
+            async move {
+                if !file_list.contains(key.as_str()) {
+                    if let Some(v) = movie_queue.get(key) {
+                        self.stdout
+                            .send(format_sstr!("in queue but not disk 1 {key} {v}"));
+                        let mq = MovieQueueDB::new(&self.config, &self.pool, &self.stdout);
+                        mq.remove_from_queue_by_path(key).await?;
+                    } else {
+                        self.stdout.send(format_sstr!("not on disk 1 {key} {val}"));
                     }
-                    Ok(())
+                    rate_limiter.acquire().await;
+                    self.remove_from_collection(key).await?;
                 }
-            });
+                Ok(())
+            }
+        });
         let results: Result<Vec<()>, Error> = try_join_all(futures).await;
         results?;
 

@@ -829,8 +829,11 @@ impl PlexMetadata {
         println!("update parent {bytes_written}");
         let bytes_written = Self::fill_plex_grandparent_metadata_show(pool).await?;
         println!("update grandparent {bytes_written}");
-        let mut stream = Box::pin(PlexFilename::get_filenames(pool, None, None, None).await?);
-        while let Some(plex_filename) = stream.try_next().await? {
+        let filenames: Vec<_> = PlexFilename::get_filenames(pool, None, None, None)
+            .await?
+            .try_collect()
+            .await?;
+        for plex_filename in filenames {
             if let Some(metadata) = Self::get_by_key(pool, &plex_filename.metadata_key).await? {
                 if let Some(parent_key) = &metadata.parent_key {
                     if Self::get_by_key(pool, parent_key).await?.is_none() {
@@ -872,8 +875,8 @@ impl PlexMetadata {
                 }
             }
         }
-        let mut stream = Box::pin(Self::get_parents(pool).await?);
-        while let Some(parent) = stream.try_next().await? {
+        let parents: Vec<_> = Self::get_parents(pool).await?.try_collect().await?;
+        for parent in parents {
             for (metadata, filename) in parent.get_children(config).await? {
                 if Self::get_by_key(pool, &metadata.metadata_key)
                     .await?
