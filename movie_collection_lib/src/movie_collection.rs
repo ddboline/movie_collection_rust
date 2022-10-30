@@ -584,7 +584,7 @@ impl MovieCollection {
         let results: Result<(), Error> = futures.try_collect().await;
         results?;
 
-        let futures: FuturesUnordered<_> = collection_map
+        let futures = collection_map
             .iter()
             .map(|(key, val)| {
                 let file_list = file_list.clone();
@@ -605,9 +605,8 @@ impl MovieCollection {
                     }
                     Ok(())
                 }
-            })
-            .collect();
-        let results: Result<(), Error> = futures.try_collect().await;
+            });
+        let results: Result<Vec<()>, Error> = try_join_all(futures).await;
         results?;
 
         for (key, val) in collection_map.iter() {
