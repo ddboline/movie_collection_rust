@@ -1,5 +1,4 @@
 use anyhow::{format_err, Error};
-use derive_more::Into;
 use futures::{future::try_join_all, stream::FuturesUnordered, Stream, TryStreamExt};
 use itertools::Itertools;
 use postgres_query::{query, query_dyn, Error as PqError, FromSqlRow};
@@ -321,10 +320,10 @@ impl MovieCollection {
 
                 let query = query!(
                     r#"
-                            SELECT cast(rating as double precision) as eprating, eptitle, epurl
-                            FROM imdb_episodes
-                            WHERE show = $show AND season = $season AND episode = $episode
-                        "#,
+                        SELECT cast(rating as double precision) as eprating, eptitle, epurl
+                        FROM imdb_episodes
+                        WHERE show = $show AND season = $season AND episode = $episode
+                    "#,
                     show = show,
                     season = season,
                     episode = episode
@@ -429,36 +428,59 @@ impl MovieCollection {
     /// # Errors
     /// Returns error if db queries fail
     pub async fn fix_collection_show_id(&self) -> Result<u64, Error> {
-        let query = r#"
-            WITH a AS (
-                SELECT a.idx, a.show, b.index
-                FROM movie_collection a
-                JOIN imdb_ratings b ON a.show = b.show
-                WHERE a.show_id is null
-            )
-            UPDATE movie_collection b
-            SET show_id=(SELECT c.index FROM imdb_ratings c WHERE b.show=c.show),
-                last_modified=now()
-            WHERE idx in (SELECT a.idx FROM a)
-        "#;
-        let rows = self.pool.get().await?.execute(query, &[]).await?;
-        Ok(rows)
+        let query = query!(
+            r#"
+                WITH a AS (
+                    SELECT a.idx, a.show, b.index
+                    FROM movie_collection a
+                    JOIN imdb_ratings b ON a.show = b.show
+                    WHERE a.show_id is null
+                )
+                UPDATE movie_collection b
+                SET show_id=(SELECT c.index FROM imdb_ratings c WHERE b.show=c.show),
+                    last_modified=now()
+                WHERE idx in (SELECT a.idx FROM a)
+            "#
+        );
+        let conn = self.pool.get().await?;
+        query.execute(&conn).await.map_err(Into::into)
+    }
+
+    /// # Errors
+    /// Returns error if db queries fail
+    pub async fn clear_plex_filename_bad_collection_id(&self) -> Result<u64, Error> {
+        let query = query!(
+            r#"
+                UPDATE plex_filename
+                SET collection_id = NULL
+                WHERE metadata_key IN (
+                    SELECT pf.metadata_key
+                    FROM plex_filename pf
+                    LEFT JOIN movie_collection mc ON mc.idx = pf.collection_id
+                    WHERE pf.collection_id IS NOT NULL AND mc.idx IS NULL
+                )
+            "#
+        );
+        let conn = self.pool.get().await?;
+        query.execute(&conn).await.map_err(Into::into)
     }
 
     /// # Errors
     /// Returns error if db queries fail
     pub async fn fix_plex_filename_collection_id(&self) -> Result<u64, Error> {
-        let query = r#"
-            UPDATE plex_filename
-            SET collection_id = (
-                SELECT m.idx
-                FROM movie_collection m
-                WHERE m.path = replace(plex_filename.filename, '/shares/', '/media/')
-            )
-            WHERE collection_id IS NULL
-        "#;
-        let rows = self.pool.get().await?.execute(query, &[]).await?;
-        Ok(rows)
+        let query = query!(
+            r#"
+                UPDATE plex_filename
+                SET collection_id = (
+                    SELECT m.idx
+                    FROM movie_collection m
+                    WHERE m.path = replace(plex_filename.filename, '/shares/', '/media/')
+                )
+                WHERE collection_id IS NULL
+            "#
+        );
+        let conn = self.pool.get().await?;
+        query.execute(&conn).await.map_err(Into::into)
     }
 
     /// # Errors
@@ -650,20 +672,20 @@ impl MovieCollection {
             source: Option<StackString>,
         }
 
-        let query = r#"
-            SELECT link, show, title, rating, istv, source
-            FROM imdb_ratings
-            WHERE link IS NOT null AND rating IS NOT null
-        "#;
-
-        self.pool
-            .get()
+        let query = query!(
+            r#"
+                SELECT link, show, title, rating, istv, source
+                FROM imdb_ratings
+                WHERE link IS NOT null AND rating IS NOT null
+            "#
+        );
+        let conn = self.pool.get().await?;
+        query
+            .query_streaming(&conn)
             .await?
-            .query(query, &[])
-            .await?
-            .iter()
-            .map(|row| {
-                let row = ImdbShowMap::from_row(row)?;
+            .map_err(Into::<Error>::into)
+            .and_then(|row| async move {
+                let row = ImdbShowMap::from_row(&row)?;
 
                 let source: Option<TvShowSource> = match row.source {
                     Some(s) => s.parse().ok(),
@@ -683,7 +705,9 @@ impl MovieCollection {
                     },
                 ))
             })
-            .collect()
+            .try_collect()
+            .await
+            .map_err(Into::into)
     }
 
     /// # Errors
@@ -693,14 +717,14 @@ impl MovieCollection {
     ) -> Result<impl Stream<Item = Result<TvShowsResult, PqError>>, Error> {
         let query = query!(
             r#"
-            SELECT b.show, c.link, c.title, c.source, count(*) as count
-            FROM movie_queue a
-            JOIN movie_collection b ON a.collection_idx=b.idx
-            JOIN imdb_ratings c ON b.show_id=c.index
-            WHERE c.istv
-            GROUP BY 1,2,3,4
-            ORDER BY 1,2,3,4
-        "#
+                SELECT b.show, c.link, c.title, c.source, count(*) as count
+                FROM movie_queue a
+                JOIN movie_collection b ON a.collection_idx=b.idx
+                JOIN imdb_ratings c ON b.show_id=c.index
+                WHERE c.istv
+                GROUP BY 1,2,3,4
+                ORDER BY 1,2,3,4
+            "#
         );
         let conn = self.pool.get().await?;
         query.fetch_streaming(&conn).await.map_err(Into::into)
@@ -720,44 +744,41 @@ impl MovieCollection {
             Some(s) => write!(source_str, "AND c.source = '{}'", s)?,
             None => write!(source_str, "AND c.source is null")?,
         }
-        let query = query_dyn!(
-            &format_sstr!(
-                r#"
-                    WITH active_links AS (
-                        SELECT c.link
-                        FROM movie_queue a
-                        JOIN movie_collection b ON a.collection_idx=b.idx
-                        JOIN imdb_ratings c ON b.show_id=c.index
-                        JOIN imdb_episodes d ON c.show = d.show
-                        UNION
-                        SELECT link
-                        FROM trakt_watchlist
-                    )
-                    SELECT c.show,
-                            c.link,
-                            c.title,
-                            d.season,
-                            d.episode,
-                            d.epurl,
-                            d.airdate,
-                            c.rating,
-                            cast(d.rating as double precision) as eprating,
-                            d.eptitle
-                    FROM imdb_ratings c
+        let query = format_sstr!(
+            r#"
+                WITH active_links AS (
+                    SELECT c.link
+                    FROM movie_queue a
+                    JOIN movie_collection b ON a.collection_idx=b.idx
+                    JOIN imdb_ratings c ON b.show_id=c.index
                     JOIN imdb_episodes d ON c.show = d.show
-                    LEFT JOIN trakt_watched_episodes e
-                        ON c.link=e.link AND d.season=e.season AND d.episode=e.episode
-                    WHERE c.link in (SELECT link FROM active_links GROUP BY link) AND
-                        e.episode is null AND
-                        c.istv AND d.airdate >= $mindate AND
-                        d.airdate <= $maxdate {source_str}
-                    GROUP BY 1,2,3,4,5,6,7,8,9,10
-                    ORDER BY d.airdate, c.show, d.season, d.episode
-                "#
-            ),
-            mindate = mindate,
-            maxdate = maxdate
-        )?;
+                    UNION
+                    SELECT link
+                    FROM trakt_watchlist
+                )
+                SELECT c.show,
+                        c.link,
+                        c.title,
+                        d.season,
+                        d.episode,
+                        d.epurl,
+                        d.airdate,
+                        c.rating,
+                        cast(d.rating as double precision) as eprating,
+                        d.eptitle
+                FROM imdb_ratings c
+                JOIN imdb_episodes d ON c.show = d.show
+                LEFT JOIN trakt_watched_episodes e
+                    ON c.link=e.link AND d.season=e.season AND d.episode=e.episode
+                WHERE c.link in (SELECT link FROM active_links GROUP BY link) AND
+                    e.episode is null AND
+                    c.istv AND d.airdate >= $mindate AND
+                    d.airdate <= $maxdate {source_str}
+                GROUP BY 1,2,3,4,5,6,7,8,9,10
+                ORDER BY d.airdate, c.show, d.season, d.episode
+            "#
+        );
+        let query = query_dyn!(&query, mindate = mindate, maxdate = maxdate)?;
         let conn = self.pool.get().await?;
         query.fetch(&conn).await.map_err(Into::into)
     }
@@ -830,9 +851,6 @@ impl MovieCollection {
         &self,
         patterns: &[impl AsRef<str>],
     ) -> Result<Vec<StackString>, Error> {
-        #[derive(FromSqlRow, Into)]
-        struct Wrap(StackString);
-
         let constr = patterns
             .iter()
             .map(|p| {
@@ -849,8 +867,16 @@ impl MovieCollection {
             "SELECT path FROM movie_collection {where_str}"
         ))?;
         let conn = self.pool.get().await?;
-        let wrap: Vec<Wrap> = query.fetch(&conn).await?;
-        Ok(wrap.into_iter().map(Into::into).collect())
+        query
+            .query_streaming(&conn)
+            .await?
+            .and_then(|row| async move {
+                let path: StackString = row.try_get(0).map_err(PqError::BeginTransaction)?;
+                Ok(path)
+            })
+            .try_collect()
+            .await
+            .map_err(Into::into)
     }
 }
 

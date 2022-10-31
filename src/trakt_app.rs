@@ -68,6 +68,7 @@ async fn trakt_app() -> Result<(), Error> {
 
     let result = if do_parse {
         sync_trakt_with_db(&trakt, &mc).await?;
+        mc.clear_plex_filename_bad_collection_id().await?;
         mc.fix_plex_filename_collection_id().await?;
         PlexMetadata::fill_plex_metadata(&pool, &config).await
     } else {
