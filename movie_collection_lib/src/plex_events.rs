@@ -687,7 +687,7 @@ impl PlexMetadata {
                     title=$title,
                     parent_key=$parent_key,
                     grandparent_key=$grandparent_key,
-                    show=$show
+                    show=$show,
                     last_modified=now()
                 WHERE metadata_key=$metadata_key
             "#,
@@ -772,7 +772,7 @@ impl PlexMetadata {
                     JOIN plex_metadata pm ON pm.metadata_key = pf.metadata_key
                     JOIN imdb_ratings ir ON ir.show = mc.show
                     WHERE pf.metadata_key = plex_metadata.metadata_key
-                )
+                ),last_modified=now()
                 WHERE show IS NULL
             "#
         );
@@ -791,7 +791,7 @@ impl PlexMetadata {
                     JOIN plex_filename pf ON pf.metadata_key = pm.metadata_key
                     JOIN movie_collection mc ON mc.idx = pf.collection_id
                     WHERE pmp.metadata_key = plex_metadata.metadata_key
-                )
+                ),last_modified=now()
                 WHERE show IS NULL
                 AND object_type = 'directory'
             "#
@@ -811,7 +811,7 @@ impl PlexMetadata {
                     JOIN plex_filename pf ON pf.metadata_key = pm.metadata_key
                     JOIN movie_collection mc ON mc.idx = pf.collection_id
                     WHERE pmgp.metadata_key = plex_metadata.metadata_key
-                )
+                ),last_modified=now()
                 WHERE show IS NULL
                 AND object_type = 'directory'
             "#

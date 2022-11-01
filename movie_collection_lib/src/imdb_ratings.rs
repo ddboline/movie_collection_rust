@@ -3,6 +3,7 @@ use futures::Stream;
 use log::debug;
 use postgres_query::{query, query_dyn, Error as PqError, FromSqlRow, Parameter};
 use serde::{Deserialize, Serialize};
+use smallvec::{smallvec, SmallVec};
 use stack_string::{format_sstr, StackString};
 use std::fmt;
 use time::OffsetDateTime;
@@ -68,28 +69,31 @@ impl ImdbRatings {
     /// Returns error if db query fails
     pub async fn update_show(&self, pool: &PgPool) -> Result<(), Error> {
         let mut bindings = Vec::new();
+        let mut updates: SmallVec<[&'static str; 6]> = smallvec!["last_modified=now()"];
+        if let Some(title) = &self.title {
+            bindings.push(("title", title as Parameter));
+            updates.push("title=$title");
+        }
+        if let Some(rating) = &self.rating {
+            bindings.push(("rating", rating as Parameter));
+            updates.push("rating=$rating");
+        }
+        if let Some(istv) = &self.istv {
+            bindings.push(("istv", istv as Parameter));
+            updates.push("istv=$istv");
+        }
+        if let Some(source) = &self.source {
+            bindings.push(("source", source as Parameter));
+            updates.push("source=$source");
+        }
+
         let query = format_sstr!(
             r#"
                 UPDATE imdb_ratings
-                SET last_modified=now(){}{}{}{}
+                SET {}
                 WHERE show=$show
             "#,
-            self.title.as_ref().map_or("", |title| {
-                bindings.push(("title", title as Parameter));
-                ",title=$title"
-            }),
-            self.rating.as_ref().map_or("", |rating| {
-                bindings.push(("rating", rating as Parameter));
-                ",rating=$rating"
-            }),
-            self.istv.as_ref().map_or("", |istv| {
-                bindings.push(("istv", istv as Parameter));
-                ",istv=$istv"
-            }),
-            self.source.as_ref().map_or(",source=null", |source| {
-                bindings.push(("source", source as Parameter));
-                ",source=$source"
-            }),
+            updates.join(","),
         );
         let query = query_dyn!(&query, show = self.show, ..bindings)?;
         let conn = pool.get().await?;

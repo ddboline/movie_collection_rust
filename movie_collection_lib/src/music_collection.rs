@@ -160,7 +160,7 @@ impl MusicCollection {
                 SELECT m.id
                 FROM music_collection m
                 WHERE m.path = replace(plex_filename.filename, '/shares/', '/media/')
-            )
+            ),last_modified=now()
             WHERE music_collection_id IS NULL
         "#;
         let rows = pool.get().await?.execute(query, &[]).await?;

@@ -350,7 +350,7 @@ impl MovieCollection {
     /// Returns error if db queries fail
     pub async fn remove_from_collection(&self, path: &str) -> Result<(), Error> {
         let query = query!(
-            r#"UPDATE movie_collection SET is_deleted=true WHERE path = $path"#,
+            r#"UPDATE movie_collection SET is_deleted=true,last_modified=now() WHERE path = $path"#,
             path = path
         );
         let conn = self.pool.get().await?;
@@ -402,7 +402,7 @@ impl MovieCollection {
         let conn = self.pool.get().await?;
         if let Some(idx) = self.get_collection_index(path).await? {
             let query = query!(
-                "UPDATE movie_collection SET is_deleted=false WHERE idx=$idx",
+                "UPDATE movie_collection SET is_deleted=false,last_modified=now() WHERE idx=$idx",
                 idx = idx
             );
             query.execute(&conn).await?;
@@ -452,7 +452,7 @@ impl MovieCollection {
         let query = query!(
             r#"
                 UPDATE plex_filename
-                SET collection_id = NULL
+                SET collection_id=NULL,last_modified=now()
                 WHERE metadata_key IN (
                     SELECT pf.metadata_key
                     FROM plex_filename pf
@@ -471,11 +471,11 @@ impl MovieCollection {
         let query = query!(
             r#"
                 UPDATE plex_filename
-                SET collection_id = (
+                SET collection_id=(
                     SELECT m.idx
                     FROM movie_collection m
                     WHERE m.path = replace(plex_filename.filename, '/shares/', '/media/')
-                )
+                ),last_modified=now()
                 WHERE collection_id IS NULL
             "#
         );
