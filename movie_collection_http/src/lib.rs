@@ -15,10 +15,11 @@ pub mod movie_queue_requests;
 pub mod movie_queue_routes;
 
 use derive_more::{Deref, Display, From, FromStr, Into};
-use rweb::Schema;
-use rweb_helper::{derive_rweb_schema, DateTimeType, DateType, UuidWrapper};
+use rweb::{Schema};
+use rweb_helper::{derive_rweb_schema, DateTimeType, DateType, UuidWrapper, DecimalWrapper};
 use serde::{Deserialize, Serialize};
 use stack_string::StackString;
+use rust_decimal::Decimal;
 
 use movie_collection_lib::{
     date_time_wrapper::DateTimeWrapper,
@@ -49,9 +50,9 @@ struct _ImdbEpisodesWrapper {
     #[schema(description = "Episode")]
     episode: i32,
     #[schema(description = "Airdate")]
-    airdate: DateType,
+    airdate: Option<DateType>,
     #[schema(description = "Rating")]
-    rating: f64,
+    rating: Option<DecimalWrapper>,
     #[schema(description = "Episode Title")]
     eptitle: StackString,
     #[schema(description = "Episode URL")]
