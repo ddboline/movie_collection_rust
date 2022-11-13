@@ -8,6 +8,9 @@ use futures::TryStreamExt;
 use stack_string::StackString;
 use std::collections::HashMap;
 use time::Date;
+use rust_decimal::prelude::ToPrimitive;
+use rust_decimal::Decimal;
+use rust_decimal_macros::dec;
 
 use movie_collection_lib::{
     imdb_episodes::{ImdbEpisodes, ImdbSeason},
@@ -240,7 +243,7 @@ impl From<ImdbEpisodes> for EpisodeItem {
             season: item.season,
             episode: item.episode,
             airdate: item.airdate,
-            rating: item.rating,
+            rating: item.rating.to_f64().unwrap_or(-1.0),
             eptitle: item.eptitle,
             epurl: item.epurl,
         }
@@ -255,7 +258,7 @@ impl From<EpisodeItem> for ImdbEpisodes {
             season: item.season,
             episode: item.episode,
             airdate: item.airdate,
-            rating: item.rating,
+            rating: Decimal::from_f64_retain(item.rating).unwrap_or(dec!(-1.0)),
             eptitle: item.eptitle,
             epurl: item.epurl,
         }

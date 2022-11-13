@@ -4,9 +4,11 @@ use postgres_query::{query, query_dyn, Error as PqError, FromSqlRow, Parameter};
 use serde::{Deserialize, Serialize};
 use smallvec::{smallvec, SmallVec};
 use stack_string::{format_sstr, StackString};
-use std::fmt;
+use std::{fmt};
 use time::{macros::date, Date, OffsetDateTime};
 use uuid::Uuid;
+use rust_decimal::Decimal;
+use rust_decimal_macros::dec;
 
 use crate::pgpool::PgPool;
 
@@ -17,7 +19,7 @@ pub struct ImdbEpisodes {
     pub season: i32,
     pub episode: i32,
     pub airdate: Date,
-    pub rating: f64,
+    pub rating: Decimal,
     pub eptitle: StackString,
     pub epurl: StackString,
 }
@@ -54,7 +56,7 @@ impl ImdbEpisodes {
             season: -1,
             episode: -1,
             airdate: date!(1970 - 01 - 01),
-            rating: -1.0,
+            rating: dec!(-1.0),
             eptitle: "".into(),
             epurl: "".into(),
         }
@@ -84,7 +86,7 @@ impl ImdbEpisodes {
         let query = query!(
             r#"
                 SELECT a.show, b.title, a.season, a.episode, a.airdate,
-                       cast(a.rating as double precision) as rating, a.eptitle, a.epurl
+                       a.rating, a.eptitle, a.epurl
                 FROM imdb_episodes a
                 JOIN imdb_ratings b ON a.show = b.show
                 WHERE a.id = $id
@@ -104,7 +106,7 @@ impl ImdbEpisodes {
         let query = query!(
             r#"
                 SELECT a.show, b.title, a.season, a.episode, a.airdate,
-                       cast(a.rating as double precision) as rating, a.eptitle, a.epurl
+                       a.rating, a.eptitle, a.epurl
                 FROM imdb_episodes a
                 JOIN imdb_ratings b ON a.show = b.show
                 WHERE a.last_modified >= $timestamp
@@ -139,7 +141,7 @@ impl ImdbEpisodes {
             &format_sstr!(
                 r#"
                 SELECT a.show, b.title, a.season, a.episode, a.airdate,
-                        cast(a.rating as double precision) as rating, a.eptitle, a.epurl
+                        a.rating, a.eptitle, a.epurl
                 FROM imdb_episodes a
                 JOIN imdb_ratings b ON a.show = b.show
                 WHERE {constraints}
@@ -158,24 +160,22 @@ impl ImdbEpisodes {
         if self.get_index(pool).await?.is_some() {
             return self.update_episode(pool).await;
         }
-        let query = query_dyn!(
-            &format_sstr!(
-                r#"
-                    INSERT INTO imdb_episodes (
-                        show, season, episode, airdate, rating, eptitle, epurl, last_modified
-                    ) VALUES (
-                        $show, $season, $episode, $airdate, {}, $eptitle, $epurl, now()
-                    )
-                "#,
-                self.rating
-            ),
+        let query = query!(
+            r#"
+                INSERT INTO imdb_episodes (
+                    show, season, episode, airdate, rating, eptitle, epurl, last_modified
+                ) VALUES (
+                    $show, $season, $episode, $airdate, $rating, $eptitle, $epurl, now()
+                )
+            "#,
             show = self.show,
             season = self.season,
             episode = self.episode,
             airdate = self.airdate,
+            rating = self.rating,
             eptitle = self.eptitle,
             epurl = self.epurl
-        )?;
+        );
         let conn = pool.get().await?;
         query.execute(&conn).await.map(|_| ()).map_err(Into::into)
     }
@@ -183,22 +183,20 @@ impl ImdbEpisodes {
     /// # Errors
     /// Returns error if db query fails
     pub async fn update_episode(&self, pool: &PgPool) -> Result<(), Error> {
-        let query = query_dyn!(
-            &format_sstr!(
-                r#"
-                    UPDATE imdb_episodes
-                    SET rating={},eptitle=$eptitle,epurl=$epurl,airdate=$airdate,last_modified=now()
-                    WHERE show=$show AND season=$season AND episode=$episode
-                "#,
-                self.rating
-            ),
+        let query = query!(
+            r#"
+                UPDATE imdb_episodes
+                SET rating=$rating,eptitle=$eptitle,epurl=$epurl,airdate=$airdate,last_modified=now()
+                WHERE show=$show AND season=$season AND episode=$episode
+            "#,
+            rating = self.rating,
             eptitle = self.eptitle,
             epurl = self.epurl,
             airdate = self.airdate,
             show = self.show,
             season = self.season,
             episode = self.episode
-        )?;
+        );
         let conn = pool.get().await?;
         query.execute(&conn).await.map(|_| ()).map_err(Into::into)
     }
