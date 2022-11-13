@@ -10,7 +10,6 @@ serde_json = "1.0"
 tokio-postgres = {version="0.7", features=["with-uuid-1", "with-time-0_3", "with-serde_json-1"]}
 postgres-types = "0.2"
 rust_decimal = {version="1.26", features=["db-tokio-postgres"]}
-rust_decimal_macros = "1.26"
 deadpool = "0.9"
 deadpool-postgres = "0.10"
 rayon = "1.5"
