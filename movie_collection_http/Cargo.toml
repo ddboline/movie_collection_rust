@@ -37,7 +37,7 @@ rust_decimal = {version="1.26", features=["db-tokio-postgres"]}
 async-graphql = {version="4.0", features=["dataloader", "time"]}
 async-graphql-warp = "4.0"
 reqwest = {version="0.11", features=["cookies", "json", "rustls-tls"], default_features=false}
-rweb-helper = { git = "https://github.com/ddboline/rweb_helper.git", tag="0.4.15" }
+rweb-helper = { git = "https://github.com/ddboline/rweb_helper.git", tag="0.4.16" }
 authorized_users = { git = "https://github.com/ddboline/auth_server_rust.git", tag="0.9.5"}
 stack-string = { version="0.7", features=["postgres_types", "rweb-openapi", "async_graphql"] }
 postgres_query = {git = "https://github.com/ddboline/rust-postgres-query", tag = "0.3.4", features=["deadpool"]}

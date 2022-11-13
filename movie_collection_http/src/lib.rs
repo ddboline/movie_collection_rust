@@ -19,7 +19,6 @@ use rweb::{Schema};
 use rweb_helper::{derive_rweb_schema, DateTimeType, DateType, UuidWrapper, DecimalWrapper};
 use serde::{Deserialize, Serialize};
 use stack_string::StackString;
-use rust_decimal::Decimal;
 
 use movie_collection_lib::{
     date_time_wrapper::DateTimeWrapper,
