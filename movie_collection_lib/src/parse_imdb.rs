@@ -4,9 +4,7 @@ use itertools::Itertools;
 use stack_string::{format_sstr, StackString};
 use std::collections::HashMap;
 use stdout_channel::StdoutChannel;
-use time::macros::date;
 use rust_decimal::Decimal;
-use rust_decimal_macros::dec;
 
 use crate::{
     config::Config, imdb_episodes::ImdbEpisodes, imdb_ratings::ImdbRatings,
@@ -209,7 +207,7 @@ impl ParseImdb {
                     if opts.update_database {
                         let key = (episode.season, episode.episode);
                         if let Some(episodes) = &episodes {
-                            let airdate = episode.airdate.unwrap_or_else(|| date!(1970 - 01 - 01));
+                            let airdate = episode.airdate;
 
                             if let Some(e) = episodes.get(&key) {
                                 let mut new = e.clone();
@@ -218,14 +216,13 @@ impl ParseImdb {
                                         episode.eptitle.clone().unwrap_or_else(|| "".into());
                                 }
                                 if let Some(rating) = &episode.rating {
-                                    new.rating = Decimal::from_f64_retain(*rating).unwrap_or(dec!(-1.0));
+                                    new.rating = Decimal::from_f64_retain(*rating);
                                 }
                                 if new.airdate != airdate {
                                     new.airdate = airdate;
                                 }
                                 let rating = e.rating;
-                                output
-                                    .push(vec![format_sstr!("exists {result} {episode} {rating}")]);
+                                output.push(vec![format_sstr!("exists {result} {episode} {rating:?}")]);
                                 new.update_episode(&self.mc.pool).await?;
                             } else {
                                 output.push(vec![format_sstr!("not exists {result} {episode}")]);
@@ -235,7 +232,7 @@ impl ParseImdb {
                                     season: episode.season,
                                     episode: episode.episode,
                                     airdate,
-                                    rating: episode.rating.and_then(|r| Decimal::from_f64_retain(r)).unwrap_or(dec!(-1.0)),
+                                    rating: episode.rating.and_then(|r| Decimal::from_f64_retain(r)),
                                     eptitle: episode.eptitle.unwrap_or_else(|| "".into()),
                                     epurl: episode.epurl.unwrap_or_else(|| "".into()),
                                 }

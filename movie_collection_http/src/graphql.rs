@@ -10,7 +10,6 @@ use std::collections::HashMap;
 use time::Date;
 use rust_decimal::prelude::ToPrimitive;
 use rust_decimal::Decimal;
-use rust_decimal_macros::dec;
 
 use movie_collection_lib::{
     imdb_episodes::{ImdbEpisodes, ImdbSeason},
@@ -226,9 +225,9 @@ pub struct EpisodeItem {
     /// Episode
     pub episode: i32,
     /// Airdate
-    pub airdate: Date,
+    pub airdate: Option<Date>,
     /// Imdb Episode Rating
-    pub rating: f64,
+    pub rating: Option<f64>,
     /// Episode Title
     pub eptitle: StackString,
     /// Episode Imdb Link
@@ -243,7 +242,7 @@ impl From<ImdbEpisodes> for EpisodeItem {
             season: item.season,
             episode: item.episode,
             airdate: item.airdate,
-            rating: item.rating.to_f64().unwrap_or(-1.0),
+            rating: item.rating.and_then(|r| r.to_f64()),
             eptitle: item.eptitle,
             epurl: item.epurl,
         }
@@ -258,7 +257,7 @@ impl From<EpisodeItem> for ImdbEpisodes {
             season: item.season,
             episode: item.episode,
             airdate: item.airdate,
-            rating: Decimal::from_f64_retain(item.rating).unwrap_or(dec!(-1.0)),
+            rating: item.rating.and_then(|r| Decimal::from_f64_retain(r)),
             eptitle: item.eptitle,
             epurl: item.epurl,
         }

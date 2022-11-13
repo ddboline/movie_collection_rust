@@ -1658,9 +1658,9 @@ async fn watch_list_http_worker(
             };
             let season_str = StackString::from_display(season);
             let episode_str = StackString::from_display(s.episode);
-            let airdate = s.airdate;
+            let airdate = s.airdate.map_or_else(StackString::new, StackString::from_display);
             let show_rating = show.rating.as_ref().unwrap_or(&-1.0);
-            let ep_rating = &s.rating;
+            let ep_rating = s.rating.map_or_else(|| format_sstr!("-1"), |e| format_sstr!("{e:0.1}"));
             let ep_url = &s.epurl;
             format_sstr!(
                 "<tr><td>{show_str}</td><td><td>{entry}</td><td>{a}</td><td>{b}</td><td>{airdate}</td><td>{c}</td></tr>",
@@ -1668,7 +1668,7 @@ async fn watch_list_http_worker(
                     r#"<a href="https://www.imdb.com/title/{ep_url}" target="_blank">s{season} ep{episode_str}</a>"#,
                 ),
                 b=format_sstr!(
-                    "rating: {ep_rating:0.1} / {show_rating:0.1}",
+                    "rating: {ep_rating} / {show_rating:0.1}",
                 ),
                 c=if watched_episodes_db.contains(&s.episode) {
                     button_rm

@@ -5,10 +5,9 @@ use serde::{Deserialize, Serialize};
 use smallvec::{smallvec, SmallVec};
 use stack_string::{format_sstr, StackString};
 use std::{fmt};
-use time::{macros::date, Date, OffsetDateTime};
+use time::{Date, OffsetDateTime};
 use uuid::Uuid;
 use rust_decimal::Decimal;
-use rust_decimal_macros::dec;
 
 use crate::pgpool::PgPool;
 
@@ -18,26 +17,26 @@ pub struct ImdbEpisodes {
     pub title: StackString,
     pub season: i32,
     pub episode: i32,
-    pub airdate: Date,
-    pub rating: Decimal,
+    pub airdate: Option<Date>,
+    pub rating: Option<Decimal>,
     pub eptitle: StackString,
     pub epurl: StackString,
 }
 
 impl fmt::Display for ImdbEpisodes {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        write!(
-            f,
-            "{} {} {} {} {} {} {} {}",
-            self.show,
-            self.title,
-            self.season,
-            self.episode,
-            self.airdate,
-            self.rating,
-            self.eptitle,
-            self.epurl,
-        )
+        write!(f, "{} {} {} {}", self.show, self.title, self.season, self.episode)?;
+        if let Some(airdate) = self.airdate {
+            write!(f, " {airdate}")?;
+        } else {
+            write!(f, " ****-**-**")?;
+        }
+        if let Some(rating) = self.rating {
+            write!(f, "{rating}")?;
+        } else {
+            write!(f, " --")?;
+        }
+        write!(f, " {} {}", self.eptitle, self.epurl)
     }
 }
 
@@ -55,8 +54,8 @@ impl ImdbEpisodes {
             title: "".into(),
             season: -1,
             episode: -1,
-            airdate: date!(1970 - 01 - 01),
-            rating: dec!(-1.0),
+            airdate: None,
+            rating: None,
             eptitle: "".into(),
             epurl: "".into(),
         }
@@ -208,8 +207,8 @@ impl ImdbEpisodes {
             self.title.clone(),
             StackString::from_display(self.season),
             StackString::from_display(self.episode),
-            StackString::from_display(self.airdate),
-            StackString::from_display(self.rating),
+            self.airdate.map(StackString::from_display).unwrap_or_else(StackString::new),
+            self.rating.map(StackString::from_display).unwrap_or_else(StackString::new),
             self.eptitle.clone(),
             self.epurl.clone(),
         ]
