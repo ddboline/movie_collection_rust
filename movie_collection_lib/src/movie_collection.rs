@@ -39,7 +39,7 @@ pub struct NewEpisodesResult {
     pub epurl: StackString,
     pub airdate: Date,
     pub rating: f64,
-    pub eprating: f64,
+    pub eprating: Option<f64>,
     pub eptitle: StackString,
 }
 
@@ -47,7 +47,7 @@ impl fmt::Display for NewEpisodesResult {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         write!(
             f,
-            "{} {} {} {} {} {} {} {} {} {}",
+            "{} {} {} {} {} {} {} {} {:?} {}",
             self.show,
             self.link,
             self.title,
@@ -1003,7 +1003,7 @@ pub async fn find_new_episodes_http_worker(
                 c=format_sstr!(
                     r#"<a href="https://www.imdb.com/title/{epurl}" target="_blank">s{season_str:02} ep{episode:02}</a>"#
                 ),
-                d=format_sstr!("rating: {:0.1} / {:0.1}", epi.eprating, epi.rating,),
+                d=format_sstr!("rating: {:0.1} / {:0.1}", epi.eprating.unwrap_or(-1.0), epi.rating,),
                 e=button_add
                     .replace("SHOW", &epi.show)
                     .replace("LINK", link_str)
