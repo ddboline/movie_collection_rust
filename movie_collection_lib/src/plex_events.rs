@@ -791,6 +791,7 @@ impl PlexMetadata {
                     JOIN plex_filename pf ON pf.metadata_key = pm.metadata_key
                     JOIN movie_collection mc ON mc.idx = pf.collection_id
                     WHERE pmp.metadata_key = plex_metadata.metadata_key
+                    LIMIT 1
                 ),last_modified=now()
                 WHERE show IS NULL
                 AND object_type = 'directory'
@@ -811,6 +812,7 @@ impl PlexMetadata {
                     JOIN plex_filename pf ON pf.metadata_key = pm.metadata_key
                     JOIN movie_collection mc ON mc.idx = pf.collection_id
                     WHERE pmgp.metadata_key = plex_metadata.metadata_key
+                    LIMIT 1
                 ),last_modified=now()
                 WHERE show IS NULL
                 AND object_type = 'directory'
