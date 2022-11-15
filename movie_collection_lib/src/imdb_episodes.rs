@@ -207,8 +207,8 @@ impl ImdbEpisodes {
             self.title.clone(),
             StackString::from_display(self.season),
             StackString::from_display(self.episode),
-            self.airdate.map(StackString::from_display).unwrap_or_else(StackString::new),
-            self.rating.map(StackString::from_display).unwrap_or_else(StackString::new),
+            self.airdate.map_or_else(StackString::new, StackString::from_display),
+            self.rating.map_or_else(StackString::new, StackString::from_display),
             self.eptitle.clone(),
             self.epurl.clone(),
         ]

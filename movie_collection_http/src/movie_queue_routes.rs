@@ -291,7 +291,7 @@ fn play_worker(
         }
 
         #[cfg(target_family = "unix")]
-        std::os::unix::fs::symlink(&full_path, &partial_path).map_err(Into::<Error>::into)?;
+        std::os::unix::fs::symlink(full_path, &partial_path).map_err(Into::<Error>::into)?;
         Ok(body)
     } else {
         Err(format_err!("video playback path does not exist").into())

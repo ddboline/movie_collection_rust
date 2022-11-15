@@ -232,7 +232,7 @@ impl ParseImdb {
                                     season: episode.season,
                                     episode: episode.episode,
                                     airdate,
-                                    rating: episode.rating.and_then(|r| Decimal::from_f64_retain(r)),
+                                    rating: episode.rating.and_then(Decimal::from_f64_retain),
                                     eptitle: episode.eptitle.unwrap_or_else(|| "".into()),
                                     epurl: episode.epurl.unwrap_or_else(|| "".into()),
                                 }

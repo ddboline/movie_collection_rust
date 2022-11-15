@@ -257,7 +257,7 @@ impl From<EpisodeItem> for ImdbEpisodes {
             season: item.season,
             episode: item.episode,
             airdate: item.airdate,
-            rating: item.rating.and_then(|r| Decimal::from_f64_retain(r)),
+            rating: item.rating.and_then(Decimal::from_f64_retain),
             eptitle: item.eptitle,
             epurl: item.epurl,
         }

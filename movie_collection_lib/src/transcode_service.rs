@@ -103,7 +103,7 @@ impl TranscodeServiceRequest {
         let fstem = input_path
             .file_stem()
             .ok_or_else(|| format_err!("No stem"))?;
-        let output_file = avi_dir(config).join(&fstem).with_extension("mp4");
+        let output_file = avi_dir(config).join(fstem).with_extension("mp4");
         let prefix = fstem.to_string_lossy().into_owned().into();
 
         Ok(Self {
@@ -236,7 +236,7 @@ impl TranscodeServiceRequest {
         let json_path = self.get_json_path(config);
         if cmd_path.exists() {
             let output = Command::new(&cmd_path)
-                .args(&["-f", json_path.to_string_lossy().as_ref()])
+                .args(["-f", json_path.to_string_lossy().as_ref()])
                 .output()
                 .await?;
             StackString::from_utf8_vec(output.stdout).map_err(Into::into)
@@ -333,7 +333,7 @@ impl TranscodeService {
         input_file: &Path,
         output_file: &Path,
     ) -> Result<(), Error> {
-        let script_file = job_dir(&self.config).join(&prefix).with_extension("json");
+        let script_file = job_dir(&self.config).join(prefix).with_extension("json");
         if script_file.exists() {
             fs::remove_file(&script_file).await?;
         }
@@ -355,7 +355,7 @@ impl TranscodeService {
         let stderr_path = debug_output_path.with_extension("err");
 
         let mut p = Command::new("HandBrakeCLI")
-            .args(&[
+            .args([
                 "-i",
                 input_file.to_string_lossy().as_ref(),
                 "-o",
@@ -425,7 +425,7 @@ impl TranscodeService {
                 .home_dir
                 .join("Documents")
                 .join("movies")
-                .join(&input_file)
+                .join(input_file)
         };
         if !input_file.exists() {
             return Err(format_err!("{input_file:?} does not exist"));
