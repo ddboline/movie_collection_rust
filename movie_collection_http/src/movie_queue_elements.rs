@@ -111,6 +111,7 @@ fn index_element(cx: Scope) -> Element {
                 "align": "center",
                 article {
                     id: "main_article",
+                    "align": "center",
                 }
             }
         }
@@ -251,7 +252,7 @@ fn movie_queue_element(
                     a {
                         href: "https://www.imdb.com/title/{link}",
                         target: "_blank",
-                        "imbd",
+                        "imdb",
                     }
                 }
             }
@@ -266,6 +267,7 @@ fn movie_queue_element(
                 "type": "submit",
                 id: "{file_name}",
                 "onclick": "delete_show('{file_name}');",
+                "remove",
             }
         };
 
@@ -319,8 +321,10 @@ fn movie_queue_element(
             href: "javascript:updateMainArticle('{watchlist_url}')",
             "Watch List",
         },
+        "<br>",
         table {
             "border": "0",
+            "align": "center",
             tbody {
                 queue_entries
             }
@@ -606,6 +610,7 @@ fn find_new_episodes_element(
         },
         table {
             "border": "0",
+            "align": "center",
             episode_entries,
         }
     })
@@ -737,14 +742,17 @@ fn tvshows_element(
     });
 
     cx.render(rsx! {
-        a {
-            href: "javascript:updateMainArticle('/list/watchlist')",
-            "Go Back",
-        },
+        br {
+            a {
+                href: "javascript:updateMainArticle('/list/watchlist')",
+                "Go Back",
+            },
+        }
         a {
             href: "javascript:updateMainArticle('/trakt/watchlist')",
             "Watch List",
         },
+        "<br>",
         button {
             name: "remcomout",
             id: "remcomout",
@@ -753,6 +761,7 @@ fn tvshows_element(
         "<br>",
         table {
             "border": "0",
+            "align": "center",
             entries,
         }
     })
@@ -832,13 +841,15 @@ fn watchlist_element(cx: Scope, shows: Vec<WatchListEntry>) -> Element {
         }
     });
     cx.render(rsx! {
-        a {
-            href: "javascript:updateMainArticle('/list/tvshows')",
-            "Go Back",
-        },
-        "<br>",
+        br {
+            a {
+                href: "javascript:updateMainArticle('/list/tvshows')",
+                "Go Back",
+            },
+        }
         table {
             "border": "0",
+            "align": "center",
             shows
         }
     })
@@ -902,13 +913,15 @@ fn trakt_watched_seasons_element(
     });
 
     cx.render(rsx! {
-        a {
-            href: "javascript:updateMainArticle('/trakt/watchlist')",
-            "Go Back",
-        },
-        "<br>",
+        br {
+            a {
+                href: "javascript:updateMainArticle('/trakt/watchlist')",
+                "Go Back",
+            },
+        }
         table {
             "border": "0",
+            "align": "center",
             entries,
         }
     })
@@ -987,6 +1000,7 @@ fn trakt_cal_http_element(cx: Scope, entries: Vec<CalEntry>) -> Element {
             }
         } else if let Some(episode) = entry.episode.as_ref() {
             let link = &episode.epurl;
+            let episode = episode.episode;
             rsx! {
                 a {
                     href: "https://www.imdb.com/title/{link}",
@@ -1024,12 +1038,15 @@ fn trakt_cal_http_element(cx: Scope, entries: Vec<CalEntry>) -> Element {
     });
 
     cx.render(rsx! {
-        a {
-            href: "javascript:updateMainArticle('/list/tvshows')",
-            "Go Back",
+        br {
+            a {
+                href: "javascript:updateMainArticle('/list/tvshows')",
+                "Go Back",
+            },
         },
         table {
             "border": "0",
+            "align": "center",
             entries,
         }
     })
@@ -1194,9 +1211,11 @@ fn watch_list_http_element(
     });
 
     cx.render(rsx! {
-        a {
-            href: "javascript:updateMainArticle('/trakt/watched/list/{imdb_url}')",
-            "Go Back",
+        br {
+            a {
+                href: "javascript:updateMainArticle('/trakt/watched/list/{imdb_url}')",
+                "Go Back",
+            }
         },
         button {
             name: "remcomout",
@@ -1211,6 +1230,7 @@ fn watch_list_http_element(
         },
         table {
             "border": "0",
+            "align": "center",
             entries,
         }
     })
