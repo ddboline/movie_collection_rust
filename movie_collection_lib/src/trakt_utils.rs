@@ -99,7 +99,7 @@ impl FromStr for TraktCommands {
     }
 }
 
-#[derive(Serialize, Deserialize, Debug)]
+#[derive(Serialize, Deserialize, Debug, PartialEq, Eq)]
 pub struct TraktCalEntry {
     pub ep_link: Option<StackString>,
     pub episode: i32,

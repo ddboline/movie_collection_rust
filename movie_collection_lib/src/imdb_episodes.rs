@@ -1,17 +1,17 @@
 use anyhow::Error;
 use futures::Stream;
 use postgres_query::{query, query_dyn, Error as PqError, FromSqlRow, Parameter};
+use rust_decimal::Decimal;
 use serde::{Deserialize, Serialize};
 use smallvec::{smallvec, SmallVec};
 use stack_string::{format_sstr, StackString};
-use std::{fmt};
+use std::fmt;
 use time::{Date, OffsetDateTime};
 use uuid::Uuid;
-use rust_decimal::Decimal;
 
 use crate::pgpool::PgPool;
 
-#[derive(Clone, Serialize, Deserialize, FromSqlRow)]
+#[derive(Clone, Serialize, Deserialize, FromSqlRow, PartialEq, Eq)]
 pub struct ImdbEpisodes {
     pub show: StackString,
     pub title: StackString,
@@ -25,7 +25,11 @@ pub struct ImdbEpisodes {
 
 impl fmt::Display for ImdbEpisodes {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        write!(f, "{} {} {} {}", self.show, self.title, self.season, self.episode)?;
+        write!(
+            f,
+            "{} {} {} {}",
+            self.show, self.title, self.season, self.episode
+        )?;
         if let Some(airdate) = self.airdate {
             write!(f, " {airdate}")?;
         } else {
@@ -207,15 +211,17 @@ impl ImdbEpisodes {
             self.title.clone(),
             StackString::from_display(self.season),
             StackString::from_display(self.episode),
-            self.airdate.map_or_else(StackString::new, StackString::from_display),
-            self.rating.map_or_else(StackString::new, StackString::from_display),
+            self.airdate
+                .map_or_else(StackString::new, StackString::from_display),
+            self.rating
+                .map_or_else(StackString::new, StackString::from_display),
             self.eptitle.clone(),
             self.epurl.clone(),
         ]
     }
 }
 
-#[derive(Debug, Default, FromSqlRow, Clone)]
+#[derive(Debug, Default, FromSqlRow, Clone, PartialEq, Eq)]
 pub struct ImdbSeason {
     pub show: StackString,
     pub title: StackString,

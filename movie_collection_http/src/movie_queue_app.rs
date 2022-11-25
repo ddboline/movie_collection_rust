@@ -7,7 +7,6 @@ use async_graphql::{
     EmptyMutation, EmptySubscription, Schema,
 };
 use async_graphql_warp::GraphQLResponse;
-use handlebars::Handlebars;
 use rweb::{
     filters::BoxedFilter,
     http::{header::CONTENT_TYPE, Response as HttpResponse},
@@ -21,9 +20,7 @@ use tokio::{
     time::interval,
 };
 
-use movie_collection_lib::{
-    config::Config, pgpool::PgPool, trakt_connection::TraktConnection, utils::get_templates,
-};
+use movie_collection_lib::{config::Config, pgpool::PgPool, trakt_connection::TraktConnection};
 
 use super::{
     errors::error_response,
@@ -40,7 +37,7 @@ use super::{
         movie_queue_transcode_status_procs, movie_queue_update, music_collection,
         music_collection_update, plex_events, plex_events_update, plex_filename,
         plex_filename_update, plex_list, plex_metadata, plex_metadata_update, plex_webhook,
-        refresh_auth, trakt_auth_url, trakt_cal, trakt_callback, trakt_watched_action,
+        refresh_auth, scripts_js, trakt_auth_url, trakt_cal, trakt_callback, trakt_watched_action,
         trakt_watched_list, trakt_watched_seasons, trakt_watchlist, trakt_watchlist_action,
         tvshows, user,
     },
@@ -51,7 +48,6 @@ pub struct AppState {
     pub config: Config,
     pub db: PgPool,
     pub trakt: TraktConnection,
-    pub hbr: Arc<Handlebars<'static>>,
 }
 
 /// # Errors
@@ -86,6 +82,7 @@ pub async fn start_app() -> Result<(), Error> {
 
 fn get_full_path(app: &AppState) -> BoxedFilter<(impl Reply,)> {
     let frontpage_path = frontpage().boxed();
+    let scripts_js_path = scripts_js().boxed();
     let find_new_episodes_path = find_new_episodes(app.clone()).boxed();
     let tvshows_path = tvshows(app.clone()).boxed();
     let movie_queue_delete_path = movie_queue_delete(app.clone()).boxed();
@@ -140,7 +137,9 @@ fn get_full_path(app: &AppState) -> BoxedFilter<(impl Reply,)> {
     let plex_metadata_update_path = plex_metadata_update(app.clone()).boxed();
     let music_collection_path = music_collection(app.clone()).boxed();
     let music_collection_update_path = music_collection_update(app.clone()).boxed();
+
     let list_path = frontpage_path
+        .or(scripts_js_path)
         .or(find_new_episodes_path)
         .or(tvshows_path)
         .or(movie_queue_delete_path)
@@ -221,7 +220,6 @@ async fn run_app(config: Config, pool: PgPool, trakt: TraktConnection) -> Result
         config,
         db: pool,
         trakt,
-        hbr: Arc::new(get_templates()?),
     };
 
     let (spec, full_path) = openapi::spec()

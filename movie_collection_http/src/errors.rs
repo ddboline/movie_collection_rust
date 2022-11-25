@@ -1,5 +1,4 @@
 use anyhow::Error as AnyhowError;
-use handlebars::RenderError;
 use http::StatusCode;
 use indexmap::IndexMap;
 use log::error;
@@ -34,8 +33,6 @@ pub enum ServiceError {
     Unauthorized,
     #[error("Anyhow error {0}")]
     AnyhowError(#[from] AnyhowError),
-    #[error("Template Parse Error {0}")]
-    RenderError(#[from] RenderError),
     #[error("IoError {0}")]
     IoError(#[from] IoError),
     #[error("FmtError {0}")]

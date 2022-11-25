@@ -5,11 +5,10 @@ use async_graphql::{
 use async_trait::async_trait;
 use derive_more::{Deref, From, Into};
 use futures::TryStreamExt;
+use rust_decimal::{prelude::ToPrimitive, Decimal};
 use stack_string::StackString;
 use std::collections::HashMap;
 use time::Date;
-use rust_decimal::prelude::ToPrimitive;
-use rust_decimal::Decimal;
 
 use movie_collection_lib::{
     imdb_episodes::{ImdbEpisodes, ImdbSeason},

@@ -11,12 +11,13 @@ pub mod errors;
 pub mod graphql;
 pub mod logged_user;
 pub mod movie_queue_app;
+pub mod movie_queue_elements;
 pub mod movie_queue_requests;
 pub mod movie_queue_routes;
 
 use derive_more::{Deref, Display, From, FromStr, Into};
-use rweb::{Schema};
-use rweb_helper::{derive_rweb_schema, DateTimeType, DateType, UuidWrapper, DecimalWrapper};
+use rweb::Schema;
+use rweb_helper::{derive_rweb_schema, DateTimeType, DateType, DecimalWrapper, UuidWrapper};
 use serde::{Deserialize, Serialize};
 use stack_string::StackString;
 

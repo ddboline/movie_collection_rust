@@ -1,6 +1,6 @@
 [package]
 name = "movie_collection_rust"
-version = "0.9.28"
+version = "0.9.29"
 authors = ["Daniel Boline <ddboline@gmail.com>"]
 edition = "2018"
 
@@ -18,7 +18,7 @@ movie_collection_http = {path = "movie_collection_http"}
 transcode_lib = {path = "transcode_lib"}
 rayon = "1.5"
 log = "0.4"
-env_logger = "0.9"
+env_logger = "0.10"
 crossbeam-utils = "0.8"
 anyhow = "1.0"
 thiserror = "1.0"
