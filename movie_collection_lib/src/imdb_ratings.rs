@@ -11,7 +11,7 @@ use uuid::Uuid;
 
 use crate::{pgpool::PgPool, tv_show_source::TvShowSource, utils::option_string_wrapper};
 
-#[derive(Default, Clone, Debug, Serialize, Deserialize, FromSqlRow)]
+#[derive(Default, Clone, Debug, Serialize, Deserialize, FromSqlRow, PartialEq)]
 pub struct ImdbRatings {
     pub index: Uuid,
     pub show: StackString,

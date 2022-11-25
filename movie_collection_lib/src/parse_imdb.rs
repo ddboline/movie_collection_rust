@@ -1,10 +1,10 @@
 use anyhow::Error;
 use clap::Parser;
 use itertools::Itertools;
+use rust_decimal::Decimal;
 use stack_string::{format_sstr, StackString};
 use std::collections::HashMap;
 use stdout_channel::StdoutChannel;
-use rust_decimal::Decimal;
 
 use crate::{
     config::Config, imdb_episodes::ImdbEpisodes, imdb_ratings::ImdbRatings,
@@ -222,7 +222,9 @@ impl ParseImdb {
                                     new.airdate = airdate;
                                 }
                                 let rating = e.rating;
-                                output.push(vec![format_sstr!("exists {result} {episode} {rating:?}")]);
+                                output.push(vec![format_sstr!(
+                                    "exists {result} {episode} {rating:?}"
+                                )]);
                                 new.update_episode(&self.mc.pool).await?;
                             } else {
                                 output.push(vec![format_sstr!("not exists {result} {episode}")]);

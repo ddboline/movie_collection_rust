@@ -12,7 +12,7 @@ use stack_string::StackString;
 
 use crate::timezone::TimeZone;
 
-#[derive(Debug, Default, Deserialize)]
+#[derive(Debug, Default, Deserialize, PartialEq, Eq)]
 pub struct ConfigInner {
     #[serde(default = "default_home_dir")]
     pub home_dir: PathBuf,
@@ -114,7 +114,7 @@ fn default_plex_webhook_key() -> Uuid {
     Uuid::new_v4()
 }
 
-#[derive(Debug, Default, Clone)]
+#[derive(Debug, Default, Clone, PartialEq, Eq)]
 pub struct Config(Arc<ConfigInner>);
 
 impl Config {

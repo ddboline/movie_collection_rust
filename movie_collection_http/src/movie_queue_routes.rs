@@ -3,9 +3,7 @@
 use anyhow::format_err;
 use bytes::Buf;
 use futures::TryStreamExt;
-use itertools::Itertools;
 use log::error;
-use maplit::hashmap;
 use rweb::{get, multipart::FormData, post, Json, Query, Rejection, Schema};
 use rweb_helper::{
     derive_rweb_schema, html_response::HtmlResponse as HtmlBase,
@@ -15,7 +13,7 @@ use serde::{Deserialize, Serialize};
 use stack_string::{format_sstr, StackString};
 use std::{
     borrow::Borrow,
-    collections::{HashMap, HashSet},
+    collections::HashMap,
     fmt::Write,
     hash::{Hash, Hasher},
     path,
@@ -28,31 +26,32 @@ use tokio_stream::StreamExt;
 use movie_collection_lib::{
     config::Config,
     date_time_wrapper::DateTimeWrapper,
-    imdb_episodes::{ImdbEpisodes, ImdbSeason},
+    imdb_episodes::ImdbEpisodes,
     imdb_ratings::ImdbRatings,
     make_list::FileLists,
-    make_queue::movie_queue_http,
-    movie_collection::{
-        find_new_episodes_http_worker, LastModifiedResponse, MovieCollection, TvShowsResult,
-    },
+    movie_collection::{LastModifiedResponse, MovieCollection, TvShowsResult},
     movie_queue::{MovieQueueDB, MovieQueueResult},
     music_collection::MusicCollection,
     pgpool::PgPool,
     plex_events::{PlexEvent, PlexFilename, PlexMetadata},
     trakt_connection::TraktConnection,
     trakt_utils::{
-        get_watched_shows_db, get_watchlist_shows_db_map, TraktActions, WatchListShow,
-        WatchedEpisode, WatchedMovie,
+        get_watchlist_shows_db_map, TraktActions, WatchListShow, WatchedEpisode, WatchedMovie,
     },
     transcode_service::{transcode_status, TranscodeService, TranscodeServiceRequest},
     tv_show_source::TvShowSource,
-    utils::HBR,
 };
+use std::convert::Infallible;
 
 use crate::{
     errors::ServiceError as Error,
     logged_user::LoggedUser,
     movie_queue_app::AppState,
+    movie_queue_elements::{
+        find_new_episodes_body, index_body, movie_queue_body, play_worker_body,
+        trakt_cal_http_body, trakt_watched_seasons_body, tvshows_body, watch_list_http_body,
+        watchlist_body,
+    },
     movie_queue_requests::{
         ImdbEpisodesUpdateRequest, ImdbRatingsSetSourceRequest, ImdbRatingsUpdateRequest,
         ImdbSeasonsRequest, ImdbShowRequest, MovieCollectionSyncRequest,
@@ -68,33 +67,13 @@ use crate::{
 pub type WarpResult<T> = Result<T, Rejection>;
 pub type HttpResult<T> = Result<T, Error>;
 
-fn movie_queue_body(patterns: &[StackString], entries: &[StackString]) -> StackString {
-    let previous = r#"<a href="javascript:updateMainArticle('/list/tvshows')">Go Back</a><br>"#;
+#[derive(RwebResponse)]
+#[response(description = "Scripts", content = "js")]
+struct JsScriptsResponse(HtmlBase<&'static str, Infallible>);
 
-    let watchlist_url = if patterns.is_empty() {
-        format_sstr!("/trakt/watchlist")
-    } else {
-        let patterns = patterns.join("_");
-        format_sstr!("/trakt/watched/list/{patterns}")
-    };
-    let entries = entries.join("");
-    format_sstr!(
-        r#"{previous}<a href="javascript:updateMainArticle('{watchlist_url}')">Watch List</a><table border="0">{entries}</table>"#,
-    )
-}
-
-async fn queue_body_resp(
-    config: &Config,
-    patterns: &[StackString],
-    queue: &[MovieQueueResult],
-    pool: &PgPool,
-) -> HttpResult<StackString> {
-    let mock_stdout = MockStdout::new();
-    let stdout = StdoutChannel::with_mock_stdout(mock_stdout.clone(), mock_stdout.clone());
-
-    let entries = movie_queue_http(queue, pool, config, &stdout).await?;
-    let body = movie_queue_body(patterns, &entries);
-    Ok(body)
+#[get("/list/scripts.js")]
+pub async fn scripts_js() -> WarpResult<JsScriptsResponse> {
+    Ok(HtmlBase::new(include_str!("../../templates/scripts.js")).into())
 }
 
 #[derive(RwebResponse)]
@@ -113,7 +92,11 @@ pub async fn movie_queue(
         patterns: Vec::new(),
     };
     let (queue, _) = req.process(&state.db, &state.config).await?;
-    let body = queue_body_resp(&state.config, &[], &queue, &state.db).await?;
+
+    let body = movie_queue_body(&state.config, &state.db, Vec::new(), queue)
+        .await
+        .map_err(Into::<Error>::into)?
+        .into();
     task.await.ok();
     Ok(HtmlBase::new(body).into())
 }
@@ -135,7 +118,10 @@ pub async fn movie_queue_show(
 
     let req = MovieQueueRequest { patterns };
     let (queue, patterns) = req.process(&state.db, &state.config).await?;
-    let body = queue_body_resp(&state.config, &patterns, &queue, &state.db).await?;
+    let body = movie_queue_body(&state.config, &state.db, patterns, queue)
+        .await
+        .map_err(Into::<Error>::into)?
+        .into();
     task.await.ok();
     Ok(HtmlBase::new(body).into())
 }
@@ -253,51 +239,6 @@ pub async fn movie_queue_transcode_directory(
     Ok(HtmlBase::new(body).into())
 }
 
-fn play_worker(
-    config: &Config,
-    full_path: &path::Path,
-    last_url: Option<&str>,
-) -> HttpResult<StackString> {
-    let file_name = full_path
-        .file_name()
-        .ok_or_else(|| format_err!("Invalid path"))?
-        .to_string_lossy();
-
-    if let Some(partial_path) = &config.video_playback_path {
-        let url = format_sstr!("/videos/partial/{file_name}");
-
-        let body = format_sstr!(
-            r#"
-            {a}
-            {file_name}<br>
-            <video width="720" controls>
-            <source src="{url}" type="video/mp4">
-            Your browser does not support HTML5 video.
-            </video>
-        "#,
-            a = if let Some(last_url) = last_url {
-                format_sstr!(
-                    r#"<input type="button" name="back" value="Back" onclick="updateMainArticle('{last_url}');"/><br>"#
-                )
-            } else {
-                StackString::new()
-            }
-        );
-
-        let partial_path = partial_path.join("videos").join("partial");
-        let partial_path = partial_path.join(file_name.as_ref());
-        if partial_path.exists() {
-            std::fs::remove_file(&partial_path)?;
-        }
-
-        #[cfg(target_family = "unix")]
-        std::os::unix::fs::symlink(full_path, &partial_path).map_err(Into::<Error>::into)?;
-        Ok(body)
-    } else {
-        Err(format_err!("video playback path does not exist").into())
-    }
-}
-
 #[derive(RwebResponse)]
 #[response(description = "Play Queue Item", content = "html")]
 struct PlayQueueResponse(HtmlBase<StackString, Error>);
@@ -329,11 +270,9 @@ pub async fn movie_queue_play(
         .map_err(Into::<Error>::into)?;
 
     let movie_path = path::Path::new(movie_path.as_str());
-    let body = play_worker(
-        &state.config,
-        movie_path,
-        last_url.as_ref().map(StackString::as_str),
-    )?;
+    let body = play_worker_body(&state.config, movie_path, last_url)
+        .map_err(Into::<Error>::into)?
+        .into();
     task.await.ok();
     Ok(HtmlBase::new(body).into())
 }
@@ -363,19 +302,6 @@ pub async fn imdb_show(
     Ok(HtmlBase::new(body).into())
 }
 
-fn new_episode_worker(entries: &[StackString]) -> StackString {
-    let previous = r#"
-        <a href="javascript:updateMainArticle('/list/tvshows')">Go Back</a><br>
-        <input type="button" name="list_cal" value="TVCalendar" onclick="updateMainArticle('/list/cal');"/>
-        <input type="button" name="list_cal" value="NetflixCalendar" onclick="updateMainArticle('/list/cal?source=netflix');"/>
-        <input type="button" name="list_cal" value="AmazonCalendar" onclick="updateMainArticle('/list/cal?source=amazon');"/>
-        <input type="button" name="list_cal" value="HuluCalendar" onclick="updateMainArticle('/list/cal?source=hulu');"/><br>
-        <button name="remcomout" id="remcomoutput"> &nbsp; </button>
-    "#;
-    let entries = entries.join("");
-    format_sstr!(r#"{previous}<table border="0">{entries}</table>"#)
-}
-
 #[derive(Serialize, Deserialize, Schema)]
 pub struct FindNewEpisodeRequest {
     #[schema(description = "TV Show Source")]
@@ -403,7 +329,7 @@ pub async fn find_new_episodes(
     let mock_stdout = MockStdout::new();
     let stdout = StdoutChannel::with_mock_stdout(mock_stdout.clone(), mock_stdout);
 
-    let entries = find_new_episodes_http_worker(
+    let body = find_new_episodes_body(
         &state.config,
         &state.db,
         &stdout,
@@ -411,9 +337,9 @@ pub async fn find_new_episodes(
         query.source.map(Into::into),
     )
     .await
-    .map_err(Into::<Error>::into)?;
+    .map_err(Into::<Error>::into)?
+    .into();
 
-    let body = new_episode_worker(&entries);
     task.await.ok();
     Ok(HtmlBase::new(body).into())
 }
@@ -713,20 +639,18 @@ struct FrontpageResponse(HtmlBase<StackString, Error>);
 pub async fn frontpage(
     #[filter = "LoggedUser::filter"] _: LoggedUser,
 ) -> WarpResult<FrontpageResponse> {
-    let body = HBR
-        .render("index.html", &hashmap! {"BODY" => ""})
-        .map_err(Into::<Error>::into)?;
-    Ok(HtmlBase::new(body.into()).into())
+    let body = index_body().into();
+    Ok(HtmlBase::new(body).into())
 }
 
-type TvShowsMap = HashMap<StackString, (StackString, WatchListShow, Option<TvShowSource>)>;
+pub type TvShowsMap = HashMap<StackString, (StackString, WatchListShow, Option<TvShowSource>)>;
 
 #[derive(Debug, Default, Eq)]
-struct ProcessShowItem {
-    show: StackString,
-    title: StackString,
-    link: StackString,
-    source: Option<TvShowSource>,
+pub struct ProcessShowItem {
+    pub show: StackString,
+    pub title: StackString,
+    pub link: StackString,
+    pub source: Option<TvShowSource>,
 }
 
 impl PartialEq for ProcessShowItem {
@@ -761,39 +685,6 @@ impl From<TvShowsResult> for ProcessShowItem {
     }
 }
 
-fn tvshows_worker(res1: TvShowsMap, tvshows: Vec<TvShowsResult>) -> StackString {
-    let tvshows: HashSet<_> = tvshows
-        .into_iter()
-        .map(|s| {
-            let item: ProcessShowItem = s.into();
-            item
-        })
-        .collect();
-    let watchlist: HashSet<_> = res1
-        .into_iter()
-        .map(|(link, (show, s, source))| {
-            let item = ProcessShowItem {
-                show,
-                title: s.title,
-                link: s.link,
-                source,
-            };
-            debug_assert!(link.as_str() == item.link.as_str());
-            item
-        })
-        .collect();
-
-    let shows = process_shows(tvshows, watchlist);
-
-    let previous = r#"
-        <a href="javascript:updateMainArticle('/list/watchlist')">Go Back</a><br>
-        <a href="javascript:updateMainArticle('/trakt/watchlist')">Watch List</a>
-        <button name="remcomout" id="remcomoutput"> &nbsp; </button><br>
-    "#;
-    let shows = shows.join("");
-    format_sstr!(r#"{previous}<table border="0">{shows}</table>"#)
-}
-
 #[derive(RwebResponse)]
 #[response(description = "List TvShows", content = "html")]
 struct ListTvShowsResponse(HtmlBase<StackString, Error>);
@@ -820,60 +711,9 @@ pub async fn tvshows(
     let show_map = get_watchlist_shows_db_map(&state.db)
         .await
         .map_err(Into::<Error>::into)?;
-    let body = tvshows_worker(show_map, shows);
+    let body = tvshows_body(show_map, shows).into();
     task.await.ok();
     Ok(HtmlBase::new(body).into())
-}
-
-fn process_shows(
-    tvshows: HashSet<ProcessShowItem>,
-    watchlist: HashSet<ProcessShowItem>,
-) -> Vec<StackString> {
-    let watchlist_shows = watchlist
-        .iter()
-        .filter(|item| tvshows.get(item.link.as_str()).is_none());
-
-    let mut shows: Vec<_> = tvshows.iter().chain(watchlist_shows).collect();
-    shows.sort_by(|x, y| x.show.cmp(&y.show));
-
-    let button_add = r#"<td><button type="submit" id="ID" onclick="watchlist_add('SHOW');">add to watchlist</button></td>"#;
-    let button_rm = r#"<td><button type="submit" id="ID" onclick="watchlist_rm('SHOW');">remove from watchlist</button></td>"#;
-
-    shows
-        .into_iter()
-        .map(|item| {
-            let link = item.link.as_str();
-            let title = &item.title;
-            let show = &item.show;
-            let has_watchlist = watchlist.contains(link);
-            let mut watchlist_str = StackString::new();
-            if has_watchlist {
-                write!(watchlist_str, r#"<a href="javascript:updateMainArticle('/trakt/watched/list/{link}')">watchlist</a>"#).unwrap();
-            }
-            format_sstr!(
-                r#"<tr><td>{ql}</td>
-                <td><a href="https://www.imdb.com/title/{link}" target="_blank">imdb</a></td><td>{src}</td><td>{watchlist_str}</td><td>{sh}</td></tr>"#,
-                ql=if tvshows.contains(link) {
-                    format_sstr!(r#"<a href="javascript:updateMainArticle('/list/queue/{show}')">{title}</a>"#)
-                } else {
-                    format_sstr!(
-                        r#"<a href="javascript:updateMainArticle('/trakt/watched/list/{link}')">{title}</a>"#
-                    )
-                },
-                src = match item.source {
-                    Some(TvShowSource::Netflix) => r#"<a href="https://netflix.com" target="_blank">netflix</a>"#,
-                    Some(TvShowSource::Hulu) => r#"<a href="https://hulu.com" target="_blank">hulu</a>"#,
-                    Some(TvShowSource::Amazon) => r#"<a href="https://amazon.com" target="_blank">amazon</a>"#,
-                    _ => "",
-                },
-                sh = if has_watchlist {
-                    button_rm.replace("SHOW", link)
-                } else {
-                    button_add.replace("SHOW", link)
-                },
-            )
-        })
-        .collect()
 }
 
 #[derive(RwebResponse)]
@@ -1139,75 +979,6 @@ pub async fn movie_queue_transcode_cleanup(
     Ok(HtmlBase::new(body).into())
 }
 
-fn watchlist_worker(
-    shows: HashMap<StackString, (StackString, WatchListShow, Option<TvShowSource>)>,
-) -> StackString {
-    let mut shows: Vec<_> = shows
-        .into_iter()
-        .map(|(_, (_, s, source))| (s.title, s.link, source))
-        .collect();
-
-    shows.sort();
-
-    let shows = shows
-        .into_iter()
-        .map(|(title, link, source)| {
-            format_sstr!(
-                r#"<tr><td>{li}</td><td>
-                   <a href="https://www.imdb.com/title/{link}" target="_blank">imdb</a> {sl} </tr>"#,
-                li=format_sstr!(
-                    r#"<a href="javascript:updateMainArticle('/trakt/watched/list/{link}')">{title}</a>"#
-                ),
-                sl=format_sstr!(
-                    r#"<td><form action="javascript:setSource('{link}', '{link}_source_id')">
-                       <select id="{link}_source_id" onchange="setSource('{link}', '{link}_source_id');">
-                       {options}
-                       </select>
-                       </form></td>
-                    "#,
-                    options = match source {
-                        Some(TvShowSource::All) | None => {
-                            r#"
-                                <option value="all"></option>
-                                <option value="amazon">Amazon</option>
-                                <option value="hulu">Hulu</option>
-                                <option value="netflix">Netflix</option>
-                            "#
-                        }
-                        Some(TvShowSource::Amazon) => {
-                            r#"
-                                <option value="amazon">Amazon</option>
-                                <option value="all"></option>
-                                <option value="hulu">Hulu</option>
-                                <option value="netflix">Netflix</option>
-                            "#
-                        }
-                        Some(TvShowSource::Hulu) => {
-                            r#"
-                                <option value="hulu">Hulu</option>
-                                <option value="all"></option>
-                                <option value="amazon">Amazon</option>
-                                <option value="netflix">Netflix</option>
-                            "#
-                        }
-                        Some(TvShowSource::Netflix) => {
-                            r#"
-                                <option value="netflix">Netflix</option>
-                                <option value="all"></option>
-                                <option value="amazon">Amazon</option>
-                                <option value="hulu">Hulu</option>
-                            "#
-                        }
-                    },
-                )
-            )
-        })
-        .join("");
-
-    let previous = r#"<a href="javascript:updateMainArticle('/list/tvshows')">Go Back</a><br>"#;
-    format_sstr!(r#"{previous}<table border="0">{shows}</table>"#)
-}
-
 #[derive(RwebResponse)]
 #[response(description = "Trakt Watchlist", content = "html")]
 struct TraktWatchlistResponse(HtmlBase<StackString, Error>);
@@ -1223,7 +994,7 @@ pub async fn trakt_watchlist(
     let shows = get_watchlist_shows_db_map(&state.db)
         .await
         .map_err(Into::<Error>::into)?;
-    let body = watchlist_worker(shows);
+    let body = watchlist_body(shows).into();
     task.await.ok();
     Ok(HtmlBase::new(body).into())
 }
@@ -1271,36 +1042,6 @@ pub async fn trakt_watchlist_action(
     Ok(HtmlBase::new(body).into())
 }
 
-fn trakt_watched_seasons_worker(link: &str, imdb_url: &str, entries: &[ImdbSeason]) -> StackString {
-    let entries = entries
-        .iter()
-        .map(|s| {
-            let show = &s.show;
-            let season = s.season;
-            let title = &s.title;
-            let id = format_sstr!("watched_seasons_id_{show}_{link}_{season}");
-            let button_add = format_sstr!(
-                r#"
-            <td>
-            <button type="submit" id="{id}"
-                onclick="imdb_update('{show}', '{link}', {season}, '/trakt/watched/list/{link}');"
-                >update database</button></td>"#,
-            );
-            let nepisodes = s.nepisodes;
-            format_sstr!(
-                "<tr><td>{a}<td>{season}<td>{nepisodes}<td>{button_add}</tr>",
-                a = format_sstr!(
-                    r#"<a href="javascript:updateMainArticle('/trakt/watched/list/{imdb_url}/{season}')">{title}</t>"#,
-                ),
-            )
-        })
-        .join("");
-
-    format_sstr!(
-        r#"<a href="javascript:updateMainArticle('/trakt/watchlist')">Go Back</a><br><table border="0">{entries}</table>"#
-    )
-}
-
 #[derive(RwebResponse)]
 #[response(description = "Trakt Watchlist Show List", content = "html")]
 struct TraktWatchlistShowListResponse(HtmlBase<StackString, Error>);
@@ -1328,7 +1069,7 @@ pub async fn trakt_watched_seasons(
         show_opt.map_or_else(empty, |(imdb_url, t)| (imdb_url, t.show, t.link));
     let req = ImdbSeasonsRequest { show };
     let entries = req.process(&state.db, &state.config).await?;
-    let body = trakt_watched_seasons_worker(&link, &imdb_url, &entries);
+    let body = trakt_watched_seasons_body(link, imdb_url, entries).into();
     task.await.ok();
     Ok(HtmlBase::new(body).into())
 }
@@ -1354,7 +1095,10 @@ pub async fn trakt_watched_list(
     let mock_stdout = MockStdout::new();
     let stdout = StdoutChannel::with_mock_stdout(mock_stdout.clone(), mock_stdout.clone());
 
-    let body = watch_list_http_worker(&state.config, &state.db, &stdout, &imdb_url, season).await?;
+    let body = watch_list_http_body(&state.config, &state.db, &stdout, &imdb_url, season)
+        .await
+        .map_err(Into::<Error>::into)?
+        .into();
     task.await.ok();
     Ok(HtmlBase::new(body).into())
 }
@@ -1397,12 +1141,6 @@ pub async fn trakt_watched_action(
     Ok(HtmlBase::new(body).into())
 }
 
-fn trakt_cal_worker(entries: &[StackString]) -> StackString {
-    let previous = r#"<a href="javascript:updateMainArticle('/list/tvshows')">Go Back</a><br>"#;
-    let entries = entries.join("");
-    format_sstr!(r#"{previous}<table border="0">{entries}</table>"#)
-}
-
 #[derive(RwebResponse)]
 #[response(description = "Trakt Calendar", content = "html")]
 struct TraktCalendarResponse(HtmlBase<StackString, Error>);
@@ -1415,8 +1153,10 @@ pub async fn trakt_cal(
     let task = user
         .store_url_task(state.trakt.get_client(), &state.config, "/trakt/cal")
         .await;
-    let entries = trakt_cal_http_worker(&state.trakt, &state.db).await?;
-    let body = trakt_cal_worker(&entries);
+    let body = trakt_cal_http_body(&state.db, &state.trakt)
+        .await
+        .map_err(Into::<Error>::into)?
+        .into();
     task.await.ok();
     Ok(HtmlBase::new(body).into())
 }
@@ -1503,202 +1243,6 @@ pub async fn refresh_auth(
         .map_err(Into::<Error>::into)?;
     task.await.ok();
     Ok(HtmlBase::new("Finished").into())
-}
-
-async fn trakt_cal_http_worker(
-    trakt: &TraktConnection,
-    pool: &PgPool,
-) -> Result<Vec<StackString>, Error> {
-    let button_add = r#"<td><button type="submit" id="ID"
-        onclick="imdb_update('SHOW', 'LINK', SEASON, '/trakt/cal');">update database</button></td>"#;
-    trakt.init().await;
-    let cal_list = trakt.get_calendar().await?;
-
-    let mut lines = Vec::new();
-    for cal in cal_list {
-        let show = match ImdbRatings::get_show_by_link(&cal.link, pool).await? {
-            Some(s) => s.show,
-            None => "".into(),
-        };
-        let exists = if show.is_empty() {
-            None
-        } else {
-            let idx_opt = ImdbEpisodes {
-                show: show.clone(),
-                season: cal.season,
-                episode: cal.episode,
-                ..ImdbEpisodes::default()
-            }
-            .get_index(pool)
-            .await?;
-
-            match idx_opt {
-                Some(idx) => ImdbEpisodes::from_index(idx, pool).await?,
-                None => None,
-            }
-        };
-        let season_str = StackString::from_display(cal.season);
-        let episode_str = StackString::from_display(cal.episode);
-        let cal_link = &cal.link;
-        let show = &cal.show;
-        let mut button = StackString::new();
-        if exists.is_none() {
-            write!(
-                button,
-                "{}",
-                button_add
-                    .replace("SHOW", show)
-                    .replace("LINK", cal_link)
-                    .replace("SEASON", &season_str)
-            )?;
-        }
-        let airdate = cal.airdate;
-        let line = format_sstr!(
-            "<tr><td>{a}</td><td>{b}</td><td>{c}</td><td>{airdate}</td>{button}</tr>",
-            a = format_sstr!(
-                r#"<a href="javascript:updateMainArticle('/trakt/watched/list/{cal_link}/{season_str}')">{show}</a>"#
-            ),
-            b = format_sstr!(
-                r#"<a href="https://www.imdb.com/title/{cal_link}" target="_blank">imdb</a>"#
-            ),
-            c = if let Some(link) = cal.ep_link {
-                format_sstr!(
-                    r#"<a href="https://www.imdb.com/title/{link}" target="_blank">{season_str} {episode_str}</a>"#
-                )
-            } else if let Some(link) = exists.as_ref() {
-                format_sstr!(
-                    r#"<a href="https://www.imdb.com/title/{link}" target="_blank">{season_str} {episode_str}</a>"#
-                )
-            } else {
-                format_sstr!("{season_str} {episode_str}")
-            },
-        );
-        lines.push(line);
-    }
-    Ok(lines)
-}
-
-async fn watch_list_http_worker(
-    config: &Config,
-    pool: &PgPool,
-    stdout: &StdoutChannel<StackString>,
-    imdb_url: &str,
-    season: i32,
-) -> HttpResult<StackString> {
-    let button_add = r#"<button type="submit" id="ID"
-        onclick="watched_add('SHOW', SEASON, EPISODE);">add to watched</button>"#;
-    let button_rm = r#"<button type="submit" id="ID" 
-        onclick="watched_rm('SHOW', SEASON, EPISODE);">remove from watched</button>"#;
-
-    let mc = MovieCollection::new(config, pool, stdout);
-    let mq = MovieQueueDB::new(config, pool, stdout);
-
-    let show = ImdbRatings::get_show_by_link(imdb_url, pool)
-        .await?
-        .ok_or_else(|| format_err!("Show Doesn't exist"))?;
-    let show_str = &show.show;
-    let link_str = &show.link;
-
-    let watched_episodes_db: HashSet<i32> = get_watched_shows_db(pool, show_str, Some(season))
-        .await?
-        .map_ok(|s| s.episode)
-        .try_collect()
-        .await?;
-
-    let queue: HashMap<(StackString, i32, i32), _> = mq
-        .print_movie_queue(&[show_str.as_str()])
-        .await?
-        .into_iter()
-        .filter_map(|s| match &s.show {
-            Some(show) => match s.season {
-                Some(season) => match s.episode {
-                    Some(episode) => Some(((show.clone(), season, episode), s)),
-                    None => None,
-                },
-                None => None,
-            },
-            None => None,
-        })
-        .collect();
-
-    let entries: Vec<_> = mc.print_imdb_episodes(show_str, Some(season)).await?;
-
-    let mut collection_idx_map = HashMap::new();
-    let mut collection_metadata_map = HashMap::new();
-    for r in &entries {
-        if let Some(row) = queue.get(&(show_str.clone(), season, r.episode)) {
-            if let Some(index) = mc.get_collection_index(&row.path).await? {
-                collection_idx_map.insert(r.episode, index);
-                if let Some(metadata_key) = mc.get_plex_metadata_key(index).await? {
-                    collection_metadata_map.insert(index, metadata_key);
-                }
-            }
-        }
-    }
-
-    let entries = entries
-        .iter()
-        .map(|s| {
-            let eptitle = &s.eptitle;
-            let entry = if let Some(collection_idx) = collection_idx_map.get(&s.episode) {
-                let host = config.plex_host.as_ref();
-                let server = config.plex_server.as_ref();
-                if let (Some(metadata_key), Some(host), Some(server)) = (collection_metadata_map.get(collection_idx), host, server) {
-                    format_sstr!(
-                        r#"<a href="http://{host}:32400/web/index.html#!/server/{server}/details?key={metadata_key}" target="_blank">{eptitle}</a>"#,
-                    )
-                } else {
-                    format_sstr!(
-                        r#"<a href="javascript:updateMainArticle('{a}');">{eptitle}</a>"#,
-                        a=format_sstr!("/list/play/{collection_idx}"),
-                    )
-                }
-            } else {
-                format_sstr!("{eptitle}")
-            };
-            let season_str = StackString::from_display(season);
-            let episode_str = StackString::from_display(s.episode);
-            let airdate = s.airdate.map_or_else(StackString::new, StackString::from_display);
-            let show_rating = show.rating.as_ref().unwrap_or(&-1.0);
-            let ep_rating = s.rating.map_or_else(|| format_sstr!("-1"), |e| format_sstr!("{e:0.1}"));
-            let ep_url = &s.epurl;
-            format_sstr!(
-                "<tr><td>{show_str}</td><td><td>{entry}</td><td>{a}</td><td>{b}</td><td>{airdate}</td><td>{c}</td></tr>",
-                a=format_sstr!(
-                    r#"<a href="https://www.imdb.com/title/{ep_url}" target="_blank">s{season} ep{episode_str}</a>"#,
-                ),
-                b=format_sstr!(
-                    "rating: {ep_rating} / {show_rating:0.1}",
-                ),
-                c=if watched_episodes_db.contains(&s.episode) {
-                    button_rm
-                        .replace("SHOW", link_str)
-                        .replace("SEASON", &season_str)
-                        .replace("EPISODE", &episode_str)
-                } else {
-                    button_add
-                        .replace("SHOW", link_str)
-                        .replace("SEASON", &season_str)
-                        .replace("EPISODE", &episode_str)
-                }
-            )
-        })
-        .join("\n");
-
-    let previous = format_sstr!(
-        r#"<a href="javascript:updateMainArticle('/trakt/watched/list/{imdb_url}')">Go Back</a><br>"#
-    );
-    let buttons = format_sstr!(
-        r#"
-        <button name="remcomout" id="remcomoutput"> &nbsp; </button>
-        <button type="submit" id="ID"
-            onclick="imdb_update('{show_str}', '{link_str}', {season},
-            '/trakt/watched/list/{link_str}/{season}');"
-            >update database</button><br>"#
-    );
-
-    let entries = format_sstr!(r#"{previous}{buttons}<table border="0">{entries}</table>"#);
-    Ok(entries)
 }
 
 #[allow(clippy::too_many_arguments)]

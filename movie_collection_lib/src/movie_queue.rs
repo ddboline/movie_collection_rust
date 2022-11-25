@@ -18,7 +18,7 @@ use crate::{
     utils::{option_string_wrapper, parse_file_stem},
 };
 
-#[derive(Default, Serialize)]
+#[derive(Default, Serialize, PartialEq, Eq)]
 pub struct MovieQueueResult {
     pub idx: i32,
     pub path: StackString,

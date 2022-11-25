@@ -1,9 +1,7 @@
 use anyhow::{format_err, Error};
 use async_trait::async_trait;
 use futures::TryStreamExt;
-use handlebars::Handlebars;
 use jwalk::WalkDir;
-use lazy_static::lazy_static;
 use postgres_query::{query, Error as PqError};
 use rand::{
     distributions::{Distribution, Uniform},
@@ -23,18 +21,6 @@ use tokio::{
 };
 
 use crate::pgpool::PgPool;
-
-lazy_static! {
-    pub static ref HBR: Handlebars<'static> = get_templates().expect("Failed to parse templates");
-}
-
-/// # Errors
-/// Return error if db query fails
-pub fn get_templates() -> Result<Handlebars<'static>, Error> {
-    let mut h = Handlebars::new();
-    h.register_template_string("index.html", include_str!("../../templates/index.html"))?;
-    Ok(h)
-}
 
 #[inline]
 #[allow(clippy::needless_lifetimes)]

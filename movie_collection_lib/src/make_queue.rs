@@ -6,17 +6,12 @@ use stack_string::{format_sstr, StackString};
 use std::{
     ffi::OsStr,
     path::{Path, PathBuf},
-    sync::Arc,
 };
 use stdout_channel::StdoutChannel;
-use uuid::Uuid;
 
 use crate::{
-    config::Config,
-    movie_collection::MovieCollection,
-    movie_queue::{MovieQueueDB, MovieQueueResult},
-    pgpool::PgPool,
-    utils::{get_video_runtime, parse_file_stem},
+    config::Config, movie_collection::MovieCollection, movie_queue::MovieQueueDB, pgpool::PgPool,
+    utils::get_video_runtime,
 };
 
 #[derive(Debug, Display, Clone)]
@@ -141,89 +136,4 @@ pub async fn make_queue_worker(
     }
 
     Ok(())
-}
-
-/// # Errors
-/// Return error on file system errors
-pub async fn movie_queue_http(
-    queue: &[MovieQueueResult],
-    pool: &PgPool,
-    config: &Config,
-    stdout: &StdoutChannel<StackString>,
-) -> Result<Vec<StackString>, Error> {
-    let mc = Arc::new(MovieCollection::new(config, pool, stdout));
-
-    let button = r#"<td><button type="submit" id="ID" onclick="delete_show('SHOW');"> remove </button></td>"#;
-
-    let futures = queue.iter().map(|row| {
-        let mc = mc.clone();
-        async move {
-        let path = Path::new(row.path.as_str());
-        let ext = path
-            .extension()
-            .ok_or_else(|| format_err!("Cannot determine extension"))?
-            .to_string_lossy();
-        let file_name = path
-            .file_name()
-            .ok_or_else(|| format_err!("Invalid path"))?
-            .to_string_lossy();
-        let file_stem = path
-            .file_stem()
-            .ok_or_else(|| format_err!("Invalid path"))?
-            .to_string_lossy();
-        let (_, season, episode) = parse_file_stem(&file_stem);
-        let host = config.plex_host.as_ref();
-        let server = config.plex_server.as_ref();
-
-        let entry = if ext == "mp4" {
-            let collection_idx = mc.get_collection_index(&row.path).await?.unwrap_or_else(Uuid::new_v4);
-            let metadata_key = mc.get_plex_metadata_key(collection_idx).await?;
-            if let (Some(metadata_key), Some(host), Some(server)) = (metadata_key, host, server) {
-                format_sstr!(
-                    r#"<a href="http://{host}:32400/web/index.html#!/server/{server}/details?key={metadata_key}" target="_blank">{idx} {file_name}</a>"#,
-                    idx=row.idx,
-                )
-            } else {
-                format_sstr!(
-                    r#"<a href="javascript:updateMainArticle('{play_url}');">{idx} {file_name}</a>"#,
-                    idx=row.idx,
-                    play_url=format_sstr!("/list/play/{collection_idx}"),
-                )
-            }
-        } else {
-            file_name.as_ref().into()
-        };
-
-        let entry = if let Some(link) = row.link.as_ref() {
-            format_sstr!(
-                r#"<tr><td>{entry}</td><td><a href={h} target="_blank">imdb</a></td>"#,
-                h=format_sstr!("https://www.imdb.com/title/{link}")
-            )
-        } else {
-            format_sstr!("<tr>\n<td>{entry}</td>\n")
-        };
-
-        let entry = format_sstr!(
-            "{entry}\n{b}",
-            b=button.replace("ID", &file_name).replace("SHOW", &file_name)
-        );
-
-        let entry = if ext == "mp4" {
-            entry
-        } else if season != -1 && episode != -1 {
-            format_sstr!(
-                r#"{entry}<td><button type="submit" id="{file_name}" onclick="transcode_queue('{file_name}');"> transcode </button></td>"#
-            )
-        } else {
-            let entries: Vec<_> = row.path.split('/').collect();
-            let len_entries = entries.len();
-            let directory = entries[len_entries - 2];
-            format_sstr!(
-                r#"{entry}<td><button type="submit" id="{file_name}" onclick="transcode_queue_directory('{file_name}', '{directory}');"> transcode </button></td>"#
-            )
-        };
-        Ok(entry)
-        }
-    });
-    try_join_all(futures).await
 }

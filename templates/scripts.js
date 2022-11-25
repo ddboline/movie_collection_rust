@@ -1,0 +1,200 @@
+!function() {
+    updateMainArticle('/list/cal?source=all');
+}();
+function updateMainArticle( url ) {
+    let xmlhttp = new XMLHttpRequest();
+    xmlhttp.onload = function f() {
+        document.getElementById("main_article").innerHTML = xmlhttp.responseText;
+    }
+    xmlhttp.open("GET", url, true);
+    xmlhttp.send(null);
+}
+function get_transcode_status() {
+    let xmlhttp = new XMLHttpRequest();
+    xmlhttp.onload = function f() {
+        document.getElementById("main_article").innerHTML = xmlhttp.responseText;
+        update_file_list();
+        update_procs();
+    }
+    xmlhttp.open("GET", '/list/transcode/status', true);
+    xmlhttp.send(null);
+}
+function watched_add(link, season, episode) {
+    let url = "/trakt/watched/add/" + link + "/" + season + "/" + episode;
+    let xmlhttp = new XMLHttpRequest();
+    xmlhttp.open("GET", url, true);
+    xmlhttp.onload = function nothing() {
+        let url = "/trakt/watched/list/" + link + "/" + season;
+        updateMainArticle(url);
+    }
+    xmlhttp.send(null);
+    let out = "requested " + link + "/" + season + "/" + episode
+    document.getElementById("remcomoutput").innerHTML = out;
+}
+function watched_rm(link, season, episode) {
+    let url = "/trakt/watched/rm/" + link + "/" + season + "/" + episode
+    let xmlhttp = new XMLHttpRequest();
+    xmlhttp.open("GET", url, true);
+    xmlhttp.onload = function nothing() {
+        let url = "/trakt/watched/list/" + link + "/" + season;
+        updateMainArticle(url);
+    }
+    xmlhttp.send(null);
+    let out = "requested " + link + "/" + season + "/" + episode
+    document.getElementById("remcomoutput").innerHTML = out;
+}
+function delete_show(index) {
+    let url = "/list/delete/" + index
+    let xmlhttp = new XMLHttpRequest();
+    xmlhttp.open("GET", url, true);
+    xmlhttp.onload = function nothing() {
+    }
+    xmlhttp.send(null);
+}
+function watchlist_add(link) {
+    let url = "/trakt/watchlist/add/" + link
+    let xmlhttp = new XMLHttpRequest();
+    xmlhttp.open("GET", url, true);
+    xmlhttp.onload = function nothing() {
+        let url = "/list/tvshows";
+        updateMainArticle(url);
+    }
+    xmlhttp.send(null);
+    let out = "requested " + link
+    document.getElementById("remcomoutput").innerHTML = out;
+}
+function watchlist_rm(link) {
+    let url = "/trakt/watchlist/rm/" + link
+    let xmlhttp = new XMLHttpRequest();
+    xmlhttp.open("GET", url, true);
+    xmlhttp.onload = function nothing() {
+        let url = "/list/tvshows";
+        updateMainArticle(url);
+    }
+    xmlhttp.send(null);
+    let out = "requested " + link
+    document.getElementById("remcomoutput").innerHTML = out;
+}
+function imdb_update(show, link, season, referal_url) {
+    let url = "/list/imdb/" + show + "?tv=true&update=true&database=true&link=" + link + "&season=" + season;
+    let xmlhttp = new XMLHttpRequest();
+    xmlhttp.open("GET", url, true);
+    xmlhttp.onload = function nothing() {
+        updateMainArticle(referal_url);
+    }
+    xmlhttp.send(null);
+    let out = "requested " + link
+    document.getElementById("remcomoutput").innerHTML = out;
+}
+function refreshAuth() {
+    let url = "/trakt/refresh_auth";
+    let xmlhttp = new XMLHttpRequest();
+    xmlhttp.onload = function() {
+        document.getElementById("main_article").innerHTML = xmlhttp.responseText;
+    }
+    xmlhttp.open("GET", url, true);
+    xmlhttp.send(null);
+}
+function traktAuth() {
+    let url = "/trakt/auth_url";
+    let xmlhttp = new XMLHttpRequest();
+    xmlhttp.onload = function() {
+        let win = window.open(xmlhttp.responseText, '_blank');
+        win.focus()
+    }
+    xmlhttp.open("GET", url, true);
+    xmlhttp.send(null);
+}
+function transcode_queue(index) {
+    let url = "/list/transcode/queue/" + index
+    let xmlhttp = new XMLHttpRequest();
+    xmlhttp.open("GET", url, true);
+    xmlhttp.onload = function nothing() {
+        document.getElementById("remcomoutput").innerHTML = "&nbsp;";
+    }
+    xmlhttp.send(null);
+    let out = "requested " + index
+    document.getElementById("remcomoutput").innerHTML = out;
+}
+function transcode_queue_directory(index, directory) {
+    let url = "/list/transcode/queue/" + directory + "/" + index
+    let xmlhttp = new XMLHttpRequest();
+    xmlhttp.open("GET", url, true);
+    xmlhttp.onload = function nothing() {
+        document.getElementById("remcomoutput").innerHTML = "&nbsp;";
+    }
+    xmlhttp.send(null);
+    let out = "requested " + index
+    document.getElementById("remcomoutput").innerHTML = out;
+}
+function update_procs() {
+    let url = "/list/transcode/status/procs";
+    let xmlhttp = new XMLHttpRequest();
+    xmlhttp.open("GET", url, true);
+    xmlhttp.onload = function nothing() {
+        document.getElementById("procs-tables").innerHTML = xmlhttp.responseText;
+    }
+    xmlhttp.send(null);
+}
+function update_file_list() {
+    let url = "/list/transcode/status/file_list";
+    let xmlhttp = new XMLHttpRequest();
+    xmlhttp.open("GET", url, true);
+    xmlhttp.onload = function nothing() {
+        document.getElementById("local-file-table").innerHTML = xmlhttp.responseText;
+    }
+    xmlhttp.send(null);
+}
+function transcode_file(file) {
+    let url = "/list/transcode/file/" + file
+    let xmlhttp = new XMLHttpRequest();
+    xmlhttp.open("GET", url, true);
+    xmlhttp.onload = function nothing() {
+        update_procs();
+        update_file_list();
+        document.getElementById("remcomoutput").innerHTML = "&nbsp;";
+    }
+    xmlhttp.send(null);
+    let out = "requested " + file
+    document.getElementById("remcomoutput").innerHTML = out;
+}
+function remcom_file(file) {
+    let movie_dir = document.getElementById('movie_dir').value;
+    let url = "/list/transcode/remcom/directory/" + movie_dir + "/" + file;
+    if (movie_dir == '') {
+        url = "/list/transcode/remcom/file/" + file;
+    }
+    let xmlhttp = new XMLHttpRequest();
+    xmlhttp.open("GET", url, true);
+    xmlhttp.onload = function nothing() {
+        update_procs();
+        update_file_list();
+        document.getElementById("remcomoutput").innerHTML = "&nbsp;";
+    }
+    xmlhttp.send(null);
+    let out = "requested " + file
+    document.getElementById("remcomoutput").innerHTML = out;
+}
+function cleanup_file(file) {
+    let url = "/list/transcode/cleanup/" + file
+    let xmlhttp = new XMLHttpRequest();
+    xmlhttp.open("GET", url, true);
+    xmlhttp.onload = function nothing() {
+        update_procs();
+        update_file_list();
+        document.getElementById("remcomoutput").innerHTML = "&nbsp;";
+    }
+    xmlhttp.send(null);
+    let out = "requested " + file
+    document.getElementById("remcomoutput").innerHTML = out;
+}
+function setSource( link, source_id ) {
+    let source = document.getElementById( source_id ).value;
+    let url = "/list/imdb_ratings/set_source?link=" + link + "&source=" + source;
+    let xmlhttp = new XMLHttpRequest();
+    xmlhttp.open("GET", url, true);
+    xmlhttp.onload = function nothing() {
+        updateMainArticle('/trakt/watchlist');
+    }
+    xmlhttp.send(null);
+}
