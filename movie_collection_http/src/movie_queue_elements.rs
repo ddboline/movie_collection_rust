@@ -1466,7 +1466,7 @@ fn plex_element(
             .as_ref()
             .map_or("", StackString::as_str);
         let filename = event.filename.as_ref().map_or("", StackString::as_str);
-        let filestem = filename.split("/").last().unwrap_or("");
+        let filestem = filename.split('/').last().unwrap_or("");
         rsx! {
             tr {
                 key: "plex-event-key-{idx}",
@@ -1732,6 +1732,12 @@ fn local_file_element(
                             select {
                                 id: "movie_dir",
                                 movie_dirs,
+                            },
+                            button {
+                                "type": "submit",
+                                id: "{f}",
+                                "onclick": "remcom_file('{f}')",
+                                "move",
                             }
                         }
                     }

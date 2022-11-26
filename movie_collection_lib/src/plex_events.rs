@@ -187,6 +187,8 @@ impl PlexEvent {
         Ok(())
     }
 
+    /// # Errors
+    /// Return error if db query fails
     pub async fn get_event_by_id(pool: &PgPool, id: Uuid) -> Result<Option<EventOutput>, Error> {
         let query = query!(
             r#"
