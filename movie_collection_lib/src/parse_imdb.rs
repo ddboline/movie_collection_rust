@@ -1,6 +1,5 @@
 use anyhow::Error;
 use clap::Parser;
-use itertools::Itertools;
 use rust_decimal::Decimal;
 use stack_string::{format_sstr, StackString};
 use std::collections::HashMap;
@@ -9,7 +8,6 @@ use stdout_channel::StdoutChannel;
 use crate::{
     config::Config, imdb_episodes::ImdbEpisodes, imdb_ratings::ImdbRatings,
     imdb_utils::ImdbConnection, movie_collection::MovieCollection, pgpool::PgPool,
-    trakt_utils::WatchListMap,
 };
 
 #[derive(Parser, Default, Debug, Clone)]
@@ -247,48 +245,5 @@ impl ParseImdb {
             }
         }
         Ok(())
-    }
-
-    /// # Errors
-    /// Return error if db queries fail
-    pub async fn parse_imdb_http_worker(
-        &self,
-        opts: &ParseImdbOptions,
-        watchlist: &WatchListMap,
-    ) -> Result<StackString, Error> {
-        let button_add = r#"<td><button type="submit" id="ID"
-            onclick="watchlist_add('SHOW');">add to watchlist</button></td>"#;
-        let button_rm = r#"<td><button type="submit" id="ID" 
-            onclick="watchlist_rm('SHOW');">remove from watchlist</button></td>"#;
-
-        let output: Vec<_> =
-            self.parse_imdb_worker(opts)
-                .await?
-                .into_iter()
-                .map(|line| {
-                    let mut imdb_url: StackString = "".into();
-                    let tmp = line.into_iter()
-                        .map(|imdb_url_| {
-                            if imdb_url_.starts_with("tt") {
-                                imdb_url = imdb_url_;
-                                format_sstr!(
-                                r#"<a href="https://www.imdb.com/title/{imdb_url}" target="_blank">{imdb_url}</a>"#
-                            )
-                            } else {
-                                imdb_url_
-                            }
-                        }).join("</td><td>");
-                    format_sstr!(
-                        "<tr><td>{tmp}</td><td>{a}</td></tr>",
-                        a=if watchlist.contains_key(&imdb_url) {
-                            button_rm.replace("SHOW", &imdb_url)
-                        } else {
-                            button_add.replace("SHOW", &imdb_url)
-                        }
-                    )
-                })
-                .collect();
-
-        Ok(output.join("\n").into())
     }
 }

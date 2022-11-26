@@ -4,13 +4,11 @@ use dioxus::prelude::{
     Scope, VNode, VirtualDom,
 };
 use futures::{future::try_join_all, TryStreamExt};
-use movie_collection_lib::{
-    imdb_episodes::ImdbEpisodes, trakt_connection::TraktConnection, trakt_utils::TraktCalEntry,
-};
 use rust_decimal_macros::dec;
 use stack_string::{format_sstr, StackString};
 use std::{
     collections::{HashMap, HashSet},
+    ffi::OsStr,
     fmt::Write,
     path::Path,
     sync::Arc,
@@ -23,12 +21,19 @@ use uuid::Uuid;
 use movie_collection_lib::{
     config::Config,
     date_time_wrapper::DateTimeWrapper,
-    imdb_episodes::ImdbSeason,
+    imdb_episodes::{ImdbEpisodes, ImdbSeason},
     imdb_ratings::ImdbRatings,
+    make_list::FileLists,
     movie_collection::{MovieCollection, NewEpisodesResult, TvShowsResult},
     movie_queue::{MovieQueueDB, MovieQueueResult},
+    parse_imdb::{ParseImdb, ParseImdbOptions},
     pgpool::PgPool,
-    trakt_utils::{get_watched_shows_db, WatchListMap},
+    plex_events::EventOutput,
+    trakt_connection::TraktConnection,
+    trakt_utils::{get_watched_shows_db, TraktCalEntry, WatchListMap},
+    transcode_service::{
+        movie_directories, ProcInfo, ProcStatus, TranscodeServiceRequest, TranscodeStatus,
+    },
     tv_show_source::TvShowSource,
     utils::parse_file_stem,
 };
@@ -1234,4 +1239,472 @@ fn watch_list_http_element(
             entries,
         }
     })
+}
+
+/// # Errors
+/// Returns error if db query fails
+pub async fn parse_imdb_http_body(
+    imdb: &ParseImdb,
+    opts: &ParseImdbOptions,
+    watchlist: WatchListMap,
+) -> Result<String, Error> {
+    let imdb_urls = imdb.parse_imdb_worker(opts).await?;
+
+    let mut app = VirtualDom::new_with_props(
+        parse_imdb_http_element,
+        parse_imdb_http_elementProps {
+            imdb_urls,
+            watchlist,
+        },
+    );
+    app.rebuild();
+    Ok(dioxus::ssr::render_vdom(&app))
+}
+
+#[inline_props]
+fn parse_imdb_http_element(
+    cx: Scope,
+    imdb_urls: Vec<Vec<StackString>>,
+    watchlist: WatchListMap,
+) -> Element {
+    let entries = imdb_urls.iter().enumerate().map(move |(idx, line)| {
+        let mut imdb_url = None;
+        for u in line {
+            if u.starts_with("tt") {
+                imdb_url.replace(u.clone());
+            }
+        }
+        let tmp = line.iter().map(|imdb_url_| {
+            if imdb_url_.starts_with("tt") {
+                rsx! {
+                    a {
+                        href: "https://www.imdb.com/title/{imdb_url_}",
+                        target: "_blank",
+                    }
+                }
+            } else {
+                rsx! {"{imdb_url_}"}
+            };
+        });
+        let button = imdb_url.map(|imdb_url| {
+            if watchlist.contains_key(&imdb_url) {
+                rsx! {
+                    td {
+                        button {
+                            "type": "submit",
+                            id: "watchlist-rm-{idx}",
+                            "onclick": "watchlist_rm('{imdb_url}');",
+                            "remove from watchlist",
+                        }
+                    }
+                }
+            } else {
+                rsx! {
+                    td {
+                        button {
+                            "type": "submit",
+                            id: "watchlist-add-{idx}",
+                            "onclick": "watchlist_add('{imdb_url}');",
+                            "add from watchlist",
+                        }
+                    }
+                }
+            }
+        });
+
+        rsx! {
+            tr {
+                key: "imdb-entries-{idx}",
+                td {tmp},
+                td {button},
+            }
+        }
+    });
+
+    cx.render(rsx! {
+        entries
+    })
+}
+
+pub fn plex_body(config: Config, events: Vec<EventOutput>) -> String {
+    let mut app = VirtualDom::new_with_props(plex_element, plex_elementProps { config, events });
+    app.rebuild();
+    dioxus::ssr::render_vdom(&app)
+}
+
+#[inline_props]
+fn plex_element(cx: Scope, config: Config, events: Vec<EventOutput>) -> Element {
+    let local = DateTimeWrapper::local_tz();
+    let entries = events.iter().enumerate().map(|(idx, event)| {
+        let last_modified = match config.default_time_zone {
+            Some(tz) => {
+                let tz = tz.into();
+                event.last_modified.to_timezone(tz)
+            }
+            None => event.last_modified.to_timezone(local),
+        };
+        let event_str = &event.event;
+        let title = &event.title;
+        let metadata_type = event.metadata_type.as_ref().map_or("", StackString::as_str);
+        let section_title = event.section_title.as_ref().map_or("", StackString::as_str);
+        let parent_title = event.parent_title.as_ref().map_or("", StackString::as_str);
+        let grandparent_title = event
+            .grandparent_title
+            .as_ref()
+            .map_or("", StackString::as_str);
+        let filename = event.filename.as_ref().map_or("", StackString::as_str);
+        rsx! {
+            tr {
+                key: "plex-event-key-{idx}",
+                "style": "text-align; center;",
+                td {"{last_modified}"},
+                td {"{event_str}"},
+                td {"{metadata_type}"},
+                td {"{section_title}"},
+                td {"{title} {parent_title} {grandparent_title} {filename}"},
+            }
+        }
+    });
+    cx.render(rsx! {
+        table {
+            "border": "1",
+            class: "dataframe",
+            thead {
+                tr {
+                    th {"Time"},
+                    th {"Event Type"},
+                    th {"Item Type"},
+                    th {"Section"},
+                    th {"Title"},
+                }
+            },
+            tbody {
+                entries
+            }
+        }
+    })
+}
+
+/// # Errors
+/// Returns error if db query fails
+pub fn local_file_body(
+    file_lists: FileLists,
+    proc_map: HashMap<StackString, Option<ProcStatus>>,
+    config: Config,
+) -> String {
+    let mut app = VirtualDom::new_with_props(
+        local_file_element,
+        local_file_elementProps {
+            file_lists,
+            proc_map,
+            config,
+        },
+    );
+    app.rebuild();
+    dioxus::ssr::render_vdom(&app)
+}
+
+#[inline_props]
+fn local_file_element(
+    cx: Scope,
+    file_lists: FileLists,
+    proc_map: HashMap<StackString, Option<ProcStatus>>,
+    config: Config,
+) -> Element {
+    let file_map = file_lists.get_file_map();
+    let entries = file_lists
+        .local_file_list
+        .iter()
+        .enumerate()
+        .map(|(idx, f)| {
+            let f_key = f
+                .replace(".mkv", "")
+                .replace(".m4v", "")
+                .replace(".avi", "")
+                .replace(".mp4", "");
+            let button = if file_map.contains_key(f_key.as_str()) {
+                rsx! {
+                    button {
+                        "type": "submit",
+                        id: "{f}",
+                        "onclick": "cleanup_file('{f}');",
+                        "cleanup"
+                    }
+                }
+            } else if let Some(status) = proc_map.get(f_key.as_str()) {
+                match status {
+                    Some(ProcStatus::Current) => {
+                        rsx! {"running"}
+                    }
+                    Some(ProcStatus::Upcoming) => {
+                        rsx! {"upcoming"}
+                    }
+                    Some(ProcStatus::Finished) => {
+                        let mut movie_dirs =
+                            movie_directories(config).unwrap_or_else(|_| Vec::new());
+                        if f_key.contains("_s") && f_key.contains("_ep") {
+                            movie_dirs.insert(0, "".into());
+                        }
+                        let movie_dirs = movie_dirs.into_iter().enumerate().map(|(i, d)| {
+                            rsx! {
+                                option {
+                                    key: "movie-key-{i}",
+                                    value: "{d}",
+                                    "{d}",
+                                }
+                            }
+                        });
+                        rsx! {
+                            select {
+                                id: "movie_dir",
+                                movie_dirs,
+                            }
+                        }
+                    }
+                    None => rsx! {"unknown"},
+                }
+            } else {
+                rsx! {
+                    button {
+                        "type": "submit",
+                        id: "{f}",
+                        "onclick": "transcode_file('{f}');",
+                        "transcode",
+                    }
+                }
+            };
+
+            rsx! {
+                tr {
+                    key: "flist-key-{idx}",
+                    td {"{f}"},
+                    td {button},
+                }
+            }
+        });
+    cx.render(rsx! {
+        br {
+            "On-deck Media Files"
+        },
+        table {
+            "border": "1",
+            class: "dataframe",
+            thead {
+                tr {
+                    th {"File"},
+                    th {"Action"},
+                }
+            },
+            tbody {
+                entries
+            }
+        }
+    })
+}
+
+pub fn procs_html_body(status: TranscodeStatus) -> String {
+    let mut app =
+        VirtualDom::new_with_props(procs_html_element, procs_html_elementProps { status });
+    app.rebuild();
+    dioxus::ssr::render_vdom(&app)
+}
+
+#[inline_props]
+fn procs_html_element(cx: Scope, status: TranscodeStatus) -> Element {
+    cx.render(procs_html_node(status))
+}
+
+pub fn transcode_get_html_body(status: TranscodeStatus) -> String {
+    let mut app = VirtualDom::new_with_props(
+        transcode_get_html_element,
+        transcode_get_html_elementProps { status },
+    );
+    app.rebuild();
+    dioxus::ssr::render_vdom(&app)
+}
+
+#[inline_props]
+fn transcode_get_html_element(cx: Scope, status: TranscodeStatus) -> Element {
+    let procs_node = procs_html_node(status);
+    cx.render(rsx! {
+        br {
+            button {
+                name: "remcomout",
+                id: "remcomout",
+                "&nbsp;",
+            }
+        },
+        div {
+            id: "procs-tables",
+            procs_node,
+        },
+        div {
+            id: "local-file-table",
+        }
+    })
+}
+
+fn procs_html_node(status: &TranscodeStatus) -> LazyNodes {
+    let proc_headers = ProcInfo::get_header();
+    let upcoming_header = TranscodeServiceRequest::get_header();
+
+    let running = if status.procs.is_empty() {
+        None
+    } else {
+        let header = proc_headers.into_iter().enumerate().map(|(i, h)| {
+            rsx! {
+                th {
+                    key: "header-{i}",
+                    "{h}",
+                }
+            }
+        });
+        let bodies = status
+            .procs
+            .iter()
+            .flat_map(ProcInfo::get_html)
+            .enumerate()
+            .map(|(i, b)| {
+                rsx! {
+                    td {
+                        key: "bodies-{i}",
+                        "{b}",
+                    }
+                }
+            });
+        Some(rsx! {
+            br {
+                "Running procs:"
+            },
+            table {
+                border: "1",
+                class: "dataframe",
+                thead {
+                    tr {
+                        header,
+                    }
+                },
+                tbody {
+                    tr {
+                        bodies,
+                    }
+                }
+            }
+        })
+    };
+    let upcoming = if status.upcoming_jobs.is_empty() {
+        None
+    } else {
+        let headers = upcoming_header.into_iter().enumerate().map(|(i, h)| {
+            rsx! {
+                th {
+                    key: "upcoming-header-key-{i}",
+                    "{h}"
+                }
+            }
+        });
+        let bodies = status
+            .upcoming_jobs
+            .iter()
+            .flat_map(TranscodeServiceRequest::get_html)
+            .enumerate()
+            .map(|(i, b)| {
+                rsx! {
+                    td {
+                        key: "upcoming-body-key-{i}",
+                        "{b}"
+                    }
+                }
+            });
+        Some(rsx! {
+            br {
+                "Upcoming jobs:",
+            },
+            table {
+                border: "1",
+                class: "dataframe",
+                thead {
+                    tr {
+                        headers
+                    }
+                },
+                tbody {
+                    tr {
+                        bodies
+                    }
+                }
+            }
+        })
+    };
+    let current = if status.current_jobs.is_empty() {
+        None
+    } else {
+        let jobs = status.current_jobs.iter().enumerate().map(|(i, (_, s))| {
+            rsx! {
+                div {
+                    key: "job-key-{i}",
+                    "{s}<br>",
+                }
+            }
+        });
+        Some(rsx! {
+            br {
+                "Current jobs:",
+            },
+            jobs,
+        })
+    };
+    let finished = if status.finished_jobs.is_empty() {
+        None
+    } else {
+        let jobs = status.finished_jobs.iter().enumerate().map(|(i, f)| {
+            let file_name = f
+                .file_name()
+                .unwrap_or_else(|| OsStr::new(""))
+                .to_string_lossy();
+            rsx! {
+                tr {
+                    key: "job-key-{i}",
+                    td {
+                        "{file_name}",
+                    },
+                    td {
+                        button {
+                            "type": "submit",
+                            id: "{file_name}",
+                            "onclick": "cleanup_file('{file_name}')",
+                            "cleanup",
+                        }
+                    }
+                }
+            }
+        });
+        Some(rsx! {
+            br {
+                "Finished jobs:"
+            },
+            table {
+                border: "1",
+                class: "dataframe",
+                thead {
+                    tr {
+                        th {"File"},
+                        th {"Action"},
+                    }
+                },
+                tbody {
+                    jobs
+                }
+            }
+        })
+    };
+
+    rsx! {
+        div{
+            running,
+            upcoming,
+            current,
+            finished,
+        }
+    }
 }

@@ -24,8 +24,8 @@ use movie_collection_lib::{
 };
 
 use crate::{
-    errors::ServiceError as Error, ImdbEpisodesWrapper, ImdbRatingsWrapper,
-    MovieCollectionRowWrapper, MovieQueueRowWrapper, TvShowSourceWrapper,
+    errors::ServiceError as Error, movie_queue_elements::parse_imdb_http_body, ImdbEpisodesWrapper,
+    ImdbRatingsWrapper, MovieCollectionRowWrapper, MovieQueueRowWrapper, TvShowSourceWrapper,
 };
 
 pub struct WatchlistShowsRequest {}
@@ -219,7 +219,9 @@ impl ImdbShowRequest {
 
         let watchlist = get_watchlist_shows_db_map(pool).await?;
         let pi = ParseImdb::new(config, pool, &stdout);
-        let body = pi.parse_imdb_http_worker(&self.into(), &watchlist).await?;
+        let body = parse_imdb_http_body(&pi, &self.into(), watchlist)
+            .await?
+            .into();
         Ok(body)
     }
 }

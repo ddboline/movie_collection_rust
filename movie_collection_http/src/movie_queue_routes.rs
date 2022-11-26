@@ -48,9 +48,9 @@ use crate::{
     logged_user::LoggedUser,
     movie_queue_app::AppState,
     movie_queue_elements::{
-        find_new_episodes_body, index_body, movie_queue_body, play_worker_body,
-        trakt_cal_http_body, trakt_watched_seasons_body, tvshows_body, watch_list_http_body,
-        watchlist_body,
+        find_new_episodes_body, index_body, local_file_body, movie_queue_body, play_worker_body,
+        plex_body, procs_html_body, trakt_cal_http_body, trakt_watched_seasons_body,
+        transcode_get_html_body, tvshows_body, watch_list_http_body, watchlist_body,
     },
     movie_queue_requests::{
         ImdbEpisodesUpdateRequest, ImdbRatingsSetSourceRequest, ImdbRatingsUpdateRequest,
@@ -744,7 +744,7 @@ pub async fn movie_queue_transcode_status(
     let status = transcode_status(&state.config)
         .await
         .map_err(Into::<Error>::into)?;
-    let body = status.get_html().join("").into();
+    let body = transcode_get_html_body(status).into();
     url_task.await.ok();
     Ok(HtmlBase::new(body).into())
 }
@@ -770,10 +770,8 @@ pub async fn movie_queue_transcode_status_file_list(
     let body = if file_lists.local_file_list.is_empty() {
         StackString::new()
     } else {
-        status
-            .get_local_file_html(&file_lists, &state.config)
-            .join("")
-            .into()
+        let proc_map = status.get_proc_map();
+        local_file_body(file_lists, proc_map, state.config.clone()).into()
     };
     Ok(HtmlBase::new(body).into())
 }
@@ -790,7 +788,7 @@ pub async fn movie_queue_transcode_status_procs(
     let status = transcode_status(&state.config)
         .await
         .map_err(Into::<Error>::into)?;
-    let body = status.get_procs_html().join("").into();
+    let body = procs_html_body(status).into();
     Ok(HtmlBase::new(body).into())
 }
 
@@ -1448,30 +1446,16 @@ pub async fn plex_list(
         .store_url_task(state.trakt.get_client(), &state.config, "/list/plex")
         .await;
     let query = query.into_inner();
-    let body = PlexEvent::get_event_http(
+    let events = PlexEvent::get_plex_events(
         &state.db,
-        &state.config,
         query.start_timestamp.map(Into::into),
         query.event_type.map(Into::into),
         query.offset,
         query.limit,
     )
     .await
-    .map_err(Into::<Error>::into)?
-    .join("\n");
-    let body = format_sstr!(
-        r#"
-            <table border="1" class="dataframe">
-            <thead><tr>
-            <th>Time</th>
-            <th>Event Type</th>
-            <th>Item Type</th>
-            <th>Section</th>
-            <th>Title</th></tr></thead>
-            <tbody>{body}</tbody>
-            </table>
-        "#
-    );
+    .map_err(Into::<Error>::into)?;
+    let body = plex_body(state.config.clone(), events).into();
     task.await.ok();
     Ok(HtmlBase::new(body).into())
 }

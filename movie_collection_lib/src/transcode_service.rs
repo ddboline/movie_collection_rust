@@ -2,7 +2,6 @@ use anyhow::{format_err, Error};
 use futures::{future::try_join_all, try_join};
 use itertools::Itertools;
 use jwalk::WalkDir;
-use log::debug;
 use procfs::process;
 use serde::{Deserialize, Serialize};
 use smallvec::{smallvec, SmallVec};
@@ -26,8 +25,8 @@ use tokio::{
 };
 
 use crate::{
-    config::Config, make_list::FileLists, make_queue::make_queue_worker,
-    movie_collection::MovieCollection, pgpool::PgPool, utils::parse_file_stem,
+    config::Config, make_queue::make_queue_worker, movie_collection::MovieCollection,
+    pgpool::PgPool, utils::parse_file_stem,
 };
 
 #[derive(Serialize, Deserialize, Debug, PartialEq, Clone, Copy, Eq)]
@@ -548,7 +547,7 @@ fn tmp_dir(config: &Config) -> PathBuf {
     config.home_dir.join("tmp_avi")
 }
 
-#[derive(Debug)]
+#[derive(Debug, PartialEq, Eq)]
 pub struct ProcInfo {
     pub pid: u64,
     pub name: StackString,
@@ -586,7 +585,7 @@ impl fmt::Display for ProcInfo {
     }
 }
 
-#[derive(Debug)]
+#[derive(Debug, PartialEq, Eq)]
 pub struct TranscodeStatus {
     pub procs: Vec<ProcInfo>,
     pub upcoming_jobs: Vec<TranscodeServiceRequest>,
@@ -594,7 +593,7 @@ pub struct TranscodeStatus {
     pub finished_jobs: Vec<PathBuf>,
 }
 
-#[derive(Copy, Clone, Debug)]
+#[derive(Copy, Clone, Debug, PartialEq, Eq)]
 pub enum ProcStatus {
     Upcoming,
     Current,
@@ -655,134 +654,6 @@ impl TranscodeStatus {
         });
 
         finished.chain(upcoming).chain(current).collect()
-    }
-
-    #[must_use]
-    pub fn get_local_file_html(&self, flists: &FileLists, config: &Config) -> Vec<StackString> {
-        let mut output = Vec::new();
-        let file_map = flists.get_file_map();
-        let proc_map = self.get_proc_map();
-        output.push("On-deck Media Files<br>".into());
-        output.push(r#"<table border="1" class="dataframe">"#.into());
-        output.push(r#"<thead><tr><th>File</th><th>Action</th></tr></thead>"#.into());
-        output.push(
-            format_sstr!(
-                r#"<tbody><tr><td>{}</td></tr></tbody>"#,
-                flists
-                    .local_file_list
-                    .iter()
-                    .map(|f| {
-                        let f_key = f.replace(".mkv", "").replace(".m4v", "").replace(".avi", "").replace(".mp4", "");
-                        debug!("proc_map.keys {:?} {:?} {}", proc_map.keys(), file_map.keys(), f_key);
-                        if file_map.get(f_key.as_str()).is_some() {
-                            format_sstr!(
-                                r#"{f}</td><td><button type="submit" id="{f}" onclick="cleanup_file('{f}');"> cleanup </button>"#
-                            )
-                        } else if let Some(status) = proc_map.get(f_key.as_str()) {
-                            match status {
-                                Some(ProcStatus::Current) => format_sstr!("{f}</td><td>running"),
-                                Some(ProcStatus::Upcoming) => format_sstr!("{f}</td><td>upcoming"),
-                                Some(ProcStatus::Finished) => {
-                                    let mut movie_dirs = movie_directories(config).unwrap_or_else(|_| Vec::new());
-                                    if f_key.contains("_s") && f_key.contains("_ep") {
-                                        movie_dirs.insert(0, "".into());
-                                    }
-                                    let movie_dirs = movie_dirs.into_iter().map(|d| format_sstr!(r#"<option value="{d}">{d}</option>"#)).join("\n");
-                                    format_sstr!(
-                                    r#"{f}</td>
-                                        <td><select id="movie_dir">{movie_dirs}</select>
-                                        <button type="submit" id="{f}" onclick="remcom_file('{f}');"> move </button>"#,
-                                    )
-                                },
-                                None => format_sstr!("{f}</td><td>unknown"),
-                            }
-                        } else {
-                            format_sstr!(
-                                r#"{f}</td><td><button type="submit" id="{f}" onclick="transcode_file('{f}');"> transcode </button>"#,
-                            )
-                        }
-                    })
-                    .join("</td></tr><tr><td>"),
-            )
-            ,
-        );
-        output.push("</table>".into());
-        output
-    }
-
-    #[must_use]
-    pub fn get_procs_html(&self) -> Vec<StackString> {
-        let mut output = Vec::new();
-        if !self.procs.is_empty() {
-            output.push("Running procs:<br>".into());
-            output.push(r#"<table border="1" class="dataframe">"#.into());
-            output.push(format_sstr!(
-                r#"<thead><tr><th>{}</th></tr></thead>"#,
-                ProcInfo::get_header().join("</th><th>")
-            ));
-            output.push(format_sstr!(
-                r#"<tbody><tr><td>{}</td></tr></tbody>"#,
-                self.procs
-                    .iter()
-                    .map(|p| p.get_html().join("</td><td>"))
-                    .join("</td></tr><tr><td>")
-            ));
-            output.push("</table>".into());
-        }
-        if !self.upcoming_jobs.is_empty() {
-            output.push("Upcoming jobs:<br>".into());
-            output.push(r#"<table border="1" class="dataframe">"#.into());
-            output.push(format_sstr!(
-                r#"<thead><tr><th>{}</th></tr></thead>"#,
-                TranscodeServiceRequest::get_header().join("</th><th>")
-            ));
-            output.push(format_sstr!(
-                r#"<tbody><tr><td>{}</td></tr></tbody>"#,
-                self.upcoming_jobs
-                    .iter()
-                    .map(|t| { t.get_html().join("</td><td>") })
-                    .join("</td></tr><tr><td>")
-            ));
-            output.push("</table>".into());
-        }
-        if !self.current_jobs.is_empty() {
-            output.push(format_sstr!(
-                "Current jobs:<br>{}<br>",
-                self.current_jobs.iter().map(|(_, s)| s).join("<br>")
-            ));
-        }
-        if !self.finished_jobs.is_empty() {
-            output.push("Finished jobs:<br>".into());
-            output.push(r#"<table border="1" class="dataframe">"#.into());
-            output.push(r#"<thead><tr><th>File</th><th>Action</th></tr></thead>"#.into());
-            output.push(
-                format_sstr!(
-                    r#"<tbody><tr><td>{}</td></tr></tbody>"#,
-                    self.finished_jobs
-                        .iter()
-                        .map(|f| format_sstr!(
-                            r#"{file_name}</td><td><button type="submit" id="{file_name}" onclick="cleanup_file('{file_name}');"> cleanup </button>"#,
-                            file_name=f.file_name().unwrap_or_else(|| OsStr::new("")).to_string_lossy()
-                        ))
-                        .join("</td></tr><tr><td>"),
-                )
-                ,
-            );
-            output.push("</table>".into());
-        }
-        output
-    }
-
-    #[must_use]
-    pub fn get_html(&self) -> Vec<StackString> {
-        let mut output: Vec<StackString> = vec![
-            r#"<button name="remcomout" id="remcomoutput">"#.into(),
-            r#"&nbsp; </button><br>"#.into(),
-            r#"<div id="procs-tables">"#.into(),
-        ];
-        output.extend_from_slice(&self.get_procs_html());
-        output.push(r#"</div><div id="local-file-table"></div>"#.into());
-        output
     }
 }
 

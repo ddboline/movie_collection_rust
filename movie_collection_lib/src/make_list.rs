@@ -25,7 +25,7 @@ use crate::{
     utils::{get_video_runtime, walk_directory},
 };
 
-#[derive(Default)]
+#[derive(Default, PartialEq, Eq)]
 pub struct FileLists {
     pub local_file_list: Vec<StackString>,
     pub file_list: Vec<PathBuf>,

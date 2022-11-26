@@ -6,6 +6,7 @@
 #![allow(clippy::cast_possible_wrap)]
 #![allow(clippy::manual_map)]
 #![allow(clippy::unused_async)]
+#![allow(clippy::implicit_hasher)]
 
 pub mod errors;
 pub mod graphql;

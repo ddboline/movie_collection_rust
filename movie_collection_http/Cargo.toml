@@ -1,6 +1,6 @@
 [package]
 name = "movie_collection_http"
-version = "0.9.29"
+version = "0.9.30"
 authors = ["Daniel Boline <ddboline@gmail.com>"]
 edition = "2018"
 
@@ -33,6 +33,7 @@ bytes = "1.0"
 postgres-types = "0.2"
 url = "2.3"
 stdout-channel = "0.5"
+smallvec = {version="1.6", features=["serde", "write"]}
 rust_decimal = {version="1.27", features=["db-tokio-postgres"]}
 rust_decimal_macros = "1.27"
 async-graphql = {version="4.0", features=["dataloader", "time"]}

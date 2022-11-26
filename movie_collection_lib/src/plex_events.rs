@@ -14,7 +14,6 @@ use std::{
     str::FromStr,
 };
 use time::{macros::datetime, OffsetDateTime};
-use time_tz::OffsetDateTimeExt;
 use uuid::Uuid;
 
 use crate::{
@@ -70,6 +69,18 @@ impl TryFrom<WebhookPayload> for PlexEvent {
         };
         Ok(payload)
     }
+}
+
+#[derive(FromSqlRow, PartialEq, Eq)]
+pub struct EventOutput {
+    pub event: StackString,
+    pub metadata_type: Option<StackString>,
+    pub section_title: Option<StackString>,
+    pub title: StackString,
+    pub parent_title: Option<StackString>,
+    pub grandparent_title: Option<StackString>,
+    pub filename: Option<StackString>,
+    pub last_modified: OffsetDateTime,
 }
 
 impl PlexEvent {
@@ -177,26 +188,13 @@ impl PlexEvent {
 
     /// # Errors
     /// Return error if db query fails
-    pub async fn get_event_http(
+    pub async fn get_plex_events(
         pool: &PgPool,
-        config: &Config,
         start_timestamp: Option<OffsetDateTime>,
         event_type: Option<PlexEventType>,
         offset: Option<u64>,
         limit: Option<u64>,
-    ) -> Result<Vec<StackString>, Error> {
-        #[derive(FromSqlRow)]
-        struct EventOutput {
-            event: StackString,
-            metadata_type: Option<StackString>,
-            section_title: Option<StackString>,
-            title: StackString,
-            parent_title: Option<StackString>,
-            grandparent_title: Option<StackString>,
-            filename: Option<StackString>,
-            last_modified: OffsetDateTime,
-        }
-
+    ) -> Result<Vec<EventOutput>, Error> {
         let mut constraints = Vec::new();
         let mut bindings = Vec::new();
         if let Some(start_timestamp) = &start_timestamp {
@@ -237,42 +235,7 @@ impl PlexEvent {
         );
         let query: Query = query_dyn!(&query, ..bindings)?;
         let conn = pool.get().await?;
-        let output: Vec<EventOutput> = query.fetch(&conn).await?;
-        let local = DateTimeWrapper::local_tz();
-        let body = output
-            .into_iter()
-            .map(|event| {
-                let last_modified = match config.default_time_zone {
-                    Some(tz) => {
-                        let tz = tz.into();
-                        event.last_modified.to_timezone(tz)
-                    }
-                    None => event.last_modified.to_timezone(local),
-                };
-                format_sstr!(
-                    r#"
-                    <tr style="text-align; center;">
-                    <td>{}</td><td>{}</td><td>{}</td><td>{}</td><td>{}</td>
-                    </tr>
-                "#,
-                    last_modified,
-                    event.event,
-                    event.metadata_type.as_ref().map_or("", StackString::as_str),
-                    event.section_title.as_ref().map_or("", StackString::as_str),
-                    format_sstr!(
-                        "{} {} {} {}",
-                        event.title,
-                        event.parent_title.as_ref().map_or("", StackString::as_str),
-                        event
-                            .grandparent_title
-                            .as_ref()
-                            .map_or("", StackString::as_str),
-                        event.filename.as_ref().map_or("", StackString::as_str),
-                    )
-                )
-            })
-            .collect();
-        Ok(body)
+        query.fetch(&conn).await.map_err(Into::into)
     }
 
     /// # Errors
