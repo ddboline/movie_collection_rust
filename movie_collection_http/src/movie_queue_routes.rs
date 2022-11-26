@@ -59,9 +59,9 @@ use crate::{
         MovieQueueUpdateRequest, ParseImdbRequest, WatchlistActionRequest,
     },
     ImdbEpisodesWrapper, ImdbRatingsWrapper, LastModifiedResponseWrapper,
-    MovieCollectionRowWrapper, MovieQueueRowWrapper, MusicCollectionWrapper, PlexEventRequest,
-    PlexEventWrapper, PlexFilenameRequest, PlexFilenameWrapper, PlexMetadataWrapper,
-    TraktActionsWrapper, TvShowSourceWrapper,
+    MovieCollectionRowWrapper, MovieQueueRowWrapper, MusicCollectionWrapper, OrderByWrapper,
+    PlexEventRequest, PlexEventWrapper, PlexFilenameRequest, PlexFilenameWrapper,
+    PlexMetadataWrapper, TraktActionsWrapper, TvShowSourceWrapper,
 };
 
 pub type WarpResult<T> = Result<T, Rejection>;
@@ -80,23 +80,53 @@ pub async fn scripts_js() -> WarpResult<JsScriptsResponse> {
 #[response(description = "Movie Queue", content = "html")]
 struct MovieQueueResponse(HtmlBase<StackString, Error>);
 
+#[derive(Serialize, Deserialize, Debug, Schema)]
+pub struct FullQueueRequest {
+    #[schema(description = "Search String")]
+    pub q: Option<StackString>,
+    #[schema(description = "Offset")]
+    pub offset: Option<u64>,
+    #[schema(description = "Limit")]
+    pub limit: Option<u64>,
+    #[schema(description = "Order By (asc/desc)")]
+    pub order_by: Option<OrderByWrapper>,
+}
+
 #[get("/list/full_queue")]
 pub async fn movie_queue(
     #[filter = "LoggedUser::filter"] user: LoggedUser,
     #[data] state: AppState,
+    query: Query<FullQueueRequest>,
 ) -> WarpResult<MovieQueueResponse> {
+    let query = query.into_inner();
     let task = user
         .store_url_task(state.trakt.get_client(), &state.config, "/list/full_queue")
         .await;
+    let mut patterns = Vec::new();
+    if let Some(q) = &query.q {
+        patterns.push(q.clone());
+    }
     let req = MovieQueueRequest {
-        patterns: Vec::new(),
+        patterns,
+        offset: query.offset,
+        limit: query.limit,
+        order_by: query.order_by.map(Into::into),
     };
     let (queue, _) = req.process(&state.db, &state.config).await?;
 
-    let body = movie_queue_body(&state.config, &state.db, Vec::new(), queue)
-        .await
-        .map_err(Into::<Error>::into)?
-        .into();
+    let body = movie_queue_body(
+        &state.config,
+        &state.db,
+        Vec::new(),
+        queue,
+        query.q,
+        query.offset,
+        query.limit,
+        query.order_by.map(Into::into),
+    )
+    .await
+    .map_err(Into::<Error>::into)?
+    .into();
     task.await.ok();
     Ok(HtmlBase::new(body).into())
 }
@@ -116,12 +146,24 @@ pub async fn movie_queue_show(
         .await;
     let patterns = vec![path];
 
-    let req = MovieQueueRequest { patterns };
+    let req = MovieQueueRequest {
+        patterns,
+        ..MovieQueueRequest::default()
+    };
     let (queue, patterns) = req.process(&state.db, &state.config).await?;
-    let body = movie_queue_body(&state.config, &state.db, patterns, queue)
-        .await
-        .map_err(Into::<Error>::into)?
-        .into();
+    let body = movie_queue_body(
+        &state.config,
+        &state.db,
+        patterns,
+        queue,
+        None,
+        None,
+        None,
+        None,
+    )
+    .await
+    .map_err(Into::<Error>::into)?
+    .into();
     task.await.ok();
     Ok(HtmlBase::new(body).into())
 }
@@ -203,7 +245,10 @@ pub async fn movie_queue_transcode(
         .await;
     let patterns = vec![path];
 
-    let req = MovieQueueRequest { patterns };
+    let req = MovieQueueRequest {
+        patterns,
+        ..MovieQueueRequest::default()
+    };
     let (entries, _) = req.process(&state.db, &state.config).await?;
     let body = transcode_worker(&state.config, None, &entries, &state.db).await?;
     task.await.ok();
@@ -226,7 +271,10 @@ pub async fn movie_queue_transcode_directory(
         .await;
     let patterns = vec![file];
 
-    let req = MovieQueueRequest { patterns };
+    let req = MovieQueueRequest {
+        patterns,
+        ..MovieQueueRequest::default()
+    };
     let (entries, _) = req.process(&state.db, &state.config).await?;
     let body = transcode_worker(
         &state.config,

@@ -18,6 +18,29 @@ use crate::{
     utils::{option_string_wrapper, parse_file_stem},
 };
 
+#[derive(Serialize, Deserialize, Debug, Copy, Clone, PartialEq, Eq)]
+pub enum OrderBy {
+    #[serde(rename = "asc")]
+    Asc,
+    #[serde(rename = "desc")]
+    Desc,
+}
+
+impl OrderBy {
+    fn to_str(self) -> &'static str {
+        match self {
+            Self::Asc => "asc",
+            Self::Desc => "desc",
+        }
+    }
+}
+
+impl fmt::Display for OrderBy {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "{}", self.to_str())
+    }
+}
+
 #[derive(Default, Serialize, PartialEq, Eq)]
 pub struct MovieQueueResult {
     pub idx: i32,
@@ -262,6 +285,9 @@ impl MovieQueueDB {
     pub async fn print_movie_queue(
         &self,
         patterns: &[&str],
+        offset: Option<u64>,
+        limit: Option<u64>,
+        order_by: Option<OrderBy>,
     ) -> Result<Vec<MovieQueueResult>, Error> {
         #[derive(FromSqlRow)]
         struct PrintMovieQueue {
@@ -278,6 +304,15 @@ impl MovieQueueDB {
         if !constraints.is_empty() {
             write!(where_str, "WHERE {}", constraints)?;
         }
+        let mut offset_str = StackString::new();
+        if let Some(offset) = offset {
+            write!(offset_str, "OFFSET {offset}")?;
+        }
+        let mut limit_str = StackString::new();
+        if let Some(limit) = limit {
+            write!(limit_str, "LIMIT {limit}")?;
+        }
+        let order_by = order_by.unwrap_or(OrderBy::Desc);
         let query = query_dyn!(&format_sstr!(
             r#"
                 SELECT a.idx, b.path, c.link, c.istv
@@ -285,7 +320,9 @@ impl MovieQueueDB {
                 JOIN movie_collection b ON a.collection_idx = b.idx
                 LEFT JOIN imdb_ratings c ON b.show_id = c.index
                 {where_str}
-                ORDER BY a.idx
+                ORDER BY a.idx {order_by}
+                {offset_str}
+                {limit_str}
             "#
         ),)?;
         let conn = self.pool.get().await?;
@@ -328,9 +365,7 @@ impl MovieQueueDB {
             Ok(result)
         });
         let results: Result<Vec<_>, Error> = try_join_all(futures).await;
-        let mut results = results?;
-
-        results.sort_by_key(|r| -r.idx);
+        let results = results?;
         Ok(results)
     }
 

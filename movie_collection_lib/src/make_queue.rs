@@ -79,7 +79,7 @@ pub async fn make_queue_worker(
             };
         }
     } else if add_files.is_empty() {
-        let movie_queue = mq.print_movie_queue(patterns).await?;
+        let movie_queue = mq.print_movie_queue(patterns, None, None, None).await?;
         if do_time {
             let futures = movie_queue.into_iter().map(|result| async move {
                 let path = Path::new(result.path.as_str());

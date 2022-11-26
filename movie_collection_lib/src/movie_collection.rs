@@ -804,7 +804,9 @@ impl MovieCollection {
 
         let episodes = self.get_new_episodes(mindate, maxdate, source).await?;
         'outer: for epi in episodes {
-            let movie_queue = mq.print_movie_queue(&[epi.show.as_str()]).await?;
+            let movie_queue = mq
+                .print_movie_queue(&[epi.show.as_str()], None, None, None)
+                .await?;
             for s in movie_queue {
                 if let Some(show) = &s.show {
                     if let Some(season) = &s.season {

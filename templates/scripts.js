@@ -198,3 +198,8 @@ function setSource( link, source_id ) {
     }
     xmlhttp.send(null);
 }
+function searchFullQueue(offset, order_by) {
+    let search = document.getElementById('full_queue_search').value;
+    let url = "/list/full_queue?limit=20" + "&offset=" + offset + "&q=" + search + "&order_by=" + order_by;
+    updateMainArticle(url);
+}

@@ -7,6 +7,7 @@
 #![allow(clippy::manual_map)]
 #![allow(clippy::unused_async)]
 #![allow(clippy::implicit_hasher)]
+#![allow(clippy::too_many_arguments)]
 
 pub mod errors;
 pub mod graphql;
@@ -27,7 +28,7 @@ use movie_collection_lib::{
     imdb_episodes::ImdbEpisodes,
     imdb_ratings::ImdbRatings,
     movie_collection::{LastModifiedResponse, MovieCollectionRow},
-    movie_queue::MovieQueueRow,
+    movie_queue::{MovieQueueRow, OrderBy},
     music_collection::MusicCollection,
     plex_events::{PlexEvent, PlexEventType, PlexFilename, PlexMetadata},
     trakt_utils::TraktActions,
@@ -268,6 +269,19 @@ enum _TraktActionsWrapper {
     Add,
     #[serde(rename = "remove")]
     Remove,
+}
+
+#[derive(Serialize, Deserialize, Debug, Clone, Copy, Deref, Into, From, PartialEq, Eq)]
+pub struct OrderByWrapper(OrderBy);
+
+derive_rweb_schema!(OrderByWrapper, _OrderByWrapper);
+
+#[derive(Serialize, Deserialize, Schema)]
+pub enum _OrderByWrapper {
+    #[serde(rename = "asc")]
+    Asc,
+    #[serde(rename = "desc")]
+    Desc,
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone, Copy, Deref, Into, From)]

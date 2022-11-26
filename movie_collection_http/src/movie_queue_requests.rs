@@ -12,7 +12,7 @@ use movie_collection_lib::{
     imdb_episodes::{ImdbEpisodes, ImdbSeason},
     imdb_ratings::ImdbRatings,
     movie_collection::{MovieCollection, MovieCollectionRow},
-    movie_queue::{MovieQueueDB, MovieQueueResult, MovieQueueRow},
+    movie_queue::{MovieQueueDB, MovieQueueResult, MovieQueueRow, OrderBy},
     parse_imdb::{ParseImdb, ParseImdbOptions},
     pgpool::PgPool,
     trakt_connection::TraktConnection,
@@ -38,9 +38,12 @@ impl WatchlistShowsRequest {
     }
 }
 
-#[derive(Debug)]
+#[derive(Debug, Default)]
 pub struct MovieQueueRequest {
     pub patterns: Vec<StackString>,
+    pub offset: Option<u64>,
+    pub limit: Option<u64>,
+    pub order_by: Option<OrderBy>,
 }
 
 impl MovieQueueRequest {
@@ -56,7 +59,7 @@ impl MovieQueueRequest {
 
         let patterns: Vec<_> = self.patterns.iter().map(StackString::as_str).collect();
         let queue = MovieQueueDB::new(config, pool, &stdout)
-            .print_movie_queue(&patterns)
+            .print_movie_queue(&patterns, self.offset, self.limit, self.order_by)
             .await?;
         Ok((queue, self.patterns))
     }

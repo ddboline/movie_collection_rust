@@ -38,7 +38,10 @@ use movie_collection_lib::{
     utils::parse_file_stem,
 };
 
-use crate::movie_queue_routes::{ProcessShowItem, TvShowsMap};
+use crate::{
+    movie_queue_routes::{ProcessShowItem, TvShowsMap},
+    OrderBy,
+};
 
 pub fn index_body() -> String {
     let mut app = VirtualDom::new(index_element);
@@ -85,7 +88,7 @@ fn index_element(cx: Scope) -> Element {
                     "type": "button",
                     "name": "list",
                     value: "FullQueue",
-                    "onclick": "updateMainArticle('/list/full_queue');"
+                    "onclick": "updateMainArticle('/list/full_queue?limit=20');"
                 },
                 input {
                     "type": "button",
@@ -140,6 +143,10 @@ pub async fn movie_queue_body(
     pool: &PgPool,
     patterns: Vec<StackString>,
     queue: Vec<MovieQueueResult>,
+    search: Option<StackString>,
+    offset: Option<u64>,
+    limit: Option<u64>,
+    order_by: Option<OrderBy>,
 ) -> Result<String, Error> {
     let mock_stdout = MockStdout::new();
     let stdout = StdoutChannel::with_mock_stdout(mock_stdout.clone(), mock_stdout.clone());
@@ -196,6 +203,10 @@ pub async fn movie_queue_body(
             config: config.clone(),
             patterns,
             entries,
+            search,
+            offset,
+            limit,
+            order_by,
         },
     );
     app.rebuild();
@@ -208,6 +219,10 @@ fn movie_queue_element(
     config: Config,
     patterns: Vec<StackString>,
     entries: Vec<QueueEntry>,
+    search: Option<StackString>,
+    offset: Option<u64>,
+    limit: Option<u64>,
+    order_by: Option<OrderBy>,
 ) -> Element {
     let watchlist_url = if patterns.is_empty() {
         format_sstr!("/trakt/watchlist")
@@ -215,6 +230,10 @@ fn movie_queue_element(
         let patterns = patterns.join("_");
         format_sstr!("/trakt/watched/list/{patterns}")
     };
+    let search_str = search
+        .as_ref()
+        .map_or_else(StackString::new, |s| format_sstr!("&q={s}"));
+    let search_str = search_str.as_str();
 
     let queue_entries = entries.iter().enumerate().map(|(idx, entry)| {
         let (_, season, episode) = parse_file_stem(&entry.file_stem);
@@ -314,6 +333,67 @@ fn movie_queue_element(
             }
         }
     });
+    let order_by = order_by.unwrap_or(OrderBy::Desc);
+    let limit = limit.unwrap_or(20);
+    let previous_button = if let Some(offset) = offset {
+        if *offset < limit {
+            None
+        } else {
+            let new_offset = *offset - limit;
+            Some(rsx! {
+                button {
+                    "type": "submit",
+                    name: "previous",
+                    value: "Previous",
+                    "onclick": "updateMainArticle('/list/full_queue?limit={limit}&offset={new_offset}&order_by={order_by}{search_str}')",
+                    "Previous",
+                }
+            })
+        }
+    } else {
+        None
+    };
+    let offset = offset.unwrap_or(0);
+    let new_offset = offset + limit;
+    let next_button = rsx! {
+        button {
+            "type": "submit",
+            name: "next",
+            value: "Next",
+            "onclick": "updateMainArticle('/list/full_queue?limit={limit}&offset={new_offset}&order_by={order_by}{search_str}')",
+            "Next",
+        }
+    };
+    let order_by_button = {
+        let order_by = match order_by {
+            OrderBy::Asc => OrderBy::Desc,
+            OrderBy::Desc => OrderBy::Asc,
+        };
+        rsx! {
+            button {
+                "type": "submit",
+                name: "{order_by}",
+                value: "{order_by}",
+                "onclick": "updateMainArticle('/list/full_queue?limit={limit}&offset={offset}&order_by={order_by}{search_str}')",
+                "{order_by}",
+            }
+        }
+    };
+    let search = rsx! {
+        form {
+            input {
+                "type": "text",
+                name: "search",
+                id: "full_queue_search",
+            },
+            input {
+                "type": "button",
+                name: "submitSearch",
+                value: "Search",
+                "onclick": "searchFullQueue({offset}, '{order_by}')",
+            }
+        }
+    };
 
     cx.render(rsx! {
         br {
@@ -326,7 +406,12 @@ fn movie_queue_element(
             href: "javascript:updateMainArticle('{watchlist_url}')",
             "Watch List",
         },
-        "<br>",
+        br {
+            order_by_button,
+            previous_button,
+            next_button,
+        }
+        search,
         table {
             "border": "0",
             "align": "center",
@@ -462,7 +547,7 @@ pub async fn find_new_episodes_body(
     let mut queue = Vec::new();
 
     for show in shows {
-        let movie_queue = mq.print_movie_queue(&[&show]).await?;
+        let movie_queue = mq.print_movie_queue(&[&show], None, None, None).await?;
         for s in movie_queue {
             if let Some(u) = mc.get_collection_index(&s.path).await? {
                 let metadata_key = mc.get_plex_metadata_key(u).await?;
@@ -773,7 +858,7 @@ fn tvshows_element(
 }
 
 pub fn watchlist_body(shows: WatchListMap) -> String {
-    let shows: Vec<_> = shows
+    let mut shows: Vec<_> = shows
         .into_iter()
         .map(|(_, (_, s, source))| WatchListEntry {
             title: s.title,
@@ -781,12 +866,13 @@ pub fn watchlist_body(shows: WatchListMap) -> String {
             source,
         })
         .collect();
+    shows.sort();
     let mut app = VirtualDom::new_with_props(watchlist_element, watchlist_elementProps { shows });
     app.rebuild();
     dioxus::ssr::render_vdom(&app)
 }
 
-#[derive(PartialEq)]
+#[derive(PartialEq, Eq, PartialOrd, Ord)]
 struct WatchListEntry {
     title: StackString,
     link: StackString,
@@ -1081,7 +1167,7 @@ pub async fn watch_list_http_body(
         .await?;
 
     let queue: HashMap<(StackString, i32, i32), _> = mq
-        .print_movie_queue(&[show_str.as_str()])
+        .print_movie_queue(&[show_str.as_str()], None, None, None)
         .await?
         .into_iter()
         .filter_map(|s| match &s.show {
