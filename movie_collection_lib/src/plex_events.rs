@@ -73,6 +73,7 @@ impl TryFrom<WebhookPayload> for PlexEvent {
 
 #[derive(FromSqlRow, PartialEq, Eq)]
 pub struct EventOutput {
+    pub id: Uuid,
     pub event: StackString,
     pub metadata_type: Option<StackString>,
     pub section_title: Option<StackString>,
@@ -186,6 +187,21 @@ impl PlexEvent {
         Ok(())
     }
 
+    pub async fn get_event_by_id(pool: &PgPool, id: Uuid) -> Result<Option<EventOutput>, Error> {
+        let query = query!(
+            r#"
+                SELECT a.id, a.event, a.metadata_type, a.section_title, a.title, a.parent_title,
+                       a.grandparent_title, b.filename, a.last_modified
+                FROM plex_event a
+                LEFT JOIN plex_filename b ON a.metadata_key = b.metadata_key
+                WHERE a.id = $id
+            "#,
+            id = id,
+        );
+        let conn = pool.get().await?;
+        query.fetch_opt(&conn).await.map_err(Into::into)
+    }
+
     /// # Errors
     /// Return error if db query fails
     pub async fn get_plex_events(
@@ -208,7 +224,7 @@ impl PlexEvent {
         }
         let query = format_sstr!(
             "
-                SELECT a.event, a.metadata_type, a.section_title, a.title, a.parent_title,
+                SELECT a.id, a.event, a.metadata_type, a.section_title, a.title, a.parent_title,
                        a.grandparent_title, b.filename, a.last_modified
                 FROM plex_event a
                 LEFT JOIN plex_filename b ON a.metadata_key = b.metadata_key

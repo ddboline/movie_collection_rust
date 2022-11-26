@@ -49,8 +49,9 @@ use crate::{
     movie_queue_app::AppState,
     movie_queue_elements::{
         find_new_episodes_body, index_body, local_file_body, movie_queue_body, play_worker_body,
-        plex_body, procs_html_body, trakt_cal_http_body, trakt_watched_seasons_body,
-        transcode_get_html_body, tvshows_body, watch_list_http_body, watchlist_body,
+        plex_body, plex_detail_body, procs_html_body, trakt_cal_http_body,
+        trakt_watched_seasons_body, transcode_get_html_body, tvshows_body, watch_list_http_body,
+        watchlist_body,
     },
     movie_queue_requests::{
         ImdbEpisodesUpdateRequest, ImdbRatingsSetSourceRequest, ImdbRatingsUpdateRequest,
@@ -1503,7 +1504,38 @@ pub async fn plex_list(
     )
     .await
     .map_err(Into::<Error>::into)?;
-    let body = plex_body(state.config.clone(), events).into();
+    let body = plex_body(state.config.clone(), events, query.offset, query.limit).into();
+    task.await.ok();
+    Ok(HtmlBase::new(body).into())
+}
+
+#[derive(RwebResponse)]
+#[response(description = "Plex Event Detail", content = "html")]
+struct PlexEventDetail(HtmlBase<StackString, Error>);
+
+#[get("/list/plex/{id}")]
+pub async fn plex_detail(
+    #[filter = "LoggedUser::filter"] user: LoggedUser,
+    #[data] state: AppState,
+    id: UuidWrapper,
+    query: Query<PlexEventRequest>,
+) -> WarpResult<PlexEventDetail> {
+    let query = query.into_inner();
+    let task = user
+        .store_url_task(
+            state.trakt.get_client(),
+            &state.config,
+            &format_sstr!("/list/plex/{id}"),
+        )
+        .await;
+    let body = if let Some(event) = PlexEvent::get_event_by_id(&state.db, id.into())
+        .await
+        .map_err(Into::<Error>::into)?
+    {
+        plex_detail_body(state.config.clone(), event, query.offset, query.limit).into()
+    } else {
+        "".into()
+    };
     task.await.ok();
     Ok(HtmlBase::new(body).into())
 }

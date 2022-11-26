@@ -14,7 +14,7 @@ use std::{
     sync::Arc,
 };
 use stdout_channel::{MockStdout, StdoutChannel};
-use time::{Duration, OffsetDateTime};
+use time::{macros::format_description, Duration, OffsetDateTime};
 use time_tz::OffsetDateTimeExt;
 use uuid::Uuid;
 
@@ -94,7 +94,7 @@ fn index_element(cx: Scope) -> Element {
                     "type": "button",
                     "name": "plex",
                     value: "PlexList",
-                    "onclick": "updateMainArticle('/list/plex?limit=100');"
+                    "onclick": "updateMainArticle('/list/plex?limit=20');"
                 },
                 input {
                     "type": "button",
@@ -845,7 +845,7 @@ fn tvshows_element(
         "<br>",
         button {
             name: "remcomout",
-            id: "remcomout",
+            id: "remcomoutput",
             "&nbsp;",
         },
         "<br>",
@@ -1310,7 +1310,7 @@ fn watch_list_http_element(
         },
         button {
             name: "remcomout",
-            id: "remcomout",
+            id: "remcomoutput",
             "&nbsp;",
         },
         button {
@@ -1412,16 +1412,36 @@ fn parse_imdb_http_element(
     })
 }
 
-pub fn plex_body(config: Config, events: Vec<EventOutput>) -> String {
-    let mut app = VirtualDom::new_with_props(plex_element, plex_elementProps { config, events });
+pub fn plex_body(
+    config: Config,
+    events: Vec<EventOutput>,
+    offset: Option<u64>,
+    limit: Option<u64>,
+) -> String {
+    let mut app = VirtualDom::new_with_props(
+        plex_element,
+        plex_elementProps {
+            config,
+            events,
+            offset,
+            limit,
+        },
+    );
     app.rebuild();
     dioxus::ssr::render_vdom(&app)
 }
 
 #[inline_props]
-fn plex_element(cx: Scope, config: Config, events: Vec<EventOutput>) -> Element {
+fn plex_element(
+    cx: Scope,
+    config: Config,
+    events: Vec<EventOutput>,
+    offset: Option<u64>,
+    limit: Option<u64>,
+) -> Element {
     let local = DateTimeWrapper::local_tz();
     let entries = events.iter().enumerate().map(|(idx, event)| {
+        let id = event.id;
         let last_modified = match config.default_time_zone {
             Some(tz) => {
                 let tz = tz.into();
@@ -1429,8 +1449,15 @@ fn plex_element(cx: Scope, config: Config, events: Vec<EventOutput>) -> Element 
             }
             None => event.last_modified.to_timezone(local),
         };
+        let last_modified = last_modified
+            .format(format_description!(
+                "[year]-[month]-[day]T[hour]:[minute]:[second][offset_hour]:[offset_minute]"
+            ))
+            .unwrap_or_default();
         let event_str = &event.event;
         let title = &event.title;
+        let title_len = if title.len() < 10 { title.len() } else { 10 };
+        let title = String::from_utf8_lossy(&title.as_bytes()[0..title_len]);
         let metadata_type = event.metadata_type.as_ref().map_or("", StackString::as_str);
         let section_title = event.section_title.as_ref().map_or("", StackString::as_str);
         let parent_title = event.parent_title.as_ref().map_or("", StackString::as_str);
@@ -1439,25 +1466,68 @@ fn plex_element(cx: Scope, config: Config, events: Vec<EventOutput>) -> Element 
             .as_ref()
             .map_or("", StackString::as_str);
         let filename = event.filename.as_ref().map_or("", StackString::as_str);
+        let filestem = filename.split("/").last().unwrap_or("");
         rsx! {
             tr {
                 key: "plex-event-key-{idx}",
                 "style": "text-align; center;",
+                td {
+                    a {
+                        href: "javascript:updateMainArticle('/list/plex/{id}')",
+                        "{id}"
+                    },
+                },
                 td {"{last_modified}"},
                 td {"{event_str}"},
                 td {"{metadata_type}"},
                 td {"{section_title}"},
-                td {"{title} {parent_title} {grandparent_title} {filename}"},
+                td {"{filestem} {grandparent_title} {parent_title} {title}"},
             }
         }
     });
+    let limit = limit.unwrap_or(20);
+    let previous_button = if let Some(offset) = offset {
+        if *offset < limit {
+            None
+        } else {
+            let new_offset = *offset - limit;
+            Some(rsx! {
+                button {
+                    "type": "submit",
+                    name: "previous",
+                    value: "Previous",
+                    "onclick": "updateMainArticle('/list/plex?limit={limit}&offset={new_offset}')",
+                    "Previous",
+                }
+            })
+        }
+    } else {
+        None
+    };
+    let offset = offset.unwrap_or(0);
+    let new_offset = offset + limit;
+    let next_button = rsx! {
+        button {
+            "type": "submit",
+            name: "next",
+            value: "Next",
+            "onclick": "updateMainArticle('/list/plex?limit={limit}&offset={new_offset}')",
+            "Next",
+        }
+    };
+
     cx.render(rsx! {
+        br {
+            previous_button,
+            next_button,
+        }
         table {
             "border": "1",
             "align": "center",
             class: "dataframe",
             thead {
                 tr {
+                    th {"ID"},
                     th {"Time"},
                     th {"Event Type"},
                     th {"Item Type"},
@@ -1467,6 +1537,123 @@ fn plex_element(cx: Scope, config: Config, events: Vec<EventOutput>) -> Element 
             },
             tbody {
                 entries
+            }
+        }
+    })
+}
+
+pub fn plex_detail_body(
+    config: Config,
+    event: EventOutput,
+    offset: Option<u64>,
+    limit: Option<u64>,
+) -> String {
+    let mut app = VirtualDom::new_with_props(
+        plex_detail_element,
+        plex_detail_elementProps {
+            config,
+            event,
+            offset,
+            limit,
+        },
+    );
+    app.rebuild();
+    dioxus::ssr::render_vdom(&app)
+}
+
+#[inline_props]
+fn plex_detail_element(
+    cx: Scope,
+    config: Config,
+    event: EventOutput,
+    offset: Option<u64>,
+    limit: Option<u64>,
+) -> Element {
+    let local = DateTimeWrapper::local_tz();
+    let id = event.id;
+    let last_modified = match config.default_time_zone {
+        Some(tz) => {
+            let tz = tz.into();
+            event.last_modified.to_timezone(tz)
+        }
+        None => event.last_modified.to_timezone(local),
+    };
+    let last_modified = last_modified
+        .format(format_description!(
+            "[year]-[month]-[day]T[hour]:[minute]:[second][offset_hour]:[offset_minute]"
+        ))
+        .unwrap_or_default();
+    let event_str = &event.event;
+    let title = &event.title;
+    let metadata_type = event.metadata_type.as_ref().map_or("", StackString::as_str);
+    let section_title = event.section_title.as_ref().map_or("", StackString::as_str);
+    let parent_title = event.parent_title.as_ref().map_or("", StackString::as_str);
+    let grandparent_title = event
+        .grandparent_title
+        .as_ref()
+        .map_or("", StackString::as_str);
+    let filename = event.filename.as_ref().map_or("", StackString::as_str);
+
+    let limit = limit.unwrap_or(20);
+    let offset = offset.unwrap_or(0);
+
+    cx.render(rsx! {
+        br {
+            button {
+                "type": "submit",
+                name: "back",
+                value: "Back",
+                "onclick": "updateMainArticle('/list/plex?limit={limit}&offset={offset}')",
+                "Back",
+            }
+        }
+        table {
+            "border": "1",
+            "align": "center",
+            class: "dataframe",
+            thead {
+                tr {
+                    th {"Field"},
+                    th {"Value"},
+                }
+            },
+            tbody {
+                tr {
+                    td {"ID"},
+                    td {"{id}"},
+                },
+                tr {
+                    td {"Last Modified"},
+                    td {"{last_modified}"},
+                },
+                tr {
+                    td {"Event"},
+                    td {"{event_str}"},
+                },
+                tr {
+                    td {"Metadata Type"},
+                    td {"{metadata_type}"},
+                },
+                tr {
+                    td {"Section"},
+                    td {"{section_title}"},
+                },
+                tr {
+                    td {"Filename"},
+                    td {"{filename}"}
+                },
+                tr {
+                    td {"Title"},
+                    td {"{title}"},
+                },
+                tr {
+                    td {"Parent Title"},
+                    td {"{parent_title}"},
+                },
+                tr {
+                    td {"Grandparent Title"},
+                    td {"{grandparent_title}"},
+                }
             }
         }
     })
@@ -1618,7 +1805,7 @@ fn transcode_get_html_element(cx: Scope, status: TranscodeStatus) -> Element {
         br {
             button {
                 name: "remcomout",
-                id: "remcomout",
+                id: "remcomoutput",
                 "&nbsp;",
             }
         },

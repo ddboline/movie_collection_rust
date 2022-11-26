@@ -35,7 +35,7 @@ use super::{
         movie_queue_transcode_cleanup, movie_queue_transcode_directory, movie_queue_transcode_file,
         movie_queue_transcode_status, movie_queue_transcode_status_file_list,
         movie_queue_transcode_status_procs, movie_queue_update, music_collection,
-        music_collection_update, plex_events, plex_events_update, plex_filename,
+        music_collection_update, plex_detail, plex_events, plex_events_update, plex_filename,
         plex_filename_update, plex_list, plex_metadata, plex_metadata_update, plex_webhook,
         refresh_auth, scripts_js, trakt_auth_url, trakt_cal, trakt_callback, trakt_watched_action,
         trakt_watched_list, trakt_watched_seasons, trakt_watchlist, trakt_watchlist_action,
@@ -131,6 +131,7 @@ fn get_full_path(app: &AppState) -> BoxedFilter<(impl Reply,)> {
     let plex_events_path = plex_events(app.clone()).boxed();
     let plex_events_update_path = plex_events_update(app.clone()).boxed();
     let plex_list_path = plex_list(app.clone()).boxed();
+    let plex_detail_path = plex_detail(app.clone()).boxed();
     let plex_filename_path = plex_filename(app.clone()).boxed();
     let plex_filename_update_path = plex_filename_update(app.clone()).boxed();
     let plex_metadata_path = plex_metadata(app.clone()).boxed();
@@ -159,6 +160,7 @@ fn get_full_path(app: &AppState) -> BoxedFilter<(impl Reply,)> {
         .or(plex_events_path)
         .or(plex_events_update_path)
         .or(plex_list_path)
+        .or(plex_detail_path)
         .or(plex_filename_path)
         .or(plex_filename_update_path)
         .or(plex_metadata_path)
