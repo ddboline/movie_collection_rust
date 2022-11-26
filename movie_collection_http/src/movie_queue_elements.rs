@@ -1368,6 +1368,7 @@ fn plex_element(cx: Scope, config: Config, events: Vec<EventOutput>) -> Element 
     cx.render(rsx! {
         table {
             "border": "1",
+            "align": "center",
             class: "dataframe",
             thead {
                 tr {
@@ -1488,6 +1489,7 @@ fn local_file_element(
         },
         table {
             "border": "1",
+            "align": "center",
             class: "dataframe",
             thead {
                 tr {
@@ -1577,7 +1579,8 @@ fn procs_html_node(status: &TranscodeStatus) -> LazyNodes {
                 "Running procs:"
             },
             table {
-                border: "1",
+                "border": "1",
+                "align": "center",
                 class: "dataframe",
                 thead {
                     tr {
@@ -1621,7 +1624,8 @@ fn procs_html_node(status: &TranscodeStatus) -> LazyNodes {
                 "Upcoming jobs:",
             },
             table {
-                border: "1",
+                "border": "1",
+                "align": "center",
                 class: "dataframe",
                 thead {
                     tr {
@@ -1684,7 +1688,8 @@ fn procs_html_node(status: &TranscodeStatus) -> LazyNodes {
                 "Finished jobs:"
             },
             table {
-                border: "1",
+                "border": "1",
+                "align": "center",
                 class: "dataframe",
                 thead {
                     tr {
