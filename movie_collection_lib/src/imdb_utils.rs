@@ -95,14 +95,14 @@ impl ImdbConnection {
         let body = self.get(&url).await?.text().await?;
 
         let tl_vec: Vec<(StackString, StackString)> = Document::from(body.as_str())
-            .find(Class("result_text"))
+            .find(Class("ipc-page-content-container"))
             .flat_map(|tr| {
                 tr.find(Name("a"))
                     .filter_map(|a| {
                         a.attr("href").and_then(|link| {
                             link.split('/').nth(2).and_then(|imdb_id| {
                                 if imdb_id.starts_with("tt") {
-                                    Some((tr.text().trim().into(), imdb_id.into()))
+                                    Some((a.text().trim().into(), imdb_id.into()))
                                 } else {
                                     None
                                 }
