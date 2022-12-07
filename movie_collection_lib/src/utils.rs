@@ -2,6 +2,7 @@ use anyhow::{format_err, Error};
 use async_trait::async_trait;
 use futures::TryStreamExt;
 use jwalk::WalkDir;
+use log::error;
 use postgres_query::{query, Error as PqError};
 use rand::{
     distributions::{Distribution, Uniform},
@@ -148,6 +149,7 @@ pub trait ExponentialRetry {
             match self.get_client().get(url.clone()).send().await {
                 Ok(resp) => return Ok(resp),
                 Err(err) => {
+                    error!("got error {err}");
                     sleep(Duration::from_millis((timeout * 1000.0) as u64)).await;
                     timeout *= 4.0 * f64::from(range.sample(&mut thread_rng())) / 1000.0;
                     if timeout >= 64.0 {
