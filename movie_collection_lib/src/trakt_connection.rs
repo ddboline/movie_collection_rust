@@ -1,5 +1,8 @@
 use anyhow::{format_err, Error};
-use base64::{encode_config, URL_SAFE_NO_PAD};
+use base64::encode_engine;
+use base64::engine::fast_portable::FastPortable;
+use base64::engine::fast_portable::NO_PAD;
+use base64::alphabet::URL_SAFE;
 use lazy_static::lazy_static;
 use log::debug;
 use maplit::hashmap;
@@ -86,7 +89,7 @@ impl TraktConnection {
 
     fn get_random_string() -> String {
         let random_bytes: SmallVec<[u8; 16]> = (0..16).map(|_| thread_rng().gen::<u8>()).collect();
-        encode_config(&random_bytes, URL_SAFE_NO_PAD)
+        encode_engine(&random_bytes, &FastPortable::from(&URL_SAFE, NO_PAD))
     }
 
     fn _get_auth_url(&self, state: &str) -> Result<Url, Error> {
