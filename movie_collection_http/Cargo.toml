@@ -1,6 +1,6 @@
 [package]
 name = "movie_collection_http"
-version = "0.9.35"
+version = "0.10.1"
 authors = ["Daniel Boline <ddboline@gmail.com>"]
 edition = "2018"
 
@@ -32,14 +32,14 @@ derive_more = "0.99"
 bytes = "1.0"
 postgres-types = "0.2"
 url = "2.3"
-stdout-channel = "0.5"
+stdout-channel = "0.6"
 smallvec = {version="1.6", features=["serde", "write"]}
 rust_decimal = {version="1.27", features=["db-tokio-postgres"]}
 rust_decimal_macros = "1.27"
-async-graphql = {version="4.0", features=["dataloader", "time"]}
-async-graphql-warp = "4.0"
+async-graphql = {version="5.0", features=["dataloader", "time"]}
+async-graphql-warp = "5.0"
 reqwest = {version="0.11", features=["cookies", "json", "rustls-tls"], default_features=false}
 rweb-helper = { git = "https://github.com/ddboline/rweb_helper.git", tag="0.4.16" }
-authorized_users = { git = "https://github.com/ddboline/auth_server_rust.git", tag="0.9.5"}
-stack-string = { version="0.7", features=["postgres_types", "rweb-openapi", "async_graphql"] }
+authorized_users = { git = "https://github.com/ddboline/auth_server_rust.git", tag="0.10.0"}
+stack-string = { version="0.8", features=["postgres_types", "rweb-openapi", "async_graphql"] }
 postgres_query = {git = "https://github.com/ddboline/rust-postgres-query", tag = "0.3.4", features=["deadpool"]}
