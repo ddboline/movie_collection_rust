@@ -161,6 +161,8 @@ impl ImdbConnection {
         try_join_all(futures).await
     }
 
+    /// # Errors
+    /// Returns error if api calls fail
     pub async fn get_suggestions(&self, title: &str) -> Result<Vec<ImdbTuple>, Error> {
         #[derive(Deserialize)]
         struct ImdbSuggestion {
@@ -431,7 +433,7 @@ mod tests {
         let conn = ImdbConnection::new();
         let results = conn.parse_imdb("the sopranos").await?;
         let top_result = &results[0];
-        assert_eq!(&top_result.title, "The Sopranos (1999) (TV Series)");
+        assert_eq!(&top_result.title, "The Sopranos");
         assert_eq!(&top_result.link, "tt0141842");
         debug!("results {results:#?}");
         assert!(results.len() > 1);
