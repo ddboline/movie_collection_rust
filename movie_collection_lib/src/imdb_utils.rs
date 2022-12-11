@@ -13,8 +13,44 @@ use time::{
     macros::{date, format_description},
     Date,
 };
+use std::fmt::Write;
 
 use crate::utils::{option_string_wrapper, ExponentialRetry};
+
+#[derive(Clone, Copy, Debug)]
+enum ImdbType {
+    TvSeries,
+    MiniSeries,
+    Movie,
+    TvMovie,
+}
+
+impl ImdbType {
+    fn from_str(s: &str) -> Option<ImdbType> {
+        match s {
+            "movie" => Some(Self::Movie),
+            "tvSeries" => Some(Self::TvSeries),
+            "tvMiniSeries" => Some(Self::MiniSeries),
+            "TvMovie" => Some(Self::TvMovie),
+            _ => None,
+        }
+    }
+
+    fn to_str(self) -> &'static str {
+        match self {
+            Self::TvSeries => "TV Series",
+            Self::MiniSeries => "TV Mini-Series",
+            Self::Movie => "Movie",
+            Self::TvMovie => "TV Movie",
+        }
+    }
+}
+
+impl fmt::Display for ImdbType {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "{}", self.to_str())
+    }
+}
 
 #[derive(Default, Debug)]
 pub struct ImdbTuple {
@@ -119,6 +155,45 @@ impl ImdbConnection {
             Ok(ImdbTuple {
                 title,
                 link,
+                rating,
+            })
+        });
+        try_join_all(futures).await
+    }
+
+    pub async fn get_suggestions(&self, title: &str) -> Result<Vec<ImdbTuple>, Error> {
+        #[derive(Deserialize)]
+        struct ImdbSuggestion {
+            id: StackString,
+            l: StackString,
+            qid: Option<StackString>,
+            y: Option<i32>,
+        }
+
+        #[derive(Deserialize)]
+        struct ImdbSuggestions {
+            d: Vec<ImdbSuggestion>,
+        }
+
+        let url = format_sstr!("https://v3.sg.media-imdb.com/suggestion/x/{title}.json");
+        let url: Url = url.parse()?;
+
+        let suggestions: ImdbSuggestions = self.get(&url).await?.json().await?;
+        let futures = suggestions.d.into_iter().map(|s| async move {
+            let mut title = s.l;
+            let year = s.y;
+            let imdb_type = s.qid.and_then(|s| ImdbType::from_str(&s));
+            let r = self.parse_imdb_rating(&s.id).await?;
+            let rating = r.rating.unwrap_or(-1.0);
+            if let Some(year) = year {
+                write!(&mut title, " ({year})").unwrap();
+            }
+            if let Some(imdb_type) = imdb_type {
+                write!(&mut title, " ({imdb_type})").unwrap();
+            }
+            Ok(ImdbTuple {
+                title,
+                link: s.id,
                 rating,
             })
         });
@@ -355,6 +430,19 @@ mod tests {
     async fn test_parse_imdb() -> Result<(), Error> {
         let conn = ImdbConnection::new();
         let results = conn.parse_imdb("the sopranos").await?;
+        let top_result = &results[0];
+        assert_eq!(&top_result.title, "The Sopranos (1999) (TV Series)");
+        assert_eq!(&top_result.link, "tt0141842");
+        debug!("results {results:#?}");
+        assert!(results.len() > 1);
+        Ok(())
+    }
+
+    #[tokio::test]
+    #[ignore]
+    async fn test_get_suggestions() -> Result<(), Error> {
+        let conn = ImdbConnection::new();
+        let results = conn.get_suggestions("the_sopranos").await?;
         let top_result = &results[0];
         assert_eq!(&top_result.title, "The Sopranos (1999) (TV Series)");
         assert_eq!(&top_result.link, "tt0141842");
