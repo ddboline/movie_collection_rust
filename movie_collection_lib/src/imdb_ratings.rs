@@ -85,6 +85,8 @@ impl ImdbRatings {
         if let Some(source) = &self.source {
             bindings.push(("source", source as Parameter));
             updates.push("source=$source");
+        } else {
+            updates.push("source=null");
         }
 
         let query = format_sstr!(
