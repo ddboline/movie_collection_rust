@@ -1843,13 +1843,22 @@ fn procs_html_node(status: &TranscodeStatus) -> LazyNodes {
         let bodies = status
             .procs
             .iter()
-            .flat_map(ProcInfo::get_html)
+            .map(|x| {
+                ProcInfo::get_html(x).into_iter().enumerate().map(|(i, b)| {
+                    rsx! {
+                        td {
+                            key: "bodies-b-{i}",
+                            "{b}",
+                        }
+                    }
+                })
+            })
             .enumerate()
             .map(|(i, b)| {
                 rsx! {
-                    td {
+                    tr {
                         key: "bodies-{i}",
-                        "{b}",
+                        b,
                     }
                 }
             });
@@ -1867,9 +1876,7 @@ fn procs_html_node(status: &TranscodeStatus) -> LazyNodes {
                     }
                 },
                 tbody {
-                    tr {
-                        bodies,
-                    }
+                    bodies,
                 }
             }
         })
