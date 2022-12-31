@@ -1,8 +1,9 @@
 use anyhow::{format_err, Error};
-use base64::encode_engine;
-use base64::engine::fast_portable::FastPortable;
-use base64::engine::fast_portable::NO_PAD;
-use base64::alphabet::URL_SAFE;
+use base64::{
+    alphabet::URL_SAFE,
+    encode_engine,
+    engine::fast_portable::{FastPortable, NO_PAD},
+};
 use lazy_static::lazy_static;
 use log::debug;
 use maplit::hashmap;
