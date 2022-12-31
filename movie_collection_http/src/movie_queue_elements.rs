@@ -1888,13 +1888,25 @@ fn procs_html_node(status: &TranscodeStatus) -> LazyNodes {
         let bodies = status
             .upcoming_jobs
             .iter()
-            .flat_map(TranscodeServiceRequest::get_html)
+            .map(|r| {
+                TranscodeServiceRequest::get_html(r)
+                    .into_iter()
+                    .enumerate()
+                    .map(|(i, l)| {
+                        rsx! {
+                            td {
+                                key: "upcoming-body-key-td-{i}",
+                                "{l}"
+                            }
+                        }
+                    })
+            })
             .enumerate()
             .map(|(i, b)| {
                 rsx! {
-                    td {
+                    tr {
                         key: "upcoming-body-key-{i}",
-                        "{b}"
+                        b
                     }
                 }
             });
@@ -1912,9 +1924,7 @@ fn procs_html_node(status: &TranscodeStatus) -> LazyNodes {
                     }
                 },
                 tbody {
-                    tr {
-                        bodies
-                    }
+                    bodies
                 }
             }
         })
