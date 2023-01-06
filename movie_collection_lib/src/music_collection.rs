@@ -1,7 +1,6 @@
 use anyhow::{format_err, Error};
 use futures::{future::try_join_all, Stream, TryStreamExt};
 use postgres_query::{query, query_dyn, Error as PqError, FromSqlRow, Parameter, Query};
-use rayon::iter::{IntoParallelRefIterator, ParallelIterator};
 use serde::{Deserialize, Serialize};
 use stack_string::{format_sstr, StackString};
 use std::{collections::HashMap, sync::Arc};
@@ -182,7 +181,7 @@ impl MusicCollection {
 
         let music_list: Result<Vec<_>, Error> = config
             .music_dirs
-            .par_iter()
+            .iter()
             .filter(|d| d.exists())
             .map(|d| walk_directory(d, &["mp3"]))
             .collect();
