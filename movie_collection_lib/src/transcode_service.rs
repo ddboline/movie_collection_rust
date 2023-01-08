@@ -750,7 +750,7 @@ fn get_paths_sync(dir: impl AsRef<Path>, ext: &str) -> Vec<PathBuf> {
                 None
             }
         })
-        .sorted_by(|x, y| x.cmp(&y))
+        .sorted_by(Ord::cmp)
         .collect()
 }
 
