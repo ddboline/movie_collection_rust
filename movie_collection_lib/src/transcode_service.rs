@@ -663,7 +663,11 @@ impl fmt::Display for TranscodeStatus {
             write!(
                 f,
                 "Running procs:\n\n{}\n\n",
-                self.procs.iter().map(|p| format_sstr!("{p}")).join("\n")
+                self.procs
+                    .iter()
+                    .sorted_by_key(|p| p.pid)
+                    .map(|p| format_sstr!("{p}"))
+                    .join("\n")
             )?;
         }
         if !self.upcoming_jobs.is_empty() {
@@ -729,6 +733,7 @@ fn get_procs() -> Result<Vec<ProcInfo>, Error> {
             }
             None
         })
+        .sorted_by_key(|p| p.pid)
         .collect();
     Ok(procs)
 }
@@ -745,6 +750,7 @@ fn get_paths_sync(dir: impl AsRef<Path>, ext: &str) -> Vec<PathBuf> {
                 None
             }
         })
+        .sorted_by(|x, y| x.cmp(&y))
         .collect()
 }
 
@@ -786,7 +792,10 @@ async fn get_upcoming_jobs(p: impl AsRef<Path>) -> Result<Vec<TranscodeServiceRe
             let js: TranscodeServiceRequest = serde_json::from_slice(&fs::read(fpath).await?)?;
             Ok(js)
         });
-    try_join_all(futures).await
+    let results: Result<Vec<_>, Error> = try_join_all(futures).await;
+    let mut upcoming_jobs = results?;
+    upcoming_jobs.sort_by(|x, y| x.prefix.cmp(&y.prefix));
+    Ok(upcoming_jobs)
 }
 
 async fn get_current_jobs(p: impl AsRef<Path>) -> Result<Vec<(PathBuf, StackString)>, Error> {
