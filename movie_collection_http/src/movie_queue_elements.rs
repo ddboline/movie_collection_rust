@@ -1,7 +1,7 @@
 use anyhow::{format_err, Error};
 use dioxus::prelude::{
-    dioxus_elements, format_args_f, inline_props, rsx, Element, LazyNodes, NodeFactory, Props,
-    Scope, VNode, VirtualDom,
+    dioxus_elements, inline_props, rsx, Element, GlobalAttributes, LazyNodes, Props, Scope,
+    VirtualDom,
 };
 use futures::{future::try_join_all, TryStreamExt};
 use rust_decimal_macros::dec;
@@ -45,15 +45,15 @@ use crate::{
 
 pub fn index_body() -> String {
     let mut app = VirtualDom::new(index_element);
-    app.rebuild();
-    dioxus::ssr::render_vdom(&app)
+    drop(app.rebuild());
+    dioxus_ssr::render(&app)
 }
 
 fn index_element(cx: Scope) -> Element {
     cx.render(rsx! {
         head {
             style {
-                [include_str!("../../templates/style.css")]
+                include_str!("../../templates/style.css")
             }
         },
         body {
@@ -209,8 +209,8 @@ pub async fn movie_queue_body(
             order_by,
         },
     );
-    app.rebuild();
-    Ok(dioxus::ssr::render_vdom(&app))
+    drop(app.rebuild());
+    Ok(dioxus_ssr::render(&app))
 }
 
 #[inline_props]
@@ -450,8 +450,8 @@ pub fn play_worker_body(
                 last_url,
             },
         );
-        app.rebuild();
-        Ok(dioxus::ssr::render_vdom(&app))
+        drop(app.rebuild());
+        Ok(dioxus_ssr::render(&app))
     } else {
         Err(format_err!("video playback path does not exist"))
     }
@@ -575,8 +575,8 @@ pub async fn find_new_episodes_body(
             source,
         },
     );
-    app.rebuild();
-    Ok(dioxus::ssr::render_vdom(&app))
+    drop(app.rebuild());
+    Ok(dioxus_ssr::render(&app))
 }
 
 #[inline_props]
@@ -730,8 +730,8 @@ pub fn tvshows_body(show_map: TvShowsMap, tvshows: Vec<TvShowsResult>) -> String
 
     let mut app =
         VirtualDom::new_with_props(tvshows_element, tvshows_elementProps { tvshows, watchlist });
-    app.rebuild();
-    dioxus::ssr::render_vdom(&app)
+    drop(app.rebuild());
+    dioxus_ssr::render(&app)
 }
 
 #[inline_props]
@@ -868,8 +868,8 @@ pub fn watchlist_body(shows: WatchListMap) -> String {
         .collect();
     shows.sort();
     let mut app = VirtualDom::new_with_props(watchlist_element, watchlist_elementProps { shows });
-    app.rebuild();
-    dioxus::ssr::render_vdom(&app)
+    drop(app.rebuild());
+    dioxus_ssr::render(&app)
 }
 
 #[derive(PartialEq, Eq, PartialOrd, Ord)]
@@ -959,8 +959,8 @@ pub fn trakt_watched_seasons_body(
             entries,
         },
     );
-    app.rebuild();
-    dioxus::ssr::render_vdom(&app)
+    drop(app.rebuild());
+    dioxus_ssr::render(&app)
 }
 
 #[inline_props]
@@ -1057,8 +1057,8 @@ pub async fn trakt_cal_http_body(pool: &PgPool, trakt: &TraktConnection) -> Resu
         trakt_cal_http_element,
         trakt_cal_http_elementProps { entries },
     );
-    app.rebuild();
-    Ok(dioxus::ssr::render_vdom(&app))
+    drop(app.rebuild());
+    Ok(dioxus_ssr::render(&app))
 }
 
 #[inline_props]
@@ -1209,8 +1209,8 @@ pub async fn watch_list_http_body(
             watched_episodes_db,
         },
     );
-    app.rebuild();
-    Ok(dioxus::ssr::render_vdom(&app))
+    drop(app.rebuild());
+    Ok(dioxus_ssr::render(&app))
 }
 
 #[inline_props]
@@ -1343,8 +1343,8 @@ pub async fn parse_imdb_http_body(
             watchlist,
         },
     );
-    app.rebuild();
-    Ok(dioxus::ssr::render_vdom(&app))
+    drop(app.rebuild());
+    Ok(dioxus_ssr::render(&app))
 }
 
 #[inline_props]
@@ -1370,7 +1370,7 @@ fn parse_imdb_http_element(
                 }
             } else {
                 rsx! {"{imdb_url_}"}
-            };
+            }
         });
         let button = imdb_url.map(|imdb_url| {
             if watchlist.contains_key(&imdb_url) {
@@ -1427,8 +1427,8 @@ pub fn plex_body(
             limit,
         },
     );
-    app.rebuild();
-    dioxus::ssr::render_vdom(&app)
+    drop(app.rebuild());
+    dioxus_ssr::render(&app)
 }
 
 #[inline_props]
@@ -1557,8 +1557,8 @@ pub fn plex_detail_body(
             limit,
         },
     );
-    app.rebuild();
-    dioxus::ssr::render_vdom(&app)
+    drop(app.rebuild());
+    dioxus_ssr::render(&app)
 }
 
 #[inline_props]
@@ -1674,8 +1674,8 @@ pub fn local_file_body(
             config,
         },
     );
-    app.rebuild();
-    dioxus::ssr::render_vdom(&app)
+    drop(app.rebuild());
+    dioxus_ssr::render(&app)
 }
 
 #[inline_props]
@@ -1786,8 +1786,8 @@ fn local_file_element(
 pub fn procs_html_body(status: TranscodeStatus) -> String {
     let mut app =
         VirtualDom::new_with_props(procs_html_element, procs_html_elementProps { status });
-    app.rebuild();
-    dioxus::ssr::render_vdom(&app)
+    drop(app.rebuild());
+    dioxus_ssr::render(&app)
 }
 
 #[inline_props]
@@ -1800,8 +1800,8 @@ pub fn transcode_get_html_body(status: TranscodeStatus) -> String {
         transcode_get_html_element,
         transcode_get_html_elementProps { status },
     );
-    app.rebuild();
-    dioxus::ssr::render_vdom(&app)
+    drop(app.rebuild());
+    dioxus_ssr::render(&app)
 }
 
 #[inline_props]
@@ -1941,9 +1941,9 @@ fn procs_html_node(status: &TranscodeStatus) -> LazyNodes {
     } else {
         let jobs = status.current_jobs.iter().enumerate().map(|(i, (_, s))| {
             rsx! {
-                div {
+                br {
                     key: "job-key-{i}",
-                    "{s}<br>",
+                    "{s}",
                 }
             }
         });

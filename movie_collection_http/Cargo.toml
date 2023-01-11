@@ -8,7 +8,8 @@ edition = "2018"
 movie_collection_lib = {path = "../movie_collection_lib"}
 futures = "0.3"
 rweb = {version="0.15", features=["openapi"], default-features=false}
-dioxus = { version = "0.2", features = ["ssr"] }
+dioxus = "0.3"
+dioxus-ssr = "0.3"
 http = "0.2"
 serde = "1.0"
 serde_derive = "1.0"
@@ -40,6 +41,6 @@ async-graphql = {version="5.0", features=["dataloader", "time"]}
 async-graphql-warp = "5.0"
 reqwest = {version="0.11", features=["cookies", "json", "rustls-tls"], default_features=false}
 rweb-helper = { git = "https://github.com/ddboline/rweb_helper.git", tag="0.4.16" }
-authorized_users = { git = "https://github.com/ddboline/auth_server_rust.git", tag="0.10.1"}
+authorized_users = { git = "https://github.com/ddboline/auth_server_rust.git", tag="0.10.3"}
 stack-string = { version="0.8", features=["postgres_types", "rweb-openapi", "async_graphql"] }
 postgres_query = {git = "https://github.com/ddboline/rust-postgres-query", tag = "0.3.4", features=["deadpool"]}

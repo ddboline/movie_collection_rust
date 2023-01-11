@@ -31,7 +31,7 @@ async-trait = "0.1"
 derive_more = "0.99"
 clap = {version="4.0", features=["derive"]}
 lazy_static = "1.4"
-base64 = "0.20"
+base64 = "0.21"
 maplit = "1.0"
 envy = "0.4"
 jwalk = "0.8"
@@ -39,7 +39,7 @@ itertools = "0.10"
 smallvec = {version="1.6", features=["serde", "write"]}
 procfs = "0.14"
 uuid = "1.0"
-roxmltree = "0.16"
+roxmltree = "0.17"
 stack-string = { version="0.8", features=["postgres_types"] }
 stdout-channel = "0.6"
 postgres_query = {git = "https://github.com/ddboline/rust-postgres-query", tag = "0.3.4", features=["deadpool"]}
