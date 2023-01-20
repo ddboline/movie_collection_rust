@@ -1495,16 +1495,25 @@ pub async fn plex_list(
         .store_url_task(state.trakt.get_client(), &state.config, "/list/plex")
         .await;
     let query = query.into_inner();
+    let section_type = query.section_type.map(Into::into);
     let events = PlexEvent::get_plex_events(
         &state.db,
         query.start_timestamp.map(Into::into),
         query.event_type.map(Into::into),
+        section_type,
         query.offset,
         query.limit,
     )
     .await
     .map_err(Into::<Error>::into)?;
-    let body = plex_body(state.config.clone(), events, query.offset, query.limit).into();
+    let body = plex_body(
+        state.config.clone(),
+        events,
+        section_type,
+        query.offset,
+        query.limit,
+    )
+    .into();
     task.await.ok();
     Ok(HtmlBase::new(body).into())
 }
