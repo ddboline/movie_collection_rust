@@ -28,7 +28,7 @@ use movie_collection_lib::{
     movie_queue::{MovieQueueDB, MovieQueueResult},
     parse_imdb::{ParseImdb, ParseImdbOptions},
     pgpool::PgPool,
-    plex_events::EventOutput,
+    plex_events::{EventOutput, PlexSectionType},
     trakt_connection::TraktConnection,
     trakt_utils::{get_watched_shows_db, TraktCalEntry, WatchListMap},
     transcode_service::{
@@ -915,13 +915,22 @@ fn watchlist_element(cx: Scope, shows: Vec<WatchListEntry>) -> Element {
                             id: "{link}_source_id",
                             "onchange": "setSource('{link}', '{link}_source_id');",
                             options.iter().enumerate().map(|(i, (s, v, l))| {
-                                let selected = (source.is_none() && *s == TvShowSource::All) || source == Some(*s);
-                                rsx! {
-                                    option {
-                                        key: "source-option-{i}",
-                                        value: "{v}",
-                                        selected: "{selected}",
-                                        "{l}",
+                                if (source.is_none() && *s == TvShowSource::All) || source == Some(*s) {
+                                    rsx! {
+                                        option {
+                                            key: "source-option-{i}",
+                                            value: "{v}",
+                                            selected: true,
+                                            "{l}",
+                                        }
+                                    }
+                                } else {
+                                    rsx! {
+                                        option {
+                                            key: "source-option-{i}",
+                                            value: "{v}",
+                                            "{l}",
+                                        }
                                     }
                                 }
                             }),
@@ -1415,6 +1424,7 @@ fn parse_imdb_http_element(
 pub fn plex_body(
     config: Config,
     events: Vec<EventOutput>,
+    section: Option<PlexSectionType>,
     offset: Option<u64>,
     limit: Option<u64>,
 ) -> String {
@@ -1423,6 +1433,7 @@ pub fn plex_body(
         plex_elementProps {
             config,
             events,
+            section,
             offset,
             limit,
         },
@@ -1436,6 +1447,7 @@ fn plex_element(
     cx: Scope,
     config: Config,
     events: Vec<EventOutput>,
+    section: Option<PlexSectionType>,
     offset: Option<u64>,
     limit: Option<u64>,
 ) -> Element {
@@ -1486,17 +1498,19 @@ fn plex_element(
         }
     });
     let limit = limit.unwrap_or(20);
+    let section_str = section.map_or_else(|| StackString::from("null"), |s| format_sstr!("'{s}'"));
     let previous_button = if let Some(offset) = offset {
         if *offset < limit {
             None
         } else {
             let new_offset = *offset - limit;
+            let section_str = section_str.clone();
             Some(rsx! {
                 button {
                     "type": "submit",
                     name: "previous",
                     value: "Previous",
-                    "onclick": "updateMainArticle('/list/plex?limit={limit}&offset={new_offset}')",
+                    "onclick": "loadPlex({new_offset}, {limit}, {section_str})",
                     "Previous",
                 }
             })
@@ -1511,15 +1525,52 @@ fn plex_element(
             "type": "submit",
             name: "next",
             value: "Next",
-            "onclick": "updateMainArticle('/list/plex?limit={limit}&offset={new_offset}')",
+            "onclick": "loadPlex({new_offset}, {limit}, {section_str})",
             "Next",
         }
     };
+    let section_select = [
+        None,
+        Some(PlexSectionType::Music),
+        Some(PlexSectionType::Movie),
+        Some(PlexSectionType::TvShow),
+    ]
+    .iter()
+    .enumerate()
+    .map(|(i, s)| {
+        let v = s.map_or_else(|| "", PlexSectionType::to_str);
+        if s == section {
+            rsx! {
+                option {
+                    id: "section-{i}",
+                    value: "{v}",
+                    selected: true,
+                    "{v}"
+                }
+            }
+        } else {
+            rsx! {
+                option {
+                    id: "section-{i}",
+                    value: "{v}",
+                    "{v}"
+                }
+            }
+        }
+    });
 
     cx.render(rsx! {
         br {
             previous_button,
             next_button,
+            form {
+                action: "javascript:loadPlexSection('plex_section_filter', {offset}, {limit})",
+                select {
+                    id: "plex_section_filter",
+                    "onchange": "loadPlexSection('plex_section_filter', {offset}, {limit})",
+                    section_select,
+                }
+            }
         }
         table {
             "border": "1",
