@@ -9,6 +9,7 @@ use serde::{Deserialize, Serialize};
 use stack_string::{format_sstr, StackString};
 use std::{
     convert::{TryFrom, TryInto},
+    fmt,
     net::Ipv4Addr,
     path::Path,
     str::FromStr,
@@ -210,6 +211,7 @@ impl PlexEvent {
         pool: &PgPool,
         start_timestamp: Option<OffsetDateTime>,
         event_type: Option<PlexEventType>,
+        section_type: Option<PlexSectionType>,
         offset: Option<u64>,
         limit: Option<u64>,
     ) -> Result<Vec<EventOutput>, Error> {
@@ -223,6 +225,11 @@ impl PlexEvent {
         if let Some(event_type) = &event_type {
             constraints.push("a.event = $event");
             bindings.push(("event", event_type as Parameter));
+        }
+        let section_type: Option<StackString> = section_type.map(|s| s.to_str().into());
+        if let Some(section_type) = &section_type {
+            constraints.push("a.section_type = $section_type");
+            bindings.push(("section_type", section_type as Parameter));
         }
         let query = format_sstr!(
             "
@@ -341,6 +348,45 @@ pub struct Metadata {
     pub library_section_type: Option<StackString>,
     #[serde(alias = "librarySectionTitle")]
     pub library_section_title: Option<StackString>,
+}
+
+#[derive(Serialize, Deserialize, Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
+pub enum PlexSectionType {
+    #[serde(alias = "artist")]
+    Music,
+    #[serde(alias = "movie")]
+    Movie,
+    #[serde(alias = "show")]
+    TvShow,
+}
+
+impl PlexSectionType {
+    #[must_use]
+    pub fn to_str(self) -> &'static str {
+        match self {
+            Self::Music => "artist",
+            Self::Movie => "movie",
+            Self::TvShow => "show",
+        }
+    }
+}
+
+impl fmt::Display for PlexSectionType {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "{}", self.to_str())
+    }
+}
+
+impl FromStr for PlexSectionType {
+    type Err = Error;
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        match s {
+            "artist" => Ok(Self::Music),
+            "movie" => Ok(Self::Movie),
+            "show" => Ok(Self::TvShow),
+            _ => Err(format_err!("Invalid PlexSectionType")),
+        }
+    }
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone, Copy)]
