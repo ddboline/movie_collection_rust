@@ -30,7 +30,7 @@ use movie_collection_lib::{
     movie_collection::{LastModifiedResponse, MovieCollectionRow},
     movie_queue::{MovieQueueRow, OrderBy},
     music_collection::MusicCollection,
-    plex_events::{PlexEvent, PlexEventType, PlexFilename, PlexMetadata},
+    plex_events::{PlexEvent, PlexEventType, PlexFilename, PlexMetadata, PlexSectionType},
     trakt_utils::TraktActions,
     tv_show_source::TvShowSource,
 };
@@ -285,6 +285,21 @@ pub enum _OrderByWrapper {
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone, Copy, Deref, Into, From)]
+pub struct PlexSectionTypeWrapper(PlexSectionType);
+
+derive_rweb_schema!(PlexSectionTypeWrapper, _PlexSectionTypeWrapper);
+
+#[derive(Serialize, Deserialize, Schema)]
+pub enum _PlexSectionTypeWrapper {
+    #[serde(rename = "artist")]
+    Music,
+    #[serde(rename = "movie")]
+    Movie,
+    #[serde(rename = "show")]
+    TvShow,
+}
+
+#[derive(Serialize, Deserialize, Debug, Clone, Copy, Deref, Into, From)]
 pub struct PlexEventTypeWrapper(PlexEventType);
 
 derive_rweb_schema!(PlexEventTypeWrapper, _PlexEventTypeWrapper);
@@ -321,6 +336,7 @@ pub enum _PlexEventTypeWrapper {
 pub struct PlexEventRequest {
     pub start_timestamp: Option<DateTimeWrapper>,
     pub event_type: Option<PlexEventTypeWrapper>,
+    pub section_type: Option<PlexSectionTypeWrapper>,
     pub offset: Option<u64>,
     pub limit: Option<u64>,
 }
@@ -334,6 +350,8 @@ struct _PlexEventRequest {
     start_timestamp: Option<DateTimeType>,
     #[schema(description = "Event Type")]
     event_type: Option<PlexEventTypeWrapper>,
+    #[schema(description = "Section Type")]
+    section_type: Option<PlexSectionTypeWrapper>,
     #[schema(description = "Offset")]
     offset: Option<u64>,
     #[schema(description = "Limit")]
