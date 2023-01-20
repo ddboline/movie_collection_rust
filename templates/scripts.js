@@ -203,3 +203,14 @@ function searchFullQueue(offset, order_by) {
     let url = "/list/full_queue?limit=20" + "&offset=" + offset + "&q=" + search + "&order_by=" + order_by;
     updateMainArticle(url);
 }
+function loadPlexSection(section_id, offset=0, limit=10) {
+    let section = document.getElementById(section_id).value;
+    loadPlex(offset, limit, section);
+}
+function loadPlex(offset=0, limit=10, section=null) {
+    let url = '/list/plex?limit=' + limit + '&offset=' + offset;
+    if(section) {
+        url = url + '&section_type=' + section;
+    }
+    updateMainArticle(url);
+}
