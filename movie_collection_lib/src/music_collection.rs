@@ -230,7 +230,7 @@ impl MusicCollection {
         let all_entries: Vec<_> = results
             .into_iter()
             .flatten()
-            .chain(music_dict.into_iter().map(|(_, v)| v))
+            .chain(music_dict.into_values())
             .collect();
         println!("all entries {}", all_entries.len());
         Ok(all_entries)

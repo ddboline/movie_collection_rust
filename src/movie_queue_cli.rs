@@ -310,7 +310,7 @@ impl MovieQueueCli {
             }
             Self::Status => {
                 let status = transcode_status(&config).await?;
-                println!("{}", status);
+                println!("{status}");
             }
             Self::RunMigrations => {
                 let mut conn = pool.get().await?;

@@ -740,7 +740,7 @@ impl MovieCollection {
         let mut source_str = StackString::new();
         match source {
             Some(TvShowSource::All) => (),
-            Some(s) => write!(source_str, "AND c.source = '{}'", s)?,
+            Some(s) => write!(source_str, "AND c.source = '{s}'")?,
             None => write!(source_str, "AND c.source is null")?,
         }
         let query = format_sstr!(

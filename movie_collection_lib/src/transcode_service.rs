@@ -378,7 +378,7 @@ impl TranscodeService {
             spawn(async move { Self::output_to_file(reader, &stderr_path, b'\n').await });
 
         let status = p.wait().await?;
-        println!("Handbrake exited with {}", status);
+        println!("Handbrake exited with {status}");
         stdout_task.await??;
         stderr_task.await??;
 
@@ -607,7 +607,7 @@ impl fmt::Display for ProcStatus {
             Self::Current => "current",
             Self::Finished => "finished",
         };
-        write!(f, "{}", s)
+        write!(f, "{s}")
     }
 }
 
@@ -828,7 +828,7 @@ pub async fn transcode_status(config: &Config) -> Result<TranscodeStatus, Error>
 /// Return error if db query fails
 pub fn movie_directories(config: &Config) -> Result<Vec<StackString>, Error> {
     let movie_dir = config.preferred_dir.join("Documents").join("movies");
-    std::fs::read_dir(&movie_dir)?
+    std::fs::read_dir(movie_dir)?
         .map(|entry| {
             let p = entry?.path();
             let p = p

@@ -16,7 +16,7 @@ use crate::{
 
 #[derive(Debug, Display, Clone)]
 pub enum PathOrIndex {
-    #[display(fmt = "{:?}", _0)]
+    #[display(fmt = "{_0:?}")]
     Path(PathBuf),
     Index(i32),
 }

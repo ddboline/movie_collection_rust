@@ -302,7 +302,7 @@ impl MovieQueueDB {
             .join(" OR ");
         let mut where_str = StackString::new();
         if !constraints.is_empty() {
-            write!(where_str, "WHERE {}", constraints)?;
+            write!(where_str, "WHERE {constraints}")?;
         }
         let mut offset_str = StackString::new();
         if let Some(offset) = offset {

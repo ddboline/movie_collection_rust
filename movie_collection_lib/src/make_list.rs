@@ -160,9 +160,9 @@ pub async fn make_list(stdout: &StdoutChannel<StackString>) -> Result<(), Error>
         if let Some(full_path) = file_map.get(f_key) {
             write!(fout, "{} {}", f, full_path.to_string_lossy()).unwrap();
         } else if let Some(Some(status)) = proc_map.get(f_key) {
-            write!(fout, "{} {}", f, status).unwrap();
+            write!(fout, "{f} {status}").unwrap();
         } else {
-            write!(fout, "{}", f).unwrap();
+            write!(fout, "{f}").unwrap();
         }
         stdout.send(fout);
     }
