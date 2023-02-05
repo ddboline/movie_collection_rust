@@ -2,7 +2,6 @@ use anyhow::{format_err, Error};
 use futures::{future::try_join_all, stream::FuturesUnordered, Stream, TryStreamExt};
 use itertools::Itertools;
 use postgres_query::{query, query_dyn, Error as PqError, FromSqlRow};
-use rayon::iter::{IntoParallelIterator, IntoParallelRefIterator, ParallelIterator};
 use serde::{Deserialize, Serialize};
 use stack_string::{format_sstr, StackString};
 use std::{
@@ -489,7 +488,7 @@ impl MovieCollection {
         let file_list: Result<Vec<_>, Error> = self
             .config
             .movie_dirs
-            .par_iter()
+            .iter()
             .filter(|d| d.exists())
             .map(|d| walk_directory(d, &self.config.suffixes))
             .collect();
@@ -507,7 +506,7 @@ impl MovieCollection {
         let file_list = Arc::new(file_list);
 
         let episode_list: Result<HashSet<(StackString, _, _, _)>, Error> = file_list
-            .par_iter()
+            .iter()
             .filter_map(|f| {
                 let res = || {
                     let file_stem = Path::new(f)
@@ -641,7 +640,7 @@ impl MovieCollection {
         }
 
         let shows_not_in_db: HashSet<StackString> = episode_list
-            .into_par_iter()
+            .into_iter()
             .filter_map(|(show, season, episode, _)| {
                 let key = (show.clone(), season, episode);
                 if episodes_set.contains(&key) {

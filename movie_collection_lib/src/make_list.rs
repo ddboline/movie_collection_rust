@@ -2,7 +2,6 @@ use anyhow::Error;
 use futures::future::join_all;
 use itertools::Itertools;
 use log::debug;
-use rayon::iter::{IntoParallelRefIterator, ParallelIterator};
 use stack_string::StackString;
 use std::{
     collections::HashMap,
@@ -98,7 +97,7 @@ impl FileLists {
             let file_list: Result<Vec<_>, Error> = spawn_blocking(move || {
                 config
                     .movie_dirs
-                    .par_iter()
+                    .iter()
                     .filter(|d| d.exists())
                     .map(|d| walk_directory(d, &patterns))
                     .collect::<Result<Vec<_>, Error>>()
