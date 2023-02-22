@@ -1013,7 +1013,11 @@ pub async fn movie_queue_transcode_cleanup(
         remove_file(&movie_path)
             .await
             .map_err(Into::<Error>::into)?;
-        let movie_path = movie_path.to_string_lossy();
+        let srt_path = movie_path.with_extension("srt");
+        if srt_path.exists() {
+            remove_file(&srt_path).await.map_err(Into::<Error>::into)?;
+        }
+        let movie_path = movie_path.to_str().unwrap_or("");
         format_sstr!("Removed {movie_path}")
     } else if tmp_path.exists() {
         remove_file(&tmp_path).await.map_err(Into::<Error>::into)?;
