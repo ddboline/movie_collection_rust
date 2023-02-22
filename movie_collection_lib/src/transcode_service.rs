@@ -488,7 +488,7 @@ impl TranscodeService {
         )
         .await?;
         let mut buf = StackString::new();
-        writeln!(buf, "add {} to queue", output_file.to_string_lossy()).unwrap();
+        writeln!(buf, "add {} to queue", output_file.to_str().unwrap_or("")).unwrap();
         debug_output_file.write_all(buf.as_bytes()).await?;
         make_queue_worker(
             &self.config,
@@ -504,6 +504,26 @@ impl TranscodeService {
         debug_output_file.write_all(b"update collection\n").await?;
         mc.make_collection().await?;
         mc.fix_collection_show_id().await?;
+
+        let srt_path = self
+            .config
+            .home_dir
+            .join("Documents")
+            .join("movies")
+            .join(&format_sstr!("{show}.srt"));
+        if srt_path.exists() {
+            let new_path = output_file.with_extension("srt");
+            let mut buf = StackString::new();
+            writeln!(
+                buf,
+                "copy {} to {}",
+                srt_path.to_str().unwrap_or(""),
+                new_path.to_str().unwrap_or("")
+            )
+            .unwrap();
+            debug_output_file.write_all(buf.as_bytes()).await?;
+            fs::copy(&srt_path, &new_path).await?;
+        }
 
         debug_output_file.flush().await?;
 
