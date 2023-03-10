@@ -68,14 +68,14 @@ pub fn parse_file_stem(file_stem: &str) -> (StackString, i32, i32) {
 
     let show = entries[..(entries.len() - 2)].join("_").into();
 
-    let season = entries[(entries.len() - 2)];
+    let season = entries[entries.len() - 2];
     let season: i32 = if season.starts_with('s') {
         season.replace('s', "").parse().unwrap_or(-1)
     } else {
         -1
     };
 
-    let episode = entries[(entries.len() - 1)];
+    let episode = entries[entries.len() - 1];
     let episode: i32 = if episode.starts_with("ep") {
         episode.replace("ep", "").parse().unwrap_or(-1)
     } else {

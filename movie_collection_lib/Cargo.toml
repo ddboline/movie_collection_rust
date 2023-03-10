@@ -1,6 +1,6 @@
 [package]
 name = "movie_collection_lib"
-version = "0.10.8"
+version = "0.10.9"
 authors = ["Daniel Boline <ddboline@gmail.com>"]
 edition = "2018"
 
@@ -25,7 +25,7 @@ bytes = "1.0"
 anyhow = "1.0"
 thiserror = "1.0"
 dirs = "4.0"
-tokio = {version="1.21", features=["full"]}
+tokio = {version="1.26", features=["full"]}
 tokio-stream = {version="0.1", features=["fs"]}
 async-trait = "0.1"
 derive_more = "0.99"
@@ -37,7 +37,7 @@ envy = "0.4"
 jwalk = "0.8"
 itertools = "0.10"
 smallvec = {version="1.6", features=["serde", "write"]}
-procfs = "0.14"
+procfs = "0.15"
 uuid = "1.0"
 roxmltree = "0.18"
 stack-string = { version="0.8", features=["postgres_types"] }

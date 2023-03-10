@@ -1,6 +1,6 @@
 [package]
 name = "movie_collection_http"
-version = "0.10.8"
+version = "0.10.9"
 authors = ["Daniel Boline <ddboline@gmail.com>"]
 edition = "2018"
 
@@ -16,7 +16,7 @@ serde_derive = "1.0"
 serde_json = "1.0"
 time = {version="0.3", features=["serde-human-readable", "macros", "formatting"]}
 time-tz = {version="1.0", features=["system"]}
-tokio = {version="1.21", features=["full"]}
+tokio = {version="1.26", features=["full"]}
 tokio-stream = "0.1"
 parking_lot = "0.12"
 lazy_static = "1.4"
@@ -41,6 +41,6 @@ async-graphql = {version="5.0", features=["dataloader", "time"]}
 async-graphql-warp = "5.0"
 reqwest = {version="0.11", features=["cookies", "json", "rustls-tls"], default_features=false}
 rweb-helper = { git = "https://github.com/ddboline/rweb_helper.git", tag="0.4.16" }
-authorized_users = { git = "https://github.com/ddboline/auth_server_rust.git", tag="0.10.3"}
+authorized_users = { git = "https://github.com/ddboline/auth_server_rust.git", tag="0.10.5"}
 stack-string = { version="0.8", features=["postgres_types", "rweb-openapi", "async_graphql"] }
 postgres_query = {git = "https://github.com/ddboline/rust-postgres-query", tag = "0.3.4", features=["deadpool"]}
