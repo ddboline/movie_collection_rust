@@ -1,5 +1,5 @@
 use anyhow::{format_err, Error};
-use futures::{future::try_join_all, stream::FuturesUnordered, Stream, TryStreamExt};
+use futures::{future::try_join_all, Stream, TryStreamExt};
 use itertools::Itertools;
 use postgres_query::{query, query_dyn, Error as PqError, FromSqlRow};
 use serde::{Deserialize, Serialize};
@@ -579,30 +579,29 @@ impl MovieCollection {
         let episodes_set = episodes_set?;
         let rate_limiter = RateLimiter::new(10, 100);
 
-        let futures: FuturesUnordered<_> = file_list
-            .iter()
-            .map(|f| {
-                let collection_map = collection_map.clone();
-                let rate_limiter = rate_limiter.clone();
-                async move {
-                    if collection_map.get(f.as_str()).is_none() {
-                        let ext = Path::new(f)
-                            .extension()
-                            .map(OsStr::to_string_lossy)
-                            .ok_or_else(|| format_err!("extension fail"))?
-                            .as_ref()
-                            .into();
-                        if self.config.suffixes.contains(&ext) {
-                            self.stdout.send(format_sstr!("not in collection {f}"));
-                            rate_limiter.acquire().await;
-                            self.insert_into_collection(f, true).await?;
-                        }
+        let futures = file_list.iter().map(|f| {
+            let collection_map = collection_map.clone();
+            let rate_limiter = rate_limiter.clone();
+            async move {
+                if collection_map.get(f.as_str()).is_none() {
+                    let ext = Path::new(f)
+                        .extension()
+                        .map(OsStr::to_string_lossy)
+                        .ok_or_else(|| format_err!("extension fail"))?
+                        .as_ref()
+                        .into();
+                    if self.config.suffixes.contains(&ext) {
+                        self.stdout.send(format_sstr!("not in collection {f}"));
+                        rate_limiter.acquire().await;
+                        self.insert_into_collection(f, true).await?;
+                        self.stdout
+                            .send(format_sstr!("inserted into collection {f}"));
                     }
-                    Ok(())
                 }
-            })
-            .collect();
-        let results: Result<(), Error> = futures.try_collect().await;
+                Ok(())
+            }
+        });
+        let results: Result<Vec<()>, Error> = try_join_all(futures).await;
         results?;
 
         let futures = collection_map.iter().map(|(key, val)| {
