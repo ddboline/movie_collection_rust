@@ -730,7 +730,6 @@ fn get_procs() -> Result<Vec<ProcInfo>, Error> {
         Path::new("/usr/bin/HandBrakeCLI"),
     ];
     let procs = process::all_processes()?
-        .into_iter()
         .filter_map(|p| {
             let p = p.ok()?;
             let exe = p.exe().ok()?;
