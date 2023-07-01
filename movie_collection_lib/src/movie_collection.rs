@@ -577,32 +577,25 @@ impl MovieCollection {
             })
             .collect();
         let episodes_set = episodes_set?;
-        let rate_limiter = RateLimiter::new(10, 100);
 
-        let futures = file_list.iter().map(|f| {
-            let collection_map = collection_map.clone();
-            let rate_limiter = rate_limiter.clone();
-            async move {
-                if collection_map.get(f.as_str()).is_none() {
-                    let ext = Path::new(f)
-                        .extension()
-                        .map(OsStr::to_string_lossy)
-                        .ok_or_else(|| format_err!("extension fail"))?
-                        .as_ref()
-                        .into();
-                    if self.config.suffixes.contains(&ext) {
-                        self.stdout.send(format_sstr!("not in collection {f}"));
-                        rate_limiter.acquire().await;
-                        self.insert_into_collection(f, true).await?;
-                        self.stdout
-                            .send(format_sstr!("inserted into collection {f}"));
-                    }
+        for f in file_list.iter() {
+            if collection_map.get(f.as_str()).is_none() {
+                let ext = Path::new(f)
+                    .extension()
+                    .map(OsStr::to_string_lossy)
+                    .ok_or_else(|| format_err!("extension fail"))?
+                    .as_ref()
+                    .into();
+                if self.config.suffixes.contains(&ext) {
+                    self.stdout.send(format_sstr!("not in collection {f}"));
+                    self.insert_into_collection(f, true).await?;
+                    self.stdout
+                        .send(format_sstr!("inserted into collection {f}"));
                 }
-                Ok(())
             }
-        });
-        let results: Result<Vec<()>, Error> = try_join_all(futures).await;
-        results?;
+        }
+
+        let rate_limiter = RateLimiter::new(10, 100);
 
         let futures = collection_map.iter().map(|(key, val)| {
             let file_list = file_list.clone();
