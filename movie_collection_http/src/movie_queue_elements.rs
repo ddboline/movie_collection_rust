@@ -1781,7 +1781,7 @@ fn local_file_element(
                         });
                         rsx! {
                             select {
-                                id: "movie_dir",
+                                id: "movie-dir-{f}",
                                 movie_dirs,
                             },
                             button {

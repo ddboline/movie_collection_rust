@@ -159,7 +159,7 @@ function transcode_file(file) {
     document.getElementById("remcomoutput").innerHTML = out;
 }
 function remcom_file(file) {
-    let movie_dir = document.getElementById('movie_dir').value;
+    let movie_dir = document.getElementById('movie-dir-' + file).value;
     let url = "/list/transcode/remcom/directory/" + movie_dir + "/" + file;
     if (movie_dir == '') {
         url = "/list/transcode/remcom/file/" + file;
