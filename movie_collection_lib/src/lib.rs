@@ -6,6 +6,7 @@
 #![allow(clippy::cast_possible_wrap)]
 #![allow(clippy::similar_names)]
 #![allow(clippy::struct_excessive_bools)]
+#![allow(clippy::unsafe_derive_deserialize)]
 
 pub mod config;
 pub mod date_time_wrapper;
