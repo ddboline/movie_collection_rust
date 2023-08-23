@@ -369,6 +369,15 @@ impl PlexSectionType {
             Self::TvShow => "show",
         }
     }
+
+    #[must_use]
+    pub fn to_display(self) -> &'static str {
+        match self {
+            Self::Music => "Music",
+            Self::Movie => "Movie",
+            Self::TvShow => "TvShow",
+        }
+    }
 }
 
 impl fmt::Display for PlexSectionType {
