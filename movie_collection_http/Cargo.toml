@@ -7,14 +7,14 @@ edition = "2018"
 [dependencies]
 movie_collection_lib = {path = "../movie_collection_lib"}
 futures = "0.3"
-dioxus = "0.3"
-dioxus-ssr = "0.3"
+dioxus = "0.4"
+dioxus-ssr = "0.4"
 http = "0.2"
 serde = "1.0"
 serde_derive = "1.0"
 serde_json = "1.0"
 time = {version="0.3", features=["serde-human-readable", "macros", "formatting"]}
-time-tz = {version="1.0", features=["system"]}
+time-tz = {version="2.0", features=["system"]}
 tokio = {version="1.28", features=["full"]}
 tokio-stream = "0.1"
 parking_lot = "0.12"
