@@ -28,7 +28,7 @@ futures = "0.3"
 serde_json = "1.0"
 derive_more = "0.99"
 time = {version="0.3", features=["serde-human-readable", "macros", "formatting"]}
-time-tz = {version="1.0", features=["system"]}
+time-tz = {version="2.0", features=["system"]}
 refinery = {version="0.8", features=["tokio-postgres"]}
 stack-string = { git = "https://github.com/ddboline/stack-string-rs.git", features=["postgres_types"], tag="0.9.1" }
 stdout-channel = "0.6"
