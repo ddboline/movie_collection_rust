@@ -53,7 +53,7 @@ fn index_element(cx: Scope) -> Element {
     cx.render(rsx! {
         head {
             style {
-                include_str!("../../templates/style.css")
+                dangerous_inner_html: include_str!("../../templates/style.css")
             }
         },
         body {
@@ -692,16 +692,17 @@ fn find_new_episodes_element(
             value: "HuluCalendar",
             "onclick": "updateMainArticle('/list/cal?source=hulu');"
         },
-        "<br>",
-        button {
-            name: "remcomout",
-            id: "remcomoutput",
-            "&nbsp;"
-        },
-        table {
-            "border": "0",
-            "align": "center",
-            episode_entries,
+        br {
+            button {
+                name: "remcomout",
+                id: "remcomoutput",
+                dangerous_inner_html: "&nbsp;"
+            },
+            table {
+                "border": "0",
+                "align": "center",
+                episode_entries,
+            }
         }
     })
 }
@@ -772,7 +773,7 @@ fn tvshows_element(
         } else {
             rsx! {
                 a {
-                    href: "javascript:updateMainArticle('/trakt/watched/list/{link}",
+                    href: "javascript:updateMainArticle('/trakt/watched/list/{link}')",
                     "{title}",
                 }
             }
@@ -842,13 +843,13 @@ fn tvshows_element(
             href: "javascript:updateMainArticle('/trakt/watchlist')",
             "Watch List",
         },
-        "<br>",
-        button {
-            name: "remcomout",
-            id: "remcomoutput",
-            "&nbsp;",
+        br {
+            button {
+                name: "remcomout",
+                id: "remcomoutput",
+                dangerous_inner_html: "&nbsp;",
+            },
         },
-        "<br>",
         table {
             "border": "0",
             "align": "center",
@@ -1320,7 +1321,7 @@ fn watch_list_http_element(
         button {
             name: "remcomout",
             id: "remcomoutput",
-            "&nbsp;",
+            dangerous_inner_html: "&nbsp;",
         },
         button {
             "type": "submit",
@@ -1538,6 +1539,7 @@ fn plex_element(
     .iter()
     .enumerate()
     .map(|(i, s)| {
+        let d = s.map_or_else(|| "", PlexSectionType::to_display);
         let v = s.map_or_else(|| "", PlexSectionType::to_str);
         if s == section {
             rsx! {
@@ -1545,7 +1547,7 @@ fn plex_element(
                     id: "section-{i}",
                     value: "{v}",
                     selected: true,
-                    "{v}"
+                    "{d}"
                 }
             }
         } else {
@@ -1553,7 +1555,7 @@ fn plex_element(
                 option {
                     id: "section-{i}",
                     value: "{v}",
-                    "{v}"
+                    "{d}"
                 }
             }
         }
@@ -1863,7 +1865,7 @@ fn transcode_get_html_element(cx: Scope, status: TranscodeStatus) -> Element {
             button {
                 name: "remcomout",
                 id: "remcomoutput",
-                "&nbsp;",
+                dangerous_inner_html: "&nbsp;",
             }
         },
         div {
