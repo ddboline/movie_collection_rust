@@ -1,6 +1,6 @@
 [package]
 name = "movie_collection_http"
-version = "0.10.14"
+version = "0.10.15"
 authors = ["Daniel Boline <ddboline@gmail.com>"]
 edition = "2018"
 
@@ -36,11 +36,11 @@ stdout-channel = "0.6"
 smallvec = {version="1.6", features=["serde", "write"]}
 rust_decimal = {version="1.27", features=["db-tokio-postgres"]}
 rust_decimal_macros = "1.27"
-async-graphql = {version="5.0", features=["dataloader", "time"]}
-async-graphql-warp = "5.0"
+async-graphql = {version="6.0", features=["dataloader", "time"]}
+async-graphql-warp = "6.0"
 reqwest = {version="0.11", features=["cookies", "json", "rustls-tls"], default_features=false}
 rweb = {git = "https://github.com/ddboline/rweb.git", features=["openapi"], default-features=false, tag="0.15.1-1"}
 rweb-helper = { git = "https://github.com/ddboline/rweb_helper.git", tag="0.5.0-1" }
-authorized_users = { git = "https://github.com/ddboline/auth_server_rust.git", tag="0.10.8"}
-stack-string = { git = "https://github.com/ddboline/stack-string-rs.git", features=["postgres_types", "rweb-openapi", "async_graphql"], tag="0.9.1" }
+authorized_users = { git = "https://github.com/ddboline/auth_server_rust.git", tag="0.10.11"}
+stack-string = { git = "https://github.com/ddboline/stack-string-rs.git", features=["postgres_types", "rweb-openapi", "async_graphql"], tag="0.9.2" }
 postgres_query = {git = "https://github.com/ddboline/rust-postgres-query", tag = "0.3.4", features=["deadpool"]}

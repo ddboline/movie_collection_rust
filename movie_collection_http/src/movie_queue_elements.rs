@@ -696,7 +696,7 @@ fn find_new_episodes_element(
             button {
                 name: "remcomout",
                 id: "remcomoutput",
-                dangerous_inner_html: "&nbsp;"
+                dangerous_inner_html: "&nbsp;",
             },
             table {
                 "border": "0",
