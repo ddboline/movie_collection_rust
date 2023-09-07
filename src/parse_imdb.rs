@@ -41,7 +41,7 @@ async fn main() {
             let e = StackString::from_display(e);
             if e.contains("Broken pipe") {
             } else {
-                panic!("{}", e);
+                panic!("{:?}", e);
             }
         }
     }
