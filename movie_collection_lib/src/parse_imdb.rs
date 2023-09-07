@@ -201,9 +201,12 @@ impl ParseImdb {
         } else if let Some(link) = link {
             output.push(vec![format_sstr!("Using {link}",)]);
             if let Some(result) = shows.get(&link) {
-                let episode_list = imdb_conn
+                let (season_list, episode_list) = imdb_conn
                     .parse_imdb_episode_list(&link, opts.season)
                     .await?;
+                if opts.season.is_none() {
+                    output.push(vec![format_sstr!("seasons {season_list:?}")]);
+                }
                 for episode in episode_list {
                     output.push(vec![format_sstr!("{result} {episode}")]);
                     if opts.update_database {
