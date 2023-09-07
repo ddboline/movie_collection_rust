@@ -1,6 +1,6 @@
-use anyhow::Error;
+use anyhow::{format_err, Error};
 use futures::future::try_join_all;
-use log::{debug, error};
+use log::debug;
 use reqwest::{Client, Url};
 use select::{
     document::Document,
@@ -8,11 +8,8 @@ use select::{
 };
 use serde::Deserialize;
 use stack_string::{format_sstr, StackString};
-use std::{fmt, fmt::Write};
-use time::{
-    macros::{date, format_description},
-    Date,
-};
+use std::{convert::TryFrom, fmt, fmt::Write};
+use time::{macros::date, Date, Month};
 
 use crate::utils::{option_string_wrapper, ExponentialRetry};
 
@@ -253,116 +250,130 @@ impl ImdbConnection {
         &self,
         imdb_id: &str,
         season: Option<i32>,
-    ) -> Result<Vec<ImdbEpisodeResult>, Error> {
-        let endpoint = format_sstr!("http://m.imdb.com/title/{imdb_id}/episodes");
+    ) -> Result<(Vec<usize>, Vec<ImdbEpisodeResult>), Error> {
+        let endpoint = if let Some(season) = season {
+            format_sstr!("http://m.imdb.com/title/{imdb_id}/episodes?season={season}")
+        } else {
+            format_sstr!("http://m.imdb.com/title/{imdb_id}/episodes")
+        };
         let url = Url::parse(&endpoint)?;
         let body = self.get(&url).await?.text().await?;
-
-        let ep_season_vec: Vec<(StackString, StackString)> = Document::from(body.as_str())
-            .find(Name("a"))
-            .filter_map(|a| {
-                if let Some("season") = a.attr("class") {
-                    let season_ = a.attr("season_number").unwrap_or("-1");
-                    if let Some(link) = a.attr("href") {
-                        let episodes_url =
-                            format_sstr!("http://www.imdb.com/title/{imdb_id}/episodes/{link}");
-                        Some((episodes_url, season_.into()))
-                    } else {
-                        None
-                    }
-                } else {
-                    None
-                }
-            })
-            .collect();
-
-        let futures = ep_season_vec
-            .into_iter()
-            .map(|(episodes_url, season_str)| async move {
-                let season_: i32 = season_str.parse()?;
-                if let Some(s) = season {
-                    if s != season_ {
-                        return Ok(Vec::new());
-                    }
-                }
-                self.parse_episodes_url(&episodes_url, season_).await
-            });
-
-        Ok(try_join_all(futures).await?.into_iter().flatten().collect())
+        Self::parse_imdb_episode_list_body(&body)
     }
 
-    async fn parse_episodes_url(
-        &self,
-        episodes_url: &str,
-        season: i32,
-    ) -> Result<Vec<ImdbEpisodeResult>, Error> {
-        let episodes_url = Url::parse(episodes_url)?;
-        let body = self.get(&episodes_url).await?.text().await?;
+    /// # Errors
+    /// Returns error if `parse_episodes_url` fails
+    #[allow(clippy::needless_collect)]
+    fn parse_imdb_episode_list_body(
+        body: &str,
+    ) -> Result<(Vec<usize>, Vec<ImdbEpisodeResult>), Error> {
+        #[derive(Deserialize, Debug)]
+        struct _Season {
+            value: StackString,
+        }
 
-        let mut results = Vec::new();
+        #[derive(Deserialize, Debug)]
+        struct _ReleaseDate {
+            year: i32,
+            month: u8,
+            day: u8,
+        }
 
-        for div in Document::from(body.as_str()).find(Name("div")) {
-            if let Some("info") = div.attr("class") {
-                if let Some("episodes") = div.attr("itemprop") {
-                    let mut result = ImdbEpisodeResult {
-                        season,
-                        ..ImdbEpisodeResult::default()
-                    };
-                    for meta in div.find(Name("meta")) {
-                        if let Some("episodeNumber") = meta.attr("itemprop") {
-                            if let Some(episode) = meta.attr("content") {
-                                result.episode = episode.parse()?;
-                            }
+        #[derive(Deserialize, Debug)]
+        struct _EpisodeItem {
+            id: StackString,
+            season: StackString,
+            episode: StackString,
+            #[serde(alias = "titleText")]
+            title_text: StackString,
+            #[serde(alias = "releaseDate")]
+            release_date: Option<_ReleaseDate>,
+            #[serde(alias = "aggregateRating")]
+            aggregate_rating: Option<f64>,
+            #[serde(alias = "voteCount")]
+            vote_count: Option<u64>,
+        }
+
+        #[derive(Deserialize, Debug)]
+        struct _Episodes {
+            items: Vec<_EpisodeItem>,
+        }
+
+        #[derive(Deserialize, Debug)]
+        struct _Section {
+            seasons: Vec<_Season>,
+            episodes: _Episodes,
+        }
+
+        #[derive(Deserialize, Debug)]
+        struct _ContentData {
+            section: _Section,
+        }
+
+        #[derive(Deserialize, Debug)]
+        struct _PageProps {
+            #[serde(alias = "contentData")]
+            content_data: _ContentData,
+        }
+
+        #[derive(Deserialize, Debug)]
+        struct _Props {
+            #[serde(alias = "pageProps")]
+            page_props: _PageProps,
+        }
+
+        #[derive(Deserialize, Debug)]
+        struct _ImdbDataObject {
+            props: _Props,
+        }
+
+        for script in Document::from(body).find(Name("script")) {
+            if let Some("__NEXT_DATA__") = script.attr("id") {
+                let body = script.text();
+                if body.contains("props") {
+                    match serde_json::from_str::<_ImdbDataObject>(&body) {
+                        Ok(imdb_data_object) => {
+                            let seasons: Vec<usize> = imdb_data_object
+                                .props
+                                .page_props
+                                .content_data
+                                .section
+                                .seasons
+                                .iter()
+                                .filter_map(|s| s.value.parse().ok())
+                                .collect();
+                            let episodes: Vec<ImdbEpisodeResult> = imdb_data_object
+                                .props
+                                .page_props
+                                .content_data
+                                .section
+                                .episodes
+                                .items
+                                .into_iter()
+                                .filter_map(|e| {
+                                    let airdate = e.release_date.and_then(|d| {
+                                        let month = Month::try_from(d.month).ok()?;
+                                        Date::from_calendar_date(d.year, month, d.day).ok()
+                                    });
+                                    Some(ImdbEpisodeResult {
+                                        season: e.season.parse().unwrap_or(1),
+                                        episode: e.episode.parse().ok()?,
+                                        epurl: Some(e.id),
+                                        eptitle: Some(e.title_text),
+                                        airdate,
+                                        rating: e.aggregate_rating,
+                                        nrating: e.vote_count,
+                                    })
+                                })
+                                .collect();
+                            return Ok((seasons, episodes));
                         }
+                        Err(e) => println!("error {e:?}"),
                     }
-                    for div_ in div.find(Name("div")) {
-                        if let Some("airdate") = div_.attr("class") {
-                            let s = div_.text();
-                            let s = s.trim();
-                            if let Ok(date) = Date::parse(
-                                s,
-                                format_description!(
-                                    "[day padding:none] [month repr:short]. [year]"
-                                ),
-                            ) {
-                                result.airdate = Some(date);
-                            } else if let Ok(date) = Date::parse(
-                                s,
-                                format_description!("[day padding:none] [month repr:short] [year]"),
-                            ) {
-                                result.airdate = Some(date);
-                            } else {
-                                error!("3: {s}");
-                            }
-                        }
-                    }
-                    for a_ in div.find(Name("a")) {
-                        if result.epurl.is_some() {
-                            continue;
-                        };
-                        if let Some(epi_url) = a_.attr("href") {
-                            if let Some(link) = epi_url.split('/').nth(2) {
-                                result.epurl = Some(link.into());
-                                result.eptitle = Some(a_.text().trim().into());
-                            }
-                        }
-                    }
-                    results.push(result);
                 }
             }
         }
-        let results = results;
-
-        let futures = results.into_iter().map(|mut result| async {
-            if let Some(link) = result.epurl.as_ref() {
-                let r = self.parse_imdb_rating(link).await?;
-                result.rating = r.rating;
-                result.nrating = r.count;
-            }
-            Ok(result)
-        });
-
-        try_join_all(futures).await
+        Err(format_err!("Parsing failed"))
     }
 }
 
@@ -455,7 +466,7 @@ mod tests {
     #[tokio::test]
     async fn test_parse_imdb_episode_list() -> Result<(), Error> {
         let conn = ImdbConnection::new();
-        let results = conn.parse_imdb_episode_list("tt0141842", Some(1)).await?;
+        let (_, results) = conn.parse_imdb_episode_list("tt0141842", Some(1)).await?;
         debug!("{results:#?}");
         let first = &results[0];
         assert_eq!(first.season, 1);
@@ -464,6 +475,17 @@ mod tests {
         assert_eq!(first.eptitle, Some("Pilot".into()));
         assert_eq!(first.airdate, Some(date!(1999 - 01 - 10)));
         assert_eq!(results.len(), 13);
+        Ok(())
+    }
+
+    #[test]
+    fn test_parse_imdb_episode_list_body() -> Result<(), Error> {
+        let body = include_str!("../../tests/data/imdb_season_episode_body.html");
+        let (seasons, episodes) = ImdbConnection::parse_imdb_episode_list_body(body)?;
+        assert_eq!(seasons.len(), 14);
+        assert_eq!(episodes[0].season, 2);
+        assert_eq!(episodes[0].episode, 1);
+        assert_eq!(episodes[0].epurl, Some(format_sstr!("tt1824276")));
         Ok(())
     }
 }
