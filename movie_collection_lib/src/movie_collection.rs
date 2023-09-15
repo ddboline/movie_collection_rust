@@ -359,12 +359,22 @@ impl MovieCollection {
     /// # Errors
     /// Returns error if db queries fail
     pub async fn get_collection_index(&self, path: &str) -> Result<Option<Uuid>, Error> {
-        let query = query!(
-            r#"SELECT idx FROM movie_collection WHERE path = $path"#,
-            path = path
-        );
-        let conn = self.pool.get().await?;
-        let id = query.fetch_opt(&conn).await?;
+        let id = if path.starts_with("/") {
+            let query = query!(
+                r#"SELECT idx FROM movie_collection WHERE path = $path LIMIT 1"#,
+                path = path
+            );
+            let conn = self.pool.get().await?;
+            query.fetch_opt(&conn).await?
+        } else {
+            let path = format_sstr!("%{path}");
+            let query = query!(
+                r#"SELECT idx FROM movie_collection WHERE path like $path LIMIT 1"#,
+                path = path
+            );
+            let conn = self.pool.get().await?;
+            query.fetch_opt(&conn).await?
+        };
         Ok(id.map(|(x,)| x))
     }
 
