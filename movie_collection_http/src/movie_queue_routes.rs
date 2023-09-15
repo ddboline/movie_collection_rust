@@ -189,14 +189,26 @@ pub async fn movie_queue_delete(
     let mock_stdout = MockStdout::new();
     let stdout = StdoutChannel::with_mock_stdout(mock_stdout.clone(), mock_stdout.clone());
 
-    if path::Path::new(path.as_str()).exists() {
+    let collection = MovieCollection::new(&state.config, &state.db, &stdout);
+
+    let mut output = StackString::new();
+    if path::Path::new(path.as_str()).exists()
+        || collection
+            .get_collection_index(&path)
+            .await
+            .map_err(Into::<Error>::into)?
+            .is_some()
+    {
         MovieQueueDB::new(&state.config, &state.db, &stdout)
             .remove_from_queue_by_path(&path)
             .await
             .map_err(Into::<Error>::into)?;
+        write!(&mut output, "success {path}").map_err(Into::<Error>::into)?;
+    } else {
+        write!(&mut output, "failure").map_err(Into::<Error>::into)?;
     }
     task.await.ok();
-    Ok(HtmlBase::new(path).into())
+    Ok(HtmlBase::new(output).into())
 }
 
 async fn transcode_worker(

@@ -286,11 +286,13 @@ fn movie_queue_element(
             }
         };
 
+        let offset = offset.unwrap_or(0);
+        let order_by = order_by.unwrap_or(OrderBy::Desc);
         let remove_button = rsx! {
             button {
                 "type": "submit",
                 id: "{file_name}",
-                "onclick": "delete_show('{file_name}');",
+                "onclick": "delete_show('{file_name}', {offset}, '{order_by}');",
                 "remove",
             }
         };
