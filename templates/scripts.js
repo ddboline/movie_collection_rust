@@ -43,11 +43,12 @@ function watched_rm(link, season, episode) {
     let out = "requested " + link + "/" + season + "/" + episode
     document.getElementById("remcomoutput").innerHTML = out;
 }
-function delete_show(index) {
+function delete_show(index, offset, order_by) {
     let url = "/list/delete/" + index
     let xmlhttp = new XMLHttpRequest();
     xmlhttp.open("GET", url, true);
     xmlhttp.onload = function nothing() {
+        searchFullQueue(offset, order_by);
     }
     xmlhttp.send(null);
 }
