@@ -275,8 +275,8 @@ impl ImdbConnection {
         #[derive(Deserialize, Debug)]
         struct _ReleaseDate {
             year: i32,
-            month: u8,
-            day: u8,
+            month: Option<u8>,
+            day: Option<u8>,
         }
 
         #[derive(Deserialize, Debug)]
@@ -351,9 +351,11 @@ impl ImdbConnection {
                                 .items
                                 .into_iter()
                                 .filter_map(|e| {
-                                    let airdate = e.release_date.and_then(|d| {
-                                        let month = Month::try_from(d.month).ok()?;
-                                        Date::from_calendar_date(d.year, month, d.day).ok()
+                                    let airdate = e.release_date.and_then(|rd| {
+                                        let m = rd.month?;
+                                        let month = Month::try_from(m).ok()?;
+                                        let d = rd.day?;
+                                        Date::from_calendar_date(rd.year, month, d).ok()
                                     });
                                     Some(ImdbEpisodeResult {
                                         season: e.season.parse().unwrap_or(1),
@@ -486,6 +488,17 @@ mod tests {
         assert_eq!(episodes[0].season, 2);
         assert_eq!(episodes[0].episode, 1);
         assert_eq!(episodes[0].epurl, Some(format_sstr!("tt1824276")));
+        Ok(())
+    }
+
+    #[test]
+    fn test_parse_american_horror() -> Result<(), Error> {
+        let body = include_str!("../../tests/data/american_horror.html");
+        let (seasons, episodes) = ImdbConnection::parse_imdb_episode_list_body(body)?;
+        assert_eq!(seasons.len(), 12);
+        assert_eq!(episodes.len(), 6);
+        assert_eq!(episodes[0].epurl, Some(format_sstr!("tt11578362")));
+        assert_eq!(episodes[0].eptitle, Some(format_sstr!("Multiply Thy Pain")));
         Ok(())
     }
 }
