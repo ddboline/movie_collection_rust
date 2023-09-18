@@ -359,7 +359,7 @@ impl MovieCollection {
     /// # Errors
     /// Returns error if db queries fail
     pub async fn get_collection_index(&self, path: &str) -> Result<Option<Uuid>, Error> {
-        let id = if path.starts_with("/") {
+        let id = if path.starts_with('/') {
             let query = query!(
                 r#"SELECT idx FROM movie_collection WHERE path = $path LIMIT 1"#,
                 path = path
@@ -588,7 +588,7 @@ impl MovieCollection {
             .collect();
         let episodes_set = episodes_set?;
 
-        for f in file_list.iter() {
+        for f in &*file_list {
             if collection_map.get(f.as_str()).is_none() {
                 let ext = Path::new(f)
                     .extension()
@@ -630,7 +630,7 @@ impl MovieCollection {
         let results: Result<Vec<()>, Error> = try_join_all(futures).await;
         results?;
 
-        for (key, val) in collection_map.iter() {
+        for (key, val) in &*collection_map {
             if !file_list.contains(key.as_str()) {
                 if movie_queue.contains_key(key.as_str()) {
                     self.stdout
