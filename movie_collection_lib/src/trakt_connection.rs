@@ -561,7 +561,7 @@ impl TraktConnection {
         let headers = self.get_rw_headers().await?;
         let trakt_endpoint = &self.config.trakt_endpoint;
         let url = format_sstr!("{trakt_endpoint}/sync/history");
-        let year = movie_obj.movie.year.expect("No year");
+        let year = movie_obj.movie.year.ok_or_else(|| format_err!("No year"))?;
         let data = hashmap! {
             "movies" => vec![
                 WatchedMovieRequest {
@@ -628,7 +628,7 @@ impl TraktConnection {
         let headers = self.get_rw_headers().await?;
         let trakt_endpoint = &self.config.trakt_endpoint;
         let url = format_sstr!("{trakt_endpoint}/sync/history/remove");
-        let year = movie_obj.movie.year.expect("No year");
+        let year = movie_obj.movie.year.ok_or_else(|| format_err!("No year"))?;
         let data = hashmap! {
             "movies" => vec![
                 WatchedMovieRequest {
