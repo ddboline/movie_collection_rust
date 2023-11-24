@@ -126,7 +126,9 @@ impl TranscodeServiceRequest {
             .extension()
             .ok_or_else(|| format_err!("no extension"))?
             .to_string_lossy();
-        let file_stem = path.file_stem().ok_or_else(|| format_err!("No file stem"))?;
+        let file_stem = path
+            .file_stem()
+            .ok_or_else(|| format_err!("No file stem"))?;
         if ext == "mp4" {
             let prefix = file_stem.to_string_lossy().into_owned().into();
             let output_dir = if let Some(d) = directory {
