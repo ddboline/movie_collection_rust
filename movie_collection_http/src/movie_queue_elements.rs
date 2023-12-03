@@ -646,7 +646,7 @@ fn find_new_episodes_element(
                     }
                 },
                 td {
-                    "raging: {eprating:0.1} / {rating:0.1}"
+                    "rating: {eprating:0.1} / {rating:0.1}"
                 },
                 td {
                     "{airdate}",
