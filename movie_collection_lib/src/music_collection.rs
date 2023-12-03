@@ -153,7 +153,7 @@ impl MusicCollection {
     /// # Errors
     /// Return error if db query fails
     pub async fn fix_plex_filename_music_collection_id(pool: &PgPool) -> Result<u64, Error> {
-        let query = r#"
+        let query = r"
             UPDATE plex_filename
             SET music_collection_id = (
                 SELECT m.id
@@ -161,7 +161,7 @@ impl MusicCollection {
                 WHERE m.path = replace(plex_filename.filename, '/shares/', '/media/')
             ),last_modified=now()
             WHERE music_collection_id IS NULL
-        "#;
+        ";
         let rows = pool.get().await?.execute(query, &[]).await?;
         Ok(rows)
     }

@@ -36,7 +36,7 @@ async fn main() {
     env_logger::init();
 
     match parse_imdb_parser().await {
-        Ok(_) => (),
+        Ok(()) => (),
         Err(e) => {
             let e = StackString::from_display(e);
             if e.contains("Broken pipe") {

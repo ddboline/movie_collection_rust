@@ -45,7 +45,7 @@ async fn main() {
     env_logger::init();
 
     match find_new_episodes().await {
-        Ok(_) => (),
+        Ok(()) => (),
         Err(e) => {
             let e = StackString::from_display(e);
             if e.contains("Broken pipe") {

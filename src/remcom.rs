@@ -86,7 +86,7 @@ async fn main() -> Result<(), Error> {
 
     if let Some(request_file) = opts.request_file {
         match remcom_single(&remcom_service, &request_file).await {
-            Ok(_) => (),
+            Ok(()) => (),
             Err(e) => {
                 let e = StackString::from_display(e);
                 if e.contains("Broken pipe") {
@@ -108,7 +108,7 @@ async fn main() -> Result<(), Error> {
     )
     .await
     {
-        Ok(_) => (),
+        Ok(()) => (),
         Err(e) => {
             let e = StackString::from_display(e);
             if e.contains("Broken pipe") {

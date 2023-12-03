@@ -97,7 +97,7 @@ impl MovieQueueDB {
         let mut conn = self.pool.get().await?;
         let tran = conn.transaction().await?;
 
-        let query = r#"SELECT max(idx) FROM movie_queue"#;
+        let query = r"SELECT max(idx) FROM movie_queue";
         let max_idx: i32 = tran
             .query(query, &[])
             .await?
@@ -108,7 +108,7 @@ impl MovieQueueDB {
         }
         let diff = max_idx - idx;
 
-        let query = query!(r#"DELETE FROM movie_queue WHERE idx = $idx"#, idx = idx);
+        let query = query!(r"DELETE FROM movie_queue WHERE idx = $idx", idx = idx);
         tran.execute(query.sql(), query.parameters()).await?;
 
         let query = query!(
@@ -220,7 +220,7 @@ impl MovieQueueDB {
             .await?
             .is_some();
 
-        let query = r#"SELECT max(idx) FROM movie_queue"#;
+        let query = r"SELECT max(idx) FROM movie_queue";
         let max_idx: i32 = tran
             .query(query, &[])
             .await?
@@ -271,7 +271,7 @@ impl MovieQueueDB {
     /// # Errors
     /// Return error if db queries fail
     pub async fn get_max_queue_index(&self) -> Result<i32, Error> {
-        let query = r#"SELECT max(idx) FROM movie_queue"#;
+        let query = r"SELECT max(idx) FROM movie_queue";
         if let Some(row) = self.pool.get().await?.query(query, &[]).await?.get(0) {
             let max_idx: i32 = row.try_get(0)?;
             Ok(max_idx)

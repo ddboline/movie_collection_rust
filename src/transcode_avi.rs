@@ -85,7 +85,7 @@ async fn main() -> Result<(), Error> {
 
     if let Some(request_file) = &opts.request_file {
         match transcode_single(&transcode_service, request_file).await {
-            Ok(_) => (),
+            Ok(()) => (),
             Err(e) => {
                 let e = StackString::from_display(e);
                 if e.contains("Broken pipe") {
@@ -98,7 +98,7 @@ async fn main() -> Result<(), Error> {
     }
 
     match transcode_avi(&transcode_service, &config, &stdout, &opts.files).await {
-        Ok(_) => (),
+        Ok(()) => (),
         Err(e) => {
             let e = StackString::from_display(e);
             if e.contains("Broken pipe") {

@@ -70,7 +70,7 @@ impl TranscodeChannel {
             let mut data = Vec::new();
             std::mem::swap(&mut delivery.data, &mut data);
             match process_data(data).await {
-                Ok(_) => debug!("process_data succeeded"),
+                Ok(()) => debug!("process_data succeeded"),
                 Err(e) => error!("process data failed {:?}", e),
             }
             delivery.ack(BasicAckOptions::default()).await?;

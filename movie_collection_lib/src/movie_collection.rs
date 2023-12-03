@@ -535,11 +535,11 @@ impl MovieCollection {
             .collect();
         let episode_list = episode_list?;
 
-        let query = r#"
+        let query = r"
             SELECT b.path, a.idx
             FROM movie_queue a
             JOIN movie_collection b ON a.collection_idx=b.idx
-        "#;
+        ";
         let movie_queue: Result<HashMap<StackString, i32>, Error> = self
             .pool
             .get()

@@ -10,7 +10,7 @@ async fn main() -> Result<(), Error> {
     let stdout = StdoutChannel::new();
 
     match make_list(&stdout).await {
-        Ok(_) => {}
+        Ok(()) => {}
         Err(e) => {
             let e = StackString::from_display(e);
             if e.contains("Broken pipe") {

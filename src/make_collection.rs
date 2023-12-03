@@ -68,7 +68,7 @@ async fn main() {
     env_logger::init();
 
     match make_collection().await {
-        Ok(_) => {}
+        Ok(()) => {}
         Err(e) => {
             let e = StackString::from_display(e);
             assert!(e.contains("Broken pipe"), "{}", e);
