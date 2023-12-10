@@ -1,7 +1,7 @@
 use anyhow::{format_err, Error};
 use dioxus::prelude::{
-    dioxus_elements, inline_props, rsx, Element, GlobalAttributes, LazyNodes, Props, Scope,
-    VirtualDom,
+    dioxus_elements, component, rsx, Element, GlobalAttributes, LazyNodes, Props, Scope,
+    VirtualDom, IntoDynNode,
 };
 use futures::{future::try_join_all, TryStreamExt};
 use rust_decimal_macros::dec;
@@ -213,7 +213,7 @@ pub async fn movie_queue_body(
     Ok(dioxus_ssr::render(&app))
 }
 
-#[inline_props]
+#[component(no_case_check)]
 fn movie_queue_element(
     cx: Scope,
     config: Config,
@@ -459,7 +459,7 @@ pub fn play_worker_body(
     }
 }
 
-#[inline_props]
+#[component(no_case_check)]
 fn play_worker_element(
     cx: Scope,
     file_name: StackString,
@@ -581,7 +581,7 @@ pub async fn find_new_episodes_body(
     Ok(dioxus_ssr::render(&app))
 }
 
-#[inline_props]
+#[component(no_case_check)]
 fn find_new_episodes_element(
     cx: Scope,
     episodes: Vec<NewEpisodesResult>,
@@ -737,7 +737,7 @@ pub fn tvshows_body(show_map: TvShowsMap, tvshows: Vec<TvShowsResult>) -> String
     dioxus_ssr::render(&app)
 }
 
-#[inline_props]
+#[component(no_case_check)]
 fn tvshows_element(
     cx: Scope,
     tvshows: HashSet<ProcessShowItem>,
@@ -882,7 +882,7 @@ struct WatchListEntry {
     source: Option<TvShowSource>,
 }
 
-#[inline_props]
+#[component(no_case_check)]
 fn watchlist_element(cx: Scope, shows: Vec<WatchListEntry>) -> Element {
     let shows = shows.iter().enumerate().map(|(idx, entry)| {
         let title = &entry.title;
@@ -975,7 +975,7 @@ pub fn trakt_watched_seasons_body(
     dioxus_ssr::render(&app)
 }
 
-#[inline_props]
+#[component(no_case_check)]
 fn trakt_watched_seasons_element(
     cx: Scope,
     link: StackString,
@@ -1073,7 +1073,7 @@ pub async fn trakt_cal_http_body(pool: &PgPool, trakt: &TraktConnection) -> Resu
     Ok(dioxus_ssr::render(&app))
 }
 
-#[inline_props]
+#[component(no_case_check)]
 fn trakt_cal_http_element(cx: Scope, entries: Vec<CalEntry>) -> Element {
     let entries = entries.iter().enumerate().map(|(idx, entry)| {
         let link = &entry.cal_entry.link;
@@ -1225,7 +1225,7 @@ pub async fn watch_list_http_body(
     Ok(dioxus_ssr::render(&app))
 }
 
-#[inline_props]
+#[component(no_case_check)]
 fn watch_list_http_element(
     cx: Scope,
     config: Config,
@@ -1359,7 +1359,7 @@ pub async fn parse_imdb_http_body(
     Ok(dioxus_ssr::render(&app))
 }
 
-#[inline_props]
+#[component(no_case_check)]
 fn parse_imdb_http_element(
     cx: Scope,
     imdb_urls: Vec<Vec<StackString>>,
@@ -1445,7 +1445,7 @@ pub fn plex_body(
     dioxus_ssr::render(&app)
 }
 
-#[inline_props]
+#[component(no_case_check)]
 fn plex_element(
     cx: Scope,
     config: Config,
@@ -1616,7 +1616,7 @@ pub fn plex_detail_body(
     dioxus_ssr::render(&app)
 }
 
-#[inline_props]
+#[component(no_case_check)]
 fn plex_detail_element(
     cx: Scope,
     config: Config,
@@ -1733,7 +1733,7 @@ pub fn local_file_body(
     dioxus_ssr::render(&app)
 }
 
-#[inline_props]
+#[component(no_case_check)]
 fn local_file_element(
     cx: Scope,
     file_lists: FileLists,
@@ -1770,7 +1770,7 @@ fn local_file_element(
                     }
                     Some(ProcStatus::Finished) => {
                         let mut movie_dirs =
-                            movie_directories(config).unwrap_or_else(|_| Vec::new());
+                            movie_directories(&config).unwrap_or_else(|_| Vec::new());
                         if f_key.contains("_s") && f_key.contains("_ep") {
                             movie_dirs.insert(0, "".into());
                         }
@@ -1845,9 +1845,9 @@ pub fn procs_html_body(status: TranscodeStatus) -> String {
     dioxus_ssr::render(&app)
 }
 
-#[inline_props]
+#[component(no_case_check)]
 fn procs_html_element(cx: Scope, status: TranscodeStatus) -> Element {
-    cx.render(procs_html_node(status))
+    cx.render(procs_html_node(&status))
 }
 
 pub fn transcode_get_html_body(status: TranscodeStatus) -> String {
@@ -1859,9 +1859,9 @@ pub fn transcode_get_html_body(status: TranscodeStatus) -> String {
     dioxus_ssr::render(&app)
 }
 
-#[inline_props]
+#[component(no_case_check)]
 fn transcode_get_html_element(cx: Scope, status: TranscodeStatus) -> Element {
-    let procs_node = procs_html_node(status);
+    let procs_node = procs_html_node(&status);
     cx.render(rsx! {
         br {
             button {

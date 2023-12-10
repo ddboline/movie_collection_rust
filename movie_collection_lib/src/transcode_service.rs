@@ -3,6 +3,7 @@ use futures::{future::try_join_all, try_join};
 use itertools::Itertools;
 use jwalk::WalkDir;
 use procfs::process;
+use procfs::process::Process;
 use serde::{Deserialize, Serialize};
 use smallvec::{smallvec, SmallVec};
 use stack_string::{format_sstr, StackString};
@@ -28,6 +29,13 @@ use crate::{
     config::Config, make_queue::make_queue_worker, movie_collection::MovieCollection,
     pgpool::PgPool, utils::parse_file_stem,
 };
+
+
+static ACCEPT_PATHS: [&str; 2] = [
+    "/usr/bin/run-encoding",
+    "/usr/bin/HandBrakeCLI",
+];
+
 
 #[derive(Serialize, Deserialize, Debug, PartialEq, Clone, Copy, Eq)]
 pub enum JobType {
@@ -592,6 +600,28 @@ impl ProcInfo {
             self.cmdline.join(" ").into(),
         ]
     }
+
+    fn from_process(p: Process) -> Option<Self> {
+        let exe = p.exe().ok()?;
+        if ACCEPT_PATHS.iter().any(|x| &exe == Path::new(x)) {
+            let cmdline: Vec<_> = p
+                .cmdline()
+                .ok()?
+                .get(1..)
+                .unwrap_or(&[])
+                .iter()
+                .map(Into::into)
+                .collect();
+            let status = p.status().ok()?;
+            return Some(ProcInfo {
+                pid: p.pid as u64,
+                name: status.name.into(),
+                exe,
+                cmdline,
+            });
+        }
+        None
+    }
 }
 
 impl fmt::Display for ProcInfo {
@@ -727,32 +757,10 @@ impl fmt::Display for TranscodeStatus {
 }
 
 fn get_procs() -> Result<Vec<ProcInfo>, Error> {
-    let accept_paths = &[
-        Path::new("/usr/bin/run-encoding"),
-        Path::new("/usr/bin/HandBrakeCLI"),
-    ];
     let procs = process::all_processes()?
         .filter_map(|p| {
             let p = p.ok()?;
-            let exe = p.exe().ok()?;
-            if accept_paths.iter().any(|x| &exe == x) {
-                let cmdline: Vec<_> = p
-                    .cmdline()
-                    .ok()?
-                    .get(1..)
-                    .unwrap_or(&[])
-                    .iter()
-                    .map(Into::into)
-                    .collect();
-                let status = p.status().ok()?;
-                return Some(ProcInfo {
-                    pid: p.pid as u64,
-                    name: status.name.into(),
-                    exe,
-                    cmdline,
-                });
-            }
-            None
+            ProcInfo::from_process(p)
         })
         .sorted_by_key(|p| p.pid)
         .collect();
