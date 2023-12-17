@@ -2,8 +2,7 @@ use anyhow::{format_err, Error};
 use futures::{future::try_join_all, try_join};
 use itertools::Itertools;
 use jwalk::WalkDir;
-use procfs::process;
-use procfs::process::Process;
+use procfs::{process, process::Process};
 use serde::{Deserialize, Serialize};
 use smallvec::{smallvec, SmallVec};
 use stack_string::{format_sstr, StackString};
@@ -30,12 +29,7 @@ use crate::{
     pgpool::PgPool, utils::parse_file_stem,
 };
 
-
-static ACCEPT_PATHS: [&str; 2] = [
-    "/usr/bin/run-encoding",
-    "/usr/bin/HandBrakeCLI",
-];
-
+static ACCEPT_PATHS: [&str; 2] = ["/usr/bin/run-encoding", "/usr/bin/HandBrakeCLI"];
 
 #[derive(Serialize, Deserialize, Debug, PartialEq, Clone, Copy, Eq)]
 pub enum JobType {

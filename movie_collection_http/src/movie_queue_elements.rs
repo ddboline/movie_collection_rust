@@ -1,7 +1,7 @@
 use anyhow::{format_err, Error};
 use dioxus::prelude::{
-    dioxus_elements, component, rsx, Element, GlobalAttributes, LazyNodes, Props, Scope,
-    VirtualDom, IntoDynNode,
+    component, dioxus_elements, rsx, Element, GlobalAttributes, IntoDynNode, LazyNodes, Props,
+    Scope, VirtualDom,
 };
 use futures::{future::try_join_all, TryStreamExt};
 use rust_decimal_macros::dec;
@@ -460,11 +460,7 @@ pub fn play_worker_body(
 }
 
 #[component]
-fn PlayWorkerElement(
-    cx: Scope,
-    file_name: StackString,
-    last_url: Option<StackString>,
-) -> Element {
+fn PlayWorkerElement(cx: Scope, file_name: StackString, last_url: Option<StackString>) -> Element {
     let back_button = if let Some(last_url) = last_url {
         Some(rsx! {
             input {
@@ -1065,10 +1061,8 @@ pub async fn trakt_cal_http_body(pool: &PgPool, trakt: &TraktConnection) -> Resu
             episode,
         });
     }
-    let mut app = VirtualDom::new_with_props(
-        TraktCalHttpElement,
-        TraktCalHttpElementProps { entries },
-    );
+    let mut app =
+        VirtualDom::new_with_props(TraktCalHttpElement, TraktCalHttpElementProps { entries });
     drop(app.rebuild());
     Ok(dioxus_ssr::render(&app))
 }
@@ -1839,8 +1833,7 @@ fn LocalFileElement(
 }
 
 pub fn procs_html_body(status: TranscodeStatus) -> String {
-    let mut app =
-        VirtualDom::new_with_props(ProcsHtmlElement, ProcsHtmlElementProps { status });
+    let mut app = VirtualDom::new_with_props(ProcsHtmlElement, ProcsHtmlElementProps { status });
     drop(app.rebuild());
     dioxus_ssr::render(&app)
 }
