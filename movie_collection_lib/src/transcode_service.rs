@@ -595,9 +595,9 @@ impl ProcInfo {
         ]
     }
 
-    fn from_process(p: Process) -> Option<Self> {
+    fn from_process(p: &Process) -> Option<Self> {
         let exe = p.exe().ok()?;
-        if ACCEPT_PATHS.iter().any(|x| &exe == Path::new(x)) {
+        if ACCEPT_PATHS.iter().any(|x| exe == Path::new(x)) {
             let cmdline: Vec<_> = p
                 .cmdline()
                 .ok()?
@@ -754,7 +754,7 @@ fn get_procs() -> Result<Vec<ProcInfo>, Error> {
     let procs = process::all_processes()?
         .filter_map(|p| {
             let p = p.ok()?;
-            ProcInfo::from_process(p)
+            ProcInfo::from_process(&p)
         })
         .sorted_by_key(|p| p.pid)
         .collect();

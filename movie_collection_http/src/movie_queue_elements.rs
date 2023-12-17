@@ -1764,7 +1764,7 @@ fn LocalFileElement(
                     }
                     Some(ProcStatus::Finished) => {
                         let mut movie_dirs =
-                            movie_directories(&config).unwrap_or_else(|_| Vec::new());
+                            movie_directories(config).unwrap_or_else(|_| Vec::new());
                         if f_key.contains("_s") && f_key.contains("_ep") {
                             movie_dirs.insert(0, "".into());
                         }
@@ -1840,7 +1840,7 @@ pub fn procs_html_body(status: TranscodeStatus) -> String {
 
 #[component]
 fn ProcsHtmlElement(cx: Scope, status: TranscodeStatus) -> Element {
-    cx.render(procs_html_node(&status))
+    cx.render(procs_html_node(status))
 }
 
 pub fn transcode_get_html_body(status: TranscodeStatus) -> String {
@@ -1854,7 +1854,7 @@ pub fn transcode_get_html_body(status: TranscodeStatus) -> String {
 
 #[component]
 fn TranscodeGetHtmlElement(cx: Scope, status: TranscodeStatus) -> Element {
-    let procs_node = procs_html_node(&status);
+    let procs_node = procs_html_node(status);
     cx.render(rsx! {
         br {
             button {
