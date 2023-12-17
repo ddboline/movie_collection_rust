@@ -198,8 +198,8 @@ pub async fn movie_queue_body(
     let entries: Result<Vec<QueueEntry>, Error> = try_join_all(futures).await;
     let entries = entries?;
     let mut app = VirtualDom::new_with_props(
-        movie_queue_element,
-        movie_queue_elementProps {
+        MovieQueueElement,
+        MovieQueueElementProps {
             config: config.clone(),
             patterns,
             entries,
@@ -213,8 +213,8 @@ pub async fn movie_queue_body(
     Ok(dioxus_ssr::render(&app))
 }
 
-#[component(no_case_check)]
-fn movie_queue_element(
+#[component]
+fn MovieQueueElement(
     cx: Scope,
     config: Config,
     patterns: Vec<StackString>,
@@ -446,8 +446,8 @@ pub fn play_worker_body(
         std::os::unix::fs::symlink(full_path, &partial_path).map_err(Into::<Error>::into)?;
 
         let mut app = VirtualDom::new_with_props(
-            play_worker_element,
-            play_worker_elementProps {
+            PlayWorkerElement,
+            PlayWorkerElementProps {
                 file_name,
                 last_url,
             },
@@ -459,8 +459,8 @@ pub fn play_worker_body(
     }
 }
 
-#[component(no_case_check)]
-fn play_worker_element(
+#[component]
+fn PlayWorkerElement(
     cx: Scope,
     file_name: StackString,
     last_url: Option<StackString>,
@@ -570,8 +570,8 @@ pub async fn find_new_episodes_body(
     let queue: HashMap<QueueKey, QueueValue> = queue.into_iter().collect();
 
     let mut app = VirtualDom::new_with_props(
-        find_new_episodes_element,
-        find_new_episodes_elementProps {
+        FindNewEpisodesElement,
+        FindNewEpisodesElementProps {
             episodes,
             queue,
             source,
@@ -581,8 +581,8 @@ pub async fn find_new_episodes_body(
     Ok(dioxus_ssr::render(&app))
 }
 
-#[component(no_case_check)]
-fn find_new_episodes_element(
+#[component]
+fn FindNewEpisodesElement(
     cx: Scope,
     episodes: Vec<NewEpisodesResult>,
     queue: HashMap<QueueKey, QueueValue>,
@@ -732,13 +732,13 @@ pub fn tvshows_body(show_map: TvShowsMap, tvshows: Vec<TvShowsResult>) -> String
         .collect();
 
     let mut app =
-        VirtualDom::new_with_props(tvshows_element, tvshows_elementProps { tvshows, watchlist });
+        VirtualDom::new_with_props(TvShowsElement, TvShowsElementProps { tvshows, watchlist });
     drop(app.rebuild());
     dioxus_ssr::render(&app)
 }
 
-#[component(no_case_check)]
-fn tvshows_element(
+#[component]
+fn TvShowsElement(
     cx: Scope,
     tvshows: HashSet<ProcessShowItem>,
     watchlist: HashSet<ProcessShowItem>,
@@ -870,7 +870,7 @@ pub fn watchlist_body(shows: WatchListMap) -> String {
         })
         .collect();
     shows.sort();
-    let mut app = VirtualDom::new_with_props(watchlist_element, watchlist_elementProps { shows });
+    let mut app = VirtualDom::new_with_props(WatchlistElement, WatchlistElementProps { shows });
     drop(app.rebuild());
     dioxus_ssr::render(&app)
 }
@@ -882,8 +882,8 @@ struct WatchListEntry {
     source: Option<TvShowSource>,
 }
 
-#[component(no_case_check)]
-fn watchlist_element(cx: Scope, shows: Vec<WatchListEntry>) -> Element {
+#[component]
+fn WatchlistElement(cx: Scope, shows: Vec<WatchListEntry>) -> Element {
     let shows = shows.iter().enumerate().map(|(idx, entry)| {
         let title = &entry.title;
         let link = &entry.link;
@@ -964,8 +964,8 @@ pub fn trakt_watched_seasons_body(
     entries: Vec<ImdbSeason>,
 ) -> String {
     let mut app = VirtualDom::new_with_props(
-        trakt_watched_seasons_element,
-        trakt_watched_seasons_elementProps {
+        TraktWatchedSeasonsElement,
+        TraktWatchedSeasonsElementProps {
             link,
             imdb_url,
             entries,
@@ -975,8 +975,8 @@ pub fn trakt_watched_seasons_body(
     dioxus_ssr::render(&app)
 }
 
-#[component(no_case_check)]
-fn trakt_watched_seasons_element(
+#[component]
+fn TraktWatchedSeasonsElement(
     cx: Scope,
     link: StackString,
     imdb_url: StackString,
@@ -1066,15 +1066,15 @@ pub async fn trakt_cal_http_body(pool: &PgPool, trakt: &TraktConnection) -> Resu
         });
     }
     let mut app = VirtualDom::new_with_props(
-        trakt_cal_http_element,
-        trakt_cal_http_elementProps { entries },
+        TraktCalHttpElement,
+        TraktCalHttpElementProps { entries },
     );
     drop(app.rebuild());
     Ok(dioxus_ssr::render(&app))
 }
 
-#[component(no_case_check)]
-fn trakt_cal_http_element(cx: Scope, entries: Vec<CalEntry>) -> Element {
+#[component]
+fn TraktCalHttpElement(cx: Scope, entries: Vec<CalEntry>) -> Element {
     let entries = entries.iter().enumerate().map(|(idx, entry)| {
         let link = &entry.cal_entry.link;
         let show = &entry.cal_entry.show;
@@ -1209,8 +1209,8 @@ pub async fn watch_list_http_body(
     }
 
     let mut app = VirtualDom::new_with_props(
-        watch_list_http_element,
-        watch_list_http_elementProps {
+        WatchListHttpElement,
+        WatchListHttpElementProps {
             config: config.clone(),
             imdb_url: imdb_url.into(),
             show,
@@ -1225,8 +1225,8 @@ pub async fn watch_list_http_body(
     Ok(dioxus_ssr::render(&app))
 }
 
-#[component(no_case_check)]
-fn watch_list_http_element(
+#[component]
+fn WatchListHttpElement(
     cx: Scope,
     config: Config,
     imdb_url: StackString,
@@ -1349,8 +1349,8 @@ pub async fn parse_imdb_http_body(
     let imdb_urls = imdb.parse_imdb_worker(opts).await?;
 
     let mut app = VirtualDom::new_with_props(
-        parse_imdb_http_element,
-        parse_imdb_http_elementProps {
+        ParseImdbHttpElement,
+        ParseImdbHttpElementProps {
             imdb_urls,
             watchlist,
         },
@@ -1359,8 +1359,8 @@ pub async fn parse_imdb_http_body(
     Ok(dioxus_ssr::render(&app))
 }
 
-#[component(no_case_check)]
-fn parse_imdb_http_element(
+#[component]
+fn ParseImdbHttpElement(
     cx: Scope,
     imdb_urls: Vec<Vec<StackString>>,
     watchlist: WatchListMap,
@@ -1432,8 +1432,8 @@ pub fn plex_body(
     limit: Option<u64>,
 ) -> String {
     let mut app = VirtualDom::new_with_props(
-        plex_element,
-        plex_elementProps {
+        PlexElement,
+        PlexElementProps {
             config,
             events,
             section,
@@ -1445,8 +1445,8 @@ pub fn plex_body(
     dioxus_ssr::render(&app)
 }
 
-#[component(no_case_check)]
-fn plex_element(
+#[component]
+fn PlexElement(
     cx: Scope,
     config: Config,
     events: Vec<EventOutput>,
@@ -1604,8 +1604,8 @@ pub fn plex_detail_body(
     limit: Option<u64>,
 ) -> String {
     let mut app = VirtualDom::new_with_props(
-        plex_detail_element,
-        plex_detail_elementProps {
+        PlexDetailElement,
+        PlexDetailElementProps {
             config,
             event,
             offset,
@@ -1616,8 +1616,8 @@ pub fn plex_detail_body(
     dioxus_ssr::render(&app)
 }
 
-#[component(no_case_check)]
-fn plex_detail_element(
+#[component]
+fn PlexDetailElement(
     cx: Scope,
     config: Config,
     event: EventOutput,
@@ -1722,8 +1722,8 @@ pub fn local_file_body(
     config: Config,
 ) -> String {
     let mut app = VirtualDom::new_with_props(
-        local_file_element,
-        local_file_elementProps {
+        LocalFileElement,
+        LocalFileElementProps {
             file_lists,
             proc_map,
             config,
@@ -1733,8 +1733,8 @@ pub fn local_file_body(
     dioxus_ssr::render(&app)
 }
 
-#[component(no_case_check)]
-fn local_file_element(
+#[component]
+fn LocalFileElement(
     cx: Scope,
     file_lists: FileLists,
     proc_map: HashMap<StackString, Option<ProcStatus>>,
@@ -1840,27 +1840,27 @@ fn local_file_element(
 
 pub fn procs_html_body(status: TranscodeStatus) -> String {
     let mut app =
-        VirtualDom::new_with_props(procs_html_element, procs_html_elementProps { status });
+        VirtualDom::new_with_props(ProcsHtmlElement, ProcsHtmlElementProps { status });
     drop(app.rebuild());
     dioxus_ssr::render(&app)
 }
 
-#[component(no_case_check)]
-fn procs_html_element(cx: Scope, status: TranscodeStatus) -> Element {
+#[component]
+fn ProcsHtmlElement(cx: Scope, status: TranscodeStatus) -> Element {
     cx.render(procs_html_node(&status))
 }
 
 pub fn transcode_get_html_body(status: TranscodeStatus) -> String {
     let mut app = VirtualDom::new_with_props(
-        transcode_get_html_element,
-        transcode_get_html_elementProps { status },
+        TranscodeGetHtmlElement,
+        TranscodeGetHtmlElementProps { status },
     );
     drop(app.rebuild());
     dioxus_ssr::render(&app)
 }
 
-#[component(no_case_check)]
-fn transcode_get_html_element(cx: Scope, status: TranscodeStatus) -> Element {
+#[component]
+fn TranscodeGetHtmlElement(cx: Scope, status: TranscodeStatus) -> Element {
     let procs_node = procs_html_node(&status);
     cx.render(rsx! {
         br {
