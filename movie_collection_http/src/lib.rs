@@ -43,6 +43,7 @@ derive_rweb_schema!(ImdbEpisodesWrapper, _ImdbEpisodesWrapper);
 
 #[allow(dead_code)]
 #[derive(Schema)]
+#[schema(component="ImdbEpisodes")]
 struct _ImdbEpisodesWrapper {
     #[schema(description = "TV Show Name")]
     show: StackString,
@@ -87,6 +88,7 @@ derive_rweb_schema!(ImdbRatingsWrapper, _ImdbRatingsWrapper);
 
 #[allow(dead_code)]
 #[derive(Schema)]
+#[schema(component="ImdbRatings")]
 struct _ImdbRatingsWrapper {
     #[schema(description = "Index")]
     index: UuidWrapper,
@@ -111,6 +113,7 @@ derive_rweb_schema!(MovieQueueRowWrapper, _MovieQueueRowWrapper);
 
 #[allow(dead_code)]
 #[derive(Schema)]
+#[schema(component="MovieQueueRow")]
 struct _MovieQueueRowWrapper {
     #[schema(description = "Queue Index")]
     idx: i32,
@@ -131,6 +134,7 @@ derive_rweb_schema!(MovieCollectionRowWrapper, _MovieCollectionRowWrapper);
 
 #[allow(dead_code)]
 #[derive(Schema)]
+#[schema(component="MovieCollectionRow")]
 struct _MovieCollectionRowWrapper {
     #[schema(description = "Collection Index")]
     idx: UuidWrapper,
@@ -147,6 +151,7 @@ derive_rweb_schema!(LastModifiedResponseWrapper, _LastModifiedResponseWrapper);
 
 #[allow(dead_code)]
 #[derive(Schema)]
+#[schema(component="LastModifiedResponse")]
 struct _LastModifiedResponseWrapper {
     #[schema(description = "Table Name")]
     table: StackString,
@@ -161,6 +166,7 @@ derive_rweb_schema!(PlexEventWrapper, _PlexEventWrapper);
 
 #[allow(dead_code)]
 #[derive(Schema)]
+#[schema(component="PlexEvent")]
 struct _PlexEventWrapper {
     #[schema(description = "Event")]
     event: StackString,
@@ -201,6 +207,7 @@ derive_rweb_schema!(PlexFilenameWrapper, _PlexFilenameWrapper);
 
 #[allow(dead_code)]
 #[derive(Schema)]
+#[schema(component="PlexFilename")]
 struct _PlexFilenameWrapper {
     #[schema(description = "Metadata Key")]
     metadata_key: StackString,
@@ -217,6 +224,7 @@ derive_rweb_schema!(PlexMetadataWrapper, _PlexMetadataWrapper);
 
 #[allow(dead_code)]
 #[derive(Schema)]
+#[schema(component="PlexMetadata")]
 struct _PlexMetadataWrapper {
     #[schema(description = "Metadata Key")]
     metadata_key: StackString,
@@ -239,6 +247,7 @@ derive_rweb_schema!(MusicCollectionWrapper, _MusicCollectionWrapper);
 
 #[allow(dead_code)]
 #[derive(Schema)]
+#[schema(component="MusicCollection")]
 struct _MusicCollectionWrapper {
     #[schema(description = "Id")]
     id: UuidWrapper,
@@ -346,6 +355,7 @@ derive_rweb_schema!(PlexEventRequest, _PlexEventRequest);
 
 #[allow(dead_code)]
 #[derive(Schema)]
+#[schema(component="PlexEventRequest")]
 struct _PlexEventRequest {
     #[schema(description = "Start Timestamp")]
     start_timestamp: Option<DateTimeType>,
@@ -370,6 +380,7 @@ derive_rweb_schema!(PlexFilenameRequest, _PlexFilenameRequest);
 
 #[allow(dead_code)]
 #[derive(Schema)]
+#[schema(component="PlexEventFilenameRequest")]
 struct _PlexFilenameRequest {
     #[schema(description = "Start Timestamp")]
     start_timestamp: Option<DateTimeType>,

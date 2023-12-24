@@ -19,7 +19,7 @@ use std::{
 };
 use thiserror::Error;
 
-use crate::logged_user::TRIGGER_DB_UPDATE;
+use crate::logged_user::{TRIGGER_DB_UPDATE, LOGIN_HTML};
 
 #[derive(Error, Debug)]
 #[allow(clippy::used_underscore_binding)]
@@ -103,16 +103,7 @@ pub async fn error_response(err: Rejection) -> Result<Box<dyn Reply>, Infallible
 }
 
 fn login_html() -> impl Reply {
-    rweb::reply::html(
-        "
-            <script>
-                !function() {
-                    let final_url = location.href;
-                    location.replace('/auth/login.html?final_url=' + final_url);
-                }()
-            </script>
-        ",
-    )
+    rweb::reply::html(LOGIN_HTML)
 }
 
 impl Entity for ServiceError {

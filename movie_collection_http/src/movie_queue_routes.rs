@@ -82,6 +82,7 @@ pub async fn scripts_js() -> WarpResult<JsScriptsResponse> {
 struct MovieQueueResponse(HtmlBase<StackString, Error>);
 
 #[derive(Serialize, Deserialize, Debug, Schema)]
+#[schema(component="FullQueueRequest")]
 pub struct FullQueueRequest {
     #[schema(description = "Search String")]
     pub q: Option<StackString>,
@@ -364,6 +365,7 @@ pub async fn imdb_show(
 }
 
 #[derive(Serialize, Deserialize, Schema)]
+#[schema(component="FindNewEpisodeRequest")]
 pub struct FindNewEpisodeRequest {
     #[schema(description = "TV Show Source")]
     pub source: Option<TvShowSourceWrapper>,
@@ -1247,6 +1249,7 @@ pub async fn trakt_auth_url(
 }
 
 #[derive(Serialize, Deserialize, Schema)]
+#[schema(component="TraktCallbackRequest")]
 pub struct TraktCallbackRequest {
     #[schema(description = "Authorization Code")]
     pub code: StackString,
@@ -1412,6 +1415,7 @@ pub async fn plex_events(
 }
 
 #[derive(Serialize, Deserialize, Debug, Schema)]
+#[schema(component="PlexEventUpdateRequest")]
 pub struct PlexEventUpdateRequest {
     events: Vec<PlexEventWrapper>,
 }
@@ -1600,6 +1604,7 @@ pub async fn plex_filename(
 }
 
 #[derive(Serialize, Deserialize, Debug, Schema)]
+#[schema(component="PlexFilenameUpdateRequest")]
 pub struct PlexFilenameUpdateRequest {
     filenames: Vec<PlexFilenameWrapper>,
 }
@@ -1678,6 +1683,7 @@ pub async fn plex_metadata(
 }
 
 #[derive(Serialize, Deserialize, Debug, Schema)]
+#[schema(component="PlexMetadataUpdateRequest")]
 pub struct PlexMetadataUpdateRequest {
     entries: Vec<PlexMetadataWrapper>,
 }

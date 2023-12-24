@@ -2,7 +2,7 @@ openapi: 3.0.1
 info:
   title: Movie Queue WebApp
   description: Web Frontend for Movie Queue
-  version: 0.9.14
+  version: 0.10.24
 paths:
   /list/index.html:
     get:
@@ -21,6 +21,15 @@ paths:
           description: Method not allowed
         '500':
           description: Internal Server Error
+  /list/scripts.js:
+    get:
+      responses:
+        '200':
+          description: Scripts
+          content:
+            text/javascript:
+              schema:
+                type: string
   /list/cal:
     get:
       parameters:
@@ -304,7 +313,9 @@ paths:
         in: path
         required: true
         schema:
-          type: integer
+          format: uuid
+          example: 334518f4-1bfd-4f20-9978-bfad0dc033e1
+          type: string
       responses:
         '200':
           description: Play Queue Item
@@ -337,42 +348,7 @@ paths:
             application/json:
               schema:
                 items:
-                  properties:
-                    show:
-                      description: TV Show Name
-                      type: string
-                    title:
-                      description: Title
-                      type: string
-                    season:
-                      description: Season
-                      type: integer
-                    episode:
-                      description: Episode
-                      type: integer
-                    airdate:
-                      description: Airdate
-                      format: date
-                      type: string
-                    rating:
-                      description: Rating
-                      type: number
-                    eptitle:
-                      description: Episode Title
-                      type: string
-                    epurl:
-                      description: Episode URL
-                      type: string
-                  type: object
-                  required:
-                  - show
-                  - title
-                  - season
-                  - episode
-                  - airdate
-                  - rating
-                  - eptitle
-                  - epurl
+                  $ref: '#/components/schemas/ImdbEpisodes'
                 type: array
         '400':
           description: Bad Request
@@ -390,42 +366,7 @@ paths:
               properties:
                 episodes:
                   items:
-                    properties:
-                      show:
-                        description: TV Show Name
-                        type: string
-                      title:
-                        description: Title
-                        type: string
-                      season:
-                        description: Season
-                        type: integer
-                      episode:
-                        description: Episode
-                        type: integer
-                      airdate:
-                        description: Airdate
-                        format: date
-                        type: string
-                      rating:
-                        description: Rating
-                        type: number
-                      eptitle:
-                        description: Episode Title
-                        type: string
-                      epurl:
-                        description: Episode URL
-                        type: string
-                    type: object
-                    required:
-                    - show
-                    - title
-                    - season
-                    - episode
-                    - airdate
-                    - rating
-                    - eptitle
-                    - epurl
+                    $ref: '#/components/schemas/ImdbEpisodes'
                   type: array
               type: object
               required:
@@ -498,42 +439,7 @@ paths:
             application/json:
               schema:
                 items:
-                  properties:
-                    index:
-                      description: Index
-                      type: integer
-                    show:
-                      description: TV Show Name
-                      type: string
-                    title:
-                      description: Title
-                      nullable: true
-                      type: string
-                    link:
-                      description: IMDB ID
-                      type: string
-                    rating:
-                      description: Rating
-                      nullable: true
-                      type: number
-                    istv:
-                      description: IsTv Flag
-                      nullable: true
-                      type: boolean
-                    source:
-                      description: Source
-                      nullable: true
-                      type: string
-                      enum:
-                      - all
-                      - amazon
-                      - hulu
-                      - netflix
-                  type: object
-                  required:
-                  - index
-                  - show
-                  - link
+                  $ref: '#/components/schemas/ImdbRatings'
                 type: array
         '400':
           description: Bad Request
@@ -551,42 +457,7 @@ paths:
               properties:
                 shows:
                   items:
-                    properties:
-                      index:
-                        description: Index
-                        type: integer
-                      show:
-                        description: TV Show Name
-                        type: string
-                      title:
-                        description: Title
-                        nullable: true
-                        type: string
-                      link:
-                        description: IMDB ID
-                        type: string
-                      rating:
-                        description: Rating
-                        nullable: true
-                        type: number
-                      istv:
-                        description: IsTv Flag
-                        nullable: true
-                        type: boolean
-                      source:
-                        description: Source
-                        nullable: true
-                        type: string
-                        enum:
-                        - all
-                        - amazon
-                        - hulu
-                        - netflix
-                    type: object
-                    required:
-                    - index
-                    - show
-                    - link
+                    $ref: '#/components/schemas/ImdbRatings'
                   type: array
               type: object
               required:
@@ -624,30 +495,7 @@ paths:
             application/json:
               schema:
                 items:
-                  properties:
-                    idx:
-                      description: Queue Index
-                      type: integer
-                    collection_idx:
-                      description: Collection Index
-                      type: integer
-                    path:
-                      description: Collection Path
-                      type: string
-                    show:
-                      description: TV Show Name
-                      type: string
-                    last_modified:
-                      description: Last Modified
-                      format: date-time
-                      nullable: true
-                      type: string
-                  type: object
-                  required:
-                  - idx
-                  - collection_idx
-                  - path
-                  - show
+                  $ref: '#/components/schemas/MovieQueueRow'
                 type: array
         '400':
           description: Bad Request
@@ -665,30 +513,7 @@ paths:
               properties:
                 queue:
                   items:
-                    properties:
-                      idx:
-                        description: Queue Index
-                        type: integer
-                      collection_idx:
-                        description: Collection Index
-                        type: integer
-                      path:
-                        description: Collection Path
-                        type: string
-                      show:
-                        description: TV Show Name
-                        type: string
-                      last_modified:
-                        description: Last Modified
-                        format: date-time
-                        nullable: true
-                        type: string
-                    type: object
-                    required:
-                    - idx
-                    - collection_idx
-                    - path
-                    - show
+                    $ref: '#/components/schemas/MovieQueueRow'
                   type: array
               type: object
               required:
@@ -726,21 +551,7 @@ paths:
             application/json:
               schema:
                 items:
-                  properties:
-                    idx:
-                      description: Collection Index
-                      type: integer
-                    path:
-                      description: Collection Path
-                      type: string
-                    show:
-                      description: TV Show Name
-                      type: string
-                  type: object
-                  required:
-                  - idx
-                  - path
-                  - show
+                  $ref: '#/components/schemas/MovieCollectionRow'
                 type: array
         '400':
           description: Bad Request
@@ -758,21 +569,7 @@ paths:
               properties:
                 collection:
                   items:
-                    properties:
-                      idx:
-                        description: Collection Index
-                        type: integer
-                      path:
-                        description: Collection Path
-                        type: string
-                      show:
-                        description: TV Show Name
-                        type: string
-                    type: object
-                    required:
-                    - idx
-                    - path
-                    - show
+                    $ref: '#/components/schemas/MovieCollectionRow'
                   type: array
               type: object
               required:
@@ -867,18 +664,7 @@ paths:
             application/json:
               schema:
                 items:
-                  properties:
-                    table:
-                      description: Table Name
-                      type: string
-                    last_modified:
-                      description: Last Modified
-                      format: date-time
-                      type: string
-                  type: object
-                  required:
-                  - table
-                  - last_modified
+                  $ref: '#/components/schemas/LastModifiedResponse'
                 type: array
         '400':
           description: Bad Request
@@ -896,22 +682,7 @@ paths:
           content:
             application/json:
               schema:
-                properties:
-                  email:
-                    description: Email Address
-                    type: string
-                  session:
-                    description: Session UUID
-                    format: uuid
-                    type: string
-                  secret_key:
-                    description: Secret Key
-                    type: string
-                type: object
-                required:
-                - email
-                - session
-                - secret_key
+                $ref: '#/components/schemas/LoggedUser'
         '400':
           description: Bad Request
         '404':
@@ -922,6 +693,40 @@ paths:
           description: Internal Server Error
   /list/full_queue:
     get:
+      parameters:
+      - name: q
+        in: query
+        required: false
+        schema:
+          description: Search String
+          nullable: true
+          type: string
+      - name: offset
+        in: query
+        required: false
+        schema:
+          description: Offset
+          nullable: true
+          type: integer
+          minimum: 0
+      - name: limit
+        in: query
+        required: false
+        schema:
+          description: Limit
+          nullable: true
+          type: integer
+          minimum: 0
+      - name: order_by
+        in: query
+        required: false
+        schema:
+          description: Order By (asc/desc)
+          nullable: true
+          type: string
+          enum:
+          - asc
+          - desc
       responses:
         '200':
           description: Movie Queue
@@ -968,6 +773,7 @@ paths:
         required: true
         schema:
           format: uuid
+          example: 334518f4-1bfd-4f20-9978-bfad0dc033e1
           type: string
       responses:
         '201':
@@ -1015,6 +821,17 @@ paths:
           - admin-database-corrupted
           - device-new
           - playback-started
+      - name: section_type
+        in: query
+        required: false
+        schema:
+          description: Section Type
+          nullable: true
+          type: string
+          enum:
+          - artist
+          - movie
+          - show
       - name: offset
         in: query
         required: false
@@ -1038,72 +855,7 @@ paths:
             application/json:
               schema:
                 items:
-                  properties:
-                    event:
-                      description: Event
-                      type: string
-                    account:
-                      description: Account
-                      type: string
-                    server:
-                      description: Server
-                      type: string
-                    player_title:
-                      description: Player Title
-                      type: string
-                    player_address:
-                      description: Player Address
-                      type: string
-                    title:
-                      description: Title
-                      type: string
-                    parent_title:
-                      description: Parent Title
-                      nullable: true
-                      type: string
-                    grandparent_title:
-                      description: Grandparent Title
-                      nullable: true
-                      type: string
-                    added_at:
-                      description: Added At Timestamp
-                      format: date-time
-                      type: string
-                    updated_at:
-                      description: Updated At Timestamp
-                      format: date-time
-                      nullable: true
-                      type: string
-                    last_modified:
-                      description: Last Modified
-                      format: date-time
-                      type: string
-                    metadata_type:
-                      description: Metadata Type
-                      nullable: true
-                      type: string
-                    section_type:
-                      description: Section Type
-                      nullable: true
-                      type: string
-                    section_title:
-                      description: Section Title
-                      nullable: true
-                      type: string
-                    metadata_key:
-                      description: Metadata Key
-                      nullable: true
-                      type: string
-                  type: object
-                  required:
-                  - event
-                  - account
-                  - server
-                  - player_title
-                  - player_address
-                  - title
-                  - added_at
-                  - last_modified
+                  $ref: '#/components/schemas/PlexEvent'
                 type: array
         '400':
           description: Bad Request
@@ -1118,79 +870,7 @@ paths:
         content:
           application/json:
             schema:
-              properties:
-                events:
-                  items:
-                    properties:
-                      event:
-                        description: Event
-                        type: string
-                      account:
-                        description: Account
-                        type: string
-                      server:
-                        description: Server
-                        type: string
-                      player_title:
-                        description: Player Title
-                        type: string
-                      player_address:
-                        description: Player Address
-                        type: string
-                      title:
-                        description: Title
-                        type: string
-                      parent_title:
-                        description: Parent Title
-                        nullable: true
-                        type: string
-                      grandparent_title:
-                        description: Grandparent Title
-                        nullable: true
-                        type: string
-                      added_at:
-                        description: Added At Timestamp
-                        format: date-time
-                        type: string
-                      updated_at:
-                        description: Updated At Timestamp
-                        format: date-time
-                        nullable: true
-                        type: string
-                      last_modified:
-                        description: Last Modified
-                        format: date-time
-                        type: string
-                      metadata_type:
-                        description: Metadata Type
-                        nullable: true
-                        type: string
-                      section_type:
-                        description: Section Type
-                        nullable: true
-                        type: string
-                      section_title:
-                        description: Section Title
-                        nullable: true
-                        type: string
-                      metadata_key:
-                        description: Metadata Key
-                        nullable: true
-                        type: string
-                    type: object
-                    required:
-                    - event
-                    - account
-                    - server
-                    - player_title
-                    - player_address
-                    - title
-                    - added_at
-                    - last_modified
-                  type: array
-              type: object
-              required:
-              - events
+              $ref: '#/components/schemas/PlexEventUpdateRequest'
         required: true
       responses:
         '201':
@@ -1238,6 +918,17 @@ paths:
           - admin-database-corrupted
           - device-new
           - playback-started
+      - name: section_type
+        in: query
+        required: false
+        schema:
+          description: Section Type
+          nullable: true
+          type: string
+          enum:
+          - artist
+          - movie
+          - show
       - name: offset
         in: query
         required: false
@@ -1257,6 +948,86 @@ paths:
       responses:
         '200':
           description: Plex Event List
+          content:
+            text/html:
+              schema:
+                type: string
+        '400':
+          description: Bad Request
+        '404':
+          description: Not Found
+        '405':
+          description: Method not allowed
+        '500':
+          description: Internal Server Error
+  /list/plex/{id}:
+    get:
+      parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          format: uuid
+          example: 334518f4-1bfd-4f20-9978-bfad0dc033e1
+          type: string
+      - name: start_timestamp
+        in: query
+        required: false
+        schema:
+          description: Start Timestamp
+          format: date-time
+          nullable: true
+          type: string
+      - name: event_type
+        in: query
+        required: false
+        schema:
+          description: Event Type
+          nullable: true
+          type: string
+          enum:
+          - library-on-deck
+          - library-new
+          - media-pause
+          - media-play
+          - media-rate
+          - media-resume
+          - media-scrobble
+          - media-stop
+          - admin-database-backup
+          - admin-database-corrupted
+          - device-new
+          - playback-started
+      - name: section_type
+        in: query
+        required: false
+        schema:
+          description: Section Type
+          nullable: true
+          type: string
+          enum:
+          - artist
+          - movie
+          - show
+      - name: offset
+        in: query
+        required: false
+        schema:
+          description: Offset
+          nullable: true
+          type: integer
+          minimum: 0
+      - name: limit
+        in: query
+        required: false
+        schema:
+          description: Limit
+          nullable: true
+          type: integer
+          minimum: 0
+      responses:
+        '200':
+          description: Plex Event Detail
           content:
             text/html:
               schema:
@@ -1303,17 +1074,139 @@ paths:
             application/json:
               schema:
                 items:
-                  properties:
-                    metadata_key:
-                      description: Metadata Key
-                      type: string
-                    filename:
-                      description: Filename
-                      type: string
-                  type: object
-                  required:
-                  - metadata_key
-                  - filename
+                  $ref: '#/components/schemas/PlexFilename'
+                type: array
+        '400':
+          description: Bad Request
+        '404':
+          description: Not Found
+        '405':
+          description: Method not allowed
+        '500':
+          description: Internal Server Error
+    post:
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PlexFilenameUpdateRequest'
+        required: true
+      responses:
+        '201':
+          description: Update Plex Filenames
+          content:
+            text/html:
+              schema:
+                type: string
+        '400':
+          description: Bad Request
+        '404':
+          description: Not Found
+        '405':
+          description: Method not allowed
+        '500':
+          description: Internal Server Error
+  /list/plex_metadata:
+    get:
+      parameters:
+      - name: start_timestamp
+        in: query
+        required: false
+        schema:
+          description: Start Timestamp
+          format: date-time
+          nullable: true
+          type: string
+      - name: offset
+        in: query
+        required: false
+        schema:
+          description: Offset
+          nullable: true
+          type: integer
+          minimum: 0
+      - name: limit
+        in: query
+        required: false
+        schema:
+          description: Limit
+          nullable: true
+          type: integer
+          minimum: 0
+      responses:
+        '200':
+          description: Plex Metadata
+          content:
+            application/json:
+              schema:
+                items:
+                  $ref: '#/components/schemas/PlexMetadata'
+                type: array
+        '400':
+          description: Bad Request
+        '404':
+          description: Not Found
+        '405':
+          description: Method not allowed
+        '500':
+          description: Internal Server Error
+    post:
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PlexMetadataUpdateRequest'
+        required: true
+      responses:
+        '201':
+          description: Update Plex Metadata
+          content:
+            text/html:
+              schema:
+                type: string
+        '400':
+          description: Bad Request
+        '404':
+          description: Not Found
+        '405':
+          description: Method not allowed
+        '500':
+          description: Internal Server Error
+  /list/music_collection:
+    get:
+      parameters:
+      - name: start_timestamp
+        in: query
+        required: false
+        schema:
+          description: Start Timestamp
+          format: date-time
+          nullable: true
+          type: string
+      - name: offset
+        in: query
+        required: false
+        schema:
+          description: Offset
+          nullable: true
+          type: integer
+          minimum: 0
+      - name: limit
+        in: query
+        required: false
+        schema:
+          description: Limit
+          nullable: true
+          type: integer
+          minimum: 0
+      responses:
+        '200':
+          description: Music Collection
+          content:
+            application/json:
+              schema:
+                items:
+                  $ref: '#/components/schemas/MusicCollection'
                 type: array
         '400':
           description: Bad Request
@@ -1329,27 +1222,17 @@ paths:
           application/json:
             schema:
               properties:
-                filenames:
+                entries:
                   items:
-                    properties:
-                      metadata_key:
-                        description: Metadata Key
-                        type: string
-                      filename:
-                        description: Filename
-                        type: string
-                    type: object
-                    required:
-                    - metadata_key
-                    - filename
+                    $ref: '#/components/schemas/MusicCollection'
                   type: array
               type: object
               required:
-              - filenames
+              - entries
         required: true
       responses:
         '201':
-          description: Update Plex Filenames
+          description: Update Music Collection
           content:
             text/html:
               schema:
@@ -1587,4 +1470,444 @@ paths:
           description: Method not allowed
         '500':
           description: Internal Server Error
-components: {}
+components:
+  schemas:
+    FindNewEpisodeRequest:
+      properties:
+        source:
+          description: TV Show Source
+          nullable: true
+          type: string
+          enum:
+          - all
+          - amazon
+          - hulu
+          - netflix
+        shows:
+          description: TV Show
+          nullable: true
+          type: string
+      type: object
+    ImdbEpisodes:
+      properties:
+        show:
+          description: TV Show Name
+          type: string
+        title:
+          description: Title
+          type: string
+        season:
+          description: Season
+          type: integer
+        episode:
+          description: Episode
+          type: integer
+        airdate:
+          description: Airdate
+          format: date
+          nullable: true
+          example: 2023-01-01
+          type: string
+        rating:
+          description: Rating
+          format: decimal
+          nullable: true
+          example: '1.234'
+          type: string
+        eptitle:
+          description: Episode Title
+          type: string
+        epurl:
+          description: Episode URL
+          type: string
+      type: object
+      required:
+      - show
+      - title
+      - season
+      - episode
+      - eptitle
+      - epurl
+    ImdbRatings:
+      properties:
+        index:
+          description: Index
+          format: uuid
+          example: 334518f4-1bfd-4f20-9978-bfad0dc033e1
+          type: string
+        show:
+          description: TV Show Name
+          type: string
+        title:
+          description: Title
+          nullable: true
+          type: string
+        link:
+          description: IMDB ID
+          type: string
+        rating:
+          description: Rating
+          nullable: true
+          type: number
+        istv:
+          description: IsTv Flag
+          nullable: true
+          type: boolean
+        source:
+          description: Source
+          nullable: true
+          type: string
+          enum:
+          - all
+          - amazon
+          - hulu
+          - netflix
+      type: object
+      required:
+      - index
+      - show
+      - link
+    MovieQueueRow:
+      properties:
+        idx:
+          description: Queue Index
+          type: integer
+        collection_idx:
+          description: Collection Index
+          format: uuid
+          example: 334518f4-1bfd-4f20-9978-bfad0dc033e1
+          type: string
+        path:
+          description: Collection Path
+          type: string
+        show:
+          description: TV Show Name
+          type: string
+        last_modified:
+          description: Last Modified
+          format: date-time
+          nullable: true
+          type: string
+      type: object
+      required:
+      - idx
+      - collection_idx
+      - path
+      - show
+    MovieCollectionRow:
+      properties:
+        idx:
+          description: Collection Index
+          format: uuid
+          example: 334518f4-1bfd-4f20-9978-bfad0dc033e1
+          type: string
+        path:
+          description: Collection Path
+          type: string
+        show:
+          description: TV Show Name
+          type: string
+      type: object
+      required:
+      - idx
+      - path
+      - show
+    LastModifiedResponse:
+      properties:
+        table:
+          description: Table Name
+          type: string
+        last_modified:
+          description: Last Modified
+          format: date-time
+          type: string
+      type: object
+      required:
+      - table
+      - last_modified
+    LoggedUser:
+      properties:
+        email:
+          description: Email Address
+          type: string
+        session:
+          description: Session UUID
+          format: uuid
+          example: 334518f4-1bfd-4f20-9978-bfad0dc033e1
+          type: string
+        secret_key:
+          description: Secret Key
+          type: string
+      type: object
+      required:
+      - email
+      - session
+      - secret_key
+    FullQueueRequest:
+      properties:
+        q:
+          description: Search String
+          nullable: true
+          type: string
+        offset:
+          description: Offset
+          nullable: true
+          type: integer
+          minimum: 0
+        limit:
+          description: Limit
+          nullable: true
+          type: integer
+          minimum: 0
+        order_by:
+          description: Order By (asc/desc)
+          nullable: true
+          type: string
+          enum:
+          - asc
+          - desc
+      type: object
+    PlexEventRequest:
+      properties:
+        start_timestamp:
+          description: Start Timestamp
+          format: date-time
+          nullable: true
+          type: string
+        event_type:
+          description: Event Type
+          nullable: true
+          type: string
+          enum:
+          - library-on-deck
+          - library-new
+          - media-pause
+          - media-play
+          - media-rate
+          - media-resume
+          - media-scrobble
+          - media-stop
+          - admin-database-backup
+          - admin-database-corrupted
+          - device-new
+          - playback-started
+        section_type:
+          description: Section Type
+          nullable: true
+          type: string
+          enum:
+          - artist
+          - movie
+          - show
+        offset:
+          description: Offset
+          nullable: true
+          type: integer
+          minimum: 0
+        limit:
+          description: Limit
+          nullable: true
+          type: integer
+          minimum: 0
+      type: object
+    PlexEvent:
+      properties:
+        event:
+          description: Event
+          type: string
+        account:
+          description: Account
+          type: string
+        server:
+          description: Server
+          type: string
+        player_title:
+          description: Player Title
+          type: string
+        player_address:
+          description: Player Address
+          type: string
+        title:
+          description: Title
+          type: string
+        parent_title:
+          description: Parent Title
+          nullable: true
+          type: string
+        grandparent_title:
+          description: Grandparent Title
+          nullable: true
+          type: string
+        added_at:
+          description: Added At Timestamp
+          format: date-time
+          type: string
+        updated_at:
+          description: Updated At Timestamp
+          format: date-time
+          nullable: true
+          type: string
+        last_modified:
+          description: Last Modified
+          format: date-time
+          type: string
+        metadata_type:
+          description: Metadata Type
+          nullable: true
+          type: string
+        section_type:
+          description: Section Type
+          nullable: true
+          type: string
+        section_title:
+          description: Section Title
+          nullable: true
+          type: string
+        metadata_key:
+          description: Metadata Key
+          nullable: true
+          type: string
+      type: object
+      required:
+      - event
+      - account
+      - server
+      - player_title
+      - player_address
+      - title
+      - added_at
+      - last_modified
+    PlexEventUpdateRequest:
+      properties:
+        events:
+          items:
+            $ref: '#/components/schemas/PlexEvent'
+          type: array
+      type: object
+      required:
+      - events
+    PlexEventFilenameRequest:
+      properties:
+        start_timestamp:
+          description: Start Timestamp
+          format: date-time
+          nullable: true
+          type: string
+        offset:
+          description: Offset
+          nullable: true
+          type: integer
+          minimum: 0
+        limit:
+          description: Limit
+          nullable: true
+          type: integer
+          minimum: 0
+      type: object
+    PlexFilename:
+      properties:
+        metadata_key:
+          description: Metadata Key
+          type: string
+        filename:
+          description: Filename
+          type: string
+        collection_id:
+          description: Collection Id
+          format: uuid
+          nullable: true
+          example: 334518f4-1bfd-4f20-9978-bfad0dc033e1
+          type: string
+      type: object
+      required:
+      - metadata_key
+      - filename
+    PlexFilenameUpdateRequest:
+      properties:
+        filenames:
+          items:
+            $ref: '#/components/schemas/PlexFilename'
+          type: array
+      type: object
+      required:
+      - filenames
+    PlexMetadata:
+      properties:
+        metadata_key:
+          description: Metadata Key
+          type: string
+        object_type:
+          description: Object Type
+          type: string
+        title:
+          description: Title
+          type: string
+        parent_key:
+          description: Parent Key
+          nullable: true
+          type: string
+        grandparent_key:
+          description: Grandparent Key
+          nullable: true
+          type: string
+        show:
+          description: show
+          nullable: true
+          type: string
+      type: object
+      required:
+      - metadata_key
+      - object_type
+      - title
+    PlexMetadataUpdateRequest:
+      properties:
+        entries:
+          items:
+            $ref: '#/components/schemas/PlexMetadata'
+          type: array
+      type: object
+      required:
+      - entries
+    MusicCollection:
+      properties:
+        id:
+          description: Id
+          format: uuid
+          example: 334518f4-1bfd-4f20-9978-bfad0dc033e1
+          type: string
+        path:
+          description: Path
+          type: string
+        artist:
+          description: Artist
+          nullable: true
+          type: string
+        album:
+          description: Album
+          nullable: true
+          type: string
+        title:
+          description: Title
+          nullable: true
+          type: string
+        last_modified:
+          description: Last Modified
+          format: date-time
+          type: string
+      type: object
+      required:
+      - id
+      - path
+      - last_modified
+    TraktCallbackRequest:
+      properties:
+        code:
+          description: Authorization Code
+          type: string
+        state:
+          description: CSRF State
+          type: string
+      type: object
+      required:
+      - code
+      - state
