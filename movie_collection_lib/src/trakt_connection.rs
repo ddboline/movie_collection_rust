@@ -1,6 +1,6 @@
 use anyhow::{format_err, Error};
 use base64::{engine::general_purpose::URL_SAFE_NO_PAD, Engine};
-use lazy_static::lazy_static;
+use once_cell::sync::Lazy;
 use log::debug;
 use maplit::hashmap;
 use rand::{thread_rng, Rng};
@@ -27,10 +27,8 @@ use crate::{
     },
 };
 
-lazy_static! {
-    static ref CSRF_TOKEN: Mutex<Option<StackString>> = Mutex::new(None);
-    static ref AUTH_TOKEN: RwLock<Option<Arc<AccessTokenResponse>>> = RwLock::new(None);
-}
+static CSRF_TOKEN: Lazy<Mutex<Option<StackString>>> = Lazy::new(|| Mutex::new(None));
+static AUTH_TOKEN: Lazy<RwLock<Option<Arc<AccessTokenResponse>>>> = Lazy::new(|| RwLock::new(None));
 
 #[derive(Clone)]
 pub struct TraktConnection {
