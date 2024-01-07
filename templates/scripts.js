@@ -1,12 +1,12 @@
 !function() {
     updateMainArticle('/list/cal?source=all');
 }();
-function updateMainArticle( url ) {
+function updateMainArticle( url, method="GET" ) {
     let xmlhttp = new XMLHttpRequest();
     xmlhttp.onload = function f() {
         document.getElementById("main_article").innerHTML = xmlhttp.responseText;
     }
-    xmlhttp.open("GET", url, true);
+    xmlhttp.open(method, url, true);
     xmlhttp.send(null);
 }
 function get_transcode_status() {
@@ -22,10 +22,10 @@ function get_transcode_status() {
 function watched_add(link, season, episode) {
     let url = "/trakt/watched/add/" + link + "/" + season + "/" + episode;
     let xmlhttp = new XMLHttpRequest();
-    xmlhttp.open("GET", url, true);
+    xmlhttp.open("POST", url, true);
     xmlhttp.onload = function nothing() {
         let url = "/trakt/watched/list/" + link + "/" + season;
-        updateMainArticle(url);
+        updateMainArticle(url, method="POST");
     }
     xmlhttp.send(null);
     let out = "requested " + link + "/" + season + "/" + episode
@@ -34,10 +34,10 @@ function watched_add(link, season, episode) {
 function watched_rm(link, season, episode) {
     let url = "/trakt/watched/rm/" + link + "/" + season + "/" + episode
     let xmlhttp = new XMLHttpRequest();
-    xmlhttp.open("GET", url, true);
+    xmlhttp.open("POST", url, true);
     xmlhttp.onload = function nothing() {
         let url = "/trakt/watched/list/" + link + "/" + season;
-        updateMainArticle(url);
+        updateMainArticle(url, method="POST");
     }
     xmlhttp.send(null);
     let out = "requested " + link + "/" + season + "/" + episode
@@ -46,7 +46,7 @@ function watched_rm(link, season, episode) {
 function delete_show(index, offset, order_by) {
     let url = "/list/delete/" + index
     let xmlhttp = new XMLHttpRequest();
-    xmlhttp.open("GET", url, true);
+    xmlhttp.open("DELETE", url, true);
     xmlhttp.onload = function nothing() {
         searchFullQueue(offset, order_by);
     }
@@ -55,7 +55,7 @@ function delete_show(index, offset, order_by) {
 function watchlist_add(link) {
     let url = "/trakt/watchlist/add/" + link
     let xmlhttp = new XMLHttpRequest();
-    xmlhttp.open("GET", url, true);
+    xmlhttp.open("POST", url, true);
     xmlhttp.onload = function nothing() {
         let url = "/list/tvshows";
         updateMainArticle(url);
@@ -67,7 +67,7 @@ function watchlist_add(link) {
 function watchlist_rm(link) {
     let url = "/trakt/watchlist/rm/" + link
     let xmlhttp = new XMLHttpRequest();
-    xmlhttp.open("GET", url, true);
+    xmlhttp.open("POST", url, true);
     xmlhttp.onload = function nothing() {
         let url = "/list/tvshows";
         updateMainArticle(url);
@@ -109,7 +109,7 @@ function traktAuth() {
 function transcode_queue(index) {
     let url = "/list/transcode/queue/" + index
     let xmlhttp = new XMLHttpRequest();
-    xmlhttp.open("GET", url, true);
+    xmlhttp.open("POST", url, true);
     xmlhttp.onload = function nothing() {
         document.getElementById("remcomoutput").innerHTML = "&nbsp;";
     }
@@ -120,7 +120,7 @@ function transcode_queue(index) {
 function transcode_queue_directory(index, directory) {
     let url = "/list/transcode/queue/" + directory + "/" + index
     let xmlhttp = new XMLHttpRequest();
-    xmlhttp.open("GET", url, true);
+    xmlhttp.open("POST", url, true);
     xmlhttp.onload = function nothing() {
         document.getElementById("remcomoutput").innerHTML = "&nbsp;";
     }
@@ -149,7 +149,7 @@ function update_file_list() {
 function transcode_file(file) {
     let url = "/list/transcode/file/" + file
     let xmlhttp = new XMLHttpRequest();
-    xmlhttp.open("GET", url, true);
+    xmlhttp.open("POST", url, true);
     xmlhttp.onload = function nothing() {
         update_procs();
         update_file_list();
@@ -166,7 +166,7 @@ function remcom_file(file) {
         url = "/list/transcode/remcom/file/" + file;
     }
     let xmlhttp = new XMLHttpRequest();
-    xmlhttp.open("GET", url, true);
+    xmlhttp.open("POST", url, true);
     xmlhttp.onload = function nothing() {
         update_procs();
         update_file_list();
@@ -179,7 +179,7 @@ function remcom_file(file) {
 function cleanup_file(file) {
     let url = "/list/transcode/cleanup/" + file
     let xmlhttp = new XMLHttpRequest();
-    xmlhttp.open("GET", url, true);
+    xmlhttp.open("DELETE", url, true);
     xmlhttp.onload = function nothing() {
         update_procs();
         update_file_list();

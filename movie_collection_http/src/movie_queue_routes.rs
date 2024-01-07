@@ -4,7 +4,7 @@ use anyhow::format_err;
 use bytes::Buf;
 use futures::TryStreamExt;
 use log::error;
-use rweb::{get, multipart::FormData, post, Json, Query, Rejection, Schema};
+use rweb::{delete, get, multipart::FormData, post, Json, Query, Rejection, Schema};
 use rweb_helper::{
     derive_rweb_schema, html_response::HtmlResponse as HtmlBase,
     json_response::JsonResponse as JsonBase, DateTimeType, RwebResponse, UuidWrapper,
@@ -82,7 +82,7 @@ pub async fn scripts_js() -> WarpResult<JsScriptsResponse> {
 struct MovieQueueResponse(HtmlBase<StackString, Error>);
 
 #[derive(Serialize, Deserialize, Debug, Schema)]
-#[schema(component="FullQueueRequest")]
+#[schema(component = "FullQueueRequest")]
 pub struct FullQueueRequest {
     #[schema(description = "Search String")]
     pub q: Option<StackString>,
@@ -174,7 +174,7 @@ pub async fn movie_queue_show(
 #[response(description = "Delete Queue Entry", content = "html")]
 struct DeleteMovieQueueResponse(HtmlBase<StackString, Error>);
 
-#[get("/list/delete/{path}")]
+#[delete("/list/delete/{path}")]
 pub async fn movie_queue_delete(
     path: StackString,
     #[filter = "LoggedUser::filter"] user: LoggedUser,
@@ -244,7 +244,7 @@ async fn transcode_worker(
 #[response(description = "Transcode Queue Item", content = "html")]
 struct TranscodeQueueResponse(HtmlBase<StackString, Error>);
 
-#[get("/list/transcode/queue/{path}")]
+#[post("/list/transcode/queue/{path}")]
 pub async fn movie_queue_transcode(
     path: StackString,
     #[filter = "LoggedUser::filter"] user: LoggedUser,
@@ -269,7 +269,7 @@ pub async fn movie_queue_transcode(
     Ok(HtmlBase::new(body).into())
 }
 
-#[get("/list/transcode/queue/{directory}/{file}")]
+#[post("/list/transcode/queue/{directory}/{file}")]
 pub async fn movie_queue_transcode_directory(
     directory: StackString,
     file: StackString,
@@ -332,6 +332,7 @@ pub async fn movie_queue_play(
         .map_err(Into::<Error>::into)?;
 
     let movie_path = path::Path::new(movie_path.as_str());
+    println!("movie_path {movie_path:?}");
     let body = play_worker_body(&state.config, movie_path, last_url)
         .map_err(Into::<Error>::into)?
         .into();
@@ -365,7 +366,7 @@ pub async fn imdb_show(
 }
 
 #[derive(Serialize, Deserialize, Schema)]
-#[schema(component="FindNewEpisodeRequest")]
+#[schema(component = "FindNewEpisodeRequest")]
 pub struct FindNewEpisodeRequest {
     #[schema(description = "TV Show Source")]
     pub source: Option<TvShowSourceWrapper>,
@@ -859,7 +860,7 @@ pub async fn movie_queue_transcode_status_procs(
 #[response(description = "Transcode File", content = "html")]
 struct TranscodeFileResponse(HtmlBase<StackString, Error>);
 
-#[get("/list/transcode/file/{filename}")]
+#[post("/list/transcode/file/{filename}")]
 pub async fn movie_queue_transcode_file(
     filename: StackString,
     #[filter = "LoggedUser::filter"] user: LoggedUser,
@@ -901,7 +902,7 @@ pub async fn movie_queue_transcode_file(
     Ok(HtmlBase::new(body).into())
 }
 
-#[get("/list/transcode/remcom/file/{filename}")]
+#[post("/list/transcode/remcom/file/{filename}")]
 pub async fn movie_queue_remcom_file(
     filename: StackString,
     #[filter = "LoggedUser::filter"] user: LoggedUser,
@@ -950,7 +951,7 @@ pub async fn movie_queue_remcom_file(
     Ok(HtmlBase::new(body).into())
 }
 
-#[get("/list/transcode/remcom/directory/{directory}/{filename}")]
+#[post("/list/transcode/remcom/directory/{directory}/{filename}")]
 pub async fn movie_queue_remcom_directory_file(
     directory: StackString,
     filename: StackString,
@@ -1003,7 +1004,7 @@ pub async fn movie_queue_remcom_directory_file(
 #[response(description = "Cleanup Transcode File", content = "html")]
 struct CleanupTranscodeFileResponse(HtmlBase<StackString, Error>);
 
-#[get("/list/transcode/cleanup/{path}")]
+#[delete("/list/transcode/cleanup/{path}")]
 pub async fn movie_queue_transcode_cleanup(
     path: StackString,
     #[filter = "LoggedUser::filter"] user: LoggedUser,
@@ -1083,7 +1084,7 @@ async fn watchlist_action_worker(
 #[response(description = "Trakt Watchlist Action", content = "html")]
 struct TraktWatchlistActionResponse(HtmlBase<StackString, Error>);
 
-#[get("/trakt/watchlist/{action}/{imdb_url}")]
+#[post("/trakt/watchlist/{action}/{imdb_url}")]
 pub async fn trakt_watchlist_action(
     action: TraktActionsWrapper,
     imdb_url: StackString,
@@ -1172,7 +1173,7 @@ pub async fn trakt_watched_list(
 #[response(description = "Trakt Watchlist Episode Action", content = "html")]
 struct TraktWatchlistEpisodeActionResponse(HtmlBase<StackString, Error>);
 
-#[get("/trakt/watched/{action}/{imdb_url}/{season}/{episode}")]
+#[post("/trakt/watched/{action}/{imdb_url}/{season}/{episode}")]
 pub async fn trakt_watched_action(
     action: TraktActionsWrapper,
     imdb_url: StackString,
@@ -1249,7 +1250,7 @@ pub async fn trakt_auth_url(
 }
 
 #[derive(Serialize, Deserialize, Schema)]
-#[schema(component="TraktCallbackRequest")]
+#[schema(component = "TraktCallbackRequest")]
 pub struct TraktCallbackRequest {
     #[schema(description = "Authorization Code")]
     pub code: StackString,
@@ -1415,7 +1416,7 @@ pub async fn plex_events(
 }
 
 #[derive(Serialize, Deserialize, Debug, Schema)]
-#[schema(component="PlexEventUpdateRequest")]
+#[schema(component = "PlexEventUpdateRequest")]
 pub struct PlexEventUpdateRequest {
     events: Vec<PlexEventWrapper>,
 }
@@ -1604,7 +1605,7 @@ pub async fn plex_filename(
 }
 
 #[derive(Serialize, Deserialize, Debug, Schema)]
-#[schema(component="PlexFilenameUpdateRequest")]
+#[schema(component = "PlexFilenameUpdateRequest")]
 pub struct PlexFilenameUpdateRequest {
     filenames: Vec<PlexFilenameWrapper>,
 }
@@ -1683,7 +1684,7 @@ pub async fn plex_metadata(
 }
 
 #[derive(Serialize, Deserialize, Debug, Schema)]
-#[schema(component="PlexMetadataUpdateRequest")]
+#[schema(component = "PlexMetadataUpdateRequest")]
 pub struct PlexMetadataUpdateRequest {
     entries: Vec<PlexMetadataWrapper>,
 }

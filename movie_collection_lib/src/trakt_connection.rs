@@ -1,8 +1,8 @@
 use anyhow::{format_err, Error};
 use base64::{engine::general_purpose::URL_SAFE_NO_PAD, Engine};
-use once_cell::sync::Lazy;
 use log::debug;
 use maplit::hashmap;
+use once_cell::sync::Lazy;
 use rand::{thread_rng, Rng};
 use reqwest::{header::HeaderMap, Client, Url};
 use serde::{Deserialize, Serialize};

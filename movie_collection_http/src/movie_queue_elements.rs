@@ -438,7 +438,11 @@ pub fn play_worker_body(
         .into();
     if let Some(partial_path) = &config.video_playback_path {
         let partial_path = partial_path.join("videos").join("partial");
+        if !partial_path.exists() {
+            std::fs::create_dir_all(&partial_path)?;
+        }
         let partial_path = partial_path.join(file_name.as_str());
+        println!("full_path {full_path:?} partial_path {partial_path:?}");
         if partial_path.exists() {
             std::fs::remove_file(&partial_path)?;
         }
@@ -479,7 +483,6 @@ fn PlayWorkerElement(cx: Scope, file_name: StackString, last_url: Option<StackSt
         br {
             back_button,
         }
-        "{file_name}",
         video {
             width: "720",
             controls: "true",
