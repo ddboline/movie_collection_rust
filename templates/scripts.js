@@ -1,12 +1,12 @@
 !function() {
     updateMainArticle('/list/cal?source=all');
 }();
-function updateMainArticle( url, method="GET" ) {
+function updateMainArticle( url) {
     let xmlhttp = new XMLHttpRequest();
     xmlhttp.onload = function f() {
         document.getElementById("main_article").innerHTML = xmlhttp.responseText;
     }
-    xmlhttp.open(method, url, true);
+    xmlhttp.open('GET', url, true);
     xmlhttp.send(null);
 }
 function get_transcode_status() {
@@ -25,7 +25,7 @@ function watched_add(link, season, episode) {
     xmlhttp.open("POST", url, true);
     xmlhttp.onload = function nothing() {
         let url = "/trakt/watched/list/" + link + "/" + season;
-        updateMainArticle(url, method="POST");
+        updateMainArticle(url);
     }
     xmlhttp.send(null);
     let out = "requested " + link + "/" + season + "/" + episode
@@ -37,7 +37,7 @@ function watched_rm(link, season, episode) {
     xmlhttp.open("POST", url, true);
     xmlhttp.onload = function nothing() {
         let url = "/trakt/watched/list/" + link + "/" + season;
-        updateMainArticle(url, method="POST");
+        updateMainArticle(url);
     }
     xmlhttp.send(null);
     let out = "requested " + link + "/" + season + "/" + episode
