@@ -241,7 +241,11 @@ async fn transcode_worker(
 }
 
 #[derive(RwebResponse)]
-#[response(description = "Transcode Queue Item", content = "html")]
+#[response(
+    description = "Transcode Queue Item",
+    content = "html",
+    status = "CREATED"
+)]
 struct TranscodeQueueResponse(HtmlBase<StackString, Error>);
 
 #[post("/list/transcode/queue/{path}")]
@@ -857,7 +861,7 @@ pub async fn movie_queue_transcode_status_procs(
 }
 
 #[derive(RwebResponse)]
-#[response(description = "Transcode File", content = "html")]
+#[response(description = "Transcode File", content = "html", status = "CREATED")]
 struct TranscodeFileResponse(HtmlBase<StackString, Error>);
 
 #[post("/list/transcode/file/{filename}")]
@@ -1081,7 +1085,11 @@ async fn watchlist_action_worker(
 }
 
 #[derive(RwebResponse)]
-#[response(description = "Trakt Watchlist Action", content = "html")]
+#[response(
+    description = "Trakt Watchlist Action",
+    content = "html",
+    status = "CREATED"
+)]
 struct TraktWatchlistActionResponse(HtmlBase<StackString, Error>);
 
 #[post("/trakt/watchlist/{action}/{imdb_url}")]
@@ -1170,7 +1178,11 @@ pub async fn trakt_watched_list(
 }
 
 #[derive(RwebResponse)]
-#[response(description = "Trakt Watchlist Episode Action", content = "html")]
+#[response(
+    description = "Trakt Watchlist Episode Action",
+    content = "html",
+    status = "CREATED"
+)]
 struct TraktWatchlistEpisodeActionResponse(HtmlBase<StackString, Error>);
 
 #[post("/trakt/watched/{action}/{imdb_url}/{season}/{episode}")]
