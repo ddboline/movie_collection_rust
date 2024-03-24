@@ -10,11 +10,14 @@ function updateMainArticle( url) {
     xmlhttp.send(null);
 }
 function get_transcode_status() {
+    const sleep = ms => new Promise(r => setTimeout(r, ms));
+
     let xmlhttp = new XMLHttpRequest();
     xmlhttp.onload = function f() {
         document.getElementById("main_article").innerHTML = xmlhttp.responseText;
         update_file_list();
         update_procs();
+        sleep(10_000).then(() => get_transcode_status());
     }
     xmlhttp.open("GET", '/list/transcode/status', true);
     xmlhttp.send(null);
@@ -77,7 +80,7 @@ function watchlist_rm(link) {
     document.getElementById("remcomoutput").innerHTML = out;
 }
 function imdb_update(show, link, season, referal_url) {
-    let url = "/list/imdb/" + show + "?tv=true&update=true&database=true&link=" + link + "&season=" + season;
+    let url = `/list/imdb/${show}?tv=true&update=true&database=true&link=${link}&season=${season}`;
     let xmlhttp = new XMLHttpRequest();
     xmlhttp.open("GET", url, true);
     xmlhttp.onload = function nothing() {
@@ -191,7 +194,7 @@ function cleanup_file(file) {
 }
 function setSource( link, source_id ) {
     let source = document.getElementById( source_id ).value;
-    let url = "/list/imdb_ratings/set_source?link=" + link + "&source=" + source;
+    let url = `/list/imdb_ratings/set_source?link=${link}&source=${source}`;
     let xmlhttp = new XMLHttpRequest();
     xmlhttp.open("GET", url, true);
     xmlhttp.onload = function nothing() {
