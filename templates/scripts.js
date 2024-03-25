@@ -17,7 +17,10 @@ function get_transcode_status() {
         document.getElementById("main_article").innerHTML = xmlhttp.responseText;
         update_file_list();
         update_procs();
-        sleep(10_000).then(() => get_transcode_status());
+        sleep(10_000).then(() => {
+            update_file_list();
+            update_procs();
+        });
     }
     xmlhttp.open("GET", '/list/transcode/status', true);
     xmlhttp.send(null);
