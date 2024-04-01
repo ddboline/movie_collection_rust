@@ -101,7 +101,7 @@ impl MovieQueueDB {
         let max_idx: i32 = tran
             .query(query, &[])
             .await?
-            .get(0)
+            .first()
             .map_or(-1, |r| r.get(0));
         if idx > max_idx || idx < 0 {
             return Ok(());
@@ -224,7 +224,7 @@ impl MovieQueueDB {
         let max_idx: i32 = tran
             .query(query, &[])
             .await?
-            .get(0)
+            .first()
             .map_or(-1, |r| r.get(0));
         let diff = max_idx - idx + 2;
         debug!("{} {} {}", max_idx, idx, diff);
@@ -272,7 +272,7 @@ impl MovieQueueDB {
     /// Return error if db queries fail
     pub async fn get_max_queue_index(&self) -> Result<i32, Error> {
         let query = r"SELECT max(idx) FROM movie_queue";
-        if let Some(row) = self.pool.get().await?.query(query, &[]).await?.get(0) {
+        if let Some(row) = self.pool.get().await?.query(query, &[]).await?.first() {
             let max_idx: i32 = row.try_get(0)?;
             Ok(max_idx)
         } else {

@@ -36,7 +36,8 @@ use movie_collection_lib::{
     plex_events::{PlexEvent, PlexFilename, PlexMetadata},
     trakt_connection::TraktConnection,
     trakt_utils::{
-        get_watchlist_shows_db_map, TraktActions, WatchListShow, WatchedEpisode, WatchedMovie,
+        get_watchlist_shows_db_map, watchlist_add, watchlist_rm, TraktActions, WatchListShow,
+        WatchedEpisode, WatchedMovie,
     },
     transcode_service::{transcode_status, TranscodeService, TranscodeServiceRequest},
     tv_show_source::TvShowSource,
@@ -57,12 +58,12 @@ use crate::{
         ImdbEpisodesUpdateRequest, ImdbRatingsSetSourceRequest, ImdbRatingsUpdateRequest,
         ImdbSeasonsRequest, ImdbShowRequest, MovieCollectionSyncRequest,
         MovieCollectionUpdateRequest, MovieQueueRequest, MovieQueueSyncRequest,
-        MovieQueueUpdateRequest, ParseImdbRequest, WatchlistActionRequest,
+        MovieQueueUpdateRequest, ParseImdbRequest,
     },
     ImdbEpisodesWrapper, ImdbRatingsWrapper, LastModifiedResponseWrapper,
     MovieCollectionRowWrapper, MovieQueueRowWrapper, MusicCollectionWrapper, OrderByWrapper,
     PlexEventRequest, PlexEventWrapper, PlexFilenameRequest, PlexFilenameWrapper,
-    PlexMetadataWrapper, TraktActionsWrapper, TvShowSourceWrapper,
+    PlexMetadataWrapper, TraktActionsWrapper, TraktWatchlistRequest, TvShowSourceWrapper,
 };
 
 pub type WarpResult<T> = Result<T, Rejection>;
@@ -761,7 +762,9 @@ struct ListTvShowsResponse(HtmlBase<StackString, Error>);
 pub async fn tvshows(
     #[filter = "LoggedUser::filter"] user: LoggedUser,
     #[data] state: AppState,
+    query: Query<TraktWatchlistRequest>,
 ) -> WarpResult<ListTvShowsResponse> {
+    let query = query.into_inner();
     let task = user
         .store_url_task(state.trakt.get_client(), &state.config, "/list/tvshows")
         .await;
@@ -770,16 +773,35 @@ pub async fn tvshows(
 
     let mc = MovieCollection::new(&state.config, &state.db, &stdout);
     let shows: Vec<_> = mc
-        .print_tv_shows()
+        .print_tv_shows(
+            query.query.as_ref().map(StackString::as_str),
+            query.source.map(Into::into),
+            None,
+            None,
+        )
         .await
         .map_err(Into::<Error>::into)?
         .try_collect()
         .await
         .map_err(Into::<Error>::into)?;
-    let show_map = get_watchlist_shows_db_map(&state.db)
-        .await
-        .map_err(Into::<Error>::into)?;
-    let body = tvshows_body(show_map, shows).into();
+    let show_map = get_watchlist_shows_db_map(
+        &state.db,
+        query.query.as_ref().map(StackString::as_str),
+        query.source.map(Into::into),
+        None,
+        None,
+    )
+    .await
+    .map_err(Into::<Error>::into)?;
+    let body = tvshows_body(
+        show_map,
+        shows,
+        query.query.as_ref().map(StackString::as_str),
+        query.source.map(Into::into),
+        query.offset,
+        query.limit,
+    )
+    .into();
     task.await.ok();
     Ok(HtmlBase::new(body).into())
 }
@@ -1057,28 +1079,52 @@ struct TraktWatchlistResponse(HtmlBase<StackString, Error>);
 pub async fn trakt_watchlist(
     #[filter = "LoggedUser::filter"] user: LoggedUser,
     #[data] state: AppState,
+    query: Query<TraktWatchlistRequest>,
 ) -> WarpResult<TraktWatchlistResponse> {
+    let query = query.into_inner();
     let task = user
         .store_url_task(state.trakt.get_client(), &state.config, "/trakt/watchlist")
         .await;
-    let shows = get_watchlist_shows_db_map(&state.db)
-        .await
-        .map_err(Into::<Error>::into)?;
-    let body = watchlist_body(shows).into();
+    let shows = get_watchlist_shows_db_map(
+        &state.db,
+        query.query.as_ref().map(StackString::as_str),
+        query.source.map(Into::into),
+        query.offset,
+        query.limit,
+    )
+    .await
+    .map_err(Into::<Error>::into)?;
+    let body = watchlist_body(
+        shows,
+        query.query.as_ref().map(StackString::as_str),
+        query.offset,
+        query.limit,
+        query.source.map(Into::into),
+    )
+    .into();
     task.await.ok();
     Ok(HtmlBase::new(body).into())
 }
 
 async fn watchlist_action_worker(
     trakt: &TraktConnection,
+    mc: &MovieCollection,
     action: TraktActions,
-    imdb_url: &str,
+    show: &str,
 ) -> HttpResult<StackString> {
     trakt.init().await;
     let mut body = StackString::new();
     match action {
-        TraktActions::Add => write!(body, "{}", trakt.add_watchlist_show(imdb_url).await?)?,
-        TraktActions::Remove => write!(body, "{}", trakt.remove_watchlist_show(imdb_url).await?)?,
+        TraktActions::Add => {
+            if let Some(result) = watchlist_add(trakt, mc, show, None).await? {
+                write!(body, "{result}")?;
+            }
+        }
+        TraktActions::Remove => {
+            if let Some(result) = watchlist_rm(trakt, mc, show).await? {
+                write!(body, "{result}")?;
+            }
+        }
         _ => (),
     }
     Ok(body)
@@ -1092,10 +1138,10 @@ async fn watchlist_action_worker(
 )]
 struct TraktWatchlistActionResponse(HtmlBase<StackString, Error>);
 
-#[post("/trakt/watchlist/{action}/{imdb_url}")]
+#[post("/trakt/watchlist/{action}/{show}")]
 pub async fn trakt_watchlist_action(
     action: TraktActionsWrapper,
-    imdb_url: StackString,
+    show: StackString,
     #[filter = "LoggedUser::filter"] user: LoggedUser,
     #[data] state: AppState,
 ) -> WarpResult<TraktWatchlistActionResponse> {
@@ -1103,15 +1149,13 @@ pub async fn trakt_watchlist_action(
         .store_url_task(
             state.trakt.get_client(),
             &state.config,
-            &format_sstr!("/trakt/watchlist/{action}/{imdb_url}"),
+            &format_sstr!("/trakt/watchlist/{action}/{show}"),
         )
         .await;
-    let req = WatchlistActionRequest {
-        action: action.into(),
-        imdb_url,
-    };
-    let imdb_url = req.process(&state.db, &state.trakt).await?;
-    let body = watchlist_action_worker(&state.trakt, action.into(), &imdb_url).await?;
+    let mock_stdout = MockStdout::new();
+    let stdout = StdoutChannel::with_mock_stdout(mock_stdout.clone(), mock_stdout.clone());
+    let mc = MovieCollection::new(&state.config, &state.db, &stdout);
+    let body = watchlist_action_worker(&state.trakt, &mc, action.into(), &show).await?;
     task.await.ok();
     Ok(HtmlBase::new(body).into())
 }

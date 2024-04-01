@@ -58,8 +58,8 @@ function delete_show(index, offset, order_by) {
     }
     xmlhttp.send(null);
 }
-function watchlist_add(link) {
-    let url = "/trakt/watchlist/add/" + link
+function watchlist_add(show) {
+    let url = "/trakt/watchlist/add/" + show
     let xmlhttp = new XMLHttpRequest();
     xmlhttp.open("POST", url, true);
     xmlhttp.onload = function nothing() {
@@ -70,8 +70,8 @@ function watchlist_add(link) {
     let out = "requested " + link
     document.getElementById("remcomoutput").innerHTML = out;
 }
-function watchlist_rm(link) {
-    let url = "/trakt/watchlist/rm/" + link
+function watchlist_rm(show) {
+    let url = "/trakt/watchlist/rm/" + show
     let xmlhttp = new XMLHttpRequest();
     xmlhttp.open("POST", url, true);
     xmlhttp.onload = function nothing() {
@@ -219,5 +219,25 @@ function loadPlex(offset=0, limit=10, section=null) {
     if(section) {
         url = url + '&section_type=' + section;
     }
+    updateMainArticle(url);
+}
+function searchTvShows(link) {
+    let search = document.getElementById('tv_shows_search').value;
+    let url = `${link}&query=${search}`;
+    updateMainArticle(url);
+}
+function sourceTvShows(link) {
+    let source = document.getElementById('tv_shows_source_id').value;
+    let url = `${link}&source=${source}`;
+    updateMainArticle(url);
+}
+function searchWatchlist(link) {
+    let search = document.getElementById('watchlist_search').value;
+    let url = `${link}&query=${search}`;
+    updateMainArticle(url);
+}
+function sourceWatchlist(link) {
+    let source = document.getElementById('watchlist_source_id').value;
+    let url = `${link}&source=${source}`;
     updateMainArticle(url);
 }

@@ -61,7 +61,7 @@ pub async fn make_queue_worker(
 
     if do_shows {
         let shows: Vec<_> = mc
-            .print_tv_shows()
+            .print_tv_shows(None, None, None, None)
             .await?
             .map_ok(StackString::from_display)
             .try_collect()

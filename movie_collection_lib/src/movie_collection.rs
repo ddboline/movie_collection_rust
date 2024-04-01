@@ -715,18 +715,49 @@ impl MovieCollection {
     /// Returns error if db queries fail
     pub async fn print_tv_shows(
         &self,
+        search_query: Option<&str>,
+        source: Option<TvShowSource>,
+        offset: Option<u64>,
+        limit: Option<u64>,
     ) -> Result<impl Stream<Item = Result<TvShowsResult, PqError>>, Error> {
-        let query = query!(
+        let mut constraints = vec![format_sstr!("c.istv")];
+        if let Some(search_query) = search_query {
+            constraints.push(format_sstr!("b.show ilike '%{search_query}%'"));
+        }
+        if let Some(source) = source {
+            if source != TvShowSource::All {
+                constraints.push(format_sstr!("c.source = '{source}'"));
+            }
+        }
+        let query = format_sstr!(
             r#"
                 SELECT b.show, c.link, c.title, c.source, count(*) as count
                 FROM movie_queue a
                 JOIN movie_collection b ON a.collection_idx=b.idx
                 JOIN imdb_ratings c ON b.show_id=c.index
-                WHERE c.istv
+                {where_str}
                 GROUP BY 1,2,3,4
                 ORDER BY 1,2,3,4
-            "#
+                {offset}
+                {limit}
+            "#,
+            where_str = if constraints.is_empty() {
+                StackString::new()
+            } else {
+                format_sstr!("WHERE {}", constraints.join(" AND "))
+            },
+            offset = if let Some(offset) = offset {
+                format_sstr!("OFFSET {offset}")
+            } else {
+                StackString::new()
+            },
+            limit = if let Some(limit) = limit {
+                format_sstr!("LIMIT {limit}")
+            } else {
+                StackString::new()
+            }
         );
+        let query = query_dyn!(&query)?;
         let conn = self.pool.get().await?;
         query.fetch_streaming(&conn).await.map_err(Into::into)
     }

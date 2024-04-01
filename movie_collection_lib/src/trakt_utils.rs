@@ -2,7 +2,7 @@ use anyhow::Error;
 use futures::{stream::FuturesUnordered, Stream, TryStreamExt};
 use itertools::Itertools;
 use log::debug;
-use postgres_query::{query, query_dyn, Error as PqError, FromSqlRow};
+use postgres_query::{query, query_dyn, Error as PqError, FromSqlRow, Query};
 use serde::{Deserialize, Serialize};
 use stack_string::{format_sstr, StackString};
 use std::{
@@ -270,7 +270,13 @@ pub type WatchListMap = HashMap<StackString, (StackString, WatchListShow, Option
 
 /// # Errors
 /// Return error if db query fails
-pub async fn get_watchlist_shows_db_map(pool: &PgPool) -> Result<WatchListMap, Error> {
+pub async fn get_watchlist_shows_db_map(
+    pool: &PgPool,
+    search_query: Option<&str>,
+    source: Option<TvShowSource>,
+    offset: Option<u64>,
+    limit: Option<u64>,
+) -> Result<WatchListMap, Error> {
     #[derive(FromSqlRow)]
     struct WatchlistShowDbMap {
         show: StackString,
@@ -281,18 +287,52 @@ pub async fn get_watchlist_shows_db_map(pool: &PgPool) -> Result<WatchListMap, E
     }
     async fn _get_watchlist_shows_db_map(
         pool: &PgPool,
+        search_query: Option<&str>,
+        source: Option<&str>,
+        offset: Option<u64>,
+        limit: Option<u64>,
     ) -> Result<impl Stream<Item = Result<WatchlistShowDbMap, PqError>>, Error> {
-        let query = query!(
-            r#"
-            SELECT b.show, b.link, a.title, a.year, b.source
-            FROM trakt_watchlist a
-            JOIN imdb_ratings b ON a.show=b.show
-        "#
+        let mut constraints = Vec::new();
+        if let Some(search_query) = search_query {
+            constraints.push(format_sstr!("b.show ilike '%{search_query}%'"));
+        }
+        if let Some(source) = source {
+            if source != "all" {
+                constraints.push(format_sstr!("b.source = '{source}'"));
+            }
+        }
+        let query = format_sstr!(
+            "
+                SELECT b.show, b.link, a.title, a.year, b.source
+                FROM trakt_watchlist a
+                JOIN imdb_ratings b ON a.show=b.show
+                {where_str}
+                ORDER BY 1
+                {offset}
+                {limit}
+            ",
+            where_str = if constraints.is_empty() {
+                StackString::new()
+            } else {
+                format_sstr!("WHERE {}", constraints.join(" AND "))
+            },
+            offset = if let Some(offset) = offset {
+                format_sstr!("OFFSET {offset}")
+            } else {
+                StackString::new()
+            },
+            limit = if let Some(limit) = limit {
+                format_sstr!("LIMIT {limit}")
+            } else {
+                StackString::new()
+            }
         );
+        let query: Query = query_dyn!(&query)?;
         let conn = pool.get().await?;
         query.fetch_streaming(&conn).await.map_err(Into::into)
     }
-    _get_watchlist_shows_db_map(pool)
+    let source = source.map(TvShowSource::to_str);
+    _get_watchlist_shows_db_map(pool, search_query, source, offset, limit)
         .await?
         .map_ok(|row| {
             let source: Option<TvShowSource> = match row.source {
@@ -713,19 +753,21 @@ async fn trakt_cal_list(trakt: &TraktConnection, mc: &MovieCollection) -> Result
     Ok(())
 }
 
-async fn watchlist_add(
+/// # Errors
+/// Return error if db query fails
+pub async fn watchlist_add(
     trakt: &TraktConnection,
     mc: &MovieCollection,
     show: &str,
     imdb_link: Option<&str>,
-) -> Result<(), Error> {
+) -> Result<Option<TraktResult>, Error> {
     trakt.init().await;
     let imdb_url = if let Some(link) = imdb_link {
         link.into()
     } else if let Some(link) = get_imdb_url_from_show(mc, show).await? {
         link
     } else {
-        return Ok(());
+        return Ok(None);
     };
     let result = trakt.add_watchlist_show(&imdb_url).await?;
     mc.stdout.send(format_sstr!("result: {result}"));
@@ -739,14 +781,16 @@ async fn watchlist_add(
         debug!("INSERT SHOW {}", show_obj);
         show_obj.insert_show(&mc.pool).await?;
     }
-    Ok(())
+    Ok(Some(result))
 }
 
-async fn watchlist_rm(
+/// # Errors
+/// Return error if db query fails
+pub async fn watchlist_rm(
     trakt: &TraktConnection,
     mc: &MovieCollection,
     show: &str,
-) -> Result<(), Error> {
+) -> Result<Option<TraktResult>, Error> {
     if let Some(imdb_url) = get_imdb_url_from_show(mc, show).await? {
         let imdb_url_ = imdb_url.clone();
         trakt.init().await;
@@ -755,8 +799,10 @@ async fn watchlist_rm(
         if let Some(show) = WatchListShow::get_show_by_link(&imdb_url, &mc.pool).await? {
             show.delete_show(&mc.pool).await?;
         }
+        Ok(Some(result))
+    } else {
+        Ok(None)
     }
-    Ok(())
 }
 
 async fn watchlist_list(mc: &MovieCollection) -> Result<(), Error> {

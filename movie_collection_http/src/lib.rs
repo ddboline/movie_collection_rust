@@ -390,6 +390,30 @@ struct _PlexFilenameRequest {
     limit: Option<u64>,
 }
 
+#[derive(Default, Clone, Debug, Serialize, Deserialize, Into, From)]
+pub struct TraktWatchlistRequest {
+    pub query: Option<StackString>,
+    pub source: Option<TvShowSourceWrapper>,
+    pub offset: Option<u64>,
+    pub limit: Option<u64>,
+}
+
+derive_rweb_schema!(TraktWatchlistRequest, _TraktWatchlistRequest);
+
+#[allow(dead_code)]
+#[derive(Schema)]
+#[schema(component = "TraktWatchlistRequest")]
+pub struct _TraktWatchlistRequest {
+    #[schema(description = "Search Query")]
+    pub query: Option<StackString>,
+    #[schema(description = "Tv Show Source")]
+    pub source: Option<TvShowSourceWrapper>,
+    #[schema(description = "Offset")]
+    pub offset: Option<StackString>,
+    #[schema(description = "Limit")]
+    pub limit: Option<StackString>,
+}
+
 #[cfg(test)]
 mod test {
     use rweb_helper::derive_rweb_test;

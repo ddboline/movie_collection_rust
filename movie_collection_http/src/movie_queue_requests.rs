@@ -15,11 +15,7 @@ use movie_collection_lib::{
     movie_queue::{MovieQueueDB, MovieQueueResult, MovieQueueRow, OrderBy},
     parse_imdb::{ParseImdb, ParseImdbOptions},
     pgpool::PgPool,
-    trakt_connection::TraktConnection,
-    trakt_utils::{
-        get_watched_shows_db, get_watchlist_shows_db_map, TraktActions, WatchListMap,
-        WatchListShow, WatchedEpisode,
-    },
+    trakt_utils::{get_watched_shows_db, get_watchlist_shows_db_map, WatchedEpisode},
     tv_show_source::TvShowSource,
 };
 
@@ -27,16 +23,6 @@ use crate::{
     errors::ServiceError as Error, movie_queue_elements::parse_imdb_http_body, ImdbEpisodesWrapper,
     ImdbRatingsWrapper, MovieCollectionRowWrapper, MovieQueueRowWrapper, TvShowSourceWrapper,
 };
-
-pub struct WatchlistShowsRequest {}
-
-impl WatchlistShowsRequest {
-    /// # Errors
-    /// Returns error if db query fails
-    pub async fn handle(&self, pool: &PgPool) -> Result<WatchListMap, Error> {
-        get_watchlist_shows_db_map(pool).await.map_err(Into::into)
-    }
-}
 
 #[derive(Debug, Default)]
 pub struct MovieQueueRequest {
@@ -99,37 +85,6 @@ impl ImdbSeasonsRequest {
                 .await
                 .map_err(Into::into)
         }
-    }
-}
-
-pub struct WatchlistActionRequest {
-    pub action: TraktActions,
-    pub imdb_url: StackString,
-}
-
-impl WatchlistActionRequest {
-    /// # Errors
-    /// Return error if api calls fail
-    pub async fn process(
-        self,
-        pool: &PgPool,
-        trakt: &TraktConnection,
-    ) -> Result<StackString, Error> {
-        match self.action {
-            TraktActions::Add => {
-                trakt.init().await;
-                if let Some(show) = trakt.get_watchlist_shows().await?.get(&self.imdb_url) {
-                    show.insert_show(pool).await?;
-                }
-            }
-            TraktActions::Remove => {
-                if let Some(show) = WatchListShow::get_show_by_link(&self.imdb_url, pool).await? {
-                    show.delete_show(pool).await?;
-                }
-            }
-            _ => {}
-        }
-        Ok(self.imdb_url)
     }
 }
 
@@ -220,7 +175,8 @@ impl ImdbShowRequest {
         let mock_stdout = MockStdout::new();
         let stdout = StdoutChannel::with_mock_stdout(mock_stdout.clone(), mock_stdout);
 
-        let watchlist = get_watchlist_shows_db_map(pool).await?;
+        let watchlist =
+            get_watchlist_shows_db_map(pool, Some(&self.show), None, None, None).await?;
         let pi = ParseImdb::new(config, pool, &stdout);
         let body = parse_imdb_http_body(&pi, &self.into(), watchlist)
             .await?

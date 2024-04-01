@@ -64,7 +64,7 @@ fn index_element(cx: Scope) -> Element {
                     "type": "button",
                     name: "tvshows",
                     value: "TVShows",
-                    "onclick": "updateMainArticle('/list/tvshows');",
+                    "onclick": "updateMainArticle('/list/tvshows?offset=0&limit=10');",
                 },
                 input {
                     "type": "button",
@@ -76,7 +76,7 @@ fn index_element(cx: Scope) -> Element {
                     "type": "button",
                     "name": "watchlist",
                     value: "WatchList",
-                    "onclick": "updateMainArticle('/trakt/watchlist');"
+                    "onclick": "updateMainArticle('/trakt/watchlist?offset=0&limit=10');"
                 },
                 input {
                     "type": "button",
@@ -88,13 +88,13 @@ fn index_element(cx: Scope) -> Element {
                     "type": "button",
                     "name": "list",
                     value: "FullQueue",
-                    "onclick": "updateMainArticle('/list/full_queue?limit=20');"
+                    "onclick": "updateMainArticle('/list/full_queue?limit=10');"
                 },
                 input {
                     "type": "button",
                     "name": "plex",
                     value: "PlexList",
-                    "onclick": "updateMainArticle('/list/plex?limit=20');"
+                    "onclick": "updateMainArticle('/list/plex?limit=10');"
                 },
                 input {
                     "type": "button",
@@ -225,7 +225,7 @@ fn MovieQueueElement(
     order_by: Option<OrderBy>,
 ) -> Element {
     let watchlist_url = if patterns.is_empty() {
-        format_sstr!("/trakt/watchlist")
+        format_sstr!("/trakt/watchlist?offset=0&limit=10")
     } else {
         let patterns = patterns.join("_");
         format_sstr!("/trakt/watched/list/{patterns}")
@@ -336,7 +336,7 @@ fn MovieQueueElement(
         }
     });
     let order_by = order_by.unwrap_or(OrderBy::Desc);
-    let limit = limit.unwrap_or(20);
+    let limit = limit.unwrap_or(10);
     let previous_button = if let Some(offset) = offset {
         if *offset < limit {
             None
@@ -400,7 +400,7 @@ fn MovieQueueElement(
     cx.render(rsx! {
         br {
             a {
-                href: "javascript:updateMainArticle('/list/tvshows')",
+                href: "javascript:updateMainArticle('/list/tvshows?offset=0&limit=10')",
                 "Go Back",
             }
         },
@@ -665,7 +665,7 @@ fn FindNewEpisodesElement(
     cx.render(rsx! {
         br {
             a {
-                href: "javascript:updateMainArticle('/list/tvshows')",
+                href: "javascript:updateMainArticle('/list/tvshows?offset=0&limit=10')",
                 "Go Back",
             },
         },
@@ -708,7 +708,14 @@ fn FindNewEpisodesElement(
     })
 }
 
-pub fn tvshows_body(show_map: TvShowsMap, tvshows: Vec<TvShowsResult>) -> String {
+pub fn tvshows_body(
+    show_map: TvShowsMap,
+    tvshows: Vec<TvShowsResult>,
+    query: Option<&str>,
+    source: Option<TvShowSource>,
+    offset: Option<u64>,
+    limit: Option<u64>,
+) -> String {
     let tvshows: HashSet<_> = tvshows
         .into_iter()
         .map(|s| {
@@ -730,8 +737,19 @@ pub fn tvshows_body(show_map: TvShowsMap, tvshows: Vec<TvShowsResult>) -> String
         })
         .collect();
 
-    let mut app =
-        VirtualDom::new_with_props(TvShowsElement, TvShowsElementProps { tvshows, watchlist });
+    let query: Option<StackString> = query.map(Into::into);
+
+    let mut app = VirtualDom::new_with_props(
+        TvShowsElement,
+        TvShowsElementProps {
+            tvshows,
+            watchlist,
+            query,
+            source,
+            offset,
+            limit,
+        },
+    );
     drop(app.rebuild());
     dioxus_ssr::render(&app)
 }
@@ -741,102 +759,214 @@ fn TvShowsElement(
     cx: Scope,
     tvshows: HashSet<ProcessShowItem>,
     watchlist: HashSet<ProcessShowItem>,
+    query: Option<StackString>,
+    source: Option<TvShowSource>,
+    offset: Option<u64>,
+    limit: Option<u64>,
 ) -> Element {
     let watchlist_shows = watchlist
         .iter()
         .filter(|item| tvshows.get(item.link.as_str()).is_none());
 
+    let search_str = query
+        .as_ref()
+        .map_or_else(StackString::new, |s| format_sstr!("&query={s}"));
+    let source_str = source.map_or_else(StackString::new, |s| format_sstr!("&source={s}"));
+
+    let offset = offset.unwrap_or(0) as usize;
+    let limit = limit.unwrap_or(10) as usize;
+
     let mut shows: Vec<_> = tvshows.iter().chain(watchlist_shows).collect();
     shows.sort_by(|x, y| x.show.cmp(&y.show));
 
-    let entries = shows.into_iter().enumerate().map(|(idx, item)| {
-        let link = item.link.as_str();
-        let title = &item.title;
-        let show = &item.show;
-        let has_watchlist = watchlist.contains(link);
-        let watchlist = if has_watchlist {
+    let entries = shows
+        .into_iter()
+        .skip(offset)
+        .take(limit)
+        .enumerate()
+        .map(|(idx, item)| {
+            let link = item.link.as_str();
+            let title = &item.title;
+            let show = &item.show;
+            let has_watchlist = watchlist.contains(link);
+            let watchlist = if has_watchlist {
+                Some(rsx! {
+                    a {
+                        href: "javascript:updateMainArticle('/trakt/watched/list/{link}')",
+                        "watchlist",
+                    }
+                })
+            } else {
+                None
+            };
+            let title_element = if tvshows.contains(link) {
+                rsx! {
+                    a {
+                        href: "javascript:updateMainArticle('/list/queue/{show}')",
+                        "{title}",
+                    }
+                }
+            } else {
+                rsx! {
+                    a {
+                        href: "javascript:updateMainArticle('/trakt/watched/list/{link}')",
+                        "{title}",
+                    }
+                }
+            };
+            let src = match item.source {
+                Some(TvShowSource::Netflix) => {
+                    Some(rsx! {a {href: "https://netflix.com", target: "_blank", "netflix"}})
+                }
+                Some(TvShowSource::Hulu) => {
+                    Some(rsx! {a {href: "https://hulu.com", target: "_blank", "hulu"}})
+                }
+                Some(TvShowSource::Amazon) => {
+                    Some(rsx! {a {href: "https://amazon.com", target: "_blank", "amazon"}})
+                }
+                _ => None,
+            };
+            let sh = if has_watchlist {
+                rsx! {
+                    td {
+                        button {
+                            "type": "submit",
+                            id: "remove-link",
+                            "onclick": "watchlist_rm('{show}');",
+                            "remove to watchlist"
+                        }
+                    }
+                }
+            } else {
+                rsx! {
+                    td {
+                        button {
+                            "type": "submit",
+                            id: "add-link",
+                            "onclick": "watchlist_add('{show}');",
+                            "add to watchlist"
+                        }
+                    }
+                }
+            };
+
+            rsx! {
+                tr {
+                    key: "show-key-{idx}",
+                    td {title_element},
+                    td {
+                        a {
+                            href: "https://www.imdb.com/title/{link}",
+                            target: "_blank",
+                            "imdb",
+                        }
+                    },
+                    td {src},
+                    td {watchlist},
+                    td {sh},
+                }
+            }
+        });
+
+    let options = [
+        (TvShowSource::All, "all", ""),
+        (TvShowSource::Amazon, "amazon", "Amazon"),
+        (TvShowSource::Hulu, "hulu", "Hulu"),
+        (TvShowSource::Netflix, "netflix", "Netflix"),
+    ];
+
+    let previous_button = {
+        let search_str = search_str.clone();
+        let source_str = source_str.clone();
+        if offset < limit {
+            None
+        } else {
+            let new_offset = offset - limit;
+            let search_str = search_str.clone();
             Some(rsx! {
-                a {
-                    href: "javascript:updateMainArticle('/trakt/watched/list/{link}')",
-                    "watchlist",
+                button {
+                    "type": "submit",
+                    name: "previous",
+                    value: "Previous",
+                    "onclick": "updateMainArticle('/list/tvshows?limit={limit}&offset={new_offset}{search_str}{source_str}')",
+                    "Previous",
                 }
             })
-        } else {
-            None
-        };
-        let title_element = if tvshows.contains(link) {
-            rsx! {
-                a {
-                    href: "javascript:updateMainArticle('/list/queue/{show}')",
-                    "{title}",
-                }
-            }
-        } else {
-            rsx! {
-                a {
-                    href: "javascript:updateMainArticle('/trakt/watched/list/{link}')",
-                    "{title}",
-                }
-            }
-        };
-        let src = match item.source {
-            Some(TvShowSource::Netflix) => {
-                Some(rsx! {a {href: "https://netflix.com", target: "_blank", "netflix"}})
-            }
-            Some(TvShowSource::Hulu) => {
-                Some(rsx! {a {href: "https://hulu.com", target: "_blank", "hulu"}})
-            }
-            Some(TvShowSource::Amazon) => {
-                Some(rsx! {a {href: "https://amazon.com", target: "_blank", "amazon"}})
-            }
-            _ => None,
-        };
-        let sh = if has_watchlist {
-            rsx! {
-                td {
-                    button {
-                        "type": "submit",
-                        id: "remove-link",
-                        "onclick": "watchlist_rm('{link}');",
-                        "remove to watchlist"
-                    }
-                }
-            }
-        } else {
-            rsx! {
-                td {
-                    button {
-                        "type": "submit",
-                        id: "add-link",
-                        "onclick": "watchlist_add('{link}');",
-                        "add to watchlist"
-                    }
-                }
-            }
-        };
+        }
+    };
 
+    let new_offset = offset + limit;
+    let next_button = {
+        let search_str = search_str.clone();
+        let source_str = source_str.clone();
         rsx! {
-            tr {
-                key: "show-key-{idx}",
-                td {title_element},
-                td {
-                    a {
-                        href: "https://www.imdb.com/title/{link}",
-                        target: "_blank",
-                        "imdb",
-                    }
-                },
-                td {src},
-                td {watchlist},
-                td {sh},
+            button {
+                "type": "submit",
+                name: "next",
+                value: "Next",
+                "onclick": "updateMainArticle('/list/tvshows?limit={limit}&offset={new_offset}{search_str}{source_str}')",
+                "Next",
             }
         }
-    });
+    };
+
+    let search = {
+        let source_str = source_str.clone();
+        rsx! {
+            form {
+                action: "javascript:searchTvShows('/list/tvshows?offset=0&limit=10{source_str}')",
+                input {
+                    "type": "text",
+                    name: "search",
+                    id: "tv_shows_search",
+                },
+                input {
+                    "type": "button",
+                    name: "submitSearch",
+                    value: "Search",
+                    "onclick": "searchTvShows('/list/tvshows?offset=0&limit=10{source_str}')",
+                }
+            }
+        }
+    };
+
+    let source_button = {
+        let search_str = search_str.clone();
+        rsx! {
+            form {
+                action: "javascript:sourceTvShows('/list/tvshows?offset=0&limit=10{search_str}')",
+                select {
+                    id: "tv_shows_source_id",
+                    "onchange": "sourceTvShows('/list/tvshows?offset=0&limit=10{search_str}');",
+                    options.iter().enumerate().map(|(i, (s, v, l))| {
+                        if (source.is_none() && *s == TvShowSource::All) || *source == Some(*s) {
+                            rsx! {
+                                option {
+                                    key: "source-option-{i}",
+                                    value: "{v}",
+                                    selected: true,
+                                    "{l}",
+                                }
+                            }
+                        } else {
+                            rsx! {
+                                option {
+                                    key: "source-option-{i}",
+                                    value: "{v}",
+                                    "{l}",
+                                }
+                            }
+                        }
+                    }),
+                }
+            }
+        }
+    };
 
     cx.render(rsx! {
         br {
             a {
-                href: "javascript:updateMainArticle('/list/watchlist')",
+                href: "javascript:updateMainArticle('/trakt/watchlist')",
                 "Go Back",
             },
         }
@@ -844,6 +974,12 @@ fn TvShowsElement(
             href: "javascript:updateMainArticle('/trakt/watchlist')",
             "Watch List",
         },
+        br {
+            source_button,
+            previous_button,
+            next_button,
+        }
+        search,
         br {
             button {
                 name: "remcomout",
@@ -859,7 +995,13 @@ fn TvShowsElement(
     })
 }
 
-pub fn watchlist_body(shows: WatchListMap) -> String {
+pub fn watchlist_body(
+    shows: WatchListMap,
+    query: Option<&str>,
+    offset: Option<u64>,
+    limit: Option<u64>,
+    source: Option<TvShowSource>,
+) -> String {
     let mut shows: Vec<_> = shows
         .into_iter()
         .map(|(_, (_, s, source))| WatchListEntry {
@@ -869,7 +1011,17 @@ pub fn watchlist_body(shows: WatchListMap) -> String {
         })
         .collect();
     shows.sort();
-    let mut app = VirtualDom::new_with_props(WatchlistElement, WatchlistElementProps { shows });
+    let query = query.map(Into::into);
+    let mut app = VirtualDom::new_with_props(
+        WatchlistElement,
+        WatchlistElementProps {
+            shows,
+            query,
+            offset,
+            limit,
+            source,
+        },
+    );
     drop(app.rebuild());
     dioxus_ssr::render(&app)
 }
@@ -882,7 +1034,14 @@ struct WatchListEntry {
 }
 
 #[component]
-fn WatchlistElement(cx: Scope, shows: Vec<WatchListEntry>) -> Element {
+fn WatchlistElement(
+    cx: Scope,
+    shows: Vec<WatchListEntry>,
+    query: Option<StackString>,
+    offset: Option<u64>,
+    limit: Option<u64>,
+    source: Option<TvShowSource>,
+) -> Element {
     let shows = shows.iter().enumerate().map(|(idx, entry)| {
         let title = &entry.title;
         let link = &entry.link;
@@ -942,12 +1101,122 @@ fn WatchlistElement(cx: Scope, shows: Vec<WatchListEntry>) -> Element {
             }
         }
     });
+
+    let search_str = query
+        .as_ref()
+        .map_or_else(StackString::new, |s| format_sstr!("&query={s}"));
+    let source_str = source.map_or_else(StackString::new, |s| format_sstr!("&source={s}"));
+
+    let offset = offset.unwrap_or(0) as usize;
+    let limit = limit.unwrap_or(10) as usize;
+
+    let search = {
+        let source_str = source_str.clone();
+        rsx! {
+            form {
+                action: "javascript:searchWatchlist('/trakt/watchlist?offset=0&limit=10{source_str}')",
+                input {
+                    "type": "text",
+                    name: "search",
+                    id: "watchlist_search",
+                },
+                input {
+                    "type": "button",
+                    name: "submitSearch",
+                    value: "Search",
+                    "onclick": "searchWatchlist('/trakt/watchlist?offset=0&limit=10{source_str}')",
+                }
+            }
+        }
+    };
+
+    let options = [
+        (TvShowSource::All, "all", ""),
+        (TvShowSource::Amazon, "amazon", "Amazon"),
+        (TvShowSource::Hulu, "hulu", "Hulu"),
+        (TvShowSource::Netflix, "netflix", "Netflix"),
+    ];
+
+    let source_button = {
+        let search_str = search_str.clone();
+        rsx! {
+            form {
+                action: "javascript:sourceWatchlist('/trakt/watchlist?offset=0&limit=10{search_str}')",
+                select {
+                    id: "watchlist_source_id",
+                    "onchange": "sourceWatchlist('/trakt/watchlist?offset=0&limit=10{search_str}');",
+                    options.iter().enumerate().map(|(i, (s, v, l))| {
+                        if (source.is_none() && *s == TvShowSource::All) || *source == Some(*s) {
+                            rsx! {
+                                option {
+                                    key: "source-option-{i}",
+                                    value: "{v}",
+                                    selected: true,
+                                    "{l}",
+                                }
+                            }
+                        } else {
+                            rsx! {
+                                option {
+                                    key: "source-option-{i}",
+                                    value: "{v}",
+                                    "{l}",
+                                }
+                            }
+                        }
+                    }),
+                }
+            }
+        }
+    };
+
+    let previous_button = {
+        let search_str = search_str.clone();
+        let source_str = source_str.clone();
+        if offset < limit {
+            None
+        } else {
+            let new_offset = offset - limit;
+            let search_str = search_str.clone();
+            Some(rsx! {
+                button {
+                    "type": "submit",
+                    name: "previous",
+                    value: "Previous",
+                    "onclick": "updateMainArticle('/trakt/watchlist?limit={limit}&offset={new_offset}{search_str}{source_str}')",
+                    "Previous",
+                }
+            })
+        }
+    };
+
+    let new_offset = offset + limit;
+    let next_button = {
+        let search_str = search_str.clone();
+        let source_str = source_str.clone();
+        rsx! {
+            button {
+                "type": "submit",
+                name: "next",
+                value: "Next",
+                "onclick": "updateMainArticle('/trakt/watchlist?limit={limit}&offset={new_offset}{search_str}{source_str}')",
+                "Next",
+            }
+        }
+    };
+
     cx.render(rsx! {
         br {
             a {
-                href: "javascript:updateMainArticle('/list/tvshows')",
+                href: "javascript:updateMainArticle('/trakt/watchlist?offset=0&limit=10')",
                 "Go Back",
             },
+        }
+        search,
+        br {
+            source_button,
+            previous_button,
+            next_button,
         }
         table {
             "border": "0",
@@ -1140,7 +1409,7 @@ fn TraktCalHttpElement(cx: Scope, entries: Vec<CalEntry>) -> Element {
     cx.render(rsx! {
         br {
             a {
-                href: "javascript:updateMainArticle('/list/tvshows')",
+                href: "javascript:updateMainArticle('/list/tvshows?offset=0&limit=10')",
                 "Go Back",
             },
         },
@@ -1344,10 +1613,12 @@ pub async fn parse_imdb_http_body(
     watchlist: WatchListMap,
 ) -> Result<String, Error> {
     let imdb_urls = imdb.parse_imdb_worker(opts).await?;
+    let show = opts.show.clone();
 
     let mut app = VirtualDom::new_with_props(
         ParseImdbHttpElement,
         ParseImdbHttpElementProps {
+            show,
             imdb_urls,
             watchlist,
         },
@@ -1359,6 +1630,7 @@ pub async fn parse_imdb_http_body(
 #[component]
 fn ParseImdbHttpElement(
     cx: Scope,
+    show: StackString,
     imdb_urls: Vec<Vec<StackString>>,
     watchlist: WatchListMap,
 ) -> Element {
@@ -1388,7 +1660,7 @@ fn ParseImdbHttpElement(
                         button {
                             "type": "submit",
                             id: "watchlist-rm-{idx}",
-                            "onclick": "watchlist_rm('{imdb_url}');",
+                            "onclick": "watchlist_rm('{show}');",
                             "remove from watchlist",
                         }
                     }
@@ -1399,7 +1671,7 @@ fn ParseImdbHttpElement(
                         button {
                             "type": "submit",
                             id: "watchlist-add-{idx}",
-                            "onclick": "watchlist_add('{imdb_url}');",
+                            "onclick": "watchlist_add('{show}');",
                             "add from watchlist",
                         }
                     }
@@ -1497,7 +1769,7 @@ fn PlexElement(
             }
         }
     });
-    let limit = limit.unwrap_or(20);
+    let limit = limit.unwrap_or(10);
     let section_str = section.map_or_else(|| StackString::from("null"), |s| format_sstr!("'{s}'"));
     let previous_button = if let Some(offset) = offset {
         if *offset < limit {
@@ -1646,7 +1918,7 @@ fn PlexDetailElement(
         .map_or("", StackString::as_str);
     let filename = event.filename.as_ref().map_or("", StackString::as_str);
 
-    let limit = limit.unwrap_or(20);
+    let limit = limit.unwrap_or(10);
     let offset = offset.unwrap_or(0);
 
     cx.render(rsx! {

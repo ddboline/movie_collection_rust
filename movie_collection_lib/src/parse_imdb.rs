@@ -158,12 +158,12 @@ impl ParseImdb {
         let link = if let Some(link) = &opts.imdb_link {
             Some(link.clone())
         } else {
-            results.get(0).map(|result| result.link.clone())
+            results.first().map(|result| result.link.clone())
         };
 
         if !opts.tv {
             if opts.update_database {
-                if let Some(result) = results.get(0) {
+                if let Some(result) = results.first() {
                     let show = &opts.show;
                     let rating = result.rating;
                     if let Some(s) = shows.get(&result.link) {
