@@ -99,7 +99,7 @@ impl FromStr for TraktCommands {
     }
 }
 
-#[derive(Serialize, Deserialize, Debug, PartialEq, Eq)]
+#[derive(Serialize, Deserialize, Debug, PartialEq, Eq, Clone)]
 pub struct TraktCalEntry {
     pub ep_link: Option<StackString>,
     pub episode: i32,
@@ -137,7 +137,7 @@ impl fmt::Display for TraktResult {
     }
 }
 
-#[derive(Serialize, Deserialize, Debug, Default, FromSqlRow, Eq)]
+#[derive(Serialize, Deserialize, Debug, Default, FromSqlRow, Eq, Clone)]
 pub struct WatchListShow {
     pub link: StackString,
     pub show: Option<StackString>,

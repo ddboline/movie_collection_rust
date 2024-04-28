@@ -571,7 +571,7 @@ fn tmp_dir(config: &Config) -> PathBuf {
     config.home_dir.join("tmp_avi")
 }
 
-#[derive(Debug, PartialEq, Eq)]
+#[derive(Debug, PartialEq, Eq, Clone)]
 pub struct ProcInfo {
     pub pid: u64,
     pub name: StackString,
@@ -631,7 +631,7 @@ impl fmt::Display for ProcInfo {
     }
 }
 
-#[derive(Debug, PartialEq, Eq)]
+#[derive(Debug, PartialEq, Eq, Clone)]
 pub struct TranscodeStatus {
     pub procs: Vec<ProcInfo>,
     pub upcoming_jobs: Vec<TranscodeServiceRequest>,

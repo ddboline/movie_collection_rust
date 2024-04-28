@@ -1,7 +1,6 @@
 use anyhow::{format_err, Error};
 use dioxus::prelude::{
-    component, dioxus_elements, rsx, Element, GlobalAttributes, IntoDynNode, LazyNodes, Props,
-    Scope, VirtualDom,
+    component, dioxus_elements, rsx, Element, GlobalAttributes, IntoDynNode, Props, VirtualDom,
 };
 use futures::{future::try_join_all, TryStreamExt};
 use rust_decimal_macros::dec;
@@ -43,14 +42,21 @@ use crate::{
     OrderBy,
 };
 
-pub fn index_body() -> String {
+/// # Errors
+/// Returns error if formatting fails
+pub fn index_body() -> Result<String, Error> {
     let mut app = VirtualDom::new(index_element);
-    drop(app.rebuild());
-    dioxus_ssr::render(&app)
+    app.rebuild_in_place();
+    let mut renderer = dioxus_ssr::Renderer::default();
+    let mut buffer = String::new();
+    renderer
+        .render_to(&mut buffer, &app)
+        .map_err(Into::<Error>::into)?;
+    Ok(buffer)
 }
 
-fn index_element(cx: Scope) -> Element {
-    cx.render(rsx! {
+fn index_element() -> Element {
+    rsx! {
         head {
             style {
                 dangerous_inner_html: include_str!("../../templates/style.css")
@@ -123,10 +129,10 @@ fn index_element(cx: Scope) -> Element {
                 }
             }
         }
-    })
+    }
 }
 
-#[derive(PartialEq)]
+#[derive(PartialEq, Clone)]
 struct QueueEntry {
     row: MovieQueueResult,
     ext: StackString,
@@ -209,13 +215,17 @@ pub async fn movie_queue_body(
             order_by,
         },
     );
-    drop(app.rebuild());
-    Ok(dioxus_ssr::render(&app))
+    app.rebuild_in_place();
+    let mut renderer = dioxus_ssr::Renderer::default();
+    let mut buffer = String::new();
+    renderer
+        .render_to(&mut buffer, &app)
+        .map_err(Into::<Error>::into)?;
+    Ok(buffer)
 }
 
 #[component]
 fn MovieQueueElement(
-    cx: Scope,
     config: Config,
     patterns: Vec<StackString>,
     entries: Vec<QueueEntry>,
@@ -270,7 +280,7 @@ fn MovieQueueElement(
         let row_entry = if let Some(link) = entry.row.link.as_ref() {
             rsx! {
                 td {
-                    filename_entry,
+                    {filename_entry},
                 },
                 td {
                     a {
@@ -282,7 +292,7 @@ fn MovieQueueElement(
             }
         } else {
             rsx! {
-                td {filename_entry},
+                td {{filename_entry}},
             }
         };
 
@@ -325,12 +335,12 @@ fn MovieQueueElement(
         rsx! {
             tr {
                 key: "queue-key-{idx}",
-                row_entry,
+                {row_entry},
                 td {
-                    remove_button,
+                    {remove_button},
                 },
                 td {
-                    transcode_button,
+                    {transcode_button},
                 }
             }
         }
@@ -338,10 +348,10 @@ fn MovieQueueElement(
     let order_by = order_by.unwrap_or(OrderBy::Desc);
     let limit = limit.unwrap_or(10);
     let previous_button = if let Some(offset) = offset {
-        if *offset < limit {
+        if offset < limit {
             None
         } else {
-            let new_offset = *offset - limit;
+            let new_offset = offset - limit;
             Some(rsx! {
                 button {
                     "type": "submit",
@@ -397,7 +407,7 @@ fn MovieQueueElement(
         }
     };
 
-    cx.render(rsx! {
+    rsx! {
         br {
             a {
                 href: "javascript:updateMainArticle('/list/tvshows?offset=0&limit=10')",
@@ -409,19 +419,19 @@ fn MovieQueueElement(
             "Watch List",
         },
         br {
-            order_by_button,
-            previous_button,
-            next_button,
+            {order_by_button},
+            {previous_button},
+            {next_button},
         }
-        search,
+        {search},
         table {
             "border": "0",
             "align": "center",
             tbody {
-                queue_entries
+                {queue_entries}
             }
         }
-    })
+    }
 }
 
 /// # Errors
@@ -456,15 +466,20 @@ pub fn play_worker_body(
                 last_url,
             },
         );
-        drop(app.rebuild());
-        Ok(dioxus_ssr::render(&app))
+        app.rebuild_in_place();
+        let mut renderer = dioxus_ssr::Renderer::default();
+        let mut buffer = String::new();
+        renderer
+            .render_to(&mut buffer, &app)
+            .map_err(Into::<Error>::into)?;
+        Ok(buffer)
     } else {
         Err(format_err!("video playback path does not exist"))
     }
 }
 
 #[component]
-fn PlayWorkerElement(cx: Scope, file_name: StackString, last_url: Option<StackString>) -> Element {
+fn PlayWorkerElement(file_name: StackString, last_url: Option<StackString>) -> Element {
     let back_button = if let Some(last_url) = last_url {
         Some(rsx! {
             input {
@@ -479,9 +494,9 @@ fn PlayWorkerElement(cx: Scope, file_name: StackString, last_url: Option<StackSt
     };
     let url = format_sstr!("/videos/partial/{file_name}");
 
-    cx.render(rsx! {
+    rsx! {
         br {
-            back_button,
+            {back_button},
         }
         video {
             width: "720",
@@ -492,7 +507,7 @@ fn PlayWorkerElement(cx: Scope, file_name: StackString, last_url: Option<StackSt
             },
             "Your browser does not support HTML5 video.",
         }
-    })
+    }
 }
 
 type QueueKey = (StackString, i32, i32);
@@ -576,13 +591,17 @@ pub async fn find_new_episodes_body(
             source,
         },
     );
-    drop(app.rebuild());
-    Ok(dioxus_ssr::render(&app))
+    app.rebuild_in_place();
+    let mut renderer = dioxus_ssr::Renderer::default();
+    let mut buffer = String::new();
+    renderer
+        .render_to(&mut buffer, &app)
+        .map_err(Into::<Error>::into)?;
+    Ok(buffer)
 }
 
 #[component]
 fn FindNewEpisodesElement(
-    cx: Scope,
     episodes: Vec<NewEpisodesResult>,
     queue: HashMap<QueueKey, QueueValue>,
     source: Option<TvShowSource>,
@@ -635,7 +654,7 @@ fn FindNewEpisodesElement(
                     }
                 },
                 td {
-                    title_element,
+                    {title_element},
                 },
                 td {
                     a {
@@ -662,7 +681,7 @@ fn FindNewEpisodesElement(
         }
     });
 
-    cx.render(rsx! {
+    rsx! {
         br {
             a {
                 href: "javascript:updateMainArticle('/list/tvshows?offset=0&limit=10')",
@@ -702,12 +721,14 @@ fn FindNewEpisodesElement(
             table {
                 "border": "0",
                 "align": "center",
-                episode_entries,
+                {episode_entries},
             }
         }
-    })
+    }
 }
 
+/// # Errors
+/// Returns error if formatting fails
 pub fn tvshows_body(
     show_map: TvShowsMap,
     tvshows: Vec<TvShowsResult>,
@@ -715,7 +736,7 @@ pub fn tvshows_body(
     source: Option<TvShowSource>,
     offset: Option<u64>,
     limit: Option<u64>,
-) -> String {
+) -> Result<String, Error> {
     let tvshows: HashSet<_> = tvshows
         .into_iter()
         .map(|s| {
@@ -750,13 +771,17 @@ pub fn tvshows_body(
             limit,
         },
     );
-    drop(app.rebuild());
-    dioxus_ssr::render(&app)
+    app.rebuild_in_place();
+    let mut renderer = dioxus_ssr::Renderer::default();
+    let mut buffer = String::new();
+    renderer
+        .render_to(&mut buffer, &app)
+        .map_err(Into::<Error>::into)?;
+    Ok(buffer)
 }
 
 #[component]
 fn TvShowsElement(
-    cx: Scope,
     tvshows: HashSet<ProcessShowItem>,
     watchlist: HashSet<ProcessShowItem>,
     query: Option<StackString>,
@@ -853,7 +878,7 @@ fn TvShowsElement(
             rsx! {
                 tr {
                     key: "show-key-{idx}",
-                    td {title_element},
+                    td {{title_element}},
                     td {
                         a {
                             href: "https://www.imdb.com/title/{link}",
@@ -861,9 +886,9 @@ fn TvShowsElement(
                             "imdb",
                         }
                     },
-                    td {src},
-                    td {watchlist},
-                    td {sh},
+                    td {{src}},
+                    td {{watchlist}},
+                    td {{sh}},
                 }
             }
         });
@@ -938,8 +963,8 @@ fn TvShowsElement(
                 select {
                     id: "tv_shows_source_id",
                     "onchange": "sourceTvShows('/list/tvshows?offset=0&limit=10{search_str}');",
-                    options.iter().enumerate().map(|(i, (s, v, l))| {
-                        if (source.is_none() && *s == TvShowSource::All) || *source == Some(*s) {
+                    {options.iter().enumerate().map(|(i, (s, v, l))| {
+                        if (source.is_none() && *s == TvShowSource::All) || source == Some(*s) {
                             rsx! {
                                 option {
                                     key: "source-option-{i}",
@@ -957,13 +982,13 @@ fn TvShowsElement(
                                 }
                             }
                         }
-                    }),
+                    })},
                 }
             }
         }
     };
 
-    cx.render(rsx! {
+    rsx! {
         br {
             a {
                 href: "javascript:updateMainArticle('/trakt/watchlist')",
@@ -975,11 +1000,11 @@ fn TvShowsElement(
             "Watch List",
         },
         br {
-            source_button,
-            previous_button,
-            next_button,
+            {source_button},
+            {previous_button},
+            {next_button},
         }
-        search,
+        {search},
         br {
             button {
                 name: "remcomout",
@@ -990,18 +1015,20 @@ fn TvShowsElement(
         table {
             "border": "0",
             "align": "center",
-            entries,
+            {entries},
         }
-    })
+    }
 }
 
+/// # Errors
+/// Returns error if formatting fails
 pub fn watchlist_body(
     shows: WatchListMap,
     query: Option<&str>,
     offset: Option<u64>,
     limit: Option<u64>,
     source: Option<TvShowSource>,
-) -> String {
+) -> Result<String, Error> {
     let mut shows: Vec<_> = shows
         .into_iter()
         .map(|(_, (_, s, source))| WatchListEntry {
@@ -1022,11 +1049,16 @@ pub fn watchlist_body(
             source,
         },
     );
-    drop(app.rebuild());
-    dioxus_ssr::render(&app)
+    app.rebuild_in_place();
+    let mut renderer = dioxus_ssr::Renderer::default();
+    let mut buffer = String::new();
+    renderer
+        .render_to(&mut buffer, &app)
+        .map_err(Into::<Error>::into)?;
+    Ok(buffer)
 }
 
-#[derive(PartialEq, Eq, PartialOrd, Ord)]
+#[derive(PartialEq, Eq, PartialOrd, Ord, Clone)]
 struct WatchListEntry {
     title: StackString,
     link: StackString,
@@ -1035,7 +1067,6 @@ struct WatchListEntry {
 
 #[component]
 fn WatchlistElement(
-    cx: Scope,
     shows: Vec<WatchListEntry>,
     query: Option<StackString>,
     offset: Option<u64>,
@@ -1075,7 +1106,7 @@ fn WatchlistElement(
                         select {
                             id: "{link}_source_id",
                             "onchange": "setSource('{link}', '{link}_source_id');",
-                            options.iter().enumerate().map(|(i, (s, v, l))| {
+                            {options.iter().enumerate().map(|(i, (s, v, l))| {
                                 if (source.is_none() && *s == TvShowSource::All) || source == Some(*s) {
                                     rsx! {
                                         option {
@@ -1094,7 +1125,7 @@ fn WatchlistElement(
                                         }
                                     }
                                 }
-                            }),
+                            })},
                         }
                     }
                 }
@@ -1145,8 +1176,8 @@ fn WatchlistElement(
                 select {
                     id: "watchlist_source_id",
                     "onchange": "sourceWatchlist('/trakt/watchlist?offset=0&limit=10{search_str}');",
-                    options.iter().enumerate().map(|(i, (s, v, l))| {
-                        if (source.is_none() && *s == TvShowSource::All) || *source == Some(*s) {
+                    {options.iter().enumerate().map(|(i, (s, v, l))| {
+                        if (source.is_none() && *s == TvShowSource::All) || source == Some(*s) {
                             rsx! {
                                 option {
                                     key: "source-option-{i}",
@@ -1164,7 +1195,7 @@ fn WatchlistElement(
                                 }
                             }
                         }
-                    }),
+                    })},
                 }
             }
         }
@@ -1205,32 +1236,34 @@ fn WatchlistElement(
         }
     };
 
-    cx.render(rsx! {
+    rsx! {
         br {
             a {
                 href: "javascript:updateMainArticle('/trakt/watchlist?offset=0&limit=10')",
                 "Go Back",
             },
         }
-        search,
+        {search},
         br {
-            source_button,
-            previous_button,
-            next_button,
+            {source_button},
+            {previous_button},
+            {next_button},
         }
         table {
             "border": "0",
             "align": "center",
-            shows
+            {shows}
         }
-    })
+    }
 }
 
+/// # Errors
+/// Returns error if formatting fails
 pub fn trakt_watched_seasons_body(
     link: StackString,
     imdb_url: StackString,
     entries: Vec<ImdbSeason>,
-) -> String {
+) -> Result<String, Error> {
     let mut app = VirtualDom::new_with_props(
         TraktWatchedSeasonsElement,
         TraktWatchedSeasonsElementProps {
@@ -1239,13 +1272,17 @@ pub fn trakt_watched_seasons_body(
             entries,
         },
     );
-    drop(app.rebuild());
-    dioxus_ssr::render(&app)
+    app.rebuild_in_place();
+    let mut renderer = dioxus_ssr::Renderer::default();
+    let mut buffer = String::new();
+    renderer
+        .render_to(&mut buffer, &app)
+        .map_err(Into::<Error>::into)?;
+    Ok(buffer)
 }
 
 #[component]
 fn TraktWatchedSeasonsElement(
-    cx: Scope,
     link: StackString,
     imdb_url: StackString,
     entries: Vec<ImdbSeason>,
@@ -1278,12 +1315,12 @@ fn TraktWatchedSeasonsElement(
                 },
                 td {"{season}"},
                 td {"{nepisodes}"},
-                td {button_add},
+                td {{button_add}},
             }
         }
     });
 
-    cx.render(rsx! {
+    rsx! {
         br {
             a {
                 href: "javascript:updateMainArticle('/trakt/watchlist')",
@@ -1293,12 +1330,12 @@ fn TraktWatchedSeasonsElement(
         table {
             "border": "0",
             "align": "center",
-            entries,
+            {entries},
         }
-    })
+    }
 }
 
-#[derive(PartialEq)]
+#[derive(PartialEq, Clone)]
 struct CalEntry {
     cal_entry: TraktCalEntry,
     episode: Option<ImdbEpisodes>,
@@ -1335,12 +1372,17 @@ pub async fn trakt_cal_http_body(pool: &PgPool, trakt: &TraktConnection) -> Resu
     }
     let mut app =
         VirtualDom::new_with_props(TraktCalHttpElement, TraktCalHttpElementProps { entries });
-    drop(app.rebuild());
-    Ok(dioxus_ssr::render(&app))
+    app.rebuild_in_place();
+    let mut renderer = dioxus_ssr::Renderer::default();
+    let mut buffer = String::new();
+    renderer
+        .render_to(&mut buffer, &app)
+        .map_err(Into::<Error>::into)?;
+    Ok(buffer)
 }
 
 #[component]
-fn TraktCalHttpElement(cx: Scope, entries: Vec<CalEntry>) -> Element {
+fn TraktCalHttpElement(entries: Vec<CalEntry>) -> Element {
     let entries = entries.iter().enumerate().map(|(idx, entry)| {
         let link = &entry.cal_entry.link;
         let show = &entry.cal_entry.show;
@@ -1398,15 +1440,15 @@ fn TraktCalHttpElement(cx: Scope, entries: Vec<CalEntry>) -> Element {
                     }
                 },
                 td {
-                    season_episode,
+                    {season_episode},
                 },
                 td {"{airdate}"},
-                td {button},
+                td {{button}},
             }
         }
     });
 
-    cx.render(rsx! {
+    rsx! {
         br {
             a {
                 href: "javascript:updateMainArticle('/list/tvshows?offset=0&limit=10')",
@@ -1416,9 +1458,9 @@ fn TraktCalHttpElement(cx: Scope, entries: Vec<CalEntry>) -> Element {
         table {
             "border": "0",
             "align": "center",
-            entries,
+            {entries},
         }
-    })
+    }
 }
 
 /// # Errors
@@ -1487,13 +1529,17 @@ pub async fn watch_list_http_body(
             watched_episodes_db,
         },
     );
-    drop(app.rebuild());
-    Ok(dioxus_ssr::render(&app))
+    app.rebuild_in_place();
+    let mut renderer = dioxus_ssr::Renderer::default();
+    let mut buffer = String::new();
+    renderer
+        .render_to(&mut buffer, &app)
+        .map_err(Into::<Error>::into)?;
+    Ok(buffer)
 }
 
 #[component]
 fn WatchListHttpElement(
-    cx: Scope,
     config: Config,
     imdb_url: StackString,
     show: ImdbRatings,
@@ -1562,7 +1608,7 @@ fn WatchListHttpElement(
                 td {
                     "{show_str}",
                 },
-                td {play_entry},
+                td {{play_entry}},
                 td {
                     a {
                         href: "https://www.imdb.com/title/{ep_url}",
@@ -1573,13 +1619,13 @@ fn WatchListHttpElement(
                 td {"rating: {ep_rating:0.1} {show_rating:0.1}"},
                 td {"{airdate}"},
                 td {
-                    button
+                    {button}
                 },
             }
         }
     });
 
-    cx.render(rsx! {
+    rsx! {
         br {
             a {
                 href: "javascript:updateMainArticle('/trakt/watched/list/{imdb_url}')",
@@ -1600,9 +1646,9 @@ fn WatchListHttpElement(
         table {
             "border": "0",
             "align": "center",
-            entries,
+            {entries},
         }
-    })
+    }
 }
 
 /// # Errors
@@ -1623,13 +1669,17 @@ pub async fn parse_imdb_http_body(
             watchlist,
         },
     );
-    drop(app.rebuild());
-    Ok(dioxus_ssr::render(&app))
+    app.rebuild_in_place();
+    let mut renderer = dioxus_ssr::Renderer::default();
+    let mut buffer = String::new();
+    renderer
+        .render_to(&mut buffer, &app)
+        .map_err(Into::<Error>::into)?;
+    Ok(buffer)
 }
 
 #[component]
 fn ParseImdbHttpElement(
-    cx: Scope,
     show: StackString,
     imdb_urls: Vec<Vec<StackString>>,
     watchlist: WatchListMap,
@@ -1682,24 +1732,26 @@ fn ParseImdbHttpElement(
         rsx! {
             tr {
                 key: "imdb-entries-{idx}",
-                td {tmp},
-                td {button},
+                td {{tmp}},
+                td {{button}},
             }
         }
     });
 
-    cx.render(rsx! {
-        entries
-    })
+    rsx! {
+        {entries}
+    }
 }
 
+/// # Errors
+/// Returns error if formatting fails
 pub fn plex_body(
     config: Config,
     events: Vec<EventOutput>,
     section: Option<PlexSectionType>,
     offset: Option<u64>,
     limit: Option<u64>,
-) -> String {
+) -> Result<String, Error> {
     let mut app = VirtualDom::new_with_props(
         PlexElement,
         PlexElementProps {
@@ -1710,13 +1762,17 @@ pub fn plex_body(
             limit,
         },
     );
-    drop(app.rebuild());
-    dioxus_ssr::render(&app)
+    app.rebuild_in_place();
+    let mut renderer = dioxus_ssr::Renderer::default();
+    let mut buffer = String::new();
+    renderer
+        .render_to(&mut buffer, &app)
+        .map_err(Into::<Error>::into)?;
+    Ok(buffer)
 }
 
 #[component]
 fn PlexElement(
-    cx: Scope,
     config: Config,
     events: Vec<EventOutput>,
     section: Option<PlexSectionType>,
@@ -1772,10 +1828,10 @@ fn PlexElement(
     let limit = limit.unwrap_or(10);
     let section_str = section.map_or_else(|| StackString::from("null"), |s| format_sstr!("'{s}'"));
     let previous_button = if let Some(offset) = offset {
-        if *offset < limit {
+        if offset < limit {
             None
         } else {
-            let new_offset = *offset - limit;
+            let new_offset = offset - limit;
             let section_str = section_str.clone();
             Some(rsx! {
                 button {
@@ -1812,7 +1868,7 @@ fn PlexElement(
     .map(|(i, s)| {
         let d = s.map_or_else(|| "", PlexSectionType::to_display);
         let v = s.map_or_else(|| "", PlexSectionType::to_str);
-        if s == section {
+        if s == &section {
             rsx! {
                 option {
                     id: "section-{i}",
@@ -1832,16 +1888,16 @@ fn PlexElement(
         }
     });
 
-    cx.render(rsx! {
+    rsx! {
         br {
-            previous_button,
-            next_button,
+            {previous_button},
+            {next_button},
             form {
                 action: "javascript:loadPlexSection('plex_section_filter', {offset}, {limit})",
                 select {
                     id: "plex_section_filter",
                     "onchange": "loadPlexSection('plex_section_filter', {offset}, {limit})",
-                    section_select,
+                    {section_select},
                 }
             }
         }
@@ -1860,18 +1916,20 @@ fn PlexElement(
                 }
             },
             tbody {
-                entries
+                {entries}
             }
         }
-    })
+    }
 }
 
+/// # Errors
+/// Returns error if formatting fails
 pub fn plex_detail_body(
     config: Config,
     event: EventOutput,
     offset: Option<u64>,
     limit: Option<u64>,
-) -> String {
+) -> Result<String, Error> {
     let mut app = VirtualDom::new_with_props(
         PlexDetailElement,
         PlexDetailElementProps {
@@ -1881,13 +1939,17 @@ pub fn plex_detail_body(
             limit,
         },
     );
-    drop(app.rebuild());
-    dioxus_ssr::render(&app)
+    app.rebuild_in_place();
+    let mut renderer = dioxus_ssr::Renderer::default();
+    let mut buffer = String::new();
+    renderer
+        .render_to(&mut buffer, &app)
+        .map_err(Into::<Error>::into)?;
+    Ok(buffer)
 }
 
 #[component]
 fn PlexDetailElement(
-    cx: Scope,
     config: Config,
     event: EventOutput,
     offset: Option<u64>,
@@ -1921,7 +1983,7 @@ fn PlexDetailElement(
     let limit = limit.unwrap_or(10);
     let offset = offset.unwrap_or(0);
 
-    cx.render(rsx! {
+    rsx! {
         br {
             button {
                 "type": "submit",
@@ -1980,7 +2042,7 @@ fn PlexDetailElement(
                 }
             }
         }
-    })
+    }
 }
 
 /// # Errors
@@ -1989,7 +2051,7 @@ pub fn local_file_body(
     file_lists: FileLists,
     proc_map: HashMap<StackString, Option<ProcStatus>>,
     config: Config,
-) -> String {
+) -> Result<String, Error> {
     let mut app = VirtualDom::new_with_props(
         LocalFileElement,
         LocalFileElementProps {
@@ -1998,13 +2060,17 @@ pub fn local_file_body(
             config,
         },
     );
-    drop(app.rebuild());
-    dioxus_ssr::render(&app)
+    app.rebuild_in_place();
+    let mut renderer = dioxus_ssr::Renderer::default();
+    let mut buffer = String::new();
+    renderer
+        .render_to(&mut buffer, &app)
+        .map_err(Into::<Error>::into)?;
+    Ok(buffer)
 }
 
 #[component]
 fn LocalFileElement(
-    cx: Scope,
     file_lists: FileLists,
     proc_map: HashMap<StackString, Option<ProcStatus>>,
     config: Config,
@@ -2039,7 +2105,7 @@ fn LocalFileElement(
                     }
                     Some(ProcStatus::Finished) => {
                         let mut movie_dirs =
-                            movie_directories(config).unwrap_or_else(|_| Vec::new());
+                            movie_directories(&config).unwrap_or_else(|_| Vec::new());
                         if f_key.contains("_s") && f_key.contains("_ep") {
                             movie_dirs.insert(0, "".into());
                         }
@@ -2055,7 +2121,7 @@ fn LocalFileElement(
                         rsx! {
                             select {
                                 id: "movie-dir-{f}",
-                                movie_dirs,
+                                {movie_dirs},
                             },
                             button {
                                 "type": "submit",
@@ -2082,11 +2148,11 @@ fn LocalFileElement(
                 tr {
                     key: "flist-key-{idx}",
                     td {"{f}"},
-                    td {button},
+                    td {{button}},
                 }
             }
         });
-    cx.render(rsx! {
+    rsx! {
         br {
             "On-deck Media Files"
         },
@@ -2101,36 +2167,50 @@ fn LocalFileElement(
                 }
             },
             tbody {
-                entries
+                {entries}
             }
         }
-    })
+    }
 }
 
-pub fn procs_html_body(status: TranscodeStatus) -> String {
+/// # Errors
+/// Returns error if formatting fails
+pub fn procs_html_body(status: TranscodeStatus) -> Result<String, Error> {
     let mut app = VirtualDom::new_with_props(ProcsHtmlElement, ProcsHtmlElementProps { status });
-    drop(app.rebuild());
-    dioxus_ssr::render(&app)
+    app.rebuild_in_place();
+    let mut renderer = dioxus_ssr::Renderer::default();
+    let mut buffer = String::new();
+    renderer
+        .render_to(&mut buffer, &app)
+        .map_err(Into::<Error>::into)?;
+    Ok(buffer)
 }
 
 #[component]
-fn ProcsHtmlElement(cx: Scope, status: TranscodeStatus) -> Element {
-    cx.render(procs_html_node(status))
+fn ProcsHtmlElement(status: TranscodeStatus) -> Element {
+    procs_html_node(&status)
 }
 
-pub fn transcode_get_html_body(status: TranscodeStatus) -> String {
+/// # Errors
+/// Returns error if formatting fails
+pub fn transcode_get_html_body(status: TranscodeStatus) -> Result<String, Error> {
     let mut app = VirtualDom::new_with_props(
         TranscodeGetHtmlElement,
         TranscodeGetHtmlElementProps { status },
     );
-    drop(app.rebuild());
-    dioxus_ssr::render(&app)
+    app.rebuild_in_place();
+    let mut renderer = dioxus_ssr::Renderer::default();
+    let mut buffer = String::new();
+    renderer
+        .render_to(&mut buffer, &app)
+        .map_err(Into::<Error>::into)?;
+    Ok(buffer)
 }
 
 #[component]
-fn TranscodeGetHtmlElement(cx: Scope, status: TranscodeStatus) -> Element {
-    let procs_node = procs_html_node(status);
-    cx.render(rsx! {
+fn TranscodeGetHtmlElement(status: TranscodeStatus) -> Element {
+    let procs_node = procs_html_node(&status);
+    rsx! {
         br {
             button {
                 name: "remcomout",
@@ -2140,15 +2220,15 @@ fn TranscodeGetHtmlElement(cx: Scope, status: TranscodeStatus) -> Element {
         },
         div {
             id: "procs-tables",
-            procs_node,
+            {procs_node},
         },
         div {
             id: "local-file-table",
         }
-    })
+    }
 }
 
-fn procs_html_node(status: &TranscodeStatus) -> LazyNodes {
+fn procs_html_node(status: &TranscodeStatus) -> Element {
     let proc_headers = ProcInfo::get_header();
     let upcoming_header = TranscodeServiceRequest::get_header();
 
@@ -2181,7 +2261,7 @@ fn procs_html_node(status: &TranscodeStatus) -> LazyNodes {
                 rsx! {
                     tr {
                         key: "bodies-{i}",
-                        b,
+                        {b},
                     }
                 }
             });
@@ -2195,11 +2275,11 @@ fn procs_html_node(status: &TranscodeStatus) -> LazyNodes {
                 class: "dataframe",
                 thead {
                     tr {
-                        header,
+                        {header},
                     }
                 },
                 tbody {
-                    bodies,
+                    {bodies},
                 }
             }
         })
@@ -2236,7 +2316,7 @@ fn procs_html_node(status: &TranscodeStatus) -> LazyNodes {
                 rsx! {
                     tr {
                         key: "upcoming-body-key-{i}",
-                        b
+                        {b}
                     }
                 }
             });
@@ -2250,11 +2330,11 @@ fn procs_html_node(status: &TranscodeStatus) -> LazyNodes {
                 class: "dataframe",
                 thead {
                     tr {
-                        headers
+                        {headers}
                     }
                 },
                 tbody {
-                    bodies
+                    {bodies}
                 }
             }
         })
@@ -2274,7 +2354,7 @@ fn procs_html_node(status: &TranscodeStatus) -> LazyNodes {
             br {
                 "Current jobs:",
             },
-            jobs,
+            {jobs},
         })
     };
     let finished = if status.finished_jobs.is_empty() {
@@ -2317,7 +2397,7 @@ fn procs_html_node(status: &TranscodeStatus) -> LazyNodes {
                     }
                 },
                 tbody {
-                    jobs
+                    {jobs}
                 }
             }
         })
@@ -2325,10 +2405,10 @@ fn procs_html_node(status: &TranscodeStatus) -> LazyNodes {
 
     rsx! {
         div{
-            running,
-            upcoming,
-            current,
-            finished,
+            {running},
+            {upcoming},
+            {current},
+            {finished},
         }
     }
 }

@@ -28,7 +28,7 @@ use crate::{
     utils::{option_string_wrapper, parse_file_stem, walk_directory},
 };
 
-#[derive(FromSqlRow, PartialEq)]
+#[derive(FromSqlRow, PartialEq, Clone)]
 pub struct NewEpisodesResult {
     pub show: StackString,
     pub link: StackString,

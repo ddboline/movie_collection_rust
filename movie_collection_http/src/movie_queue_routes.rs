@@ -708,13 +708,13 @@ struct FrontpageResponse(HtmlBase<StackString, Error>);
 pub async fn frontpage(
     #[filter = "LoggedUser::filter"] _: LoggedUser,
 ) -> WarpResult<FrontpageResponse> {
-    let body = index_body().into();
+    let body = index_body().map_err(Into::<Error>::into)?.into();
     Ok(HtmlBase::new(body).into())
 }
 
 pub type TvShowsMap = HashMap<StackString, (StackString, WatchListShow, Option<TvShowSource>)>;
 
-#[derive(Debug, Default, Eq)]
+#[derive(Debug, Default, Eq, Clone)]
 pub struct ProcessShowItem {
     pub show: StackString,
     pub title: StackString,
@@ -801,6 +801,7 @@ pub async fn tvshows(
         query.offset,
         query.limit,
     )
+    .map_err(Into::<Error>::into)?
     .into();
     task.await.ok();
     Ok(HtmlBase::new(body).into())
@@ -834,7 +835,9 @@ pub async fn movie_queue_transcode_status(
     let status = transcode_status(&state.config)
         .await
         .map_err(Into::<Error>::into)?;
-    let body = transcode_get_html_body(status).into();
+    let body = transcode_get_html_body(status)
+        .map_err(Into::<Error>::into)?
+        .into();
     url_task.await.ok();
     Ok(HtmlBase::new(body).into())
 }
@@ -861,7 +864,9 @@ pub async fn movie_queue_transcode_status_file_list(
         StackString::new()
     } else {
         let proc_map = status.get_proc_map();
-        local_file_body(file_lists, proc_map, state.config.clone()).into()
+        local_file_body(file_lists, proc_map, state.config.clone())
+            .map_err(Into::<Error>::into)?
+            .into()
     };
     Ok(HtmlBase::new(body).into())
 }
@@ -878,7 +883,7 @@ pub async fn movie_queue_transcode_status_procs(
     let status = transcode_status(&state.config)
         .await
         .map_err(Into::<Error>::into)?;
-    let body = procs_html_body(status).into();
+    let body = procs_html_body(status).map_err(Into::<Error>::into)?.into();
     Ok(HtmlBase::new(body).into())
 }
 
@@ -1101,6 +1106,7 @@ pub async fn trakt_watchlist(
         query.limit,
         query.source.map(Into::into),
     )
+    .map_err(Into::<Error>::into)?
     .into();
     task.await.ok();
     Ok(HtmlBase::new(body).into())
@@ -1187,7 +1193,9 @@ pub async fn trakt_watched_seasons(
         show_opt.map_or_else(empty, |(imdb_url, t)| (imdb_url, t.show, t.link));
     let req = ImdbSeasonsRequest { show };
     let entries = req.process(&state.db, &state.config).await?;
-    let body = trakt_watched_seasons_body(link, imdb_url, entries).into();
+    let body = trakt_watched_seasons_body(link, imdb_url, entries)
+        .map_err(Into::<Error>::into)?
+        .into();
     task.await.ok();
     Ok(HtmlBase::new(body).into())
 }
@@ -1590,6 +1598,7 @@ pub async fn plex_list(
         query.offset,
         query.limit,
     )
+    .map_err(Into::<Error>::into)?
     .into();
     task.await.ok();
     Ok(HtmlBase::new(body).into())
@@ -1618,7 +1627,9 @@ pub async fn plex_detail(
         .await
         .map_err(Into::<Error>::into)?
     {
-        plex_detail_body(state.config.clone(), event, query.offset, query.limit).into()
+        plex_detail_body(state.config.clone(), event, query.offset, query.limit)
+            .map_err(Into::<Error>::into)?
+            .into()
     } else {
         "".into()
     };

@@ -41,7 +41,7 @@ impl fmt::Display for OrderBy {
     }
 }
 
-#[derive(Default, Serialize, PartialEq, Eq)]
+#[derive(Default, Serialize, PartialEq, Eq, Clone)]
 pub struct MovieQueueResult {
     pub idx: i32,
     pub path: StackString,

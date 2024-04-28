@@ -72,7 +72,7 @@ impl TryFrom<WebhookPayload> for PlexEvent {
     }
 }
 
-#[derive(FromSqlRow, PartialEq, Eq)]
+#[derive(FromSqlRow, PartialEq, Eq, Clone)]
 pub struct EventOutput {
     pub id: Uuid,
     pub event: StackString,

@@ -1,6 +1,6 @@
 [package]
 name = "movie_collection_rust"
-version = "0.10.30"
+version = "0.10.31"
 authors = ["Daniel Boline <ddboline@gmail.com>"]
 edition = "2018"
 
@@ -16,18 +16,18 @@ Utilities for maintaining a collection of videos."""
 anyhow = "1.0"
 clap = {version="4.0", features=["derive"]}
 derive_more = "0.99"
-env_logger = "0.10"
+env_logger = "0.11"
 futures = "0.3"
 log = "0.4"
 movie_collection_lib = {path = "movie_collection_lib"}
 movie_collection_http = {path = "movie_collection_http"}
 refinery = {version="0.8", features=["tokio-postgres"]}
 serde_json = "1.0"
-stack-string = { git = "https://github.com/ddboline/stack-string-rs.git", features=["postgres_types"], tag="0.9.2" }
+stack-string = { git = "https://github.com/ddboline/stack-string-rs.git", features=["postgres_types"], tag="0.9.3" }
 stdout-channel = "0.6"
 time = {version="0.3", features=["serde-human-readable", "macros", "formatting"]}
 time-tz = {version="2.0", features=["system"]}
-tokio = {version="1.35", features=["rt", "macros", "rt-multi-thread"]}
+tokio = {version="1.37", features=["rt", "macros", "rt-multi-thread"]}
 transcode_lib = {path = "transcode_lib"}
 
 [workspace]

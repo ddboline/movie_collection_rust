@@ -2,12 +2,11 @@ use async_graphql::{
     dataloader::{DataLoader, Loader},
     ComplexObject, Context, Enum, Error, Object, SimpleObject,
 };
-use async_trait::async_trait;
 use derive_more::{Deref, From, Into};
 use futures::TryStreamExt;
 use rust_decimal::{prelude::ToPrimitive, Decimal};
 use stack_string::StackString;
-use std::collections::HashMap;
+use std::{collections::HashMap, future::Future};
 use time::Date;
 
 use movie_collection_lib::{
@@ -282,51 +281,54 @@ impl From<&str> for RatingsShowKey {
     }
 }
 
-#[async_trait]
 impl Loader<RatingsShowKey> for ItemLoader {
     type Value = ImdbRatings;
     type Error = Error;
 
-    async fn load(
+    fn load(
         &self,
         keys: &[RatingsShowKey],
-    ) -> Result<HashMap<RatingsShowKey, Self::Value>, Self::Error> {
+    ) -> impl Future<Output = Result<HashMap<RatingsShowKey, Self::Value>, Self::Error>> + Send
+    {
         let mut shows = HashMap::new();
-        for key in keys {
-            if let Some(item) = ImdbRatings::get_show_by_link(key.as_str(), &self.0)
-                .await
-                .map_err(Error::new_with_source)?
-            {
-                shows.insert(key.clone(), item);
+        async move {
+            for key in keys {
+                if let Some(item) = ImdbRatings::get_show_by_link(key.as_str(), &self.0)
+                    .await
+                    .map_err(Error::new_with_source)?
+                {
+                    shows.insert(key.clone(), item);
+                }
             }
+            Ok(shows)
         }
-        Ok(shows)
     }
 }
 
 #[derive(Clone, PartialEq, Eq, Hash, From, Into, Deref)]
 pub struct ShowSeasonKey(StackString);
 
-#[async_trait]
 impl Loader<ShowSeasonKey> for ItemLoader {
     type Value = Vec<ImdbSeason>;
     type Error = Error;
 
-    async fn load(
+    fn load(
         &self,
         keys: &[ShowSeasonKey],
-    ) -> Result<HashMap<ShowSeasonKey, Self::Value>, Self::Error> {
+    ) -> impl Future<Output = Result<HashMap<ShowSeasonKey, Self::Value>, Self::Error>> {
         let mut episodes = HashMap::new();
-        for key in keys {
-            let show = key.as_str();
-            let values: Vec<_> = ImdbSeason::get_seasons(show, &self.0)
-                .await
-                .map_err(Error::new_with_source)?
-                .try_collect()
-                .await?;
-            episodes.insert(key.clone(), values);
+        async move {
+            for key in keys {
+                let show = key.as_str();
+                let values: Vec<_> = ImdbSeason::get_seasons(show, &self.0)
+                    .await
+                    .map_err(Error::new_with_source)?
+                    .try_collect()
+                    .await?;
+                episodes.insert(key.clone(), values);
+            }
+            Ok(episodes)
         }
-        Ok(episodes)
     }
 }
 
@@ -337,31 +339,34 @@ pub struct EpisodesShowSeasonKey {
     episode: Option<i32>,
 }
 
-#[async_trait]
 impl Loader<EpisodesShowSeasonKey> for ItemLoader {
     type Value = Vec<ImdbEpisodes>;
     type Error = Error;
 
-    async fn load(
+    fn load(
         &self,
         keys: &[EpisodesShowSeasonKey],
-    ) -> Result<HashMap<EpisodesShowSeasonKey, Self::Value>, Self::Error> {
+    ) -> impl Future<Output = Result<HashMap<EpisodesShowSeasonKey, Self::Value>, Self::Error>>
+    {
         let mut episodes = HashMap::new();
-        for key in keys {
-            let EpisodesShowSeasonKey {
-                show,
-                season,
-                episode,
-            } = key;
-            let values: Vec<_> =
-                ImdbEpisodes::get_episodes_by_show_season_episode(show, *season, *episode, &self.0)
-                    .await
-                    .map_err(Error::new_with_source)?
-                    .try_collect()
-                    .await?;
-            episodes.insert(key.clone(), values);
+        async move {
+            for key in keys {
+                let EpisodesShowSeasonKey {
+                    show,
+                    season,
+                    episode,
+                } = key;
+                let values: Vec<_> = ImdbEpisodes::get_episodes_by_show_season_episode(
+                    show, *season, *episode, &self.0,
+                )
+                .await
+                .map_err(Error::new_with_source)?
+                .try_collect()
+                .await?;
+                episodes.insert(key.clone(), values);
+            }
+            Ok(episodes)
         }
-        Ok(episodes)
     }
 }
 
