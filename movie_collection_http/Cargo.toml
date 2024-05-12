@@ -1,6 +1,6 @@
 [package]
 name = "movie_collection_http"
-version = "0.10.31"
+version = "0.10.32"
 authors = ["Daniel Boline <ddboline@gmail.com>"]
 edition = "2018"
 
@@ -9,7 +9,7 @@ anyhow = "1.0"
 async-graphql = {version="7.0", features=["dataloader", "time"]}
 async-graphql-warp = "7.0"
 async-trait = "0.1"
-authorized_users = { git = "https://github.com/ddboline/auth_server_rust.git", tag="0.11.13"}
+authorized_users = { git = "https://github.com/ddboline/auth_server_rust.git", tag="0.11.14"}
 bytes = "1.0"
 derive_more = "0.99"
 dioxus = "0.5"
