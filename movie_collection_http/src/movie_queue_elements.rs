@@ -2138,6 +2138,7 @@ fn LocalFileElement(
                 }
             } else {
                 if let Some(subtitles) = file_lists.subtitles.get(f.as_str()) {
+                    let nlines = subtitles.iter().find_map(|(_, n)| *n);
                     let options = subtitles.iter().enumerate().map(|(i, (s, _))| {
                         let mkv_number = s.number;
                         let label =
@@ -2150,10 +2151,10 @@ fn LocalFileElement(
                             }
                         }
                     });
-                    let title = if subtitles.iter().any(|(_, e)| *e) {
-                        "re-extract subtitles"
+                    let title = if let Some(n) = nlines {
+                        format_sstr!("re-extract subtitles {n}")
                     } else {
-                        "extract subtitles"
+                        "extract subtitles".into()
                     };
                     subtitle_selector.replace(rsx! {
                         select {
