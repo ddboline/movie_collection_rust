@@ -29,6 +29,7 @@ use movie_collection_lib::{
     imdb_episodes::ImdbEpisodes,
     imdb_ratings::ImdbRatings,
     make_list::FileLists,
+    mkv_utils::MkvTrack,
     movie_collection::{LastModifiedResponse, MovieCollection, TvShowsResult},
     movie_queue::{MovieQueueDB, MovieQueueResult},
     music_collection::MusicCollection,
@@ -1868,4 +1869,43 @@ pub async fn music_collection_update(
     }
     task.await.ok();
     Ok(HtmlBase::new("Success").into())
+}
+
+#[derive(RwebResponse)]
+#[response(
+    description = "Extract Subtitles",
+    content = "html",
+    status = "Created"
+)]
+struct ExtractSubtitlesResponse(HtmlBase<StackString, Error>);
+
+#[post("/list/transcode/subtitle/{filename}/{index}")]
+pub async fn movie_queue_extract_subtitle(
+    filename: StackString,
+    index: u64,
+    #[filter = "LoggedUser::filter"] user: LoggedUser,
+    #[data] state: AppState,
+) -> WarpResult<ExtractSubtitlesResponse> {
+    let task = user
+        .store_url_task(
+            state.trakt.get_client(),
+            &state.config,
+            &format_sstr!("/list/transcode/subtitle/{filename}/{index}"),
+        )
+        .await;
+
+    let input_path = state
+        .config
+        .home_dir
+        .join("Documents")
+        .join("movies")
+        .join(&filename);
+
+    let input_file: StackString = input_path.to_string_lossy().into();
+    let output = MkvTrack::extract_subtitles_from_mkv(&input_file, index)
+        .await
+        .map_err(Into::<Error>::into)?;
+    task.await.ok();
+
+    Ok(HtmlBase::new(output).into())
 }
