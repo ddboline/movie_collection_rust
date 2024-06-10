@@ -54,9 +54,9 @@ impl MkvTrack {
                 if let Some(track) = current_track.replace(Self::default()) {
                     tracks.push(track);
                 }
-            } else if line.starts_with("|  + Track number ") {
+            } else if line.starts_with("|  + Track number: ") {
                 if let Some(entry) = line
-                    .strip_prefix("|  + Track number ")
+                    .strip_prefix("|  + Track number: ")
                     .and_then(|l| l.split_ascii_whitespace().next())
                 {
                     if let Some(track) = &mut current_track {
@@ -170,8 +170,6 @@ mod tests {
                 assert_eq!(track.language.as_str(), "eng");
             }
         }
-        println!("{tracks:#?}");
-        assert!(false);
         Ok(())
     }
 }
