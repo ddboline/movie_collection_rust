@@ -30,16 +30,16 @@ use super::{
         find_new_episodes, frontpage, imdb_episodes_route, imdb_episodes_update,
         imdb_ratings_route, imdb_ratings_set_source, imdb_ratings_update, imdb_show,
         last_modified_route, movie_collection_route, movie_collection_update, movie_queue,
-        movie_queue_delete, movie_queue_play, movie_queue_remcom_directory_file,
-        movie_queue_remcom_file, movie_queue_route, movie_queue_show, movie_queue_transcode,
-        movie_queue_transcode_cleanup, movie_queue_transcode_directory, movie_queue_transcode_file,
-        movie_queue_transcode_status, movie_queue_transcode_status_file_list,
-        movie_queue_transcode_status_procs, movie_queue_update, music_collection,
-        music_collection_update, plex_detail, plex_events, plex_events_update, plex_filename,
-        plex_filename_update, plex_list, plex_metadata, plex_metadata_update, plex_webhook,
-        refresh_auth, scripts_js, trakt_auth_url, trakt_cal, trakt_callback, trakt_watched_action,
-        trakt_watched_list, trakt_watched_seasons, trakt_watchlist, trakt_watchlist_action,
-        tvshows, user,
+        movie_queue_delete, movie_queue_extract_subtitle, movie_queue_play,
+        movie_queue_remcom_directory_file, movie_queue_remcom_file, movie_queue_route,
+        movie_queue_show, movie_queue_transcode, movie_queue_transcode_cleanup,
+        movie_queue_transcode_directory, movie_queue_transcode_file, movie_queue_transcode_status,
+        movie_queue_transcode_status_file_list, movie_queue_transcode_status_procs,
+        movie_queue_update, music_collection, music_collection_update, plex_detail, plex_events,
+        plex_events_update, plex_filename, plex_filename_update, plex_list, plex_metadata,
+        plex_metadata_update, plex_webhook, refresh_auth, scripts_js, trakt_auth_url, trakt_cal,
+        trakt_callback, trakt_watched_action, trakt_watched_list, trakt_watched_seasons,
+        trakt_watchlist, trakt_watchlist_action, tvshows, user,
     },
 };
 
@@ -138,6 +138,7 @@ fn get_full_path(app: &AppState) -> BoxedFilter<(impl Reply,)> {
     let plex_metadata_update_path = plex_metadata_update(app.clone()).boxed();
     let music_collection_path = music_collection(app.clone()).boxed();
     let music_collection_update_path = music_collection_update(app.clone()).boxed();
+    let movie_queue_extract_subtitle_path = movie_queue_extract_subtitle(app.clone()).boxed();
 
     let list_path = frontpage_path
         .or(scripts_js_path)
@@ -166,7 +167,8 @@ fn get_full_path(app: &AppState) -> BoxedFilter<(impl Reply,)> {
         .or(plex_metadata_path)
         .or(plex_metadata_update_path)
         .or(music_collection_path)
-        .or(music_collection_update_path);
+        .or(music_collection_update_path)
+        .or(movie_queue_extract_subtitle_path);
     let auth_url_path = trakt_auth_url(app.clone()).boxed();
     let trakt_callback_path = trakt_callback(app.clone()).boxed();
     let refresh_auth_path = refresh_auth(app.clone()).boxed();
