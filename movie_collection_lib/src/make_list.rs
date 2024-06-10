@@ -1,8 +1,8 @@
-use anyhow::{format_err, Error};
+use anyhow::Error;
 use futures::future::join_all;
 use itertools::Itertools;
 use log::debug;
-use stack_string::{format_sstr, StackString};
+use stack_string::StackString;
 use std::{
     collections::HashMap,
     ffi::OsStr,
@@ -29,7 +29,7 @@ use crate::{
 pub struct FileLists {
     pub local_file_list: Vec<StackString>,
     pub file_list: Vec<PathBuf>,
-    pub subtitles: HashMap<StackString, Vec<(MkvTrack, bool)>>,
+    pub subtitles: HashMap<StackString, Vec<(MkvTrack, Option<usize>)>>,
 }
 
 impl FileLists {
@@ -111,20 +111,24 @@ impl FileLists {
             file_list?
         };
 
-        let mut subtitles: HashMap<StackString, Vec<(MkvTrack, bool)>> = HashMap::new();
+        let mut subtitles: HashMap<StackString, Vec<(MkvTrack, Option<usize>)>> = HashMap::new();
 
         for f in &local_file_list {
             if f.ends_with(".mkv") {
                 let movies_dir = config.home_dir.join("Documents").join("movies");
                 let full_path = movies_dir.join(f);
-                let exists = full_path.with_extension("srt").exists();
+                let srt_path = full_path.with_extension("srt");
+                let mut nlines: Option<usize> = None;
+                if srt_path.exists() {
+                    nlines.replace(fs::read_to_string(srt_path).await?.split('\n').count());
+                }
                 let full_path: StackString = full_path.to_string_lossy().into();
                 for track in MkvTrack::get_subtitles_from_mkv(&full_path).await? {
                     if track.track_type == Some(TrackType::Subtitles) {
                         subtitles
                             .entry(f.clone())
                             .or_default()
-                            .push((track, exists));
+                            .push((track, nlines));
                     }
                 }
             }
