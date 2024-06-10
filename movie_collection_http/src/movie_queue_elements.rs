@@ -2081,11 +2081,14 @@ fn LocalFileElement(
         .iter()
         .enumerate()
         .map(|(idx, f)| {
-            let f_key = f
-                .replace(".mkv", "")
-                .replace(".m4v", "")
-                .replace(".avi", "")
-                .replace(".mp4", "");
+            let mut f_key = f.clone();
+            for suffix in [".mkv", ".m4v", ".avi", ".mp4"] {
+                if let Some(s) = f_key.strip_suffix(suffix) {
+                    f_key = s.into();
+                    break;
+                }
+            }
+            let mut subtitle_selector = None;
             let button = if file_map.contains_key(f_key.as_str()) {
                 rsx! {
                     button {
@@ -2134,6 +2137,37 @@ fn LocalFileElement(
                     None => rsx! {"unknown"},
                 }
             } else {
+                if let Some(subtitles) = file_lists.subtitles.get(f.as_str()) {
+                    let options = subtitles.iter().enumerate().map(|(i, (s, _))| {
+                        let mkv_number = s.number;
+                        let label =
+                            format_sstr!("{} {} {} {}", s.number, s.language, s.codec_id, s.name);
+                        rsx! {
+                            option {
+                                key: "subtitle-key-{f}-{i}",
+                                value: "{mkv_number}",
+                                "{label}"
+                            }
+                        }
+                    });
+                    let title = if subtitles.iter().any(|(_, e)| *e) {
+                        "re-extract subtitles"
+                    } else {
+                        "extract subtitles"
+                    };
+                    subtitle_selector.replace(rsx! {
+                        select {
+                            id: "subtitle-selector-{f}",
+                            {options},
+                        },
+                        button {
+                            "type": "submit",
+                            id: "subtitle-button-{f}",
+                            "onclick": "extract_subtitles('{f}')",
+                            "{title}",
+                        }
+                    });
+                }
                 rsx! {
                     button {
                         "type": "submit",
@@ -2149,6 +2183,7 @@ fn LocalFileElement(
                     key: "flist-key-{idx}",
                     td {"{f}"},
                     td {{button}},
+                    td {{subtitle_selector}},
                 }
             }
         });
