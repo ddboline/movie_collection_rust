@@ -18,6 +18,7 @@ use tokio_stream::{wrappers::ReadDirStream, StreamExt};
 
 use crate::{
     config::Config,
+    mkv_utils::{MkvTrack, TrackType},
     movie_collection::MovieCollection,
     pgpool::PgPool,
     transcode_service::transcode_status,
@@ -28,6 +29,7 @@ use crate::{
 pub struct FileLists {
     pub local_file_list: Vec<StackString>,
     pub file_list: Vec<PathBuf>,
+    pub subtitles: HashMap<StackString, Vec<(MkvTrack, Option<usize>)>>,
 }
 
 impl FileLists {
@@ -71,10 +73,12 @@ impl FileLists {
         let patterns: Vec<_> = local_file_list
             .iter()
             .map(|f| {
-                f.replace(".mkv", "")
-                    .replace(".m4v", "")
-                    .replace(".avi", "")
-                    .replace(".mp4", "")
+                for suffix in [".mkv", ".m4v", ".avi", ".mp4"] {
+                    if let Some(s) = f.strip_suffix(suffix) {
+                        return s.into();
+                    }
+                }
+                f.clone()
             })
             .collect();
 
@@ -107,9 +111,33 @@ impl FileLists {
             file_list?
         };
 
+        let mut subtitles: HashMap<StackString, Vec<(MkvTrack, Option<usize>)>> = HashMap::new();
+
+        for f in &local_file_list {
+            if f.ends_with(".mkv") {
+                let movies_dir = config.home_dir.join("Documents").join("movies");
+                let full_path = movies_dir.join(f);
+                let srt_path = full_path.with_extension("srt");
+                let mut nlines: Option<usize> = None;
+                if srt_path.exists() {
+                    nlines.replace(fs::read_to_string(srt_path).await?.split('\n').count());
+                }
+                let full_path: StackString = full_path.to_string_lossy().into();
+                for track in MkvTrack::get_subtitles_from_mkv(&full_path).await? {
+                    if track.track_type == Some(TrackType::Subtitles) {
+                        subtitles
+                            .entry(f.clone())
+                            .or_default()
+                            .push((track, nlines));
+                    }
+                }
+            }
+        }
+
         Ok(Self {
             local_file_list,
             file_list,
+            subtitles,
         })
     }
 

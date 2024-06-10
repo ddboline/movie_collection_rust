@@ -241,3 +241,17 @@ function sourceWatchlist(link) {
     let url = `${link}&source=${source}`;
     updateMainArticle(url);
 }
+function extract_subtitles(file) {
+    let index = document.getElementById(`subtitle-selector-${file}`).value;
+    let url = `/list/transcode/subtitle/${file}/${index}`;
+    let xmlhttp = new XMLHttpRequest();
+    xmlhttp.open("POST", url, true);
+    xmlhttp.onload = function nothing() {
+        update_procs();
+        update_file_list();
+        document.getElementById("remcomoutput").innerHTML = "&nbsp;";
+    }
+    xmlhttp.send(null);
+    let out = `extract ${index} from ${file}`;
+    document.getElementById("remcomoutput").innerHTML = out;
+}

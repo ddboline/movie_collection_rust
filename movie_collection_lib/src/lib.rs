@@ -15,6 +15,7 @@ pub mod imdb_ratings;
 pub mod imdb_utils;
 pub mod make_list;
 pub mod make_queue;
+pub mod mkv_utils;
 pub mod movie_collection;
 pub mod movie_queue;
 pub mod music_collection;
