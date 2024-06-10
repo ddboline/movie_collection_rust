@@ -1,6 +1,6 @@
 use anyhow::{format_err, Error};
 use stack_string::{format_sstr, StackString};
-use std::{path::Path, thread::current};
+use std::fmt;
 use tokio::process::Command;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -29,6 +29,12 @@ impl TrackType {
     }
 }
 
+impl fmt::Display for TrackType {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "{}", self.to_str())
+    }
+}
+
 #[derive(Debug, Default, PartialEq, Eq, Clone)]
 pub struct MkvTrack {
     pub number: u64,
@@ -48,8 +54,11 @@ impl MkvTrack {
                 if let Some(track) = current_track.replace(Self::default()) {
                     tracks.push(track);
                 }
-            } else if line.starts_with("|  + Track number") {
-                if let Some(entry) = line.split_ascii_whitespace().into_iter().nth(4) {
+            } else if line.starts_with("|  + Track number ") {
+                if let Some(entry) = line
+                    .strip_prefix("|  + Track number ")
+                    .and_then(|l| l.split_ascii_whitespace().next())
+                {
                     if let Some(track) = &mut current_track {
                         if let Ok(n) = entry.parse() {
                             track.number = n;
@@ -91,8 +100,11 @@ impl MkvTrack {
         tracks
     }
 
+    /// # Errors
+    /// Return error if fpath doesn't end in mkv, or if output of mkvinfo is not
+    /// utf8
     pub async fn get_subtitles_from_mkv(fpath: &str) -> Result<Vec<Self>, Error> {
-        if !fpath.ends_with(".mkv") {
+        if !fpath.to_lowercase().ends_with(".mkv") {
             return Err(format_err!("Filename must end in mkv"));
         }
 
@@ -100,6 +112,12 @@ impl MkvTrack {
             .args([fpath])
             .output()
             .await?;
+        if !output.status.success() && output.status.code() != Some(1) {
+            return Err(format_err!(
+                "Process exited with error {:?}",
+                output.status.code()
+            ));
+        }
         let output = StackString::from_utf8_vec(output.stdout)?;
 
         let tracks = Self::parse_mkvinfo(&output);
@@ -107,6 +125,9 @@ impl MkvTrack {
         Ok(tracks)
     }
 
+    /// # Errors
+    /// Return error if fpath doesn't end in mkv, or if output of mkvinfo is not
+    /// utf8
     pub async fn extract_subtitles_from_mkv(fpath: &str, index: u64) -> Result<StackString, Error> {
         let fname = fpath
             .strip_suffix(".mkv")
@@ -119,6 +140,12 @@ impl MkvTrack {
             .args([fpath, "tracks", &format_sstr!("{}:{srt_path}", index - 1)])
             .output()
             .await?;
+        if !output.status.success() && output.status.code() != Some(1) {
+            return Err(format_err!(
+                "Process exited with error {:?}",
+                output.status.code()
+            ));
+        }
         let output = StackString::from_utf8_vec(output.stdout)?;
         Ok(output)
     }
