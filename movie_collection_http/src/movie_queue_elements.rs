@@ -2088,7 +2088,38 @@ fn LocalFileElement(
                     break;
                 }
             }
-            let mut subtitle_selector = None;
+            let subtitle_selector = file_lists.subtitles.get(f.as_str()).map(|subtitles| {
+                let nlines = subtitles.iter().find_map(|(_, n)| *n);
+                let options = subtitles.iter().enumerate().map(|(i, (s, _))| {
+                    let mkv_number = s.number;
+                    let label =
+                        format_sstr!("{} {} {} {}", s.number, s.language, s.codec_id, s.name);
+                    rsx! {
+                        option {
+                            key: "subtitle-key-{f}-{i}",
+                            value: "{mkv_number}",
+                            "{label}"
+                        }
+                    }
+                });
+                let title = if let Some(n) = nlines {
+                    format_sstr!("re-extract subtitles {n}")
+                } else {
+                    "extract subtitles".into()
+                };
+                rsx! {
+                    select {
+                        id: "subtitle-selector-{f}",
+                        {options},
+                    },
+                    button {
+                        "type": "submit",
+                        id: "subtitle-button-{f}",
+                        "onclick": "extract_subtitles('{f}')",
+                        "{title}",
+                    }
+                }
+            });
             let button = if file_map.contains_key(f_key.as_str()) {
                 rsx! {
                     button {
@@ -2137,38 +2168,6 @@ fn LocalFileElement(
                     None => rsx! {"unknown"},
                 }
             } else {
-                if let Some(subtitles) = file_lists.subtitles.get(f.as_str()) {
-                    let nlines = subtitles.iter().find_map(|(_, n)| *n);
-                    let options = subtitles.iter().enumerate().map(|(i, (s, _))| {
-                        let mkv_number = s.number;
-                        let label =
-                            format_sstr!("{} {} {} {}", s.number, s.language, s.codec_id, s.name);
-                        rsx! {
-                            option {
-                                key: "subtitle-key-{f}-{i}",
-                                value: "{mkv_number}",
-                                "{label}"
-                            }
-                        }
-                    });
-                    let title = if let Some(n) = nlines {
-                        format_sstr!("re-extract subtitles {n}")
-                    } else {
-                        "extract subtitles".into()
-                    };
-                    subtitle_selector.replace(rsx! {
-                        select {
-                            id: "subtitle-selector-{f}",
-                            {options},
-                        },
-                        button {
-                            "type": "submit",
-                            id: "subtitle-button-{f}",
-                            "onclick": "extract_subtitles('{f}')",
-                            "{title}",
-                        }
-                    });
-                }
                 rsx! {
                     button {
                         "type": "submit",
