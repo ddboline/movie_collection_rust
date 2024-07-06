@@ -9,7 +9,7 @@ use movie_collection_lib::{config::Config, pgpool::PgPool, transcode_service::Tr
 async fn main() -> Result<(), Error> {
     env_logger::init();
     let config = Config::with_config().unwrap();
-    let pool = PgPool::new(&config.pgurl);
+    let pool = PgPool::new(&config.pgurl)?;
     let stdout = StdoutChannel::new();
 
     let transcode_service = TranscodeService::new(&config, &config.transcode_queue, &pool, &stdout);

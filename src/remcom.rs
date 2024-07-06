@@ -80,7 +80,7 @@ async fn main() -> Result<(), Error> {
     let opts = RemcomOpts::parse();
     let stdout = StdoutChannel::new();
     let config = Config::with_config()?;
-    let pool = PgPool::new(&config.pgurl);
+    let pool = PgPool::new(&config.pgurl)?;
 
     let remcom_service = TranscodeService::new(&config, &config.remcom_queue, &pool, &stdout);
 

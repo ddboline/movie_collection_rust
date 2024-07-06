@@ -119,7 +119,7 @@ mod tests {
     #[ignore]
     async fn test_transcode_service() -> Result<(), Error> {
         let config = Config::with_config()?;
-        let pool = PgPool::new(&config.pgurl);
+        let pool = PgPool::new(&config.pgurl)?;
 
         let mock_stdout = MockStdout::new();
         let stdout = StdoutChannel::with_mock_stdout(mock_stdout.clone(), mock_stdout.clone());

@@ -54,7 +54,7 @@ async fn trakt_app() -> Result<(), Error> {
     let opts = TraktAppOpts::parse();
     let config = Config::with_config()?;
     let do_parse = opts.parse;
-    let pool = PgPool::new(&config.pgurl);
+    let pool = PgPool::new(&config.pgurl)?;
     let stdout = StdoutChannel::new();
 
     let trakt_command = opts.trakt_command.unwrap_or(TraktCommands::None);

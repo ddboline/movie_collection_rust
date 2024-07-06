@@ -72,7 +72,7 @@ pub async fn start_app() -> Result<(), Error> {
         }
     }
 
-    let pool = PgPool::new(&config.pgurl);
+    let pool = PgPool::new(&config.pgurl)?;
     let trakt = TraktConnection::new(config.clone());
 
     tokio::task::spawn(_update_db(pool.clone()));

@@ -21,7 +21,7 @@ struct FindNewEpisodesOpt {
 async fn find_new_episodes() -> Result<(), Error> {
     let opts = FindNewEpisodesOpt::parse();
     let config = Config::with_config()?;
-    let pool = PgPool::new(&config.pgurl);
+    let pool = PgPool::new(&config.pgurl)?;
     let stdout = StdoutChannel::new();
 
     let source = if opts.shows.is_empty() {

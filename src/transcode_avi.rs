@@ -77,7 +77,7 @@ async fn main() -> Result<(), Error> {
     env_logger::init();
     let stdout = StdoutChannel::new();
     let config = Config::with_config()?;
-    let pool = PgPool::new(&config.pgurl);
+    let pool = PgPool::new(&config.pgurl)?;
 
     let opts = TranscodeAviOpts::parse();
 

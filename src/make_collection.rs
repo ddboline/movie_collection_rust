@@ -33,7 +33,7 @@ async fn make_collection() -> Result<(), Error> {
     let do_parse = opts.parse;
     let do_time = opts.time;
     let stdout = StdoutChannel::new();
-    let pool = PgPool::new(&config.pgurl);
+    let pool = PgPool::new(&config.pgurl)?;
 
     let mc = MovieCollection::new(&config, &pool, &stdout);
     if do_parse {

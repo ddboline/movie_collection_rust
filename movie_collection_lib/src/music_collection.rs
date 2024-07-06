@@ -247,7 +247,7 @@ mod tests {
     #[ignore]
     async fn test_make_music_collection() -> Result<(), Error> {
         let config = Config::with_config()?;
-        let pool = PgPool::new(&config.pgurl);
+        let pool = PgPool::new(&config.pgurl)?;
 
         let result = MusicCollection::make_collection(&config, &pool).await?;
         assert!(!result.is_empty());

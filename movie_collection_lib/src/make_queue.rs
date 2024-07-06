@@ -55,7 +55,7 @@ pub async fn make_queue_worker(
     do_shows: bool,
     stdout: &StdoutChannel<StackString>,
 ) -> Result<(), Error> {
-    let pool = PgPool::new(&config.pgurl);
+    let pool = PgPool::new(&config.pgurl)?;
     let mc = MovieCollection::new(config, &pool, stdout);
     let mq = MovieQueueDB::new(config, &pool, stdout);
 

@@ -1028,7 +1028,7 @@ mod tests {
     #[ignore]
     async fn test_get_plex_filename() -> Result<(), Error> {
         let config = Config::with_config()?;
-        let pool = PgPool::new(&config.pgurl);
+        let pool = PgPool::new(&config.pgurl)?;
         let events: Vec<_> = PlexEvent::get_events(&pool, None, None, None, None)
             .await?
             .try_collect()
