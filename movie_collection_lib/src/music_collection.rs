@@ -113,9 +113,9 @@ impl MusicCollection {
         let query = query!(
             "
                 INSERT INTO music_collection (
-                    id, path, artist, album, title, last_modified
+                    id, path, artist, album, title
                 ) VALUES (
-                    $id, $path, $artist, $album, $title, now()
+                    $id, $path, $artist, $album, $title
                 )
             ",
             id = self.id,

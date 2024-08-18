@@ -424,8 +424,8 @@ impl MovieCollection {
         } else {
             let query = query!(
                 r#"
-                    INSERT INTO movie_collection (path, show, last_modified)
-                    VALUES ($path, $show, now())
+                    INSERT INTO movie_collection (path, show)
+                    VALUES ($path, $show)
                 "#,
                 path = path,
                 show = show
@@ -498,7 +498,7 @@ impl MovieCollection {
                 let query = query!(
                     r#"
                         UPDATE movie_collection
-                        SET show_id = $show_id
+                        SET show_id=$show_id,last_modified=now()
                         WHERE idx = $idx
                     "#,
                     show_id = rating.index,
@@ -510,7 +510,7 @@ impl MovieCollection {
                 let query = query!(
                     r#"
                         UPDATE movie_collection
-                        SET episode_id = $id
+                        SET episode_id=$id,last_modified=now()
                         WHERE idx = $idx
                     "#,
                     id = episode.id,

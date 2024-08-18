@@ -193,9 +193,9 @@ impl ImdbEpisodes {
         let query = query!(
             r#"
                 INSERT INTO imdb_episodes (
-                    show, season, episode, airdate, rating, eptitle, epurl, last_modified, id
+                    show, season, episode, airdate, rating, eptitle, epurl, id
                 ) VALUES (
-                    $show, $season, $episode, $airdate, $rating, $eptitle, $epurl, $id, now()
+                    $show, $season, $episode, $airdate, $rating, $eptitle, $epurl, $id
                 )
             "#,
             show = self.show,

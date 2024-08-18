@@ -49,9 +49,9 @@ impl ImdbRatings {
         let query = query!(
             r#"
                 INSERT INTO imdb_ratings
-                (show, title, link, rating, istv, source, index, last_modified)
+                (show, title, link, rating, istv, source, index)
                 VALUES
-                ($show, $title, $link, $rating, $istv, $source, $index, now())
+                ($show, $title, $link, $rating, $istv, $source, $index)
             "#,
             show = self.show,
             title = self.title,
@@ -93,7 +93,7 @@ impl ImdbRatings {
         let query = format_sstr!(
             r#"
                 UPDATE imdb_ratings
-                SET {}
+                SET {},last_modified=now()
                 WHERE show=$show
             "#,
             updates.join(","),

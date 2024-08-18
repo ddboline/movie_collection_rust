@@ -117,7 +117,7 @@ impl MovieQueueDB {
                     SELECT new_idx - 1
                     FROM temp_movie_queue
                     WHERE collection_idx = movie_queue.collection_idx
-                )
+                ),last_modified=now()
             "#,
         );
         query.execute(&conn).await.map_err(Into::into)
@@ -203,7 +203,7 @@ impl MovieQueueDB {
                 INSERT INTO movie_queue (idx, collection_idx)
                 VALUES ($idx, $collection_idx)
                 ON CONFLICT (collection_idx)
-                DO UPDATE SET idx = $idx
+                DO UPDATE SET idx=$idx,last_modified=now()
             "#,
             idx = idx,
             collection_idx = collection_idx
