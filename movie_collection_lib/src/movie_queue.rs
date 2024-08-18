@@ -1,7 +1,6 @@
 use anyhow::{format_err, Error};
 use futures::future::try_join_all;
 use itertools::Itertools;
-use log::debug;
 use postgres_query::{query, query_dyn, FromSqlRow};
 use serde::{Deserialize, Serialize};
 use stack_string::{format_sstr, StackString};
@@ -93,47 +92,44 @@ impl MovieQueueDB {
 
     /// # Errors
     /// Return error if db queries fail
-    pub async fn remove_from_queue_by_idx(&self, idx: i32) -> Result<(), Error> {
-        let mut conn = self.pool.get().await?;
-        let tran = conn.transaction().await?;
+    pub async fn reorder_queue(&self) -> Result<u64, Error> {
+        let conn = self.pool.get().await?;
 
-        let query = r"SELECT max(idx) FROM movie_queue";
-        let max_idx: i32 = tran
-            .query(query, &[])
-            .await?
-            .first()
-            .map_or(-1, |r| r.get(0));
-        if idx > max_idx || idx < 0 {
-            return Ok(());
-        }
-        let diff = max_idx - idx;
+        let query = query!(
+            r#"
+                CREATE TEMP TABLE temp_movie_queue AS (
+                    SELECT idx,
+                           last_modified,
+                           collection_idx,
+                           row_number() OVER (
+                            ORDER BY (idx, last_modified)
+                           ) AS new_idx
+                    FROM movie_queue
+                )
+            "#
+        );
+        query.execute(&conn).await?;
+
+        let query = query!(
+            r#"
+                UPDATE movie_queue
+                SET idx = (
+                    SELECT new_idx - 1
+                    FROM temp_movie_queue
+                    WHERE collection_idx = movie_queue.collection_idx
+                )
+            "#,
+        );
+        query.execute(&conn).await.map_err(Into::into)
+    }
+
+    /// # Errors
+    /// Return error if db queries fail
+    pub async fn remove_from_queue_by_idx(&self, idx: i32) -> Result<u64, Error> {
+        let conn = self.pool.get().await?;
 
         let query = query!(r"DELETE FROM movie_queue WHERE idx = $idx", idx = idx);
-        tran.execute(query.sql(), query.parameters()).await?;
-
-        let query = query!(
-            r#"
-                UPDATE movie_queue
-                SET idx = idx + $diff, last_modified = now()
-                WHERE idx > $idx
-            "#,
-            diff = diff,
-            idx = idx
-        );
-        tran.execute(query.sql(), query.parameters()).await?;
-
-        let query = query!(
-            r#"
-                UPDATE movie_queue
-                SET idx = idx - $diff - 1, last_modified = now()
-                WHERE idx > $idx
-            "#,
-            diff = diff,
-            idx = idx
-        );
-        tran.execute(query.sql(), query.parameters()).await?;
-
-        tran.commit().await.map_err(Into::into)
+        query.execute(&conn).await.map_err(Into::into)
     }
 
     /// # Errors
@@ -177,7 +173,7 @@ impl MovieQueueDB {
 
     /// # Errors
     /// Return error if db queries fail
-    pub async fn insert_into_queue(&self, idx: i32, path: &str) -> Result<(), Error> {
+    pub async fn insert_into_queue(&self, idx: i32, path: &str) -> Result<u64, Error> {
         if !Path::new(path).exists() {
             return Err(format_err!("File doesn't exist"));
         }
@@ -201,71 +197,19 @@ impl MovieQueueDB {
         &self,
         idx: i32,
         collection_idx: Uuid,
-    ) -> Result<(), Error> {
-        let query = query!(
-            r#"SELECT idx FROM movie_queue WHERE collection_idx = $idx"#,
-            idx = collection_idx
-        );
-        let conn = self.pool.get().await?;
-        if let Some((current_idx,)) = query.fetch_opt(&conn).await? {
-            self.remove_from_queue_by_idx(current_idx).await?;
-        }
-
-        let mut conn = self.pool.get().await?;
-        let tran = conn.transaction().await?;
-
-        let query = query!("SELECT idx FROM movie_queue WHERE idx=$idx", idx = idx);
-        let exists = tran
-            .query_opt(query.sql(), query.parameters())
-            .await?
-            .is_some();
-
-        let query = r"SELECT max(idx) FROM movie_queue";
-        let max_idx: i32 = tran
-            .query(query, &[])
-            .await?
-            .first()
-            .map_or(-1, |r| r.get(0));
-        let diff = max_idx - idx + 2;
-        debug!("{} {} {}", max_idx, idx, diff);
-
-        if exists {
-            let query = query!(
-                r#"
-                    UPDATE movie_queue
-                    SET idx = idx + $diff, last_modified = now()
-                    WHERE idx >= $idx
-                "#,
-                diff = diff,
-                idx = idx
-            );
-            tran.execute(query.sql(), query.parameters()).await?;
-        }
-
+    ) -> Result<u64, Error> {
         let query = query!(
             r#"
-                INSERT INTO movie_queue (idx, collection_idx, last_modified)
-                VALUES ($idx, $collection_idx, now())
+                INSERT INTO movie_queue (idx, collection_idx)
+                VALUES ($idx, $collection_idx)
+                ON CONFLICT (collection_idx)
+                DO UPDATE SET idx = $idx
             "#,
             idx = idx,
             collection_idx = collection_idx
         );
-        tran.execute(query.sql(), query.parameters()).await?;
-
-        if exists {
-            let query = query!(
-                r#"
-                    UPDATE movie_queue
-                    SET idx = idx - $diff + 1, last_modified = now()
-                    WHERE idx > $idx
-                "#,
-                diff = diff,
-                idx = idx
-            );
-            tran.execute(query.sql(), query.parameters()).await?;
-        }
-
-        tran.commit().await.map_err(Into::into)
+        let conn = self.pool.get().await?;
+        query.execute(&conn).await.map_err(Into::into)
     }
 
     /// # Errors
