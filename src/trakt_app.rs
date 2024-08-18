@@ -1,15 +1,12 @@
 use anyhow::Error;
 use clap::Parser;
+use futures::TryStreamExt;
 use stack_string::StackString;
 use stdout_channel::StdoutChannel;
+use tokio::time::{sleep, Duration};
 
 use movie_collection_lib::{
-    config::Config,
-    movie_collection::MovieCollection,
-    pgpool::PgPool,
-    plex_events::PlexMetadata,
-    trakt_connection::TraktConnection,
-    trakt_utils::{sync_trakt_with_db, trakt_app_parse, TraktActions, TraktCommands},
+    config::Config, imdb_episodes::ImdbEpisodes, movie_collection::MovieCollection, pgpool::PgPool, plex_events::PlexMetadata, trakt_connection::TraktConnection, trakt_utils::{sync_trakt_with_db, trakt_app_parse, TraktActions, TraktCommands}
 };
 
 #[allow(clippy::unnecessary_wraps)]
@@ -70,6 +67,17 @@ async fn trakt_app() -> Result<(), Error> {
         sync_trakt_with_db(&trakt, &mc).await?;
         mc.clear_plex_filename_bad_collection_id().await?;
         mc.fix_plex_filename_collection_id().await?;
+        let episodes: Vec<_> = ImdbEpisodes::get_episodes_not_recorded_in_trakt(&pool).await?.try_collect().await?;
+        for episode in episodes {
+            println!("episode {episode}");
+            let trakt_command = TraktCommands::Watched;
+            let trakt_action = TraktActions::Add;
+            match trakt_app_parse(&config, &trakt, &trakt_command, trakt_action, Some(episode.show.as_str()), None, episode.season, &[episode.episode], &stdout, &pool).await {
+                Ok(()) => println!("success"),
+                Err(e) => println!("failure {e:?}"),
+            }
+            sleep(Duration::from_secs(1)).await;
+        }
         PlexMetadata::fill_plex_metadata(&pool, &config).await
     } else {
         trakt_app_parse(
