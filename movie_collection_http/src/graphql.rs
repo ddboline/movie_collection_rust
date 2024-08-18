@@ -8,6 +8,7 @@ use rust_decimal::{prelude::ToPrimitive, Decimal};
 use stack_string::StackString;
 use std::{collections::HashMap, future::Future};
 use time::Date;
+use uuid::Uuid;
 
 use movie_collection_lib::{
     imdb_episodes::{ImdbEpisodes, ImdbSeason},
@@ -258,6 +259,7 @@ impl From<EpisodeItem> for ImdbEpisodes {
             rating: item.rating.and_then(Decimal::from_f64_retain),
             eptitle: item.eptitle,
             epurl: item.epurl,
+            id: Uuid::new_v4(),
         }
     }
 }
