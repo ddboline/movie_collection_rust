@@ -1123,7 +1123,6 @@ mod tests {
             .try_collect()
             .await?;
         println!("{}", episodes.len());
-        assert!(false);
         Ok(())
     }
 }
