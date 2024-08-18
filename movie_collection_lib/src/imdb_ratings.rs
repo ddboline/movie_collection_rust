@@ -107,7 +107,7 @@ impl ImdbRatings {
     pub async fn get_show_by_link(link: &str, pool: &PgPool) -> Result<Option<Self>, Error> {
         let query = query!(
             r#"
-                SELECT index, show, title, link, rating, istv, source
+                SELECT *
                 FROM imdb_ratings
                 WHERE (link = $link OR show = $link)
             "#,
@@ -125,7 +125,7 @@ impl ImdbRatings {
     ) -> Result<impl Stream<Item = Result<Self, PqError>>, Error> {
         let query = query!(
             r#"
-                SELECT index, show, title, link, rating, istv, source
+                SELECT *
                 FROM imdb_ratings
                 WHERE last_modified >= $timestamp
             "#,
