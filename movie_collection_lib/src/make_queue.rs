@@ -71,12 +71,15 @@ pub async fn make_queue_worker(
     } else if !del_files.is_empty() {
         for file in del_files {
             match file {
-                PathOrIndex::Index(idx) => mq.remove_from_queue_by_idx(*idx).await?,
+                PathOrIndex::Index(idx) => {
+                    mq.remove_from_queue_by_idx(*idx).await?;
+                }
                 PathOrIndex::Path(path) => {
                     mq.remove_from_queue_by_path(&path.to_string_lossy())
                         .await?;
                 }
             };
+            mq.reorder_queue().await?;
         }
     } else if add_files.is_empty() {
         let movie_queue = mq.print_movie_queue(patterns, None, None, None).await?;
@@ -101,6 +104,7 @@ pub async fn make_queue_worker(
         if let PathOrIndex::Path(path) = &add_files[0] {
             mq.insert_into_queue(max_idx + 1, &path.to_string_lossy())
                 .await?;
+            mq.reorder_queue().await?;
         } else {
             return Err(format_err!("No file specified"));
         }
@@ -123,12 +127,14 @@ pub async fn make_queue_worker(
                 }
             }
         }
+        mq.reorder_queue().await?;
     } else {
         for file in add_files {
             let max_idx = mq.get_max_queue_index().await?;
             if let PathOrIndex::Path(path) = file {
                 mq.insert_into_queue(max_idx + 1, &path.to_string_lossy())
                     .await?;
+                mq.reorder_queue().await?;
             } else {
                 return Err(format_err!("{} is not a path", file));
             }

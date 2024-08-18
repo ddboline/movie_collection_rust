@@ -1035,7 +1035,10 @@ mod tests {
     use anyhow::Error;
     use stdout_channel::{MockStdout, StdoutChannel};
 
-    use crate::{config::Config, movie_collection::MovieCollection, pgpool::PgPool};
+    use crate::{
+        config::Config, movie_collection::MovieCollection, movie_queue::MovieQueueDB,
+        pgpool::PgPool,
+    };
 
     #[tokio::test]
     #[ignore]
@@ -1053,6 +1056,18 @@ mod tests {
             ])
             .await?;
         assert_eq!(files.len(), 2);
+        Ok(())
+    }
+
+    #[tokio::test]
+    #[ignore]
+    async fn test_reorder_queue() -> Result<(), Error> {
+        let config = Config::with_config()?;
+        let pool = PgPool::new(&config.pgurl)?;
+        let mock_stdout = MockStdout::new();
+        let stdout = StdoutChannel::with_mock_stdout(mock_stdout.clone(), mock_stdout.clone());
+        let mc = MovieQueueDB::new(&config, &pool, &stdout);
+        mc.reorder_queue().await?;
         Ok(())
     }
 }
