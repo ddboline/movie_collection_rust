@@ -1019,8 +1019,9 @@ impl PlexMetadata {
 mod tests {
     use anyhow::Error;
     use futures::TryStreamExt;
+    use stdout_channel::StdoutChannel;
 
-    use crate::{config::Config, pgpool::PgPool, plex_events::PlexEvent};
+    use crate::{config::Config, imdb_episodes::ImdbEpisodes, movie_collection::MovieCollection, pgpool::PgPool, plex_events::PlexEvent};
 
     use super::PlexMetadata;
 
@@ -1103,6 +1104,20 @@ mod tests {
             filename.as_ref().unwrap().filename,
             "/shares/dileptonnas/Documents/television/archer/season13/archer_s13_ep01.mp4"
         );
+        Ok(())
+    }
+
+    #[tokio::test]
+    #[ignore]
+    async fn test_update_trakt_watched_from_plex_events() -> Result<(), Error> {
+        let config = Config::with_config()?;
+        let pool = PgPool::new(&config.pgurl)?;
+        let stdout = StdoutChannel::new();
+        let mc = MovieCollection::new(&config, &pool, &stdout);
+        mc.fix_collection_episode_id().await?;
+        let episodes: Vec<_> = ImdbEpisodes::get_episodes_not_recorded_in_trakt(&pool).await?.try_collect().await?;
+        println!("{}", episodes.len());
+        assert!(false);
         Ok(())
     }
 }

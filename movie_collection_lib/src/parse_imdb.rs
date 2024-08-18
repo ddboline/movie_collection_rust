@@ -4,6 +4,7 @@ use rust_decimal::Decimal;
 use stack_string::{format_sstr, StackString};
 use std::collections::HashMap;
 use stdout_channel::StdoutChannel;
+use uuid::Uuid;
 
 use crate::{
     config::Config, imdb_episodes::ImdbEpisodes, imdb_ratings::ImdbRatings,
@@ -242,6 +243,7 @@ impl ParseImdb {
                                     rating: episode.rating.and_then(Decimal::from_f64_retain),
                                     eptitle: episode.eptitle.unwrap_or_else(|| "".into()),
                                     epurl: episode.epurl.unwrap_or_else(|| "".into()),
+                                    id: Uuid::new_v4(),
                                 }
                                 .insert_episode(&self.mc.pool)
                                 .await?;
