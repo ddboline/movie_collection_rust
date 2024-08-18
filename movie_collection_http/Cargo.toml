@@ -1,6 +1,6 @@
 [package]
 name = "movie_collection_http"
-version = "0.10.38"
+version = "0.10.39"
 authors = ["Daniel Boline <ddboline@gmail.com>"]
 edition = "2018"
 
