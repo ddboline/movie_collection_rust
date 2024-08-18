@@ -408,6 +408,12 @@ impl MovieCollection {
         if check_path && !Path::new(&path).exists() {
             return Err(format_err!("No such file"));
         }
+        let file_stem = Path::new(&path)
+            .file_stem()
+            .ok_or_else(|| format_err!("No file stem"))?
+            .to_string_lossy();
+        let show = parse_file_stem(&file_stem).0;
+
         let conn = self.pool.get().await?;
         if let Some(idx) = self.get_collection_index(path).await? {
             let query = query!(
@@ -416,11 +422,6 @@ impl MovieCollection {
             );
             query.execute(&conn).await?;
         } else {
-            let file_stem = Path::new(&path)
-                .file_stem()
-                .ok_or_else(|| format_err!("No file stem"))?
-                .to_string_lossy();
-            let (show, _, _) = parse_file_stem(&file_stem);
             let query = query!(
                 r#"
                     INSERT INTO movie_collection (path, show, last_modified)
@@ -453,6 +454,64 @@ impl MovieCollection {
         );
         let conn = self.pool.get().await?;
         query.execute(&conn).await.map_err(Into::into)
+    }
+
+    /// # Errors
+    /// Returns error if db queries fail
+    pub async fn fix_collection_episode_id(&self) -> Result<u64, Error> {
+        #[derive(FromSqlRow)]
+        struct IndexPath {
+            idx: Uuid,
+            path: StackString,
+        }
+
+        let query = query!(
+            r#"
+                SELECT mc.idx, mc.path
+                FROM movie_collection mc
+                JOIN imdb_ratings ir ON ir.index = mc.show_id
+                WHERE mc.episode_id IS NULL
+                  AND ir.istv = true
+            "#
+        );
+        let conn = self.pool.get().await?;
+        let results: Vec<IndexPath> = query.fetch(&conn).await?;
+
+        for IndexPath {idx, path} in results {
+            let file_stem = Path::new(&path)
+                .file_stem()
+                .ok_or_else(|| format_err!("No file stem"))?
+                .to_string_lossy();
+            let (show, season, episode) = parse_file_stem(&file_stem);
+            let rating = ImdbRatings::get_show_by_link(&show, &self.pool).await?;
+            let episodes: Vec<ImdbEpisodes> = ImdbEpisodes::get_episodes_by_show_season_episode(&show, Some(season), Some(episode), &self.pool).await?.try_collect().await?;
+            let episode = episodes.first();
+            if let Some(rating) = &rating {
+                let query = query!(
+                    r#"
+                        UPDATE movie_collection
+                        SET show_id = $show_id
+                        WHERE idx = $idx
+                    "#,
+                    show_id = rating.index,
+                    idx = idx,
+                );
+                query.execute(&conn).await?;
+            }
+            if let Some(episode) = episode {
+                let query = query!(
+                    r#"
+                        UPDATE movie_collection
+                        SET episode_id = $id
+                        WHERE idx = $idx
+                    "#,
+                    id = episode.id,
+                    idx = idx,
+                );
+                query.execute(&conn).await?;
+            }
+        }
+        Ok(0)
     }
 
     /// # Errors
