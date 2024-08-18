@@ -1,0 +1,1 @@
+ALTER TABLE movie_collection ADD COLUMN episode_id UUID REFERENCES imdb_episodes (id);
