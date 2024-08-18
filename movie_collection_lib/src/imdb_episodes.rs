@@ -21,6 +21,7 @@ pub struct ImdbEpisodes {
     pub rating: Option<Decimal>,
     pub eptitle: StackString,
     pub epurl: StackString,
+    pub id: Uuid,
 }
 
 impl fmt::Display for ImdbEpisodes {
@@ -62,6 +63,7 @@ impl ImdbEpisodes {
             rating: None,
             eptitle: "".into(),
             epurl: "".into(),
+            id: Uuid::new_v4(),
         }
     }
 
@@ -89,7 +91,7 @@ impl ImdbEpisodes {
         let query = query!(
             r#"
                 SELECT a.show, b.title, a.season, a.episode, a.airdate,
-                       a.rating, a.eptitle, a.epurl
+                       a.rating, a.eptitle, a.epurl, a.id
                 FROM imdb_episodes a
                 JOIN imdb_ratings b ON a.show = b.show
                 WHERE a.id = $id
@@ -109,7 +111,7 @@ impl ImdbEpisodes {
         let query = query!(
             r#"
                 SELECT a.show, b.title, a.season, a.episode, a.airdate,
-                       a.rating, a.eptitle, a.epurl
+                       a.rating, a.eptitle, a.epurl, a.id
                 FROM imdb_episodes a
                 JOIN imdb_ratings b ON a.show = b.show
                 WHERE a.last_modified >= $timestamp
@@ -144,7 +146,7 @@ impl ImdbEpisodes {
             &format_sstr!(
                 r#"
                 SELECT a.show, b.title, a.season, a.episode, a.airdate,
-                        a.rating, a.eptitle, a.epurl
+                       a.rating, a.eptitle, a.epurl, a.id
                 FROM imdb_episodes a
                 JOIN imdb_ratings b ON a.show = b.show
                 WHERE {constraints}
@@ -153,6 +155,29 @@ impl ImdbEpisodes {
             ),
             ..bindings
         )?;
+        let conn = pool.get().await?;
+        query.fetch_streaming(&conn).await.map_err(Into::into)
+    }
+
+    /// # Errors
+    /// Returns error if db query fails
+    pub async fn get_episodes_not_recorded_in_trakt(pool: &PgPool) -> Result<impl Stream<Item = Result<Self, PqError>>, Error> {
+        let query = query!(
+            r#"
+                SELECT ie.show, ir.title, ie.season, ie.episode, ie.airdate,
+                       ie.rating, ie.eptitle, ie.epurl, ie.id
+                FROM plex_event pe
+                JOIN plex_filename pf ON pf.metadata_key = pe.metadata_key
+                JOIN movie_collection mc ON mc.idx = pf.collection_id
+                JOIN imdb_episodes ie ON ie.id = mc.episode_id
+                JOIN imdb_ratings ir ON ir.index = mc.show_id
+                JOIN trakt_watchlist tw ON tw.link = ir.link
+                LEFT JOIN trakt_watched_episodes twe ON twe.link = ir.link AND twe.season = ie.season AND twe.episode = ie.episode
+                WHERE twe.link IS NULL
+                GROUP BY 1,2,3,4,5,6,7,8,9
+                ORDER BY 1,2,3,4,5,6,7,8,9
+            "#,
+        );
         let conn = pool.get().await?;
         query.fetch_streaming(&conn).await.map_err(Into::into)
     }
