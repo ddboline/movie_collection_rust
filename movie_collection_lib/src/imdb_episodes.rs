@@ -193,9 +193,9 @@ impl ImdbEpisodes {
         let query = query!(
             r#"
                 INSERT INTO imdb_episodes (
-                    show, season, episode, airdate, rating, eptitle, epurl, last_modified
+                    show, season, episode, airdate, rating, eptitle, epurl, last_modified, id
                 ) VALUES (
-                    $show, $season, $episode, $airdate, $rating, $eptitle, $epurl, now()
+                    $show, $season, $episode, $airdate, $rating, $eptitle, $epurl, $id, now()
                 )
             "#,
             show = self.show,
@@ -204,7 +204,8 @@ impl ImdbEpisodes {
             airdate = self.airdate,
             rating = self.rating,
             eptitle = self.eptitle,
-            epurl = self.epurl
+            epurl = self.epurl,
+            id = self.id,
         );
         let conn = pool.get().await?;
         query.execute(&conn).await.map(|_| ()).map_err(Into::into)

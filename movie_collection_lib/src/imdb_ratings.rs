@@ -49,16 +49,17 @@ impl ImdbRatings {
         let query = query!(
             r#"
                 INSERT INTO imdb_ratings
-                (show, title, link, rating, istv, source, last_modified)
+                (show, title, link, rating, istv, source, index, last_modified)
                 VALUES
-                ($show, $title, $link, $rating, $istv, $source, now())
+                ($show, $title, $link, $rating, $istv, $source, $index, now())
             "#,
             show = self.show,
             title = self.title,
             link = self.link,
             rating = self.rating,
             istv = self.istv,
-            source = source
+            source = source,
+            index = self.index,
         );
         debug!("{:?}", self);
         let conn = pool.get().await?;
