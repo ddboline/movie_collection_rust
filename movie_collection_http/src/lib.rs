@@ -61,6 +61,8 @@ struct _ImdbEpisodesWrapper {
     eptitle: StackString,
     #[schema(description = "Episode URL")]
     epurl: StackString,
+    #[schema(description = "ID")]
+    id: UuidWrapper,
 }
 
 #[derive(Serialize, Deserialize, Clone, Debug, Eq, Copy, PartialEq, Into, From)]
