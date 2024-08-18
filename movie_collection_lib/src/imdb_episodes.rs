@@ -161,7 +161,9 @@ impl ImdbEpisodes {
 
     /// # Errors
     /// Returns error if db query fails
-    pub async fn get_episodes_not_recorded_in_trakt(pool: &PgPool) -> Result<impl Stream<Item = Result<Self, PqError>>, Error> {
+    pub async fn get_episodes_not_recorded_in_trakt(
+        pool: &PgPool,
+    ) -> Result<impl Stream<Item = Result<Self, PqError>>, Error> {
         let query = query!(
             r#"
                 SELECT ie.show, ir.title, ie.season, ie.episode, ie.airdate,

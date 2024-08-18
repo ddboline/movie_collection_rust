@@ -1021,7 +1021,10 @@ mod tests {
     use futures::TryStreamExt;
     use stdout_channel::StdoutChannel;
 
-    use crate::{config::Config, imdb_episodes::ImdbEpisodes, movie_collection::MovieCollection, pgpool::PgPool, plex_events::PlexEvent};
+    use crate::{
+        config::Config, imdb_episodes::ImdbEpisodes, movie_collection::MovieCollection,
+        pgpool::PgPool, plex_events::PlexEvent,
+    };
 
     use super::PlexMetadata;
 
@@ -1115,7 +1118,10 @@ mod tests {
         let stdout = StdoutChannel::new();
         let mc = MovieCollection::new(&config, &pool, &stdout);
         mc.fix_collection_episode_id().await?;
-        let episodes: Vec<_> = ImdbEpisodes::get_episodes_not_recorded_in_trakt(&pool).await?.try_collect().await?;
+        let episodes: Vec<_> = ImdbEpisodes::get_episodes_not_recorded_in_trakt(&pool)
+            .await?
+            .try_collect()
+            .await?;
         println!("{}", episodes.len());
         assert!(false);
         Ok(())

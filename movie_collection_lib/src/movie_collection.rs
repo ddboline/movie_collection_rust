@@ -477,14 +477,22 @@ impl MovieCollection {
         let conn = self.pool.get().await?;
         let results: Vec<IndexPath> = query.fetch(&conn).await?;
 
-        for IndexPath {idx, path} in results {
+        for IndexPath { idx, path } in results {
             let file_stem = Path::new(&path)
                 .file_stem()
                 .ok_or_else(|| format_err!("No file stem"))?
                 .to_string_lossy();
             let (show, season, episode) = parse_file_stem(&file_stem);
             let rating = ImdbRatings::get_show_by_link(&show, &self.pool).await?;
-            let episodes: Vec<ImdbEpisodes> = ImdbEpisodes::get_episodes_by_show_season_episode(&show, Some(season), Some(episode), &self.pool).await?.try_collect().await?;
+            let episodes: Vec<ImdbEpisodes> = ImdbEpisodes::get_episodes_by_show_season_episode(
+                &show,
+                Some(season),
+                Some(episode),
+                &self.pool,
+            )
+            .await?
+            .try_collect()
+            .await?;
             let episode = episodes.first();
             if let Some(rating) = &rating {
                 let query = query!(
