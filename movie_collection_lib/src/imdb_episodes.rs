@@ -90,7 +90,7 @@ impl ImdbEpisodes {
     pub async fn from_index(idx: Uuid, pool: &PgPool) -> Result<Option<Self>, Error> {
         let query = query!(
             r#"
-                SELECT a.*, b.*
+                SELECT a.*, b.title
                 FROM imdb_episodes a
                 JOIN imdb_ratings b ON a.show = b.show
                 WHERE a.id = $id
@@ -109,7 +109,7 @@ impl ImdbEpisodes {
     ) -> Result<impl Stream<Item = Result<Self, PqError>>, Error> {
         let query = query!(
             r#"
-                SELECT a.show, b.*
+                SELECT a.*, b.title
                 FROM imdb_episodes a
                 JOIN imdb_ratings b ON a.show = b.show
                 WHERE a.last_modified >= $timestamp
@@ -163,8 +163,8 @@ impl ImdbEpisodes {
     ) -> Result<impl Stream<Item = Result<Self, PqError>>, Error> {
         let query = query!(
             r#"
-                SELECT ie.show, ir.title, ie.season, ie.episode, ie.airdate,
-                       ie.rating, ie.eptitle, ie.epurl, ie.id
+                SELECT ie.show, ie.season, ie.episode, ie.airdate,
+                       ie.rating, ie.eptitle, ie.epurl, ie.id, ir.title
                 FROM plex_event pe
                 JOIN plex_filename pf ON pf.metadata_key = pe.metadata_key
                 JOIN movie_collection mc ON mc.idx = pf.collection_id
