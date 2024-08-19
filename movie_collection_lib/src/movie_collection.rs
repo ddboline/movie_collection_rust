@@ -622,7 +622,7 @@ impl MovieCollection {
             .collect();
         let movie_queue = Arc::new(movie_queue?);
 
-        let query = "SELECT path, show FROM movie_collection";
+        let query = "SELECT path, show FROM movie_collection WHERE is_deleted = false";
         let collection_map: Result<HashMap<StackString, StackString>, Error> = self
             .pool
             .get()
