@@ -44,7 +44,7 @@ impl fmt::Display for ImdbRatings {
 impl ImdbRatings {
     /// # Errors
     /// Returns error if db query fails
-    pub async fn insert_show(&self, pool: &PgPool) -> Result<(), Error> {
+    pub async fn insert_show(&self, pool: &PgPool) -> Result<u64, Error> {
         let source = self.source.as_ref().map(StackString::from_display);
         let query = query!(
             r#"
@@ -63,12 +63,12 @@ impl ImdbRatings {
         );
         debug!("{:?}", self);
         let conn = pool.get().await?;
-        query.execute(&conn).await.map(|_| ()).map_err(Into::into)
+        query.execute(&conn).await.map_err(Into::into)
     }
 
     /// # Errors
     /// Returns error if db query fails
-    pub async fn update_show(&self, pool: &PgPool) -> Result<(), Error> {
+    pub async fn update_show(&self, pool: &PgPool) -> Result<u64, Error> {
         let mut bindings = Vec::new();
         let mut updates: SmallVec<[&'static str; 6]> = smallvec!["last_modified=now()"];
         if let Some(title) = &self.title {
@@ -100,7 +100,7 @@ impl ImdbRatings {
         );
         let query = query_dyn!(&query, show = self.show, ..bindings)?;
         let conn = pool.get().await?;
-        query.execute(&conn).await.map(|_| ()).map_err(Into::into)
+        query.execute(&conn).await.map_err(Into::into)
     }
 
     /// # Errors

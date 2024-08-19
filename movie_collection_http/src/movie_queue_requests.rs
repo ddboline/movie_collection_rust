@@ -274,8 +274,12 @@ impl ImdbRatingsUpdateRequest {
         for show in self.shows {
             let show: ImdbRatings = show.into();
             match ImdbRatings::get_show_by_link(show.link.as_ref(), pool).await? {
-                Some(_) => show.update_show(pool).await?,
-                None => show.insert_show(pool).await?,
+                Some(_) => {
+                    show.update_show(pool).await?;
+                }
+                None => {
+                    show.insert_show(pool).await?;
+                }
             }
         }
         Ok(())

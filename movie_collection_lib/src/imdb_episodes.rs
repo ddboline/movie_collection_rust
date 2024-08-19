@@ -11,7 +11,7 @@ use uuid::Uuid;
 
 use crate::pgpool::PgPool;
 
-#[derive(Clone, Serialize, Deserialize, FromSqlRow, PartialEq, Eq)]
+#[derive(Clone, Serialize, Deserialize, FromSqlRow, PartialEq, Eq, Debug)]
 pub struct ImdbEpisodes {
     pub show: StackString,
     pub title: StackString,
@@ -90,8 +90,7 @@ impl ImdbEpisodes {
     pub async fn from_index(idx: Uuid, pool: &PgPool) -> Result<Option<Self>, Error> {
         let query = query!(
             r#"
-                SELECT a.show, b.title, a.season, a.episode, a.airdate,
-                       a.rating, a.eptitle, a.epurl, a.id
+                SELECT a.*, b.*
                 FROM imdb_episodes a
                 JOIN imdb_ratings b ON a.show = b.show
                 WHERE a.id = $id
@@ -110,8 +109,7 @@ impl ImdbEpisodes {
     ) -> Result<impl Stream<Item = Result<Self, PqError>>, Error> {
         let query = query!(
             r#"
-                SELECT a.show, b.title, a.season, a.episode, a.airdate,
-                       a.rating, a.eptitle, a.epurl, a.id
+                SELECT a.show, b.*
                 FROM imdb_episodes a
                 JOIN imdb_ratings b ON a.show = b.show
                 WHERE a.last_modified >= $timestamp
@@ -145,8 +143,7 @@ impl ImdbEpisodes {
         let query = query_dyn!(
             &format_sstr!(
                 r#"
-                SELECT a.show, b.title, a.season, a.episode, a.airdate,
-                       a.rating, a.eptitle, a.epurl, a.id
+                SELECT a.*, b.title
                 FROM imdb_episodes a
                 JOIN imdb_ratings b ON a.show = b.show
                 WHERE {constraints}
@@ -166,8 +163,7 @@ impl ImdbEpisodes {
     ) -> Result<impl Stream<Item = Result<Self, PqError>>, Error> {
         let query = query!(
             r#"
-                SELECT ie.show, ir.title, ie.season, ie.episode, ie.airdate,
-                       ie.rating, ie.eptitle, ie.epurl, ie.id
+                SELECT ie.*, ir.title
                 FROM plex_event pe
                 JOIN plex_filename pf ON pf.metadata_key = pe.metadata_key
                 JOIN movie_collection mc ON mc.idx = pf.collection_id
@@ -299,5 +295,45 @@ impl ImdbSeason {
         );
         let conn = pool.get().await?;
         query.fetch_streaming(&conn).await.map_err(Into::into)
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use anyhow::Error;
+    use futures::TryStreamExt;
+
+    use crate::{
+        config::Config, imdb_episodes::{ImdbEpisodes, ImdbSeason}, imdb_ratings::ImdbRatings, pgpool::PgPool
+    };
+
+    #[tokio::test]
+    #[ignore]
+    async fn test_imdb_episodes() -> Result<(), Error> {
+        let config = Config::with_config()?;
+        let pool = PgPool::new(&config.pgurl)?;
+
+        let episodes: Vec<_> =
+            ImdbEpisodes::get_episodes_by_show_season_episode("the_sopranos", None, None, &pool)
+                .await?
+                .try_collect()
+                .await?;
+        assert_eq!(episodes.len(), 86);
+        let episode = episodes.first().unwrap();
+        println!("{episode:?}");
+        assert_eq!(episode.season, 1);
+        assert_eq!(episode.episode, 1);
+        let index = episode.get_index(&pool).await?.unwrap();
+        assert_eq!(index, episode.id);
+        let episode0 = ImdbEpisodes::from_index(episode.id, &pool).await?.unwrap();
+        assert_eq!(episode.id, episode0.id);
+        let seasons: Vec<_> = ImdbSeason::get_seasons("the_sopranos", &pool)
+            .await?
+            .try_collect()
+            .await?;
+        assert_eq!(seasons.len(), 6);
+        let show = ImdbRatings::get_show_by_link("the_sopranos", &pool).await?.unwrap();
+        assert_eq!(show.show, episode.show);
+        Ok(())
     }
 }
