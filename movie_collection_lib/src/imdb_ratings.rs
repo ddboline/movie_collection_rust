@@ -93,7 +93,7 @@ impl ImdbRatings {
         let query = format_sstr!(
             r#"
                 UPDATE imdb_ratings
-                SET {},last_modified=now()
+                SET {}
                 WHERE show=$show
             "#,
             updates.join(","),
