@@ -163,7 +163,8 @@ impl ImdbEpisodes {
     ) -> Result<impl Stream<Item = Result<Self, PqError>>, Error> {
         let query = query!(
             r#"
-                SELECT ie.*, ir.title
+                SELECT ie.show, ir.title, ie.season, ie.episode, ie.airdate,
+                       ie.rating, ie.eptitle, ie.epurl, ie.id
                 FROM plex_event pe
                 JOIN plex_filename pf ON pf.metadata_key = pe.metadata_key
                 JOIN movie_collection mc ON mc.idx = pf.collection_id
