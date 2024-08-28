@@ -189,6 +189,7 @@ impl ParseImdb {
                             link: result.link.clone(),
                             rating: Some(rating),
                             istv: Some(istv),
+                            index: Uuid::new_v4(),
                             ..ImdbRatings::default()
                         }
                         .insert_show(&self.mc.pool)
