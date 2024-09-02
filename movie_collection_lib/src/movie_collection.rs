@@ -382,7 +382,13 @@ impl MovieCollection {
     /// Returns error if db queries fail
     pub async fn get_plex_metadata_key(&self, idx: Uuid) -> Result<Option<StackString>, Error> {
         let query = query!(
-            r#"SELECT metadata_key FROM plex_filename WHERE collection_id = $idx"#,
+            r#"
+                SELECT metadata_key
+                FROM plex_filename
+                WHERE collection_id = $idx
+                ORDER BY last_modified DESC
+                LIMIT 1
+            "#,
             idx = idx,
         );
         let conn = self.pool.get().await?;
