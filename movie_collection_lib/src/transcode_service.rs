@@ -365,6 +365,8 @@ impl TranscodeService {
                 output_file.to_string_lossy().as_ref(),
                 "--preset",
                 "Android 480p30",
+                "--audio-lang-list",
+                "any",
             ])
             .kill_on_drop(true)
             .stdout(Stdio::piped())
