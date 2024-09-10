@@ -217,6 +217,8 @@ struct _PlexFilenameWrapper {
     filename: StackString,
     #[schema(description = "Collection Id")]
     collection_id: Option<UuidWrapper>,
+    #[schema(description = "Music Collection Id")]
+    music_collection_id: Option<UuidWrapper>,
 }
 
 #[derive(Default, Debug, Serialize, Deserialize, Into, From, Deref)]

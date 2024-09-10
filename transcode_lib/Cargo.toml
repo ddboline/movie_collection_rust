@@ -10,7 +10,7 @@ edition = "2018"
 anyhow = "1.0"
 deadpool = "0.12"
 deadpool-lapin = {version="0.12", features=["serde"]}
-lapin = {version="2.0", default_features=false, features=["rustls"]}
+lapin = {version="2.0", default-features=false, features=["rustls"]}
 derive_more = "0.99"
 futures = "0.3"
 log = "0.4"

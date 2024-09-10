@@ -289,6 +289,7 @@ impl PlexEvent {
             metadata_key: metadata_key.clone(),
             filename,
             collection_id: None,
+            music_collection_id: None,
         })
     }
 
@@ -487,6 +488,7 @@ pub struct PlexFilename {
     pub metadata_key: StackString,
     pub filename: StackString,
     pub collection_id: Option<Uuid>,
+    pub music_collection_id: Option<Uuid>,
 }
 
 impl PlexFilename {
@@ -577,8 +579,40 @@ impl PlexFilename {
             .is_none()
         {
             self._insert(&conn).await?;
+        } else {
+            self._update(&conn).await?;
         }
         tran.commit().await?;
+        Ok(())
+    }
+
+    async fn _update<C>(&self, conn: &C) -> Result<(), Error>
+    where C: GenericClient + Sync
+    {
+        if self.collection_id.is_some() {
+            let query = query!(
+                "
+                    UPDATE plex_filename
+                    SET collection_id=$collection_id
+                    WHERE metadata_key=$metadata_key
+                ",
+                collection_id=self.collection_id,
+                metadata_key=self.metadata_key,
+            );
+            query.execute(&conn).await?;
+        }
+        if self.music_collection_id.is_some() {
+            let query = query!(
+                "
+                    UPDATE plex_filename
+                    SET music_collection_id=$music_collection_id
+                    WHERE metadata_key=$metadata_key
+                ",
+                music_collection_id=self.music_collection_id,
+                metadata_key=self.metadata_key,
+            );
+            query.execute(&conn).await?;
+        }
         Ok(())
     }
 
@@ -1007,6 +1041,7 @@ impl PlexMetadata {
                             metadata_key: plex_metadata.metadata_key.clone(),
                             filename: f.into(),
                             collection_id: None,
+                            music_collection_id: None,
                         });
                 Ok(Some((plex_metadata, plex_filename)))
             })
