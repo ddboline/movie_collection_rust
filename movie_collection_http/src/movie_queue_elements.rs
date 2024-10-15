@@ -791,7 +791,7 @@ fn TvShowsElement(
 ) -> Element {
     let watchlist_shows = watchlist
         .iter()
-        .filter(|item| tvshows.get(item.link.as_str()).is_none());
+        .filter(|item| !tvshows.contains(item.link.as_str()));
 
     let search_str = query
         .as_ref()
@@ -1795,6 +1795,7 @@ fn PlexElement(
             ))
             .unwrap_or_default();
         let event_str = &event.event;
+
         let title = &event.title;
         let title_len = if title.len() < 10 { title.len() } else { 10 };
         let title = String::from_utf8_lossy(&title.as_bytes()[0..title_len]);
@@ -1807,6 +1808,19 @@ fn PlexElement(
             .map_or("", StackString::as_str);
         let filename = event.filename.as_ref().map_or("", StackString::as_str);
         let filestem = filename.split('/').last().unwrap_or("");
+
+        let mut display_title = StackString::new();
+        if let Some(show) = &event.show {
+            display_title.push_str(show.as_str());
+            if let Some(season) = &event.season {
+                display_title = format_sstr!("{display_title} s{season}");
+            }
+            if let Some(episode) = &event.episode {
+                display_title = format_sstr!("{display_title} ep{episode}");
+            }
+        } else {
+            display_title = format_sstr!("{filestem} {grandparent_title} {parent_title} {title}");
+        }
         rsx! {
             tr {
                 key: "plex-event-key-{idx}",
@@ -1821,7 +1835,7 @@ fn PlexElement(
                 td {"{event_str}"},
                 td {"{metadata_type}"},
                 td {"{section_title}"},
-                td {"{filestem} {grandparent_title} {parent_title} {title}"},
+                td {"{display_title}"},
             }
         }
     });
@@ -1979,6 +1993,38 @@ fn PlexDetailElement(
         .as_ref()
         .map_or("", StackString::as_str);
     let filename = event.filename.as_ref().map_or("", StackString::as_str);
+    let filestem = filename.split('/').last().unwrap_or("");
+    let mut display_title = StackString::new();
+    if let Some(show) = &event.show {
+        display_title.push_str(show.as_str());
+        if let Some(season) = &event.season {
+            display_title = format_sstr!("{display_title} s{season}");
+        }
+        if let Some(episode) = &event.episode {
+            display_title = format_sstr!("{display_title} ep{episode}");
+        }
+    } else {
+        display_title = format_sstr!("{filestem} {grandparent_title} {parent_title} {title}");
+    }
+    let display_element = if let Some(epurl) = &event.epurl {
+        rsx! {
+            a {
+                href: "https://www.imdb.com/title/{epurl}",
+                target: "_blank",
+                "{display_title}",
+            }
+        }
+    } else if let Some(show_url) = &event.show_url {
+        rsx! {
+            a {
+                href: "https://www.imdb.com/title/{show_url}",
+                target: "_blank",
+                "{display_title}",
+            }
+        }
+    } else {
+        rsx! { "{display_title}" }
+    };
 
     let limit = limit.unwrap_or(10);
     let offset = offset.unwrap_or(0);
@@ -2039,6 +2085,10 @@ fn PlexDetailElement(
                 tr {
                     td {"Grandparent Title"},
                     td {"{grandparent_title}"},
+                },
+                tr {
+                    td {"Show"},
+                    td { {display_element} },
                 }
             }
         }
