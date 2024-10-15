@@ -29,7 +29,10 @@ use crate::{
     pgpool::PgPool, utils::parse_file_stem,
 };
 
-static ACCEPT_PATHS: [&str; 2] = ["/usr/bin/run-encoding", "/usr/bin/HandBrakeCLI"];
+static ENCODING_PATH: &str = "/usr/bin/run-encoding";
+static HANDBRAKE_PATH: &str = "/usr/bin/HandBrakeCLI";
+
+static ACCEPT_PATHS: [&str; 2] = [ENCODING_PATH, HANDBRAKE_PATH];
 
 #[derive(Serialize, Deserialize, Debug, PartialEq, Clone, Copy, Eq)]
 pub enum JobType {
@@ -357,7 +360,7 @@ impl TranscodeService {
         let stdout_path = debug_output_path.with_extension("out");
         let stderr_path = debug_output_path.with_extension("err");
 
-        let mut p = Command::new("HandBrakeCLI")
+        let mut p = Command::new(HANDBRAKE_PATH)
             .args([
                 "-i",
                 input_file.to_string_lossy().as_ref(),
@@ -876,7 +879,7 @@ mod tests {
         init_env,
         transcode_service::{
             get_current_jobs, get_last_line, get_paths, get_procs, get_upcoming_jobs,
-            transcode_status, JobType, ProcInfo, TranscodeServiceRequest,
+            transcode_status, JobType, ProcInfo, TranscodeServiceRequest, HANDBRAKE_PATH,
         },
     };
 
@@ -976,13 +979,13 @@ mod tests {
         let p = ProcInfo {
             pid: 25625,
             name: "HandBrakeCLI".into(),
-            exe: "/usr/bin/HandBrakeCLI".into(),
+            exe: HANDBRAKE_PATH.into(),
             cmdline: cmdline.clone(),
         };
         assert_eq!(
             StackString::from_display(p),
             format_sstr!(
-                "25625\tHandBrakeCLI\t/usr/bin/HandBrakeCLI\t{}",
+                "25625\tHandBrakeCLI\t{HANDBRAKE_PATH}\t{}",
                 cmdline.join(" ")
             )
         );

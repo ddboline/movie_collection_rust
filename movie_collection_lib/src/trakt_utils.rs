@@ -714,7 +714,17 @@ async fn get_imdb_url_from_show(
     show: &str,
 ) -> Result<Option<StackString>, Error> {
     let imdb_shows = mc.print_imdb_shows(show, false).await?;
-    let result = if imdb_shows.len() > 1 {
+    let result = if imdb_shows.is_empty() {
+        let shows = mc.print_imdb_shows(show, true).await?;
+        if shows.len() == 1 {
+            Some(shows[0].link.clone())
+        } else {
+            for show in imdb_shows {
+                debug!("{}", show);
+            }
+            None
+        }
+    } else if imdb_shows.len() > 1 {
         for show in imdb_shows {
             debug!("{}", show);
         }

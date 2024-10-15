@@ -83,20 +83,18 @@ pub struct EventOutput {
     pub grandparent_title: Option<StackString>,
     pub filename: Option<StackString>,
     pub last_modified: OffsetDateTime,
+    pub show: Option<StackString>,
+    pub season: Option<i32>,
+    pub episode: Option<i32>,
+    pub show_url: Option<StackString>,
+    pub epurl: Option<StackString>,
 }
 
 impl PlexEvent {
     /// # Errors
     /// Return error if deserialization fails
     pub fn get_from_payload(buf: &[u8]) -> Result<Self, Error> {
-        info!(
-            "buf {}",
-            if let Ok(s) = std::str::from_utf8(buf) {
-                s
-            } else {
-                ""
-            }
-        );
+        info!("buf {}", std::str::from_utf8(buf).unwrap_or_default());
         let object: WebhookPayload = serde_json::from_slice(buf)?;
         info!("{:#?}", object);
         object.try_into()
@@ -194,9 +192,13 @@ impl PlexEvent {
         let query = query!(
             r#"
                 SELECT a.id, a.event, a.metadata_type, a.section_title, a.title, a.parent_title,
-                       a.grandparent_title, b.filename, a.last_modified
+                       a.grandparent_title, b.filename, a.last_modified,
+                       c.show, d.season, d.episode, e.link as show_url, d.epurl
                 FROM plex_event a
                 LEFT JOIN plex_filename b ON a.metadata_key = b.metadata_key
+                LEFT JOIN movie_collection c ON c.idx = b.collection_id
+                LEFT JOIN imdb_episodes d ON d.id = c.episode_id
+                LEFT JOIN imdb_ratings e ON e.show = c.show
                 WHERE a.id = $id
             "#,
             id = id,
@@ -234,9 +236,13 @@ impl PlexEvent {
         let query = format_sstr!(
             "
                 SELECT a.id, a.event, a.metadata_type, a.section_title, a.title, a.parent_title,
-                       a.grandparent_title, b.filename, a.last_modified
+                       a.grandparent_title, b.filename, a.last_modified,
+                       c.show, d.season, d.episode, e.link as show_url, d.epurl
                 FROM plex_event a
                 LEFT JOIN plex_filename b ON a.metadata_key = b.metadata_key
+                LEFT JOIN movie_collection c ON c.idx = b.collection_id
+                LEFT JOIN imdb_episodes d ON d.id = c.episode_id
+                LEFT JOIN imdb_ratings e ON e.show = c.show
                 {where_str}
                 ORDER BY a.last_modified DESC
                 {limit}
@@ -587,7 +593,8 @@ impl PlexFilename {
     }
 
     async fn _update<C>(&self, conn: &C) -> Result<(), Error>
-    where C: GenericClient + Sync
+    where
+        C: GenericClient + Sync,
     {
         if self.collection_id.is_some() {
             let query = query!(
@@ -596,8 +603,8 @@ impl PlexFilename {
                     SET collection_id=$collection_id
                     WHERE metadata_key=$metadata_key
                 ",
-                collection_id=self.collection_id,
-                metadata_key=self.metadata_key,
+                collection_id = self.collection_id,
+                metadata_key = self.metadata_key,
             );
             query.execute(&conn).await?;
         }
@@ -608,8 +615,8 @@ impl PlexFilename {
                     SET music_collection_id=$music_collection_id
                     WHERE metadata_key=$metadata_key
                 ",
-                music_collection_id=self.music_collection_id,
-                metadata_key=self.metadata_key,
+                music_collection_id = self.music_collection_id,
+                metadata_key = self.metadata_key,
             );
             query.execute(&conn).await?;
         }
@@ -911,7 +918,7 @@ impl PlexMetadata {
                     if Self::get_by_key(pool, parent_key).await?.is_none() {
                         let mut parent_metadata =
                             Self::get_metadata_by_key(config, parent_key).await?;
-                        parent_metadata.show = metadata.show.clone();
+                        parent_metadata.show.clone_from(&metadata.show);
                         parent_metadata.insert(pool).await?;
                         println!("insert parent {parent_metadata:?}");
                     }
@@ -920,7 +927,7 @@ impl PlexMetadata {
                     if Self::get_by_key(pool, grandparent_key).await?.is_none() {
                         let mut grandparent_metadata =
                             Self::get_metadata_by_key(config, grandparent_key).await?;
-                        grandparent_metadata.show = metadata.show.clone();
+                        grandparent_metadata.show.clone_from(&metadata.show);
                         grandparent_metadata.insert(pool).await?;
                         println!("insert grandparent {grandparent_metadata:?}");
                     }

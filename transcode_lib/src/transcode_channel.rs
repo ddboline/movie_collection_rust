@@ -1,5 +1,5 @@
 use anyhow::{format_err, Error};
-use deadpool_lapin::Config as LapinConfig;
+use deadpool_lapin::{Config as LapinConfig, Runtime};
 use derive_more::{Deref, DerefMut};
 use futures::StreamExt;
 use lapin::{
@@ -20,7 +20,7 @@ pub struct TranscodeChannel(Channel);
 impl TranscodeChannel {
     pub async fn open_channel() -> Result<Self, Error> {
         let cfg = LapinConfig::default();
-        let pool = cfg.create_pool(None)?;
+        let pool = cfg.create_pool(Some(Runtime::Tokio1))?;
         let conn = pool.get().await?;
         conn.create_channel().await.map_err(Into::into).map(Self)
     }

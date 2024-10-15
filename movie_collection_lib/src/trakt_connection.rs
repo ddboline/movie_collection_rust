@@ -502,7 +502,7 @@ impl TraktConnection {
             .map(|entry| {
                 let imdb: StackString = entry.show.ids.imdb.unwrap_or_else(|| "".into());
                 TraktCalEntry {
-                    ep_link: entry.episode.ids.imdb.as_ref().map(Clone::clone),
+                    ep_link: entry.episode.ids.imdb.clone(),
                     episode: entry.episode.number,
                     link: imdb,
                     season: entry.episode.season,

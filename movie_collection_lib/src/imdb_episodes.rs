@@ -305,7 +305,10 @@ mod tests {
     use futures::TryStreamExt;
 
     use crate::{
-        config::Config, imdb_episodes::{ImdbEpisodes, ImdbSeason}, imdb_ratings::ImdbRatings, pgpool::PgPool
+        config::Config,
+        imdb_episodes::{ImdbEpisodes, ImdbSeason},
+        imdb_ratings::ImdbRatings,
+        pgpool::PgPool,
     };
 
     #[tokio::test]
@@ -333,7 +336,9 @@ mod tests {
             .try_collect()
             .await?;
         assert_eq!(seasons.len(), 6);
-        let show = ImdbRatings::get_show_by_link("the_sopranos", &pool).await?.unwrap();
+        let show = ImdbRatings::get_show_by_link("the_sopranos", &pool)
+            .await?
+            .unwrap();
         assert_eq!(show.show, episode.show);
         Ok(())
     }
