@@ -1,11 +1,11 @@
 use anyhow::Error;
 use futures::Stream;
-use postgres_query::{query, query_dyn, Error as PqError, FromSqlRow, Parameter};
+use log::debug;
+use postgres_query::{query, query_dyn, Error as PqError, FromSqlRow, Parameter, Query};
 use rust_decimal::Decimal;
 use serde::{Deserialize, Serialize};
-use smallvec::{smallvec, SmallVec};
 use stack_string::{format_sstr, StackString};
-use std::fmt;
+use std::{convert::TryInto, fmt};
 use time::{Date, OffsetDateTime};
 use uuid::Uuid;
 
@@ -101,56 +101,124 @@ impl ImdbEpisodes {
         query.fetch_opt(&conn).await.map_err(Into::into)
     }
 
+    fn get_imdb_episodes_query<'a>(
+        select_str: &'a str,
+        order_str: &'a str,
+        show: &'a Option<&str>,
+        season: &'a Option<i32>,
+        episode: &'a Option<i32>,
+        timestamp: &'a Option<OffsetDateTime>,
+        offset: Option<usize>,
+        limit: Option<usize>,
+    ) -> Result<Query<'a>, PqError> {
+        let mut constraints = Vec::new();
+        let mut query_bindings = Vec::new();
+        if let Some(show) = show {
+            constraints.push("a.show = $show");
+            query_bindings.push(("show", show as Parameter));
+        }
+        if let Some(season) = &season {
+            constraints.push("a.season = $season");
+            query_bindings.push(("season", season as Parameter));
+        }
+        if let Some(episode) = &episode {
+            constraints.push("a.episode = $episode");
+            query_bindings.push(("episode", episode as Parameter));
+        }
+        if let Some(timestamp) = timestamp {
+            constraints.push("a.last_modified >= $timestamp");
+            query_bindings.push(("timestamp", timestamp as Parameter));
+        }
+        let where_str = if constraints.is_empty() {
+            "".into()
+        } else {
+            format_sstr!("WHERE {}", constraints.join(" AND "))
+        };
+        let mut query = format_sstr!(
+            r#"
+                    SELECT {select_str}
+                    FROM imdb_episodes a
+                    JOIN imdb_ratings b ON a.show = b.show
+                    {where_str}
+                    {order_str}
+                "#
+        );
+        if let Some(offset) = &offset {
+            query.push_str(&format_sstr!(" OFFSET {offset}"));
+        }
+        if let Some(limit) = &limit {
+            query.push_str(&format_sstr!(" LIMIT {limit}"));
+        }
+        query_bindings.shrink_to_fit();
+        debug!("query:\n{}", query);
+        query_dyn!(&query, ..query_bindings)
+    }
+
     /// # Errors
     /// Returns error if db query fails
     pub async fn get_episodes_after_timestamp(
-        timestamp: OffsetDateTime,
         pool: &PgPool,
+        timestamp: Option<OffsetDateTime>,
+        offset: Option<usize>,
+        limit: Option<usize>,
     ) -> Result<impl Stream<Item = Result<Self, PqError>>, Error> {
-        let query = query!(
-            r#"
-                SELECT a.*, b.title
-                FROM imdb_episodes a
-                JOIN imdb_ratings b ON a.show = b.show
-                WHERE a.last_modified >= $timestamp
-            "#,
-            timestamp = timestamp
-        );
+        let query = Self::get_imdb_episodes_query(
+            "a.*, b.title",
+            "",
+            &None,
+            &None,
+            &None,
+            &timestamp,
+            offset,
+            limit,
+        )?;
         let conn = pool.get().await?;
         query.fetch_streaming(&conn).await.map_err(Into::into)
     }
 
     /// # Errors
+    /// Returns error if db query fails
+    pub async fn get_total(
+        pool: &PgPool,
+        timestamp: Option<OffsetDateTime>,
+        show: Option<&str>,
+        season: Option<i32>,
+        episode: Option<i32>,
+    ) -> Result<usize, Error> {
+        #[derive(FromSqlRow)]
+        struct Count {
+            count: i64,
+        }
+
+        let query = Self::get_imdb_episodes_query(
+            "count(*)", "", &show, &season, &episode, &timestamp, None, None,
+        )?;
+        let conn = pool.get().await?;
+        let count: Count = query.fetch_one(&conn).await?;
+
+        Ok(count.count.try_into()?)
+    }
+
+    /// # Errors
     /// Returns error if db queries fail
     pub async fn get_episodes_by_show_season_episode(
+        pool: &PgPool,
         show: &str,
         season: Option<i32>,
         episode: Option<i32>,
-        pool: &PgPool,
+        offset: Option<usize>,
+        limit: Option<usize>,
     ) -> Result<impl Stream<Item = Result<Self, PqError>>, Error> {
-        let mut constraints: SmallVec<[_; 3]> = smallvec!["a.show = $show"];
-        let mut bindings: SmallVec<[_; 3]> = smallvec![("show", &show as Parameter)];
-        if let Some(season) = &season {
-            constraints.push("a.season = $season");
-            bindings.push(("season", season as Parameter));
-        }
-        if let Some(episode) = &episode {
-            constraints.push("a.episode = $episode");
-            bindings.push(("episode", episode as Parameter));
-        }
-        let constraints = constraints.join(" AND ");
-
-        let query = query_dyn!(
-            &format_sstr!(
-                r#"
-                SELECT a.*, b.title
-                FROM imdb_episodes a
-                JOIN imdb_ratings b ON a.show = b.show
-                WHERE {constraints}
-                ORDER BY a.season, a.episode
-                "#
-            ),
-            ..bindings
+        let show = Some(show);
+        let query = Self::get_imdb_episodes_query(
+            "a.*, b.title",
+            "ORDER BY a.season, a.episode",
+            &show,
+            &season,
+            &episode,
+            &None,
+            offset,
+            limit,
         )?;
         let conn = pool.get().await?;
         query.fetch_streaming(&conn).await.map_err(Into::into)
@@ -317,11 +385,17 @@ mod tests {
         let config = Config::with_config()?;
         let pool = PgPool::new(&config.pgurl)?;
 
-        let episodes: Vec<_> =
-            ImdbEpisodes::get_episodes_by_show_season_episode("the_sopranos", None, None, &pool)
-                .await?
-                .try_collect()
-                .await?;
+        let episodes: Vec<_> = ImdbEpisodes::get_episodes_by_show_season_episode(
+            &pool,
+            "the_sopranos",
+            None,
+            None,
+            None,
+            None,
+        )
+        .await?
+        .try_collect()
+        .await?;
         assert_eq!(episodes.len(), 86);
         let episode = episodes.first().unwrap();
         println!("{episode:?}");

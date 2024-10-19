@@ -248,19 +248,27 @@ impl MovieQueueCli {
                         file.write_all(&serde_json::to_vec(&last_modified)?).await?;
                     }
                     "imdb_ratings" => {
-                        let shows: Vec<_> =
-                            ImdbRatings::get_shows_after_timestamp(start_timestamp, &pool)
-                                .await?
-                                .try_collect()
-                                .await?;
+                        let shows: Vec<_> = ImdbRatings::get_shows_after_timestamp(
+                            &pool,
+                            Some(start_timestamp),
+                            None,
+                            None,
+                        )
+                        .await?
+                        .try_collect()
+                        .await?;
                         file.write_all(&serde_json::to_vec(&shows)?).await?;
                     }
                     "imdb_episodes" => {
-                        let episodes: Vec<_> =
-                            ImdbEpisodes::get_episodes_after_timestamp(start_timestamp, &pool)
-                                .await?
-                                .try_collect()
-                                .await?;
+                        let episodes: Vec<_> = ImdbEpisodes::get_episodes_after_timestamp(
+                            &pool,
+                            Some(start_timestamp),
+                            None,
+                            None,
+                        )
+                        .await?
+                        .try_collect()
+                        .await?;
                         file.write_all(&serde_json::to_vec(&episodes)?).await?;
                     }
                     "plex_event" => {
@@ -289,7 +297,9 @@ impl MovieQueueCli {
                     }
                     "movie_collection" => {
                         let mc = MovieCollection::new(&config, &pool, &stdout);
-                        let entries = mc.get_collection_after_timestamp(start_timestamp).await?;
+                        let entries = mc
+                            .get_collection_after_timestamp(Some(start_timestamp), None, None)
+                            .await?;
                         file.write_all(&serde_json::to_vec(&entries)?).await?;
                     }
                     "music_collection" => {
@@ -302,7 +312,9 @@ impl MovieQueueCli {
                     }
                     "movie_queue" => {
                         let mq = MovieQueueDB::new(&config, &pool, &stdout);
-                        let entries = mq.get_queue_after_timestamp(start_timestamp).await?;
+                        let entries = mq
+                            .get_queue_after_timestamp(Some(start_timestamp), None, None)
+                            .await?;
                         file.write_all(&serde_json::to_vec(&entries)?).await?;
                     }
                     _ => {}

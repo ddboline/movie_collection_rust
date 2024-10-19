@@ -27,8 +27,8 @@ use crate::{
 #[derive(Debug, Default)]
 pub struct MovieQueueRequest {
     pub patterns: Vec<StackString>,
-    pub offset: Option<u64>,
-    pub limit: Option<u64>,
+    pub offset: Option<usize>,
+    pub limit: Option<usize>,
     pub order_by: Option<OrderBy>,
 }
 
@@ -190,11 +190,17 @@ impl ImdbShowRequest {
 struct _ImdbEpisodesSyncRequest {
     #[schema(description = "Start Timestamp")]
     pub start_timestamp: DateTimeType,
+    #[schema(description = "Offset")]
+    pub offset: Option<usize>,
+    #[schema(description = "Limit")]
+    pub limit: Option<usize>,
 }
 
 #[derive(Serialize, Deserialize)]
 pub struct MovieQueueSyncRequest {
-    pub start_timestamp: DateTimeWrapper,
+    pub start_timestamp: Option<DateTimeWrapper>,
+    pub offset: Option<usize>,
+    pub limit: Option<usize>,
 }
 
 derive_rweb_schema!(MovieQueueSyncRequest, _ImdbEpisodesSyncRequest);
@@ -206,20 +212,28 @@ impl MovieQueueSyncRequest {
         &self,
         pool: &PgPool,
         config: &Config,
-    ) -> Result<Vec<MovieQueueRow>, Error> {
+    ) -> Result<(usize, Vec<MovieQueueRow>), Error> {
         let mock_stdout = MockStdout::new();
         let stdout = StdoutChannel::with_mock_stdout(mock_stdout.clone(), mock_stdout);
 
+        let timestamp = self.start_timestamp.map(Into::into);
+        let offset = self.offset;
+        let limit = self.limit;
+
         let mq = MovieQueueDB::new(config, pool, &stdout);
-        mq.get_queue_after_timestamp(self.start_timestamp.into())
-            .await
-            .map_err(Into::into)
+        let total = mq.get_total(timestamp).await?;
+        let data = mq
+            .get_queue_after_timestamp(timestamp, offset, limit)
+            .await?;
+        Ok((total, data))
     }
 }
 
 #[derive(Serialize, Deserialize)]
 pub struct MovieCollectionSyncRequest {
-    pub start_timestamp: DateTimeWrapper,
+    pub start_timestamp: Option<DateTimeWrapper>,
+    pub offset: Option<usize>,
+    pub limit: Option<usize>,
 }
 
 derive_rweb_schema!(MovieCollectionSyncRequest, _ImdbEpisodesSyncRequest);
@@ -231,14 +245,20 @@ impl MovieCollectionSyncRequest {
         &self,
         pool: &PgPool,
         config: &Config,
-    ) -> Result<Vec<MovieCollectionRow>, Error> {
+    ) -> Result<(usize, Vec<MovieCollectionRow>), Error> {
         let mock_stdout = MockStdout::new();
         let stdout = StdoutChannel::with_mock_stdout(mock_stdout.clone(), mock_stdout);
 
+        let timestamp = self.start_timestamp.map(Into::into);
+        let offset = self.offset;
+        let limit = self.limit;
+
         let mc = MovieCollection::new(config, pool, &stdout);
-        mc.get_collection_after_timestamp(self.start_timestamp.into())
-            .await
-            .map_err(Into::into)
+        let total = mc.get_total(timestamp).await?;
+        let data = mc
+            .get_collection_after_timestamp(timestamp, offset, limit)
+            .await?;
+        Ok((total, data))
     }
 }
 

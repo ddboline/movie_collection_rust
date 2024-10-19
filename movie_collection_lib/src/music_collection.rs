@@ -1,9 +1,10 @@
 use anyhow::{format_err, Error};
 use futures::{future::try_join_all, Stream, TryStreamExt};
+use log::debug;
 use postgres_query::{query, query_dyn, Error as PqError, FromSqlRow, Parameter, Query};
 use serde::{Deserialize, Serialize};
 use stack_string::{format_sstr, StackString};
-use std::{collections::HashMap, sync::Arc};
+use std::{collections::HashMap, convert::TryInto, sync::Arc};
 use time::OffsetDateTime;
 use uuid::Uuid;
 
@@ -35,17 +36,56 @@ impl Default for MusicCollection {
 }
 
 impl MusicCollection {
+    fn get_music_collection_query<'a>(
+        select_str: &'a str,
+        order_str: &'a str,
+        start_timestamp: &'a Option<OffsetDateTime>,
+        offset: Option<usize>,
+        limit: Option<usize>,
+    ) -> Result<Query<'a>, PqError> {
+        let mut constraints = Vec::new();
+        let mut bindings = Vec::new();
+        if let Some(start_timestamp) = &start_timestamp {
+            constraints.push("last_modified > $start_timestamp");
+            bindings.push(("start_timestamp", start_timestamp as Parameter));
+        }
+        let where_str = if constraints.is_empty() {
+            StackString::new()
+        } else {
+            format_sstr!("WHERE {}", constraints.join(" AND "))
+        };
+        let mut query = format_sstr!(
+            "
+                SELECT {select_str} FROM music_collection
+                {where_str}
+                {order_str}
+            "
+        );
+        if let Some(offset) = &offset {
+            query.push_str(&format_sstr!(" OFFSET {offset}"));
+        }
+        if let Some(limit) = &limit {
+            query.push_str(&format_sstr!(" LIMIT {limit}"));
+        }
+        bindings.shrink_to_fit();
+        debug!("query:\n{}", query);
+        query_dyn!(&query, ..bindings)
+    }
+
     /// # Errors
     /// Return error if db query fails
-    pub async fn get_count(pool: &PgPool) -> Result<i64, Error> {
+    pub async fn get_count(
+        pool: &PgPool,
+        start_timestamp: Option<OffsetDateTime>,
+    ) -> Result<usize, Error> {
         #[derive(FromSqlRow)]
         struct Count {
             count: i64,
         }
-        let query = query!("SELECT count(*) AS count FROM music_collection");
+        let query = Self::get_music_collection_query("count(*)", "", &start_timestamp, None, None)?;
         let conn = pool.get().await?;
         let count: Count = query.fetch_one(&conn).await?;
-        Ok(count.count)
+        Ok(count.count.try_into()?)
     }
 
     /// # Errors
@@ -53,45 +93,16 @@ impl MusicCollection {
     pub async fn get_entries(
         pool: &PgPool,
         start_timestamp: Option<OffsetDateTime>,
-        offset: Option<u64>,
-        limit: Option<u64>,
+        offset: Option<usize>,
+        limit: Option<usize>,
     ) -> Result<impl Stream<Item = Result<Self, PqError>>, Error> {
-        if Self::get_count(pool).await? == 0 {
-            let query = query!("SELECT * FROM music_collection LIMIT 0");
-            let conn = pool.get().await?;
-            return query.fetch_streaming(&conn).await.map_err(Into::into);
-        }
-        let mut constraints = Vec::new();
-        let mut bindings = Vec::new();
-        if let Some(start_timestamp) = &start_timestamp {
-            constraints.push("last_modified > $start_timestamp");
-            bindings.push(("start_timestamp", start_timestamp as Parameter));
-        }
-        let query = format_sstr!(
-            "
-                SELECT * FROM music_collection
-                {where_str}
-                ORDER BY last_modified DESC
-                {limit}
-                {offset}
-            ",
-            where_str = if constraints.is_empty() {
-                StackString::new()
-            } else {
-                format_sstr!("WHERE {}", constraints.join(" AND "))
-            },
-            limit = if let Some(limit) = limit {
-                format_sstr!("LIMIT {limit}")
-            } else {
-                StackString::new()
-            },
-            offset = if let Some(offset) = offset {
-                format_sstr!("OFFSET {offset}")
-            } else {
-                StackString::new()
-            }
-        );
-        let query: Query = query_dyn!(&query, ..bindings)?;
+        let query = Self::get_music_collection_query(
+            "*",
+            "ORDER BY last_modified DESC",
+            &start_timestamp,
+            offset,
+            limit,
+        )?;
         let conn = pool.get().await?;
         query.fetch_streaming(&conn).await.map_err(Into::into)
     }

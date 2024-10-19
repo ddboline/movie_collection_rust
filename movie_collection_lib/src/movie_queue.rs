@@ -1,10 +1,11 @@
 use anyhow::{format_err, Error};
 use futures::future::try_join_all;
 use itertools::Itertools;
-use postgres_query::{query, query_dyn, FromSqlRow};
+use log::debug;
+use postgres_query::{query, query_dyn, Error as PqError, FromSqlRow, Parameter, Query};
 use serde::{Deserialize, Serialize};
 use stack_string::{format_sstr, StackString};
-use std::{fmt, fmt::Write, path::Path};
+use std::{convert::TryInto, fmt, fmt::Write, path::Path};
 use stdout_channel::StdoutChannel;
 use time::OffsetDateTime;
 use uuid::Uuid;
@@ -229,8 +230,8 @@ impl MovieQueueDB {
     pub async fn print_movie_queue(
         &self,
         patterns: &[&str],
-        offset: Option<u64>,
-        limit: Option<u64>,
+        offset: Option<usize>,
+        limit: Option<usize>,
         order_by: Option<OrderBy>,
     ) -> Result<Vec<MovieQueueResult>, Error> {
         #[derive(FromSqlRow)]
@@ -313,22 +314,75 @@ impl MovieQueueDB {
         Ok(results)
     }
 
+    fn get_movie_queue_query<'a>(
+        select_str: &'a str,
+        order_str: &'a str,
+        timestamp: &'a Option<OffsetDateTime>,
+        offset: Option<usize>,
+        limit: Option<usize>,
+    ) -> Result<Query<'a>, PqError> {
+        let mut constraints = Vec::new();
+        let mut query_bindings = Vec::new();
+        if let Some(timestamp) = timestamp {
+            constraints.push("a.last_modified >= $timestamp");
+            query_bindings.push(("timestamp", timestamp as Parameter));
+        }
+        let where_str = if constraints.is_empty() {
+            "".into()
+        } else {
+            format_sstr!("WHERE {}", constraints.join(" AND "))
+        };
+        let mut query = format_sstr!(
+            r#"
+                SELECT {select_str}
+                FROM movie_queue a
+                JOIN movie_collection b ON a.collection_idx = b.idx
+                {where_str}
+                {order_str}
+            "#,
+        );
+        if let Some(offset) = &offset {
+            query.push_str(&format_sstr!(" OFFSET {offset}"));
+        }
+        if let Some(limit) = &limit {
+            query.push_str(&format_sstr!(" LIMIT {limit}"));
+        }
+        query_bindings.shrink_to_fit();
+        debug!("query:\n{}", query);
+        query_dyn!(&query, ..query_bindings)
+    }
+
     /// # Errors
     /// Return error if db queries fail
     pub async fn get_queue_after_timestamp(
         &self,
-        timestamp: OffsetDateTime,
+        timestamp: Option<OffsetDateTime>,
+        offset: Option<usize>,
+        limit: Option<usize>,
     ) -> Result<Vec<MovieQueueRow>, Error> {
-        let query = query!(
-            r#"
-                SELECT a.idx, a.collection_idx, b.path, b.show, a.last_modified
-                FROM movie_queue a
-                JOIN movie_collection b ON a.collection_idx = b.idx
-                WHERE a.last_modified >= $timestamp
-            "#,
-            timestamp = timestamp
-        );
+        let query = Self::get_movie_queue_query(
+            "a.idx, a.collection_idx, b.path, b.show, a.last_modified",
+            "ORDER BY a.idx",
+            &timestamp,
+            offset,
+            limit,
+        )?;
         let conn = self.pool.get().await?;
         query.fetch(&conn).await.map_err(Into::into)
+    }
+
+    /// # Errors
+    /// Return error if db queries fail
+    pub async fn get_total(&self, timestamp: Option<OffsetDateTime>) -> Result<usize, Error> {
+        #[derive(FromSqlRow)]
+        struct Count {
+            count: i64,
+        }
+
+        let query = Self::get_movie_queue_query("count(*)", "", &timestamp, None, None)?;
+        let conn = self.pool.get().await?;
+        let count: Count = query.fetch_one(&conn).await?;
+
+        Ok(count.count.try_into()?)
     }
 }

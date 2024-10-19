@@ -150,8 +150,8 @@ pub async fn movie_queue_body(
     patterns: Vec<StackString>,
     queue: Vec<MovieQueueResult>,
     search: Option<StackString>,
-    offset: Option<u64>,
-    limit: Option<u64>,
+    offset: Option<usize>,
+    limit: Option<usize>,
     order_by: Option<OrderBy>,
 ) -> Result<String, Error> {
     let mock_stdout = MockStdout::new();
@@ -230,8 +230,8 @@ fn MovieQueueElement(
     patterns: Vec<StackString>,
     entries: Vec<QueueEntry>,
     search: Option<StackString>,
-    offset: Option<u64>,
-    limit: Option<u64>,
+    offset: Option<usize>,
+    limit: Option<usize>,
     order_by: Option<OrderBy>,
 ) -> Element {
     let watchlist_url = if patterns.is_empty() {
@@ -734,8 +734,8 @@ pub fn tvshows_body(
     tvshows: Vec<TvShowsResult>,
     query: Option<&str>,
     source: Option<TvShowSource>,
-    offset: Option<u64>,
-    limit: Option<u64>,
+    offset: Option<usize>,
+    limit: Option<usize>,
 ) -> Result<String, Error> {
     let tvshows: HashSet<_> = tvshows
         .into_iter()
@@ -786,8 +786,8 @@ fn TvShowsElement(
     watchlist: HashSet<ProcessShowItem>,
     query: Option<StackString>,
     source: Option<TvShowSource>,
-    offset: Option<u64>,
-    limit: Option<u64>,
+    offset: Option<usize>,
+    limit: Option<usize>,
 ) -> Element {
     let watchlist_shows = watchlist
         .iter()
@@ -798,8 +798,8 @@ fn TvShowsElement(
         .map_or_else(StackString::new, |s| format_sstr!("&query={s}"));
     let source_str = source.map_or_else(StackString::new, |s| format_sstr!("&source={s}"));
 
-    let offset = offset.unwrap_or(0) as usize;
-    let limit = limit.unwrap_or(10) as usize;
+    let offset = offset.unwrap_or(0);
+    let limit = limit.unwrap_or(10);
 
     let mut shows: Vec<_> = tvshows.iter().chain(watchlist_shows).collect();
     shows.sort_by(|x, y| x.show.cmp(&y.show));
@@ -1025,8 +1025,8 @@ fn TvShowsElement(
 pub fn watchlist_body(
     shows: WatchListMap,
     query: Option<&str>,
-    offset: Option<u64>,
-    limit: Option<u64>,
+    offset: Option<usize>,
+    limit: Option<usize>,
     source: Option<TvShowSource>,
 ) -> Result<String, Error> {
     let mut shows: Vec<_> = shows
@@ -1069,8 +1069,8 @@ struct WatchListEntry {
 fn WatchlistElement(
     shows: Vec<WatchListEntry>,
     query: Option<StackString>,
-    offset: Option<u64>,
-    limit: Option<u64>,
+    offset: Option<usize>,
+    limit: Option<usize>,
     source: Option<TvShowSource>,
 ) -> Element {
     let shows = shows.iter().enumerate().map(|(idx, entry)| {
@@ -1138,8 +1138,8 @@ fn WatchlistElement(
         .map_or_else(StackString::new, |s| format_sstr!("&query={s}"));
     let source_str = source.map_or_else(StackString::new, |s| format_sstr!("&source={s}"));
 
-    let offset = offset.unwrap_or(0) as usize;
-    let limit = limit.unwrap_or(10) as usize;
+    let offset = offset.unwrap_or(0);
+    let limit = limit.unwrap_or(10);
 
     let search = {
         let source_str = source_str.clone();
@@ -1749,8 +1749,8 @@ pub fn plex_body(
     config: Config,
     events: Vec<EventOutput>,
     section: Option<PlexSectionType>,
-    offset: Option<u64>,
-    limit: Option<u64>,
+    offset: Option<usize>,
+    limit: Option<usize>,
 ) -> Result<String, Error> {
     let mut app = VirtualDom::new_with_props(
         PlexElement,
@@ -1776,8 +1776,8 @@ fn PlexElement(
     config: Config,
     events: Vec<EventOutput>,
     section: Option<PlexSectionType>,
-    offset: Option<u64>,
-    limit: Option<u64>,
+    offset: Option<usize>,
+    limit: Option<usize>,
 ) -> Element {
     let local = DateTimeWrapper::local_tz();
     let entries = events.iter().enumerate().map(|(idx, event)| {
@@ -1941,8 +1941,8 @@ fn PlexElement(
 pub fn plex_detail_body(
     config: Config,
     event: EventOutput,
-    offset: Option<u64>,
-    limit: Option<u64>,
+    offset: Option<usize>,
+    limit: Option<usize>,
 ) -> Result<String, Error> {
     let mut app = VirtualDom::new_with_props(
         PlexDetailElement,
@@ -1966,8 +1966,8 @@ pub fn plex_detail_body(
 fn PlexDetailElement(
     config: Config,
     event: EventOutput,
-    offset: Option<u64>,
-    limit: Option<u64>,
+    offset: Option<usize>,
+    limit: Option<usize>,
 ) -> Element {
     let local = DateTimeWrapper::local_tz();
     let id = event.id;

@@ -1,11 +1,13 @@
 use anyhow::{format_err, Error};
 use futures::{future::try_join_all, Stream, TryStreamExt};
 use itertools::Itertools;
-use postgres_query::{query, query_dyn, Error as PqError, FromSqlRow};
+use log::debug;
+use postgres_query::{query, query_dyn, Error as PqError, FromSqlRow, Parameter, Query};
 use serde::{Deserialize, Serialize};
 use stack_string::{format_sstr, StackString};
 use std::{
     collections::{HashMap, HashSet},
+    convert::TryInto,
     ffi::OsStr,
     fmt,
     fmt::Write,
@@ -85,7 +87,7 @@ impl fmt::Display for TvShowsResult {
     }
 }
 
-#[derive(Default, Serialize, Deserialize, FromSqlRow)]
+#[derive(Default, Serialize, Deserialize, FromSqlRow, Debug)]
 pub struct MovieCollectionRow {
     pub idx: Uuid,
     pub path: StackString,
@@ -240,11 +242,13 @@ impl MovieCollection {
         show: &str,
         season: Option<i32>,
     ) -> Result<Vec<ImdbEpisodes>, Error> {
-        ImdbEpisodes::get_episodes_by_show_season_episode(show, season, None, &self.pool)
-            .await?
-            .try_collect()
-            .await
-            .map_err(Into::into)
+        ImdbEpisodes::get_episodes_by_show_season_episode(
+            &self.pool, show, season, None, None, None,
+        )
+        .await?
+        .try_collect()
+        .await
+        .map_err(Into::into)
     }
 
     /// # Errors
@@ -491,10 +495,12 @@ impl MovieCollection {
             let (show, season, episode) = parse_file_stem(&file_stem);
             let rating = ImdbRatings::get_show_by_link(&show, &self.pool).await?;
             let episodes: Vec<ImdbEpisodes> = ImdbEpisodes::get_episodes_by_show_season_episode(
+                &self.pool,
                 &show,
                 Some(season),
                 Some(episode),
-                &self.pool,
+                None,
+                None,
             )
             .await?
             .try_collect()
@@ -934,22 +940,75 @@ impl MovieCollection {
         Ok(output)
     }
 
+    fn get_movie_collection_query<'a>(
+        select_str: &'a str,
+        order_str: &'a str,
+        timestamp: &'a Option<OffsetDateTime>,
+        offset: Option<usize>,
+        limit: Option<usize>,
+    ) -> Result<Query<'a>, PqError> {
+        let mut constraints = Vec::new();
+        let mut query_bindings = Vec::new();
+        if let Some(timestamp) = timestamp {
+            constraints.push("last_modified >= $timestamp");
+            query_bindings.push(("timestamp", timestamp as Parameter));
+        }
+        let where_str = if constraints.is_empty() {
+            "".into()
+        } else {
+            format_sstr!("WHERE {}", constraints.join(" AND "))
+        };
+        let mut query = format_sstr!(
+            r#"
+                SELECT {select_str}
+                FROM movie_collection
+                {where_str}
+                {order_str}
+            "#
+        );
+        if let Some(offset) = &offset {
+            query.push_str(&format_sstr!(" OFFSET {offset}"));
+        }
+        if let Some(limit) = &limit {
+            query.push_str(&format_sstr!(" LIMIT {limit}"));
+        }
+        query_bindings.shrink_to_fit();
+        debug!("query:\n{}", query);
+        query_dyn!(&query, ..query_bindings)
+    }
+
     /// # Errors
     /// Returns error if db queries fail
     pub async fn get_collection_after_timestamp(
         &self,
-        timestamp: OffsetDateTime,
+        timestamp: Option<OffsetDateTime>,
+        offset: Option<usize>,
+        limit: Option<usize>,
     ) -> Result<Vec<MovieCollectionRow>, Error> {
-        let query = query!(
-            r#"
-                SELECT idx, path, show
-                FROM movie_collection
-                WHERE last_modified >= $timestamp
-            "#,
-            timestamp = timestamp
-        );
+        let query = Self::get_movie_collection_query(
+            "idx, path, show",
+            "ORDER BY path",
+            &timestamp,
+            offset,
+            limit,
+        )?;
         let conn = self.pool.get().await?;
         query.fetch(&conn).await.map_err(Into::into)
+    }
+
+    /// # Errors
+    /// Returns error if db queries fail
+    pub async fn get_total(&self, timestamp: Option<OffsetDateTime>) -> Result<usize, Error> {
+        #[derive(FromSqlRow)]
+        struct Count {
+            count: i64,
+        }
+
+        let query = Self::get_movie_collection_query("count(*)", "", &timestamp, None, None)?;
+        let conn = self.pool.get().await?;
+        let count: Count = query.fetch_one(&conn).await?;
+
+        Ok(count.count.try_into()?)
     }
 
     /// # Errors

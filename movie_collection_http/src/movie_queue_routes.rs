@@ -20,6 +20,7 @@ use std::{
     path::PathBuf,
 };
 use stdout_channel::{MockStdout, StdoutChannel};
+use time::OffsetDateTime;
 use tokio::fs::remove_file;
 use tokio_stream::StreamExt;
 
@@ -89,9 +90,9 @@ pub struct FullQueueRequest {
     #[schema(description = "Search String")]
     pub q: Option<StackString>,
     #[schema(description = "Offset")]
-    pub offset: Option<u64>,
+    pub offset: Option<usize>,
     #[schema(description = "Limit")]
-    pub limit: Option<u64>,
+    pub limit: Option<usize>,
     #[schema(description = "Order By (asc/desc)")]
     pub order_by: Option<OrderByWrapper>,
 }
@@ -416,7 +417,9 @@ pub async fn find_new_episodes(
 
 #[derive(Serialize, Deserialize, Debug)]
 pub struct ImdbEpisodesSyncRequest {
-    pub start_timestamp: DateTimeWrapper,
+    pub start_timestamp: Option<DateTimeWrapper>,
+    pub offset: Option<usize>,
+    pub limit: Option<usize>,
 }
 
 derive_rweb_schema!(ImdbEpisodesSyncRequest, _ImdbEpisodesSyncRequest);
@@ -425,12 +428,34 @@ derive_rweb_schema!(ImdbEpisodesSyncRequest, _ImdbEpisodesSyncRequest);
 #[allow(dead_code)]
 struct _ImdbEpisodesSyncRequest {
     #[schema(description = "Start Timestamp")]
-    pub start_timestamp: DateTimeType,
+    pub start_timestamp: Option<DateTimeType>,
+    #[schema(description = "Offset")]
+    pub offset: Option<usize>,
+    #[schema(description = "Limit")]
+    pub limit: Option<usize>,
+}
+
+#[derive(Debug, Serialize, Deserialize, Schema)]
+#[schema(component = "Pagination")]
+struct Pagination {
+    #[schema(description = "Total Number of Entries")]
+    total: usize,
+    #[schema(description = "Number of Entries to Skip")]
+    offset: usize,
+    #[schema(description = "Number of Entries Returned")]
+    limit: usize,
+}
+
+#[derive(Debug, Serialize, Deserialize, Schema)]
+#[schema(component = "PaginatedImdbEpisodes")]
+struct PaginatedImdbEpisodes {
+    pagination: Pagination,
+    data: Vec<ImdbEpisodesWrapper>,
 }
 
 #[derive(RwebResponse)]
 #[response(description = "List Imdb Episodes")]
-struct ListImdbEpisodesResponse(JsonBase<Vec<ImdbEpisodesWrapper>, Error>);
+struct ListImdbEpisodesResponse(JsonBase<PaginatedImdbEpisodes, Error>);
 
 #[get("/list/imdb_episodes")]
 pub async fn imdb_episodes_route(
@@ -440,6 +465,10 @@ pub async fn imdb_episodes_route(
 ) -> WarpResult<ListImdbEpisodesResponse> {
     let query = query.into_inner();
 
+    let offset = query.offset.unwrap_or(0);
+    let limit = query.limit.unwrap_or(10);
+    let start_timestamp: Option<OffsetDateTime> = query.start_timestamp.map(Into::into);
+
     let task = user
         .store_url_task(
             state.trakt.get_client(),
@@ -448,16 +477,29 @@ pub async fn imdb_episodes_route(
         )
         .await;
 
-    let episodes =
-        ImdbEpisodes::get_episodes_after_timestamp(query.start_timestamp.into(), &state.db)
-            .await
-            .map_err(Into::<Error>::into)?
-            .map_ok(Into::into)
-            .try_collect()
-            .await
-            .map_err(Into::<Error>::into)?;
+    let total = ImdbEpisodes::get_total(&state.db, start_timestamp, None, None, None)
+        .await
+        .map_err(Into::<Error>::into)?;
+    let pagination = Pagination {
+        total,
+        offset,
+        limit,
+    };
+
+    let data: Vec<_> = ImdbEpisodes::get_episodes_after_timestamp(
+        &state.db,
+        start_timestamp,
+        Some(offset),
+        Some(limit),
+    )
+    .await
+    .map_err(Into::<Error>::into)?
+    .map_ok(Into::into)
+    .try_collect()
+    .await
+    .map_err(Into::<Error>::into)?;
     task.await.ok();
-    Ok(JsonBase::new(episodes).into())
+    Ok(JsonBase::new(PaginatedImdbEpisodes { pagination, data }).into())
 }
 
 #[derive(RwebResponse)]
@@ -488,14 +530,23 @@ pub async fn imdb_episodes_update(
 
 #[derive(Serialize, Deserialize)]
 pub struct ImdbRatingsSyncRequest {
-    pub start_timestamp: DateTimeWrapper,
+    pub start_timestamp: Option<DateTimeWrapper>,
+    pub offset: Option<usize>,
+    pub limit: Option<usize>,
 }
 
 derive_rweb_schema!(ImdbRatingsSyncRequest, _ImdbEpisodesSyncRequest);
 
+#[derive(Debug, Serialize, Deserialize, Schema)]
+#[schema(component = "PaginatedImdbRatings")]
+struct PaginatedImdbRatings {
+    pagination: Pagination,
+    data: Vec<ImdbRatingsWrapper>,
+}
+
 #[derive(RwebResponse)]
 #[response(description = "List Imdb Shows")]
-struct ListImdbShowsResponse(JsonBase<Vec<ImdbRatingsWrapper>, Error>);
+struct ListImdbShowsResponse(JsonBase<PaginatedImdbRatings, Error>);
 
 #[get("/list/imdb_ratings")]
 pub async fn imdb_ratings_route(
@@ -512,16 +563,32 @@ pub async fn imdb_ratings_route(
             "/list/imdb_ratings",
         )
         .await;
-
-    let ratings = ImdbRatings::get_shows_after_timestamp(query.start_timestamp.into(), &state.db)
-        .await
-        .map_err(Into::<Error>::into)?
-        .map_ok(Into::into)
-        .try_collect()
+    let start_timestamp = query.start_timestamp.map(Into::into);
+    let total = ImdbRatings::get_total(&state.db, start_timestamp)
         .await
         .map_err(Into::<Error>::into)?;
+    let offset = query.offset.unwrap_or(0);
+    let limit = query.limit.unwrap_or(total);
+    let pagination = Pagination {
+        total,
+        offset,
+        limit,
+    };
+
+    let data = ImdbRatings::get_shows_after_timestamp(
+        &state.db,
+        start_timestamp,
+        Some(offset),
+        Some(limit),
+    )
+    .await
+    .map_err(Into::<Error>::into)?
+    .map_ok(Into::into)
+    .try_collect()
+    .await
+    .map_err(Into::<Error>::into)?;
     task.await.ok();
-    Ok(JsonBase::new(ratings).into())
+    Ok(JsonBase::new(PaginatedImdbRatings { pagination, data }).into())
 }
 
 #[derive(RwebResponse)]
@@ -572,9 +639,16 @@ pub async fn imdb_ratings_set_source(
     Ok(HtmlBase::new("Success").into())
 }
 
+#[derive(Debug, Serialize, Deserialize, Schema)]
+#[schema(component = "PaginatedMovieQueueRow")]
+struct PaginatedMovieQueueRow {
+    pagination: Pagination,
+    data: Vec<MovieQueueRowWrapper>,
+}
+
 #[derive(RwebResponse)]
 #[response(description = "List Movie Queue Entries")]
-struct ListMovieQueueResponse(JsonBase<Vec<MovieQueueRowWrapper>, Error>);
+struct ListMovieQueueResponse(JsonBase<PaginatedMovieQueueRow, Error>);
 
 #[get("/list/movie_queue")]
 pub async fn movie_queue_route(
@@ -582,18 +656,22 @@ pub async fn movie_queue_route(
     #[filter = "LoggedUser::filter"] user: LoggedUser,
     #[data] state: AppState,
 ) -> WarpResult<ListMovieQueueResponse> {
+    let query = query.into_inner();
+
     let task = user
         .store_url_task(state.trakt.get_client(), &state.config, "/list/movie_queue")
         .await;
-    let x = query
-        .into_inner()
-        .get_queue(&state.db, &state.config)
-        .await?
-        .into_iter()
-        .map(Into::into)
-        .collect();
+    let (total, data) = query.get_queue(&state.db, &state.config).await?;
+    let offset = query.offset.unwrap_or(0);
+    let limit = query.limit.unwrap_or(total);
+    let pagination = Pagination {
+        total,
+        offset,
+        limit,
+    };
+    let data = data.into_iter().map(Into::into).collect();
     task.await.ok();
-    Ok(JsonBase::new(x).into())
+    Ok(JsonBase::new(PaginatedMovieQueueRow { pagination, data }).into())
 }
 
 #[derive(RwebResponse)]
@@ -621,9 +699,16 @@ pub async fn movie_queue_update(
     Ok(HtmlBase::new("Success").into())
 }
 
+#[derive(Debug, Serialize, Deserialize, Schema)]
+#[schema(component = "PaginatedMovieCollectionRow")]
+struct PaginatedMovieCollectionRow {
+    pagination: Pagination,
+    data: Vec<MovieCollectionRowWrapper>,
+}
+
 #[derive(RwebResponse)]
 #[response(description = "List Movie Collection Entries")]
-struct ListMovieCollectionResponse(JsonBase<Vec<MovieCollectionRowWrapper>, Error>);
+struct ListMovieCollectionResponse(JsonBase<PaginatedMovieCollectionRow, Error>);
 
 #[get("/list/movie_collection")]
 pub async fn movie_collection_route(
@@ -634,15 +719,18 @@ pub async fn movie_collection_route(
     let task = user
         .store_url_task(state.trakt.get_client(), &state.config, "/list/movie_queue")
         .await;
-    let x = query
-        .into_inner()
-        .get_collection(&state.db, &state.config)
-        .await?
-        .into_iter()
-        .map(Into::into)
-        .collect();
+    let query = query.into_inner();
+    let (total, data) = query.get_collection(&state.db, &state.config).await?;
+    let offset = query.offset.unwrap_or(0);
+    let limit = query.limit.unwrap_or(total);
+    let pagination = Pagination {
+        total,
+        offset,
+        limit,
+    };
+    let data = data.into_iter().map(Into::into).collect();
     task.await.ok();
-    Ok(JsonBase::new(x).into())
+    Ok(JsonBase::new(PaginatedMovieCollectionRow { pagination, data }).into())
 }
 
 #[derive(RwebResponse)]
@@ -1445,9 +1533,16 @@ async fn watched_action_http_worker(
     Ok(body)
 }
 
+#[derive(Debug, Serialize, Deserialize, Schema)]
+#[schema(component = "PaginatedPlexEvent")]
+struct PaginatedPlexEvent {
+    pagination: Pagination,
+    data: Vec<PlexEventWrapper>,
+}
+
 #[derive(RwebResponse)]
 #[response(description = "Plex Events")]
-struct PlexEventResponse(JsonBase<Vec<PlexEventWrapper>, Error>);
+struct PlexEventResponse(JsonBase<PaginatedPlexEvent, Error>);
 
 #[get("/list/plex_event")]
 pub async fn plex_events(
@@ -1463,12 +1558,26 @@ pub async fn plex_events(
         )
         .await;
     let query = query.into_inner();
-    let events = PlexEvent::get_events(
+    let start_timestamp = query.start_timestamp.map(Into::into);
+    let event_type = query.event_type.map(Into::into);
+
+    let total = PlexEvent::get_total(&state.db, start_timestamp, event_type)
+        .await
+        .map_err(Into::<Error>::into)?;
+    let offset = query.offset.unwrap_or(0);
+    let limit = query.limit.unwrap_or(total);
+    let pagination = Pagination {
+        total,
+        offset,
+        limit,
+    };
+
+    let data = PlexEvent::get_events(
         &state.db,
-        query.start_timestamp.map(Into::into),
-        query.event_type.map(Into::into),
-        query.offset,
-        query.limit,
+        start_timestamp,
+        event_type,
+        Some(offset),
+        Some(limit),
     )
     .await
     .map_err(Into::<Error>::into)?
@@ -1477,7 +1586,7 @@ pub async fn plex_events(
     .await
     .map_err(Into::<Error>::into)?;
     task.await.ok();
-    Ok(JsonBase::new(events).into())
+    Ok(JsonBase::new(PaginatedPlexEvent { pagination, data }).into())
 }
 
 #[derive(Serialize, Deserialize, Debug, Schema)]
@@ -1638,9 +1747,16 @@ pub async fn plex_detail(
     Ok(HtmlBase::new(body).into())
 }
 
+#[derive(Debug, Serialize, Deserialize, Schema)]
+#[schema(component = "PaginatedPlexFilename")]
+struct PaginatedPlexFilename {
+    pagination: Pagination,
+    data: Vec<PlexFilenameWrapper>,
+}
+
 #[derive(RwebResponse)]
 #[response(description = "Plex Filenames")]
-struct PlexFilenameResponse(JsonBase<Vec<PlexFilenameWrapper>, Error>);
+struct PlexFilenameResponse(JsonBase<PaginatedPlexFilename, Error>);
 
 #[get("/list/plex_filename")]
 pub async fn plex_filename(
@@ -1656,7 +1772,19 @@ pub async fn plex_filename(
         )
         .await;
     let query = query.into_inner();
-    let filenames = PlexFilename::get_filenames(
+    let start_timestamp = query.start_timestamp.map(Into::into);
+    let total = PlexFilename::get_total(&state.db, start_timestamp)
+        .await
+        .map_err(Into::<Error>::into)?;
+    let offset = query.offset.unwrap_or(0);
+    let limit = query.limit.unwrap_or(total);
+    let pagination = Pagination {
+        total,
+        offset,
+        limit,
+    };
+
+    let data = PlexFilename::get_filenames(
         &state.db,
         query.start_timestamp.map(Into::into),
         query.offset,
@@ -1669,7 +1797,7 @@ pub async fn plex_filename(
     .await
     .map_err(Into::<Error>::into)?;
     task.await.ok();
-    Ok(JsonBase::new(filenames).into())
+    Ok(JsonBase::new(PaginatedPlexFilename { pagination, data }).into())
 }
 
 #[derive(Serialize, Deserialize, Debug, Schema)]
@@ -1717,9 +1845,16 @@ pub async fn plex_filename_update(
     Ok(HtmlBase::new("Success").into())
 }
 
+#[derive(Debug, Serialize, Deserialize, Schema)]
+#[schema(component = "PaginatedPlexMetadata")]
+struct PaginatedPlexMetadata {
+    pagination: Pagination,
+    data: Vec<PlexMetadataWrapper>,
+}
+
 #[derive(RwebResponse)]
 #[response(description = "Plex Metadata")]
-struct PlexMetadataResponse(JsonBase<Vec<PlexMetadataWrapper>, Error>);
+struct PlexMetadataResponse(JsonBase<PaginatedPlexMetadata, Error>);
 
 #[get("/list/plex_metadata")]
 pub async fn plex_metadata(
@@ -1735,20 +1870,27 @@ pub async fn plex_metadata(
         )
         .await;
     let query = query.into_inner();
-    let entries = PlexMetadata::get_entries(
-        &state.db,
-        query.start_timestamp.map(Into::into),
-        query.offset,
-        query.limit,
-    )
-    .await
-    .map_err(Into::<Error>::into)?
-    .map_ok(Into::into)
-    .try_collect()
-    .await
-    .map_err(Into::<Error>::into)?;
+    let start_timestamp = query.start_timestamp.map(Into::into);
+    let total = PlexMetadata::get_total(&state.db, start_timestamp)
+        .await
+        .map_err(Into::<Error>::into)?;
+    let offset = query.offset.unwrap_or(0);
+    let limit = query.limit.unwrap_or(total);
+    let pagination = Pagination {
+        total,
+        offset,
+        limit,
+    };
+
+    let data = PlexMetadata::get_entries(&state.db, start_timestamp, Some(offset), Some(limit))
+        .await
+        .map_err(Into::<Error>::into)?
+        .map_ok(Into::into)
+        .try_collect()
+        .await
+        .map_err(Into::<Error>::into)?;
     task.await.ok();
-    Ok(JsonBase::new(entries).into())
+    Ok(JsonBase::new(PaginatedPlexMetadata { pagination, data }).into())
 }
 
 #[derive(Serialize, Deserialize, Debug, Schema)]
@@ -1796,9 +1938,16 @@ pub async fn plex_metadata_update(
     Ok(HtmlBase::new("Success").into())
 }
 
+#[derive(Debug, Serialize, Deserialize, Schema)]
+#[schema(component = "PaginatedMusicCollection")]
+struct PaginatedMusicCollection {
+    pagination: Pagination,
+    data: Vec<MusicCollectionWrapper>,
+}
+
 #[derive(RwebResponse)]
 #[response(description = "Music Collection")]
-struct MusicCollectionResponse(JsonBase<Vec<MusicCollectionWrapper>, Error>);
+struct MusicCollectionResponse(JsonBase<PaginatedMusicCollection, Error>);
 
 #[get("/list/music_collection")]
 pub async fn music_collection(
@@ -1814,20 +1963,27 @@ pub async fn music_collection(
         )
         .await;
     let query = query.into_inner();
-    let entries = MusicCollection::get_entries(
-        &state.db,
-        query.start_timestamp.map(Into::into),
-        query.offset,
-        query.limit,
-    )
-    .await
-    .map_err(Into::<Error>::into)?
-    .map_ok(Into::into)
-    .try_collect()
-    .await
-    .map_err(Into::<Error>::into)?;
+    let start_timestamp = query.start_timestamp.map(Into::into);
+    let total = MusicCollection::get_count(&state.db, start_timestamp)
+        .await
+        .map_err(Into::<Error>::into)?;
+    let offset = query.offset.unwrap_or(0);
+    let limit = query.limit.unwrap_or(total);
+    let pagination = Pagination {
+        total,
+        offset,
+        limit,
+    };
+
+    let data = MusicCollection::get_entries(&state.db, start_timestamp, Some(offset), Some(limit))
+        .await
+        .map_err(Into::<Error>::into)?
+        .map_ok(Into::into)
+        .try_collect()
+        .await
+        .map_err(Into::<Error>::into)?;
     task.await.ok();
-    Ok(JsonBase::new(entries).into())
+    Ok(JsonBase::new(PaginatedMusicCollection { pagination, data }).into())
 }
 
 #[derive(Serialize, Deserialize, Debug, Schema)]
@@ -1882,7 +2038,7 @@ struct ExtractSubtitlesResponse(HtmlBase<StackString, Error>);
 #[post("/list/transcode/subtitle/{filename}/{index}")]
 pub async fn movie_queue_extract_subtitle(
     filename: StackString,
-    index: u64,
+    index: usize,
     #[filter = "LoggedUser::filter"] user: LoggedUser,
     #[data] state: AppState,
 ) -> WarpResult<ExtractSubtitlesResponse> {

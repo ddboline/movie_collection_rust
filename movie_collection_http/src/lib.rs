@@ -36,7 +36,7 @@ use movie_collection_lib::{
     tv_show_source::TvShowSource,
 };
 
-#[derive(Clone, Serialize, Deserialize, Into, From)]
+#[derive(Clone, Serialize, Deserialize, Into, From, Debug)]
 pub struct ImdbEpisodesWrapper(ImdbEpisodes);
 
 derive_rweb_schema!(ImdbEpisodesWrapper, _ImdbEpisodesWrapper);
@@ -129,7 +129,7 @@ struct _MovieQueueRowWrapper {
     last_modified: Option<DateTimeType>,
 }
 
-#[derive(Default, Serialize, Deserialize, Into, From, Deref)]
+#[derive(Default, Serialize, Deserialize, Into, From, Deref, Debug)]
 pub struct MovieCollectionRowWrapper(MovieCollectionRow);
 
 derive_rweb_schema!(MovieCollectionRowWrapper, _MovieCollectionRowWrapper);
@@ -351,8 +351,8 @@ pub struct PlexEventRequest {
     pub start_timestamp: Option<DateTimeWrapper>,
     pub event_type: Option<PlexEventTypeWrapper>,
     pub section_type: Option<PlexSectionTypeWrapper>,
-    pub offset: Option<u64>,
-    pub limit: Option<u64>,
+    pub offset: Option<usize>,
+    pub limit: Option<usize>,
 }
 
 derive_rweb_schema!(PlexEventRequest, _PlexEventRequest);
@@ -368,16 +368,16 @@ struct _PlexEventRequest {
     #[schema(description = "Section Type")]
     section_type: Option<PlexSectionTypeWrapper>,
     #[schema(description = "Offset")]
-    offset: Option<u64>,
+    offset: Option<usize>,
     #[schema(description = "Limit")]
-    limit: Option<u64>,
+    limit: Option<usize>,
 }
 
 #[derive(Serialize, Deserialize, Debug)]
 pub struct PlexFilenameRequest {
     pub start_timestamp: Option<DateTimeWrapper>,
-    pub offset: Option<u64>,
-    pub limit: Option<u64>,
+    pub offset: Option<usize>,
+    pub limit: Option<usize>,
 }
 
 derive_rweb_schema!(PlexFilenameRequest, _PlexFilenameRequest);
@@ -389,17 +389,17 @@ struct _PlexFilenameRequest {
     #[schema(description = "Start Timestamp")]
     start_timestamp: Option<DateTimeType>,
     #[schema(description = "Offset")]
-    offset: Option<u64>,
+    offset: Option<usize>,
     #[schema(description = "Limit")]
-    limit: Option<u64>,
+    limit: Option<usize>,
 }
 
 #[derive(Default, Clone, Debug, Serialize, Deserialize, Into, From)]
 pub struct TraktWatchlistRequest {
     pub query: Option<StackString>,
     pub source: Option<TvShowSourceWrapper>,
-    pub offset: Option<u64>,
-    pub limit: Option<u64>,
+    pub offset: Option<usize>,
+    pub limit: Option<usize>,
 }
 
 derive_rweb_schema!(TraktWatchlistRequest, _TraktWatchlistRequest);

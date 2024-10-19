@@ -128,7 +128,10 @@ impl MkvTrack {
     /// # Errors
     /// Return error if fpath doesn't end in mkv, or if output of mkvinfo is not
     /// utf8
-    pub async fn extract_subtitles_from_mkv(fpath: &str, index: u64) -> Result<StackString, Error> {
+    pub async fn extract_subtitles_from_mkv(
+        fpath: &str,
+        index: usize,
+    ) -> Result<StackString, Error> {
         let fname = fpath
             .strip_suffix(".mkv")
             .ok_or_else(|| format_err!("Wrong suffix"))?;

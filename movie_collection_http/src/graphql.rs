@@ -359,7 +359,7 @@ impl Loader<EpisodesShowSeasonKey> for ItemLoader {
                     episode,
                 } = key;
                 let values: Vec<_> = ImdbEpisodes::get_episodes_by_show_season_episode(
-                    show, *season, *episode, &self.0,
+                    &self.0, show, *season, *episode, None, None,
                 )
                 .await
                 .map_err(Error::new_with_source)?

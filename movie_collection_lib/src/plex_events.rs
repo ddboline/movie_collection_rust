@@ -1,6 +1,6 @@
 use anyhow::{format_err, Error};
 use futures::{Stream, TryStreamExt};
-use log::info;
+use log::{debug, info};
 use postgres_query::{
     client::GenericClient, query, query_dyn, Error as PqError, FromSqlRow, Parameter, Query,
 };
@@ -100,53 +100,89 @@ impl PlexEvent {
         object.try_into()
     }
 
+    fn get_plex_event_query<'a>(
+        select_str: &'a str,
+        order_str: &'a str,
+        start_timestamp: &'a Option<OffsetDateTime>,
+        event_type: &'a Option<StackString>,
+        offset: Option<usize>,
+        limit: Option<usize>,
+    ) -> Result<Query<'a>, PqError> {
+        let mut constraints = Vec::new();
+        let mut query_bindings = Vec::new();
+        if let Some(start_timestamp) = &start_timestamp {
+            constraints.push("last_modified > $start_timestamp");
+            query_bindings.push(("start_timestamp", start_timestamp as Parameter));
+        }
+        if let Some(event_type) = event_type {
+            constraints.push("event = $event");
+            query_bindings.push(("event", event_type as Parameter));
+        }
+        let where_str = if constraints.is_empty() {
+            "".into()
+        } else {
+            format_sstr!("WHERE {}", constraints.join(" AND "))
+        };
+        let mut query = format_sstr!(
+            "
+                SELECT {select_str}
+                FROM plex_event
+                {where_str}
+                {order_str}
+            "
+        );
+        if let Some(offset) = &offset {
+            query.push_str(&format_sstr!(" OFFSET {offset}"));
+        }
+        if let Some(limit) = &limit {
+            query.push_str(&format_sstr!(" LIMIT {limit}"));
+        }
+        query_bindings.shrink_to_fit();
+        debug!("query:\n{}", query);
+        query_dyn!(&query, ..query_bindings)
+    }
+
     /// # Errors
     /// Return error if db query fails
     pub async fn get_events(
         pool: &PgPool,
         start_timestamp: Option<OffsetDateTime>,
         event_type: Option<PlexEventType>,
-        offset: Option<u64>,
-        limit: Option<u64>,
+        offset: Option<usize>,
+        limit: Option<usize>,
     ) -> Result<impl Stream<Item = Result<Self, PqError>>, Error> {
-        let mut constraints = Vec::new();
-        let mut bindings = Vec::new();
-        if let Some(start_timestamp) = &start_timestamp {
-            constraints.push("last_modified > $start_timestamp");
-            bindings.push(("start_timestamp", start_timestamp as Parameter));
-        }
         let event_type: Option<StackString> = event_type.map(|s| s.to_str().into());
-        if let Some(event_type) = &event_type {
-            constraints.push("event = $event");
-            bindings.push(("event", event_type as Parameter));
-        }
-        let query = format_sstr!(
-            "
-                SELECT * FROM plex_event
-                {where_str}
-                ORDER BY last_modified DESC
-                {limit}
-                {offset}
-            ",
-            where_str = if constraints.is_empty() {
-                StackString::new()
-            } else {
-                format_sstr!("WHERE {}", constraints.join(" AND "))
-            },
-            limit = if let Some(limit) = limit {
-                format_sstr!("LIMIT {limit}")
-            } else {
-                StackString::new()
-            },
-            offset = if let Some(offset) = offset {
-                format_sstr!("OFFSET {offset}")
-            } else {
-                StackString::new()
-            }
-        );
-        let query: Query = query_dyn!(&query, ..bindings)?;
+        let query = Self::get_plex_event_query(
+            "*",
+            "ORDER BY last_modified DESC",
+            &start_timestamp,
+            &event_type,
+            offset,
+            limit,
+        )?;
         let conn = pool.get().await?;
         query.fetch_streaming(&conn).await.map_err(Into::into)
+    }
+
+    /// # Errors
+    /// Return error if db query fails
+    pub async fn get_total(
+        pool: &PgPool,
+        start_timestamp: Option<OffsetDateTime>,
+        event_type: Option<PlexEventType>,
+    ) -> Result<usize, Error> {
+        #[derive(FromSqlRow)]
+        struct Count {
+            count: i64,
+        }
+
+        let event_type: Option<StackString> = event_type.map(|s| s.to_str().into());
+        let query =
+            Self::get_plex_event_query("count(*)", "", &start_timestamp, &event_type, None, None)?;
+        let conn = pool.get().await?;
+        let count: Count = query.fetch_one(&conn).await?;
+
+        Ok(count.count.try_into()?)
     }
 
     /// # Errors
@@ -214,8 +250,8 @@ impl PlexEvent {
         start_timestamp: Option<OffsetDateTime>,
         event_type: Option<PlexEventType>,
         section_type: Option<PlexSectionType>,
-        offset: Option<u64>,
-        limit: Option<u64>,
+        offset: Option<usize>,
+        limit: Option<usize>,
     ) -> Result<Vec<EventOutput>, Error> {
         let mut constraints = Vec::new();
         let mut bindings = Vec::new();
@@ -498,47 +534,78 @@ pub struct PlexFilename {
 }
 
 impl PlexFilename {
-    /// # Errors
-    /// Return error if db query fails
-    pub async fn get_filenames(
-        pool: &PgPool,
-        start_timestamp: Option<OffsetDateTime>,
-        offset: Option<u64>,
-        limit: Option<u64>,
-    ) -> Result<impl Stream<Item = Result<Self, PqError>>, Error> {
+    fn get_plex_filenames_query<'a>(
+        select_str: &'a str,
+        order_str: &'a str,
+        start_timestamp: &'a Option<OffsetDateTime>,
+        offset: Option<usize>,
+        limit: Option<usize>,
+    ) -> Result<Query<'a>, PqError> {
         let mut constraints = Vec::new();
         let mut bindings = Vec::new();
         if let Some(start_timestamp) = &start_timestamp {
             constraints.push("last_modified > $start_timestamp");
             bindings.push(("start_timestamp", start_timestamp as Parameter));
         }
-        let query = format_sstr!(
+        let where_str = if constraints.is_empty() {
+            "".into()
+        } else {
+            format_sstr!("WHERE {}", constraints.join(" AND "))
+        };
+        let mut query = format_sstr!(
             "
-                SELECT * FROM plex_filename
+                SELECT {select_str}
+                FROM plex_filename
                 {where_str}
-                ORDER BY last_modified DESC
-                {limit}
-                {offset}
-            ",
-            where_str = if constraints.is_empty() {
-                StackString::new()
-            } else {
-                format_sstr!("WHERE {}", constraints.join(" AND "))
-            },
-            limit = if let Some(limit) = limit {
-                format_sstr!("LIMIT {limit}")
-            } else {
-                StackString::new()
-            },
-            offset = if let Some(offset) = offset {
-                format_sstr!("OFFSET {offset}")
-            } else {
-                StackString::new()
-            }
+                {order_str}
+            "
         );
-        let query: Query = query_dyn!(&query, ..bindings)?;
+        if let Some(offset) = &offset {
+            query.push_str(&format_sstr!(" OFFSET {offset}"));
+        }
+        if let Some(limit) = &limit {
+            query.push_str(&format_sstr!(" LIMIT {limit}"));
+        }
+        bindings.shrink_to_fit();
+        debug!("query:\n{}", query);
+        query_dyn!(&query, ..bindings)
+    }
+
+    /// # Errors
+    /// Return error if db query fails
+    pub async fn get_filenames(
+        pool: &PgPool,
+        start_timestamp: Option<OffsetDateTime>,
+        offset: Option<usize>,
+        limit: Option<usize>,
+    ) -> Result<impl Stream<Item = Result<Self, PqError>>, Error> {
+        let query = Self::get_plex_filenames_query(
+            "*",
+            "ORDER BY last_modified DESC",
+            &start_timestamp,
+            offset,
+            limit,
+        )?;
         let conn = pool.get().await?;
         query.fetch_streaming(&conn).await.map_err(Into::into)
+    }
+
+    /// # Errors
+    /// Return error if db query fails
+    pub async fn get_total(
+        pool: &PgPool,
+        start_timestamp: Option<OffsetDateTime>,
+    ) -> Result<usize, Error> {
+        #[derive(FromSqlRow)]
+        struct Count {
+            count: i64,
+        }
+
+        let query = Self::get_plex_filenames_query("count(*)", "", &start_timestamp, None, None)?;
+        let conn = pool.get().await?;
+        let count: Count = query.fetch_one(&conn).await?;
+
+        Ok(count.count.try_into()?)
     }
 
     async fn _get_by_key<C>(conn: &C, key: &str) -> Result<Option<Self>, Error>
@@ -647,47 +714,77 @@ pub struct PlexMetadata {
 }
 
 impl PlexMetadata {
-    /// # Errors
-    /// Return error if db query fails
-    pub async fn get_entries(
-        pool: &PgPool,
-        start_timestamp: Option<OffsetDateTime>,
-        offset: Option<u64>,
-        limit: Option<u64>,
-    ) -> Result<impl Stream<Item = Result<Self, PqError>>, Error> {
+    fn get_plex_metadata_query<'a>(
+        select_str: &'a str,
+        order_str: &'a str,
+        start_timestamp: &'a Option<OffsetDateTime>,
+        offset: Option<usize>,
+        limit: Option<usize>,
+    ) -> Result<Query<'a>, PqError> {
         let mut constraints = Vec::new();
         let mut bindings = Vec::new();
         if let Some(start_timestamp) = &start_timestamp {
             constraints.push("last_modified > $start_timestamp");
             bindings.push(("start_timestamp", start_timestamp as Parameter));
         }
-        let query = format_sstr!(
+        let where_str = if constraints.is_empty() {
+            StackString::new()
+        } else {
+            format_sstr!("WHERE {}", constraints.join(" AND "))
+        };
+        let mut query = format_sstr!(
             "
-                SELECT * FROM plex_metadata
+                SELECT {select_str} FROM plex_metadata
                 {where_str}
-                ORDER BY last_modified DESC
-                {limit}
-                {offset}
-            ",
-            where_str = if constraints.is_empty() {
-                StackString::new()
-            } else {
-                format_sstr!("WHERE {}", constraints.join(" AND "))
-            },
-            limit = if let Some(limit) = limit {
-                format_sstr!("LIMIT {limit}")
-            } else {
-                StackString::new()
-            },
-            offset = if let Some(offset) = offset {
-                format_sstr!("OFFSET {offset}")
-            } else {
-                StackString::new()
-            }
+                {order_str}
+            "
         );
-        let query: Query = query_dyn!(&query, ..bindings)?;
+        if let Some(offset) = &offset {
+            query.push_str(&format_sstr!(" OFFSET {offset}"));
+        }
+        if let Some(limit) = &limit {
+            query.push_str(&format_sstr!(" LIMIT {limit}"));
+        }
+        bindings.shrink_to_fit();
+        debug!("query:\n{}", query);
+        query_dyn!(&query, ..bindings)
+    }
+
+    /// # Errors
+    /// Return error if db query fails
+    pub async fn get_entries(
+        pool: &PgPool,
+        start_timestamp: Option<OffsetDateTime>,
+        offset: Option<usize>,
+        limit: Option<usize>,
+    ) -> Result<impl Stream<Item = Result<Self, PqError>>, Error> {
+        let query = Self::get_plex_metadata_query(
+            "*",
+            "ORDER BY last_modified DESC",
+            &start_timestamp,
+            offset,
+            limit,
+        )?;
         let conn = pool.get().await?;
         query.fetch_streaming(&conn).await.map_err(Into::into)
+    }
+
+    /// # Errors
+    /// Return error if db query fails
+    pub async fn get_total(
+        pool: &PgPool,
+        start_timestamp: Option<OffsetDateTime>,
+    ) -> Result<usize, Error> {
+        #[derive(FromSqlRow)]
+        struct Count {
+            count: i64,
+        }
+
+        let query = Self::get_plex_metadata_query("count(*)", "", &start_timestamp, None, None)?;
+        let conn = pool.get().await?;
+        let count: Count = query.fetch_one(&conn).await?;
+
+        Ok(count.count.try_into()?)
     }
 
     async fn get_parents(

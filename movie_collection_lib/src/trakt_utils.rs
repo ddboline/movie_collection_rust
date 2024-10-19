@@ -274,8 +274,8 @@ pub async fn get_watchlist_shows_db_map(
     pool: &PgPool,
     search_query: Option<&str>,
     source: Option<TvShowSource>,
-    offset: Option<u64>,
-    limit: Option<u64>,
+    offset: Option<usize>,
+    limit: Option<usize>,
 ) -> Result<WatchListMap, Error> {
     #[derive(FromSqlRow)]
     struct WatchlistShowDbMap {
@@ -289,8 +289,8 @@ pub async fn get_watchlist_shows_db_map(
         pool: &PgPool,
         search_query: Option<&str>,
         source: Option<&str>,
-        offset: Option<u64>,
-        limit: Option<u64>,
+        offset: Option<usize>,
+        limit: Option<usize>,
     ) -> Result<impl Stream<Item = Result<WatchlistShowDbMap, PqError>>, Error> {
         let mut constraints = Vec::new();
         if let Some(search_query) = search_query {
