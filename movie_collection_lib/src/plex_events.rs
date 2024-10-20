@@ -25,6 +25,7 @@ use crate::{
 
 #[derive(FromSqlRow, Debug, Serialize, Deserialize)]
 pub struct PlexEvent {
+    pub id: Uuid,
     pub event: StackString,
     pub account: StackString,
     pub server: StackString,
@@ -52,6 +53,7 @@ impl TryFrom<WebhookPayload> for PlexEvent {
         let event = item.event.to_str().into();
         let player_address = StackString::from_display(item.player.public_address);
         let payload = Self {
+            id: Uuid::new_v4(),
             event,
             account: item.account.title,
             server: item.server.title,
@@ -191,16 +193,17 @@ impl PlexEvent {
         let query = query!(
             "
             INSERT INTO plex_event (
-                event, account, server, player_title, player_address, title, parent_title,
+                id, event, account, server, player_title, player_address, title, parent_title,
                 grandparent_title, added_at, updated_at, last_modified, metadata_type,
                 section_type, section_title, metadata_key
             )
             VALUES (
-                $event, $account, $server, $player_title, $player_address, $title, $parent_title,
+                $id, $event, $account, $server, $player_title, $player_address, $title, $parent_title,
                 $grandparent_title, $added_at, $updated_at, $last_modified,
                 $metadata_type, $section_type, $section_title, $metadata_key
             )
             ",
+            id = self.id,
             event = self.event,
             account = self.account,
             server = self.server,
