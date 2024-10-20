@@ -202,6 +202,7 @@ impl PlexEvent {
                 $grandparent_title, $added_at, $updated_at, $last_modified,
                 $metadata_type, $section_type, $section_title, $metadata_key
             )
+            ON CONFLICT DO NOTHING
             ",
             id = self.id,
             event = self.event,

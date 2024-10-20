@@ -381,14 +381,8 @@ impl MovieCollectionUpdateRequest {
 
         let mc = MovieCollection::new(config, pool, &stdout);
         for entry in &self.collection {
-            if mc
-                .get_collection_index(entry.path.as_ref())
-                .await?
-                .is_none()
-            {
-                mc.insert_into_collection(entry.path.as_ref(), false)
-                    .await?;
-            }
+            mc.insert_into_collection(entry.path.as_ref(), false)
+                .await?;
         }
         Ok(())
     }

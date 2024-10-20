@@ -1829,17 +1829,11 @@ pub async fn plex_filename_update(
         .await;
     let payload = payload.into_inner();
     for filename in payload.filenames {
-        if PlexFilename::get_by_key(&state.db, &filename.metadata_key)
+        let filename: PlexFilename = filename.into();
+        filename
+            .insert(&state.db)
             .await
-            .map_err(Into::<Error>::into)?
-            .is_none()
-        {
-            let filename: PlexFilename = filename.into();
-            filename
-                .insert(&state.db)
-                .await
-                .map_err(Into::<Error>::into)?;
-        }
+            .map_err(Into::<Error>::into)?;
     }
     task.await.ok();
     Ok(HtmlBase::new("Success").into())
@@ -1922,17 +1916,11 @@ pub async fn plex_metadata_update(
         .await;
     let payload = payload.into_inner();
     for metadata in payload.entries {
-        if PlexMetadata::get_by_key(&state.db, &metadata.metadata_key)
+        let metadata: PlexMetadata = metadata.into();
+        metadata
+            .insert(&state.db)
             .await
-            .map_err(Into::<Error>::into)?
-            .is_none()
-        {
-            let metadata: PlexMetadata = metadata.into();
-            metadata
-                .insert(&state.db)
-                .await
-                .map_err(Into::<Error>::into)?;
-        }
+            .map_err(Into::<Error>::into)?;
     }
     task.await.ok();
     Ok(HtmlBase::new("Success").into())
