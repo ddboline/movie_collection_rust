@@ -12,7 +12,7 @@ bytes = "1.0"
 clap = {version="4.0", features=["derive"]}
 derive_more = {version="1.0", features=["full"]}
 dirs = "5.0"
-dotenv = "0.15"
+dotenvy = "0.15"
 deadpool = "0.12"
 deadpool-postgres = "0.14"
 envy = "0.4"
@@ -40,6 +40,6 @@ thiserror = "1.0"
 time = {version="0.3", features=["serde-human-readable", "macros", "formatting"]}
 time-tz = {version="2.0", features=["system"]}
 tokio-postgres = {version="0.7", features=["with-uuid-1", "with-time-0_3", "with-serde_json-1"]}
-tokio = {version="1.38", features=["rt", "macros", "rt-multi-thread", "process"]}
+tokio = {version="1.40", features=["rt", "macros", "rt-multi-thread", "process"]}
 tokio-stream = {version="0.1", features=["fs"]}
 uuid = "1.0"

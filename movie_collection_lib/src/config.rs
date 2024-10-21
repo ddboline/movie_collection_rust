@@ -131,12 +131,12 @@ impl Config {
         let config_dir = dirs::config_dir().ok_or_else(|| format_err!("No CONFIG directory"))?;
         let env_file = config_dir.join("movie_collection_rust").join("config.env");
 
-        dotenv::dotenv().ok();
+        dotenvy::dotenv().ok();
 
         if Path::new("config.env").exists() {
-            dotenv::from_filename("config.env").ok();
+            dotenvy::from_filename("config.env").ok();
         } else if env_file.exists() {
-            dotenv::from_path(&env_file).ok();
+            dotenvy::from_path(&env_file).ok();
         }
 
         Self::new()

@@ -38,7 +38,7 @@ stdout-channel = "0.6"
 thiserror = "1.0"
 time = {version="0.3", features=["serde-human-readable", "macros", "formatting"]}
 time-tz = {version="2.0", features=["system"]}
-tokio = {version="1.38", features=["rt", "macros", "rt-multi-thread"]}
+tokio = {version="1.40", features=["rt", "macros", "rt-multi-thread"]}
 tokio-stream = "0.1"
 uuid = "1.0"
 url = "2.3"
