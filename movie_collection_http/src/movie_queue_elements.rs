@@ -1821,6 +1821,30 @@ fn PlexElement(
         } else {
             display_title = format_sstr!("{filestem} {grandparent_title} {parent_title} {title}");
         }
+        let display_element = if let Some((show_url, season)) = event
+            .show_url
+            .as_ref()
+            .and_then(|u| event.season.map(|s| (u, s)))
+        {
+            rsx! {
+                a {
+                    href: "javascript:updateMainArticle('/trakt/watched/list/{show_url}/{season}')",
+                    "{display_title}",
+                }
+            }
+        } else if let Some(show_url) = &event.show_url {
+            rsx! {
+                a {
+                    href: "javascript:updateMainArticle('/trakt/watched/list/{show_url}')",
+                    "{display_title}",
+                }
+            }
+        } else {
+            rsx! {
+                "{display_title}"
+            }
+        };
+
         rsx! {
             tr {
                 key: "plex-event-key-{idx}",
@@ -1835,7 +1859,7 @@ fn PlexElement(
                 td {"{event_str}"},
                 td {"{metadata_type}"},
                 td {"{section_title}"},
-                td {"{display_title}"},
+                td { {display_element} },
             }
         }
     });
@@ -2006,19 +2030,21 @@ fn PlexDetailElement(
     } else {
         display_title = format_sstr!("{filestem} {grandparent_title} {parent_title} {title}");
     }
-    let display_element = if let Some(epurl) = &event.epurl {
+    let display_element = if let Some((show_url, season)) = event
+        .show_url
+        .as_ref()
+        .and_then(|u| event.season.map(|s| (u, s)))
+    {
         rsx! {
             a {
-                href: "https://www.imdb.com/title/{epurl}",
-                target: "_blank",
+                href: "javascript:updateMainArticle('/trakt/watched/list/{show_url}/{season}')",
                 "{display_title}",
             }
         }
     } else if let Some(show_url) = &event.show_url {
         rsx! {
             a {
-                href: "https://www.imdb.com/title/{show_url}",
-                target: "_blank",
+                href: "javascript:updateMainArticle('/trakt/watched/list/{show_url}')",
                 "{display_title}",
             }
         }

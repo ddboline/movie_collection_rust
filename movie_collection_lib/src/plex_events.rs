@@ -198,7 +198,8 @@ impl PlexEvent {
                 section_type, section_title, metadata_key
             )
             VALUES (
-                $id, $event, $account, $server, $player_title, $player_address, $title, $parent_title,
+                $id, $event, $account, $server, $player_title, $player_address, $title, \
+             $parent_title,
                 $grandparent_title, $added_at, $updated_at, $last_modified,
                 $metadata_type, $section_type, $section_title, $metadata_key
             )
