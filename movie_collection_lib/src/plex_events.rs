@@ -90,6 +90,7 @@ pub struct EventOutput {
     pub episode: Option<i32>,
     pub show_url: Option<StackString>,
     pub epurl: Option<StackString>,
+    pub metadata_key: Option<StackString>,
 }
 
 impl PlexEvent {
@@ -234,7 +235,7 @@ impl PlexEvent {
             r#"
                 SELECT a.id, a.event, a.metadata_type, a.section_title, a.title, a.parent_title,
                        a.grandparent_title, b.filename, a.last_modified,
-                       c.show, d.season, d.episode, e.link as show_url, d.epurl
+                       c.show, d.season, d.episode, e.link as show_url, d.epurl, a.metadata_key
                 FROM plex_event a
                 LEFT JOIN plex_filename b ON a.metadata_key = b.metadata_key
                 LEFT JOIN movie_collection c ON c.idx = b.collection_id
@@ -278,7 +279,7 @@ impl PlexEvent {
             "
                 SELECT a.id, a.event, a.metadata_type, a.section_title, a.title, a.parent_title,
                        a.grandparent_title, b.filename, a.last_modified,
-                       c.show, d.season, d.episode, e.link as show_url, d.epurl
+                       c.show, d.season, d.episode, e.link as show_url, d.epurl, a.metadata_key
                 FROM plex_event a
                 LEFT JOIN plex_filename b ON a.metadata_key = b.metadata_key
                 LEFT JOIN movie_collection c ON c.idx = b.collection_id

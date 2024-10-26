@@ -1780,6 +1780,9 @@ fn PlexElement(
     limit: Option<usize>,
 ) -> Element {
     let local = DateTimeWrapper::local_tz();
+    let host = config.plex_host.as_ref();
+    let server = config.plex_server.as_ref();
+
     let entries = events.iter().enumerate().map(|(idx, event)| {
         let id = event.id;
         let last_modified = match config.default_time_zone {
@@ -1836,6 +1839,14 @@ fn PlexElement(
             rsx! {
                 a {
                     href: "javascript:updateMainArticle('/trakt/watched/list/{show_url}')",
+                    "{display_title}",
+                }
+            }
+        } else if let (Some(metadata_key), Some(host), Some(server)) = (&event.metadata_key, host, server) {
+            rsx! {
+                a {
+                    href: "http://{host}:32400/web/index.html#!/server/{server}/details?key={metadata_key}",
+                    target: "_blank",
                     "{display_title}",
                 }
             }
@@ -1994,6 +2005,9 @@ fn PlexDetailElement(
     limit: Option<usize>,
 ) -> Element {
     let local = DateTimeWrapper::local_tz();
+    let host = config.plex_host.as_ref();
+    let server = config.plex_server.as_ref();
+
     let id = event.id;
     let last_modified = match config.default_time_zone {
         Some(tz) => {
@@ -2030,6 +2044,22 @@ fn PlexDetailElement(
     } else {
         display_title = format_sstr!("{filestem} {grandparent_title} {parent_title} {title}");
     }
+    let metadata_title = event.metadata_key.as_ref().map_or("".into(), Clone::clone);
+    let metadata_key = if let (Some(metadata_key), Some(host), Some(server)) =
+        (&event.metadata_key, host, server)
+    {
+        rsx! {
+            a {
+                href: "http://{host}:32400/web/index.html#!/server/{server}/details?key={metadata_key}",
+                target: "_blank",
+                "{metadata_key}",
+            }
+        }
+    } else {
+        rsx! {
+            { metadata_title }
+        }
+    };
     let display_element = if let Some((show_url, season)) = event
         .show_url
         .as_ref()
@@ -2045,6 +2075,16 @@ fn PlexDetailElement(
         rsx! {
             a {
                 href: "javascript:updateMainArticle('/trakt/watched/list/{show_url}')",
+                "{display_title}",
+            }
+        }
+    } else if let (Some(metadata_key), Some(host), Some(server)) =
+        (&event.metadata_key, host, server)
+    {
+        rsx! {
+            a {
+                href: "http://{host}:32400/web/index.html#!/server/{server}/details?key={metadata_key}",
+                target: "_blank",
                 "{display_title}",
             }
         }
@@ -2092,6 +2132,10 @@ fn PlexDetailElement(
                     td {"Metadata Type"},
                     td {"{metadata_type}"},
                 },
+                tr {
+                    td {"Metadata Key"},
+                    td { {metadata_key} },
+                }
                 tr {
                     td {"Section"},
                     td {"{section_title}"},

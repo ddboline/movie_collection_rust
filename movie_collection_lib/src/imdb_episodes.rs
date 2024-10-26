@@ -101,6 +101,8 @@ impl ImdbEpisodes {
         query.fetch_opt(&conn).await.map_err(Into::into)
     }
 
+    #[allow(clippy::too_many_arguments)]
+    #[allow(clippy::ref_option_ref)]
     fn get_imdb_episodes_query<'a>(
         select_str: &'a str,
         order_str: &'a str,
