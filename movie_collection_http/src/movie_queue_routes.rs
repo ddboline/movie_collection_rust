@@ -142,12 +142,9 @@ pub async fn movie_queue_show(
     #[filter = "LoggedUser::filter"] user: LoggedUser,
     #[data] state: AppState,
 ) -> WarpResult<MovieQueueResponse> {
+    let url = format_sstr!("/list/queue/{path}");
     let task = user
-        .store_url_task(
-            state.trakt.get_client(),
-            &state.config,
-            &format_sstr!("/list/queue/{path}"),
-        )
+        .store_url_task(state.trakt.get_client(), &state.config, &url)
         .await;
     let patterns = vec![path];
 
@@ -183,12 +180,9 @@ pub async fn movie_queue_delete(
     #[filter = "LoggedUser::filter"] user: LoggedUser,
     #[data] state: AppState,
 ) -> WarpResult<DeleteMovieQueueResponse> {
+    let url = format_sstr!("/list/delete/{path}");
     let task = user
-        .store_url_task(
-            state.trakt.get_client(),
-            &state.config,
-            &format_sstr!("/list/delete/{path}"),
-        )
+        .store_url_task(state.trakt.get_client(), &state.config, &url)
         .await;
     let mock_stdout = MockStdout::new();
     let stdout = StdoutChannel::with_mock_stdout(mock_stdout.clone(), mock_stdout.clone());
@@ -257,12 +251,9 @@ pub async fn movie_queue_transcode(
     #[filter = "LoggedUser::filter"] user: LoggedUser,
     #[data] state: AppState,
 ) -> WarpResult<TranscodeQueueResponse> {
+    let url = format_sstr!("/list/transcode/queue/{path}");
     let task = user
-        .store_url_task(
-            state.trakt.get_client(),
-            &state.config,
-            &format_sstr!("/list/transcode/queue/{path}"),
-        )
+        .store_url_task(state.trakt.get_client(), &state.config, &url)
         .await;
     let patterns = vec![path];
 
@@ -283,12 +274,9 @@ pub async fn movie_queue_transcode_directory(
     #[filter = "LoggedUser::filter"] user: LoggedUser,
     #[data] state: AppState,
 ) -> WarpResult<TranscodeQueueResponse> {
+    let url = format_sstr!("/list/transcode/queue/{directory}/{file}");
     let task = user
-        .store_url_task(
-            state.trakt.get_client(),
-            &state.config,
-            &format_sstr!("/list/transcode/queue/{directory}/{file}"),
-        )
+        .store_url_task(state.trakt.get_client(), &state.config, &url)
         .await;
     let patterns = vec![file];
 
@@ -322,12 +310,9 @@ pub async fn movie_queue_play(
         .get_url(state.trakt.get_client(), &state.config)
         .await
         .map_err(Into::<Error>::into)?;
+    let url = format_sstr!("/list/play/{idx}");
     let task = user
-        .store_url_task(
-            state.trakt.get_client(),
-            &state.config,
-            &format_sstr!("/list/play/{idx}"),
-        )
+        .store_url_task(state.trakt.get_client(), &state.config, &url)
         .await;
 
     let mock_stdout = MockStdout::new();
@@ -358,12 +343,9 @@ pub async fn imdb_show(
     #[filter = "LoggedUser::filter"] user: LoggedUser,
     #[data] state: AppState,
 ) -> WarpResult<ListImdbResponse> {
+    let url = format_sstr!("/list/imdb/{show}");
     let task = user
-        .store_url_task(
-            state.trakt.get_client(),
-            &state.config,
-            &format_sstr!("/list/imdb/{show}"),
-        )
+        .store_url_task(state.trakt.get_client(), &state.config, &url)
         .await;
     let query = query.into_inner();
     let req = ImdbShowRequest { show, query };
@@ -986,12 +968,9 @@ pub async fn movie_queue_transcode_file(
     #[filter = "LoggedUser::filter"] user: LoggedUser,
     #[data] state: AppState,
 ) -> WarpResult<TranscodeFileResponse> {
+    let url = format_sstr!("/list/transcode/file/{filename}");
     let task = user
-        .store_url_task(
-            state.trakt.get_client(),
-            &state.config,
-            &format_sstr!("/list/transcode/file/{filename}"),
-        )
+        .store_url_task(state.trakt.get_client(), &state.config, &url)
         .await;
     let mock_stdout = MockStdout::new();
     let stdout = StdoutChannel::with_mock_stdout(mock_stdout.clone(), mock_stdout.clone());
@@ -1028,12 +1007,9 @@ pub async fn movie_queue_remcom_file(
     #[filter = "LoggedUser::filter"] user: LoggedUser,
     #[data] state: AppState,
 ) -> WarpResult<TranscodeFileResponse> {
+    let url = format_sstr!("/list/transcode/remcom/file/{filename}");
     let task = user
-        .store_url_task(
-            state.trakt.get_client(),
-            &state.config,
-            &format_sstr!("/list/transcode/remcom/file/{filename}"),
-        )
+        .store_url_task(state.trakt.get_client(), &state.config, &url)
         .await;
     let mock_stdout = MockStdout::new();
     let stdout = StdoutChannel::with_mock_stdout(mock_stdout.clone(), mock_stdout.clone());
@@ -1078,12 +1054,9 @@ pub async fn movie_queue_remcom_directory_file(
     #[filter = "LoggedUser::filter"] user: LoggedUser,
     #[data] state: AppState,
 ) -> WarpResult<TranscodeFileResponse> {
+    let url = format_sstr!("/list/transcode/remcom/directory/{directory}/{filename}");
     let task = user
-        .store_url_task(
-            state.trakt.get_client(),
-            &state.config,
-            &format_sstr!("/list/transcode/remcom/directory/{directory}/{filename}"),
-        )
+        .store_url_task(state.trakt.get_client(), &state.config, &url)
         .await;
     let mock_stdout = MockStdout::new();
     let stdout = StdoutChannel::with_mock_stdout(mock_stdout.clone(), mock_stdout.clone());
@@ -1130,12 +1103,9 @@ pub async fn movie_queue_transcode_cleanup(
     #[filter = "LoggedUser::filter"] user: LoggedUser,
     #[data] state: AppState,
 ) -> WarpResult<CleanupTranscodeFileResponse> {
+    let url = format_sstr!("/list/transcode/cleanup/{path}");
     let task = user
-        .store_url_task(
-            state.trakt.get_client(),
-            &state.config,
-            &format_sstr!("/list/transcode/cleanup/{path}"),
-        )
+        .store_url_task(state.trakt.get_client(), &state.config, &url)
         .await;
     let movie_path = state
         .config
@@ -1240,12 +1210,9 @@ pub async fn trakt_watchlist_action(
     #[filter = "LoggedUser::filter"] user: LoggedUser,
     #[data] state: AppState,
 ) -> WarpResult<TraktWatchlistActionResponse> {
+    let url = format_sstr!("/trakt/watchlist/{action}/{show}");
     let task = user
-        .store_url_task(
-            state.trakt.get_client(),
-            &state.config,
-            &format_sstr!("/trakt/watchlist/{action}/{show}"),
-        )
+        .store_url_task(state.trakt.get_client(), &state.config, &url)
         .await;
     let mock_stdout = MockStdout::new();
     let stdout = StdoutChannel::with_mock_stdout(mock_stdout.clone(), mock_stdout.clone());
@@ -1265,12 +1232,9 @@ pub async fn trakt_watched_seasons(
     #[filter = "LoggedUser::filter"] user: LoggedUser,
     #[data] state: AppState,
 ) -> WarpResult<TraktWatchlistShowListResponse> {
+    let url = format_sstr!("/trakt/watched/list/{imdb_url}");
     let task = user
-        .store_url_task(
-            state.trakt.get_client(),
-            &state.config,
-            &format_sstr!("/trakt/watched/list/{imdb_url}"),
-        )
+        .store_url_task(state.trakt.get_client(), &state.config, &url)
         .await;
     let show_opt = ImdbRatings::get_show_by_link(&imdb_url, &state.db)
         .await
@@ -1300,12 +1264,9 @@ pub async fn trakt_watched_list(
     #[filter = "LoggedUser::filter"] user: LoggedUser,
     #[data] state: AppState,
 ) -> WarpResult<TraktWatchlistShowSeasonResponse> {
+    let url = format_sstr!("/trakt/watched/list/{imdb_url}/{season}");
     let task = user
-        .store_url_task(
-            state.trakt.get_client(),
-            &state.config,
-            &format_sstr!("/trakt/watched/list/{imdb_url}/{season}"),
-        )
+        .store_url_task(state.trakt.get_client(), &state.config, &url)
         .await;
     let mock_stdout = MockStdout::new();
     let stdout = StdoutChannel::with_mock_stdout(mock_stdout.clone(), mock_stdout.clone());
@@ -1335,12 +1296,9 @@ pub async fn trakt_watched_action(
     #[filter = "LoggedUser::filter"] user: LoggedUser,
     #[data] state: AppState,
 ) -> WarpResult<TraktWatchlistEpisodeActionResponse> {
+    let url = format_sstr!("/trakt/watched/{action}/{imdb_url}/{season}/{episode}");
     let task = user
-        .store_url_task(
-            state.trakt.get_client(),
-            &state.config,
-            &format_sstr!("/trakt/watched/{action}/{imdb_url}/{season}/{episode}"),
-        )
+        .store_url_task(state.trakt.get_client(), &state.config, &url)
         .await;
     let mock_stdout = MockStdout::new();
     let stdout = StdoutChannel::with_mock_stdout(mock_stdout.clone(), mock_stdout.clone());
@@ -1726,12 +1684,9 @@ pub async fn plex_detail(
     query: Query<PlexEventRequest>,
 ) -> WarpResult<PlexEventDetail> {
     let query = query.into_inner();
+    let url = format_sstr!("/list/plex/{id}");
     let task = user
-        .store_url_task(
-            state.trakt.get_client(),
-            &state.config,
-            &format_sstr!("/list/plex/{id}"),
-        )
+        .store_url_task(state.trakt.get_client(), &state.config, &url)
         .await;
     let body = if let Some(event) = PlexEvent::get_event_by_id(&state.db, id.into())
         .await
@@ -2030,12 +1985,9 @@ pub async fn movie_queue_extract_subtitle(
     #[filter = "LoggedUser::filter"] user: LoggedUser,
     #[data] state: AppState,
 ) -> WarpResult<ExtractSubtitlesResponse> {
+    let url = format_sstr!("/list/transcode/subtitle/{filename}/{index}");
     let task = user
-        .store_url_task(
-            state.trakt.get_client(),
-            &state.config,
-            &format_sstr!("/list/transcode/subtitle/{filename}/{index}"),
-        )
+        .store_url_task(state.trakt.get_client(), &state.config, &url)
         .await;
 
     let input_path = state

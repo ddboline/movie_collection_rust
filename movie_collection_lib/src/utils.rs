@@ -1,9 +1,9 @@
 use anyhow::{format_err, Error};
 use async_trait::async_trait;
-use futures::TryStreamExt;
+use futures::Stream;
 use jwalk::WalkDir;
 use log::error;
-use postgres_query::{query, Error as PqError};
+use postgres_query::{query, Error as PqError, FromSqlRow};
 use rand::{
     distributions::{Distribution, Uniform},
     thread_rng,
@@ -12,10 +12,8 @@ use reqwest::{Client, Response, Url};
 use serde::{Deserialize, Serialize};
 use smallvec::SmallVec;
 use stack_string::{format_sstr, StackString};
-use std::{
-    collections::HashSet,
-    path::{Path, PathBuf},
-};
+use std::path::{Path, PathBuf};
+use time::OffsetDateTime;
 use tokio::{
     process::Command,
     time::{sleep, Duration},
@@ -161,19 +159,42 @@ pub trait ExponentialRetry {
     }
 }
 
-/// # Errors
-/// Return error if db query fails
-pub async fn get_authorized_users(pool: &PgPool) -> Result<HashSet<StackString>, Error> {
-    let query = query!("SELECT email FROM authorized_users");
-    let conn = pool.get().await?;
-    query
-        .query_streaming(&conn)
-        .await?
-        .and_then(|row| async move {
-            let email: StackString = row.try_get(0).map_err(PqError::BeginTransaction)?;
-            Ok(email)
-        })
-        .try_collect()
-        .await
-        .map_err(Into::into)
+#[derive(FromSqlRow, Clone, Debug)]
+pub struct AuthorizedUsers {
+    pub email: StackString,
+    pub created_at: OffsetDateTime,
+}
+
+impl AuthorizedUsers {
+    /// # Errors
+    /// Return error if db query fails
+    pub async fn get_authorized_users(
+        pool: &PgPool,
+    ) -> Result<impl Stream<Item = Result<Self, PqError>>, Error> {
+        let query = query!("SELECT * FROM authorized_users WHERE deleted_at IS NULL");
+        let conn = pool.get().await?;
+        query.fetch_streaming(&conn).await.map_err(Into::into)
+    }
+
+    /// # Errors
+    /// Returns error if db query fails
+    pub async fn get_most_recent(
+        pool: &PgPool,
+    ) -> Result<(Option<OffsetDateTime>, Option<OffsetDateTime>), Error> {
+        #[derive(FromSqlRow)]
+        struct CreatedDeleted {
+            created_at: Option<OffsetDateTime>,
+            deleted_at: Option<OffsetDateTime>,
+        }
+
+        let query = query!(
+            "SELECT max(created_at) as created_at, max(deleted_at) as deleted_at FROM users"
+        );
+        let conn = pool.get().await?;
+        let result: Option<CreatedDeleted> = query.fetch_opt(&conn).await?;
+        match result {
+            Some(result) => Ok((result.created_at, result.deleted_at)),
+            None => Ok((None, None)),
+        }
+    }
 }

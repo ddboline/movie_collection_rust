@@ -139,8 +139,9 @@ impl MkvTrack {
         if index < 1 {
             return Err(format_err!("Index must be greater than 0"));
         }
+        let srt_path = format_sstr!("{}:{srt_path}", index - 1);
         let output = Command::new("/usr/bin/mkvextract")
-            .args([fpath, "tracks", &format_sstr!("{}:{srt_path}", index - 1)])
+            .args([fpath, "tracks", &srt_path])
             .output()
             .await?;
         if !output.status.success() && output.status.code() != Some(1) {

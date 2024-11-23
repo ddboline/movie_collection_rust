@@ -171,7 +171,7 @@ derive_rweb_schema!(PlexEventWrapper, _PlexEventWrapper);
 #[schema(component = "PlexEvent")]
 struct _PlexEventWrapper {
     #[schema(description = "ID")]
-    id: StackString,
+    id: UuidWrapper,
     #[schema(description = "Event")]
     event: StackString,
     #[schema(description = "Account")]

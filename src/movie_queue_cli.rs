@@ -245,7 +245,8 @@ impl MovieQueueCli {
                 match table.as_str() {
                     "last_modified" => {
                         let last_modified = LastModifiedResponse::get_last_modified(&pool).await?;
-                        file.write_all(&serde_json::to_vec(&last_modified)?).await?;
+                        let v = serde_json::to_vec(&last_modified)?;
+                        file.write_all(&v).await?;
                     }
                     "imdb_ratings" => {
                         let shows: Vec<_> = ImdbRatings::get_shows_after_timestamp(
@@ -257,7 +258,8 @@ impl MovieQueueCli {
                         .await?
                         .try_collect()
                         .await?;
-                        file.write_all(&serde_json::to_vec(&shows)?).await?;
+                        let v = serde_json::to_vec(&shows)?;
+                        file.write_all(&v).await?;
                     }
                     "imdb_episodes" => {
                         let episodes: Vec<_> = ImdbEpisodes::get_episodes_after_timestamp(
@@ -269,7 +271,8 @@ impl MovieQueueCli {
                         .await?
                         .try_collect()
                         .await?;
-                        file.write_all(&serde_json::to_vec(&episodes)?).await?;
+                        let v = serde_json::to_vec(&episodes)?;
+                        file.write_all(&v).await?;
                     }
                     "plex_event" => {
                         let events: Vec<_> =
@@ -277,7 +280,8 @@ impl MovieQueueCli {
                                 .await?
                                 .try_collect()
                                 .await?;
-                        file.write_all(&serde_json::to_vec(&events)?).await?;
+                        let v = serde_json::to_vec(&events)?;
+                        file.write_all(&v).await?;
                     }
                     "plex_filename" => {
                         let filenames: Vec<_> =
@@ -285,7 +289,8 @@ impl MovieQueueCli {
                                 .await?
                                 .try_collect()
                                 .await?;
-                        file.write_all(&serde_json::to_vec(&filenames)?).await?;
+                        let v = serde_json::to_vec(&filenames)?;
+                        file.write_all(&v).await?;
                     }
                     "plex_metadata" => {
                         let metadatas: Vec<_> =
@@ -293,14 +298,16 @@ impl MovieQueueCli {
                                 .await?
                                 .try_collect()
                                 .await?;
-                        file.write_all(&serde_json::to_vec(&metadatas)?).await?;
+                        let v = serde_json::to_vec(&metadatas)?;
+                        file.write_all(&v).await?;
                     }
                     "movie_collection" => {
                         let mc = MovieCollection::new(&config, &pool, &stdout);
                         let entries = mc
                             .get_collection_after_timestamp(Some(start_timestamp), None, None)
                             .await?;
-                        file.write_all(&serde_json::to_vec(&entries)?).await?;
+                        let v = serde_json::to_vec(&entries)?;
+                        file.write_all(&v).await?;
                     }
                     "music_collection" => {
                         let entries: Vec<_> =
@@ -308,14 +315,16 @@ impl MovieQueueCli {
                                 .await?
                                 .try_collect()
                                 .await?;
-                        file.write_all(&serde_json::to_vec(&entries)?).await?;
+                        let v = serde_json::to_vec(&entries)?;
+                        file.write_all(&v).await?;
                     }
                     "movie_queue" => {
                         let mq = MovieQueueDB::new(&config, &pool, &stdout);
                         let entries = mq
                             .get_queue_after_timestamp(Some(start_timestamp), None, None)
                             .await?;
-                        file.write_all(&serde_json::to_vec(&entries)?).await?;
+                        let v = serde_json::to_vec(&entries)?;
+                        file.write_all(&v).await?;
                     }
                     _ => {}
                 }

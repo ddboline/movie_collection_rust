@@ -1,6 +1,6 @@
 [package]
 name = "movie_collection_http"
-version = "0.10.52"
+version = "0.11.0"
 authors = ["Daniel Boline <ddboline@gmail.com>"]
 edition = "2018"
 
@@ -9,7 +9,7 @@ anyhow = "1.0"
 async-graphql = {version="7.0", features=["dataloader", "time"]}
 async-graphql-warp = "7.0"
 async-trait = "0.1"
-authorized_users = { git = "https://github.com/ddboline/auth_server_rust.git", tag="0.11.15"}
+authorized_users = { git = "https://github.com/ddboline/auth_server_rust.git", tag="0.12.0"}
 bytes = "1.0"
 derive_more = {version="1.0", features=["full"]}
 dioxus = "0.5"
@@ -33,12 +33,12 @@ rweb = {git = "https://github.com/ddboline/rweb.git", features=["openapi"], defa
 rweb-helper = { git = "https://github.com/ddboline/rweb_helper.git", tag="0.5.3" }
 serde_yaml = "0.9"
 smallvec = {version="1.6", features=["serde", "write"]}
-stack-string = { git = "https://github.com/ddboline/stack-string-rs.git", features=["postgres_types", "rweb-openapi", "async_graphql"], tag="0.9.3" }
+stack-string = { git = "https://github.com/ddboline/stack-string-rs.git", features=["postgres_types", "rweb-openapi", "async_graphql"], tag="1.0.2" }
 stdout-channel = "0.6"
-thiserror = "1.0"
+thiserror = "2.0"
 time = {version="0.3", features=["serde-human-readable", "macros", "formatting"]}
 time-tz = {version="2.0", features=["system"]}
-tokio = {version="1.40", features=["rt", "macros", "rt-multi-thread"]}
+tokio = {version="1.41", features=["rt", "macros", "rt-multi-thread"]}
 tokio-stream = "0.1"
 uuid = "1.0"
 url = "2.3"

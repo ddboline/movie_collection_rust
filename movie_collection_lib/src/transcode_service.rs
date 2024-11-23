@@ -183,7 +183,7 @@ impl TranscodeServiceRequest {
             };
 
             let input_path = path.to_path_buf();
-            let output_path = output_dir.join(&format_sstr!("{prefix}.mp4"));
+            let output_path = output_dir.join(format_sstr!("{prefix}.mp4"));
 
             Ok(Self {
                 job_type: JobType::Move,
@@ -230,7 +230,7 @@ impl TranscodeServiceRequest {
         match self.job_type {
             JobType::Transcode => job_dir(config).join(prefix).with_extension("json"),
             JobType::Move => job_dir(config)
-                .join(&format_sstr!("{prefix}_copy"))
+                .join(format_sstr!("{prefix}_copy"))
                 .with_extension("json"),
         }
     }
@@ -356,7 +356,7 @@ impl TranscodeService {
             .join("Documents")
             .join("movies")
             .join(output_path);
-        let debug_output_path = log_dir(&self.config).join(&format_sstr!("{prefix}_mp4"));
+        let debug_output_path = log_dir(&self.config).join(format_sstr!("{prefix}_mp4"));
         let stdout_path = debug_output_path.with_extension("out");
         let stderr_path = debug_output_path.with_extension("err");
 
@@ -406,7 +406,7 @@ impl TranscodeService {
                     f.write_all(&stdout).await?;
                 }
             }
-            let new_debug_output_path = tmp_avi_path.join(&format_sstr!("{prefix}_mp4.out"));
+            let new_debug_output_path = tmp_avi_path.join(format_sstr!("{prefix}_mp4.out"));
             fs::rename(&stderr_path, &new_debug_output_path).await?;
             fs::remove_file(&stdout_path).await?;
         }
@@ -420,7 +420,7 @@ impl TranscodeService {
         output_file: &Path,
     ) -> Result<(), Error> {
         let script_file = job_dir(&self.config)
-            .join(&format_sstr!("{show}_copy"))
+            .join(format_sstr!("{show}_copy"))
             .with_extension("json");
         if script_file.exists() {
             fs::remove_file(&script_file).await?;
@@ -439,7 +439,7 @@ impl TranscodeService {
             return Err(format_err!("{input_file:?} does not exist"));
         }
 
-        let debug_output_path = log_dir(&self.config).join(&format_sstr!("{show}_copy.out"));
+        let debug_output_path = log_dir(&self.config).join(format_sstr!("{show}_copy.out"));
         let mut debug_output_file = File::create(&debug_output_path).await?;
 
         let show_path = self
@@ -447,7 +447,7 @@ impl TranscodeService {
             .home_dir
             .join("Documents")
             .join("movies")
-            .join(&format_sstr!("{show}.mp4"));
+            .join(format_sstr!("{show}.mp4"));
         if !show_path.exists() {
             return Ok(());
         }
@@ -519,7 +519,7 @@ impl TranscodeService {
             .home_dir
             .join("Documents")
             .join("movies")
-            .join(&format_sstr!("{show}.srt"));
+            .join(format_sstr!("{show}.srt"));
         if srt_path.exists() {
             let new_path = output_file.with_extension("srt");
             let mut buf = StackString::new();
@@ -537,8 +537,7 @@ impl TranscodeService {
         debug_output_file.flush().await?;
 
         if debug_output_path.exists() {
-            let new_debug_output_path =
-                tmp_dir(&self.config).join(&format_sstr!("{show}_copy.out"));
+            let new_debug_output_path = tmp_dir(&self.config).join(format_sstr!("{show}_copy.out"));
             fs::rename(&debug_output_path, &new_debug_output_path).await?;
         }
 
@@ -711,25 +710,21 @@ impl TranscodeStatus {
 impl fmt::Display for TranscodeStatus {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         if !self.procs.is_empty() {
-            write!(
-                f,
-                "Running procs:\n\n{}\n\n",
-                self.procs
-                    .iter()
-                    .sorted_by_key(|p| p.pid)
-                    .map(|p| format_sstr!("{p}"))
-                    .join("\n")
-            )?;
+            let s = self
+                .procs
+                .iter()
+                .sorted_by_key(|p| p.pid)
+                .map(|p| format_sstr!("{p}"))
+                .join("\n");
+            write!(f, "Running procs:\n\n{s}\n\n",)?;
         }
         if !self.upcoming_jobs.is_empty() {
-            write!(
-                f,
-                "Upcoming jobs:\n\n{}\n\n",
-                self.upcoming_jobs
-                    .iter()
-                    .map(StackString::from_display)
-                    .join("\n")
-            )?;
+            let s = self
+                .upcoming_jobs
+                .iter()
+                .map(StackString::from_display)
+                .join("\n");
+            write!(f, "Upcoming jobs:\n\n{s}\n\n")?;
         }
         if !self.current_jobs.is_empty() {
             write!(

@@ -258,7 +258,7 @@ impl MovieQueueDB {
             write!(limit_str, "LIMIT {limit}")?;
         }
         let order_by = order_by.unwrap_or(OrderBy::Desc);
-        let query = query_dyn!(&format_sstr!(
+        let query = &format_sstr!(
             r#"
                 SELECT a.idx, b.path, c.link, c.istv
                 FROM movie_queue a
@@ -269,7 +269,8 @@ impl MovieQueueDB {
                 {offset_str}
                 {limit_str}
             "#
-        ),)?;
+        );
+        let query = query_dyn!(query,)?;
         let conn = self.pool.get().await?;
         let results: Vec<PrintMovieQueue> = query.fetch(&conn).await?;
 

@@ -203,19 +203,18 @@ impl MovieCollection {
                 rating: f64,
             }
 
-            let query = query_dyn!(
-                &format_sstr!(
-                    r#"
-                            SELECT index, show, title, link, rating
-                            FROM imdb_ratings
-                            WHERE link is not null AND
-                                  rating is not null AND
-                                  show = $show {}
-                        "#,
-                    if istv { "AND istv" } else { "" },
-                ),
-                show = show
-            )?;
+            let query = format_sstr!(
+                r#"
+                        SELECT index, show, title, link, rating
+                        FROM imdb_ratings
+                        WHERE link is not null AND
+                              rating is not null AND
+                              show = $show {}
+                    "#,
+                if istv { "AND istv" } else { "" },
+            );
+
+            let query = query_dyn!(&query, show = show)?;
             let conn = self.pool.get().await?;
             let results: Vec<TempImdbRating> = query.fetch(&conn).await?;
             let results: Vec<_> = results
@@ -284,7 +283,7 @@ impl MovieCollection {
             write!(search_constr, "AND ({search_strs})")?;
         }
 
-        let query = query_dyn!(&format_sstr!(
+        let query = format_sstr!(
             r#"
                 SELECT a.path, a.show,
                 COALESCE(b.rating, -1) as rating,
@@ -294,7 +293,9 @@ impl MovieCollection {
                 LEFT JOIN imdb_ratings b ON a.show_id = b.index
                 WHERE a.is_deleted = false {search_constr}
             "#
-        ),)?;
+        );
+
+        let query = query_dyn!(&query,)?;
         let conn = self.pool.get().await?;
         let results: Vec<SearchMovieCollection> = query.fetch(&conn).await?;
 
@@ -1029,9 +1030,8 @@ impl MovieCollection {
         } else {
             format_sstr!("WHERE {constr}")
         };
-        let query = query_dyn!(&format_sstr!(
-            "SELECT path FROM movie_collection {where_str}"
-        ))?;
+        let query = format_sstr!("SELECT path FROM movie_collection {where_str}");
+        let query = query_dyn!(&query)?;
         let conn = self.pool.get().await?;
         query
             .query_streaming(&conn)
@@ -1072,13 +1072,15 @@ impl LastModifiedResponse {
             struct Count {
                 count: i64,
             }
-            let query = query_dyn!(&format_sstr!("SELECT count(*) AS count FROM {table}"))?;
+            let query = format_sstr!("SELECT count(*) AS count FROM {table}");
+            let query = query_dyn!(&query)?;
             let conn = pool.get().await?;
             let count: Count = query.fetch_one(&conn).await?;
             if count.count == 0 {
                 return Ok(None);
             }
-            let query = query_dyn!(&format_sstr!("SELECT max(last_modified) FROM {table}"))?;
+            let query = format_sstr!("SELECT max(last_modified) FROM {table}");
+            let query = query_dyn!(&query)?;
             if let Some((last_modified,)) = query.fetch_opt(&conn).await? {
                 let last_modified: OffsetDateTime = last_modified;
                 Ok(Some(LastModifiedResponse {

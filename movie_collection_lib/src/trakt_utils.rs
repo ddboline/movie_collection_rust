@@ -478,8 +478,7 @@ pub async fn get_watched_shows_db(
     if !where_vec.is_empty() {
         write!(where_str, "WHERE {}", where_vec.join(" AND "))?;
     }
-
-    let query = query_dyn!(&format_sstr!(
+    let query = format_sstr!(
         r#"
             SELECT a.link as imdb_url,
                    c.show,
@@ -492,7 +491,8 @@ pub async fn get_watched_shows_db(
             {where_str}
             ORDER BY 3,4,5
         "#
-    ))?;
+    );
+    let query = query_dyn!(&query)?;
     let conn = pool.get().await?;
     query.fetch_streaming(&conn).await.map_err(Into::into)
 }
