@@ -131,11 +131,12 @@ impl MkvTrack {
     pub async fn extract_subtitles_from_mkv(
         fpath: &str,
         index: usize,
+        suffix: &str,
     ) -> Result<StackString, Error> {
         let fname = fpath
             .strip_suffix(".mkv")
             .ok_or_else(|| format_err!("Wrong suffix"))?;
-        let srt_path = format_sstr!("{fname}.srt");
+        let srt_path = format_sstr!("{fname}.{suffix}");
         if index < 1 {
             return Err(format_err!("Index must be greater than 0"));
         }
