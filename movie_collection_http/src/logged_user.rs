@@ -7,7 +7,7 @@ use log::debug;
 use maplit::hashmap;
 use reqwest::Client;
 use rweb::{filters::cookie::cookie, Filter, Rejection, Schema};
-use rweb_helper::{UuidWrapper, DateTimeType};
+use rweb_helper::{DateTimeType, UuidWrapper};
 use serde::{Deserialize, Serialize};
 use stack_string::{format_sstr, StackString};
 use std::{
