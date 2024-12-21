@@ -1978,14 +1978,15 @@ pub async fn music_collection_update(
 )]
 struct ExtractSubtitlesResponse(HtmlBase<StackString, Error>);
 
-#[post("/list/transcode/subtitle/{filename}/{index}")]
+#[post("/list/transcode/subtitle/{filename}/{index}/{suffix}")]
 pub async fn movie_queue_extract_subtitle(
     filename: StackString,
     index: usize,
+    suffix: StackString,
     #[filter = "LoggedUser::filter"] user: LoggedUser,
     #[data] state: AppState,
 ) -> WarpResult<ExtractSubtitlesResponse> {
-    let url = format_sstr!("/list/transcode/subtitle/{filename}/{index}");
+    let url = format_sstr!("/list/transcode/subtitle/{filename}/{index}/{suffix}");
     let task = user
         .store_url_task(state.trakt.get_client(), &state.config, &url)
         .await;
@@ -1998,7 +1999,7 @@ pub async fn movie_queue_extract_subtitle(
         .join(&filename);
 
     let input_file: StackString = input_path.to_string_lossy().into();
-    let output = MkvTrack::extract_subtitles_from_mkv(&input_file, index)
+    let output = MkvTrack::extract_subtitles_from_mkv(&input_file, index, &suffix)
         .await
         .map_err(Into::<Error>::into)?;
     task.await.ok();
