@@ -24,7 +24,7 @@ use movie_collection_lib::{
     imdb_ratings::ImdbRatings,
     make_list::FileLists,
     movie_collection::{MovieCollection, NewEpisodesResult, TvShowsResult},
-    movie_queue::{MovieQueueDB, MovieQueueResult},
+    movie_queue::{MovieQueueDB, MovieQueueResult, OrderBy},
     parse_imdb::{ParseImdb, ParseImdbOptions},
     pgpool::PgPool,
     plex_events::{EventOutput, PlexSectionType},
@@ -37,10 +37,7 @@ use movie_collection_lib::{
     utils::parse_file_stem,
 };
 
-use crate::{
-    movie_queue_routes::{ProcessShowItem, TvShowsMap},
-    OrderBy,
-};
+use crate::movie_queue_routes::{ProcessShowItem, TvShowsMap};
 
 /// # Errors
 /// Returns error if formatting fails
@@ -2212,12 +2209,17 @@ fn LocalFileElement(
                 let nlines = subtitles.iter().find_map(|(_, n)| *n);
                 let options = subtitles.iter().enumerate().map(|(i, (s, _))| {
                     let mkv_number = s.number;
-                    let label =
+                    let suffix = if s.codec_id == "S_TEXT/ASS" {
+                        "ass"
+                    } else {
+                        "srt"
+                    };
+                    let label: StackString =
                         format_sstr!("{} {} {} {}", s.number, s.language, s.codec_id, s.name);
                     rsx! {
                         option {
                             key: "subtitle-key-{f}-{i}",
-                            value: "{mkv_number}",
+                            value: "{mkv_number}/{suffix}",
                             "{label}"
                         }
                     }
