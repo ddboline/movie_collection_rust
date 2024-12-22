@@ -1999,9 +1999,16 @@ pub async fn movie_queue_extract_subtitle(
         .join(&filename);
 
     let input_file: StackString = input_path.to_string_lossy().into();
-    let output = MkvTrack::extract_subtitles_from_mkv(&input_file, index, &suffix)
-        .await
-        .map_err(Into::<Error>::into)?;
+    let pyasstosrt_path = state.config.pyasstosrt_path.as_deref();
+    let output = MkvTrack::extract_subtitles_from_mkv(
+        &input_file,
+        index,
+        &suffix,
+        pyasstosrt_path,
+        &state.config.mkvextract_path,
+    )
+    .await
+    .map_err(Into::<Error>::into)?;
     task.await.ok();
 
     Ok(HtmlBase::new(output).into())
