@@ -1,7 +1,7 @@
 use anyhow::{format_err, Error};
 use stack_string::{format_sstr, StackString};
-use std::fmt;
-use tokio::process::Command;
+use std::{fmt, path::Path};
+use tokio::{fs::remove_file, process::Command};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum TrackType {
@@ -103,15 +103,21 @@ impl MkvTrack {
     /// # Errors
     /// Return error if fpath doesn't end in mkv, or if output of mkvinfo is not
     /// utf8
-    pub async fn get_subtitles_from_mkv(fpath: &str) -> Result<Vec<Self>, Error> {
+    pub async fn get_subtitles_from_mkv(
+        fpath: &str,
+        mkvinfo_path: &Path,
+    ) -> Result<Vec<Self>, Error> {
         if !fpath.to_lowercase().ends_with(".mkv") {
             return Err(format_err!("Filename must end in mkv"));
         }
+        if !Path::new(&fpath).exists() {
+            return Err(format_err!("File {fpath} does not exist"));
+        }
+        if !mkvinfo_path.exists() {
+            return Err(format_err!("mkvinfo not found"));
+        }
 
-        let output = Command::new("/usr/bin/mkvinfo")
-            .args([fpath])
-            .output()
-            .await?;
+        let output = Command::new(mkvinfo_path).args([fpath]).output().await?;
         if !output.status.success() && output.status.code() != Some(1) {
             return Err(format_err!(
                 "Process exited with error {:?}",
@@ -132,6 +138,8 @@ impl MkvTrack {
         fpath: &str,
         index: usize,
         suffix: &str,
+        pyasstosrt_path: Option<&Path>,
+        mkvextract_path: &Path,
     ) -> Result<StackString, Error> {
         let fname = fpath
             .strip_suffix(".mkv")
@@ -140,8 +148,11 @@ impl MkvTrack {
         if index < 1 {
             return Err(format_err!("Index must be greater than 0"));
         }
+        if !mkvextract_path.exists() {
+            return Err(format_err!("mkvextract not found"));
+        }
         let srt_path = format_sstr!("{}:{srt_path}", index - 1);
-        let output = Command::new("/usr/bin/mkvextract")
+        let output = Command::new(mkvextract_path)
             .args([fpath, "tracks", &srt_path])
             .output()
             .await?;
@@ -151,7 +162,33 @@ impl MkvTrack {
                 output.status.code()
             ));
         }
-        let output = StackString::from_utf8_vec(output.stdout)?;
+        let srt_path = format_sstr!("{fname}.{suffix}");
+        if !Path::new(&srt_path).exists() {
+            return Err(format_err!("Srt File Not Created"));
+        }
+        let mut output = StackString::from_utf8_vec(output.stdout)?;
+        if let Some(pyasstosrt_path) = pyasstosrt_path {
+            if suffix == "ass" && pyasstosrt_path.exists() {
+                let ass_output = Command::new(pyasstosrt_path)
+                    .args(["export", &srt_path])
+                    .output()
+                    .await?;
+                if !ass_output.status.success() && ass_output.status.code() != Some(1) {
+                    let status_code = ass_output.status.code().unwrap_or(0);
+                    let ass_output = StackString::from_utf8_vec(ass_output.stderr)?;
+                    return Err(format_err!(
+                        "Process exited with error {status_code} {ass_output}",
+                    ));
+                }
+                let ass_output = StackString::from_utf8_vec(ass_output.stdout)?;
+                output.push_str("\n");
+                output.push_str(&ass_output);
+                let srt_path = Path::new(&srt_path);
+                if srt_path.exists() {
+                    remove_file(srt_path).await?;
+                }
+            }
+        }
         Ok(output)
     }
 }
