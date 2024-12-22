@@ -123,7 +123,9 @@ impl FileLists {
                     nlines.replace(fs::read_to_string(srt_path).await?.split('\n').count());
                 }
                 let full_path: StackString = full_path.to_string_lossy().into();
-                for track in MkvTrack::get_subtitles_from_mkv(&full_path).await? {
+                for track in
+                    MkvTrack::get_subtitles_from_mkv(&full_path, &config.mkvinfo_path).await?
+                {
                     if track.track_type == Some(TrackType::Subtitles) {
                         subtitles
                             .entry(f.clone())
