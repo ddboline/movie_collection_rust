@@ -60,8 +60,19 @@ pub struct ConfigInner {
     pub plex_token: Option<StackString>,
     pub plex_host: Option<StackString>,
     pub plex_server: Option<StackString>,
+    pub pyasstosrt_path: Option<PathBuf>,
+    #[serde(default = "default_mkvinfo_path")]
+    pub mkvinfo_path: PathBuf,
+    #[serde(default = "default_mkvextract_path")]
+    pub mkvextract_path: PathBuf,
 }
 
+fn default_mkvinfo_path() -> PathBuf {
+    "/usr/bin/mkvinfo".into()
+}
+fn default_mkvextract_path() -> PathBuf {
+    "/usr/bin/mkvextract".into()
+}
 fn default_suffixes() -> SmallVec<[StackString; 3]> {
     smallvec!["avi".into(), "mp4".into(), "mkv".into(), "m4v".into()]
 }
