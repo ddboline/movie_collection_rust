@@ -163,7 +163,8 @@ impl ImdbRatings {
         offset: Option<usize>,
         limit: Option<usize>,
     ) -> Result<impl Stream<Item = Result<Self, PqError>>, Error> {
-        let query = Self::get_imdb_ratings_query("*", "ORDER BY show", timestamp.as_ref(), offset, limit)?;
+        let query =
+            Self::get_imdb_ratings_query("*", "ORDER BY show", timestamp.as_ref(), offset, limit)?;
         let conn = pool.get().await?;
         query.fetch_streaming(&conn).await.map_err(Into::into)
     }

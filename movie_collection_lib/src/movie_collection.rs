@@ -1005,7 +1005,8 @@ impl MovieCollection {
             count: i64,
         }
 
-        let query = Self::get_movie_collection_query("count(*)", "", timestamp.as_ref(), None, None)?;
+        let query =
+            Self::get_movie_collection_query("count(*)", "", timestamp.as_ref(), None, None)?;
         let conn = self.pool.get().await?;
         let count: Count = query.fetch_one(&conn).await?;
 

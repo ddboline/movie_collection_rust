@@ -194,7 +194,14 @@ impl ImdbEpisodes {
         }
 
         let query = Self::get_imdb_episodes_query(
-            "count(*)", "", &show, &season, &episode, timestamp.as_ref(), None, None,
+            "count(*)",
+            "",
+            &show,
+            &season,
+            &episode,
+            timestamp.as_ref(),
+            None,
+            None,
         )?;
         let conn = pool.get().await?;
         let count: Count = query.fetch_one(&conn).await?;
