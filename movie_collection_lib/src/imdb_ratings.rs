@@ -121,7 +121,7 @@ impl ImdbRatings {
     fn get_imdb_ratings_query<'a>(
         select_str: &'a str,
         order_str: &'a str,
-        timestamp: &'a Option<OffsetDateTime>,
+        timestamp: Option<&'a OffsetDateTime>,
         offset: Option<usize>,
         limit: Option<usize>,
     ) -> Result<Query<'a>, PqError> {
@@ -163,7 +163,7 @@ impl ImdbRatings {
         offset: Option<usize>,
         limit: Option<usize>,
     ) -> Result<impl Stream<Item = Result<Self, PqError>>, Error> {
-        let query = Self::get_imdb_ratings_query("*", "ORDER BY show", &timestamp, offset, limit)?;
+        let query = Self::get_imdb_ratings_query("*", "ORDER BY show", timestamp.as_ref(), offset, limit)?;
         let conn = pool.get().await?;
         query.fetch_streaming(&conn).await.map_err(Into::into)
     }
@@ -179,7 +179,7 @@ impl ImdbRatings {
             count: i64,
         }
 
-        let query = Self::get_imdb_ratings_query("count(*)", "", &timestamp, None, None)?;
+        let query = Self::get_imdb_ratings_query("count(*)", "", timestamp.as_ref(), None, None)?;
         let conn = pool.get().await?;
         let count: Count = query.fetch_one(&conn).await?;
 

@@ -103,6 +103,7 @@ impl PlexEvent {
         object.try_into()
     }
 
+    #[allow(clippy::ref_option)]
     fn get_plex_event_query<'a>(
         select_str: &'a str,
         order_str: &'a str,
@@ -540,6 +541,7 @@ pub struct PlexFilename {
 }
 
 impl PlexFilename {
+    #[allow(clippy::ref_option)]
     fn get_plex_filenames_query<'a>(
         select_str: &'a str,
         order_str: &'a str,
@@ -632,7 +634,7 @@ impl PlexFilename {
         Self::_get_by_key(&conn, key).await
     }
 
-    async fn _insert<C>(&self, conn: &C) -> Result<(), Error>
+    async fn insert_impl<C>(&self, conn: &C) -> Result<(), Error>
     where
         C: GenericClient + Sync,
     {
@@ -657,15 +659,15 @@ impl PlexFilename {
             .await?
             .is_none()
         {
-            self._insert(&conn).await?;
+            self.insert_impl(&conn).await?;
         } else {
-            self._update(&conn).await?;
+            self.update_impl(&conn).await?;
         }
         tran.commit().await?;
         Ok(())
     }
 
-    async fn _update<C>(&self, conn: &C) -> Result<(), Error>
+    async fn update_impl<C>(&self, conn: &C) -> Result<(), Error>
     where
         C: GenericClient + Sync,
     {
@@ -720,6 +722,7 @@ pub struct PlexMetadata {
 }
 
 impl PlexMetadata {
+    #[allow(clippy::ref_option)]
     fn get_plex_metadata_query<'a>(
         select_str: &'a str,
         order_str: &'a str,
@@ -835,7 +838,7 @@ impl PlexMetadata {
         query.fetch_opt(&conn).await.map_err(Into::into)
     }
 
-    async fn _insert<C>(&self, conn: &C) -> Result<u64, Error>
+    async fn insert_impl<C>(&self, conn: &C) -> Result<u64, Error>
     where
         C: GenericClient + Sync,
     {
@@ -856,7 +859,7 @@ impl PlexMetadata {
         query.execute(&conn).await.map_err(Into::into)
     }
 
-    async fn _update<C>(&self, conn: &C) -> Result<u64, Error>
+    async fn update_impl<C>(&self, conn: &C) -> Result<u64, Error>
     where
         C: GenericClient + Sync,
     {
@@ -889,8 +892,8 @@ impl PlexMetadata {
         let conn: &PgTransaction = &tran;
 
         let bytes = match Self::_get_by_key(&conn, &self.metadata_key).await? {
-            Some(_) => self._update(&conn).await?,
-            None => self._insert(&conn).await?,
+            Some(_) => self.update_impl(&conn).await?,
+            None => self.insert_impl(&conn).await?,
         };
         tran.commit().await?;
         Ok(bytes)

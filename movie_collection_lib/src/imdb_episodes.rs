@@ -103,13 +103,14 @@ impl ImdbEpisodes {
 
     #[allow(clippy::too_many_arguments)]
     #[allow(clippy::ref_option_ref)]
+    #[allow(clippy::ref_option)]
     fn get_imdb_episodes_query<'a>(
         select_str: &'a str,
         order_str: &'a str,
         show: &'a Option<&str>,
         season: &'a Option<i32>,
         episode: &'a Option<i32>,
-        timestamp: &'a Option<OffsetDateTime>,
+        timestamp: Option<&'a OffsetDateTime>,
         offset: Option<usize>,
         limit: Option<usize>,
     ) -> Result<Query<'a>, PqError> {
@@ -170,7 +171,7 @@ impl ImdbEpisodes {
             &None,
             &None,
             &None,
-            &timestamp,
+            timestamp.as_ref(),
             offset,
             limit,
         )?;
@@ -193,7 +194,7 @@ impl ImdbEpisodes {
         }
 
         let query = Self::get_imdb_episodes_query(
-            "count(*)", "", &show, &season, &episode, &timestamp, None, None,
+            "count(*)", "", &show, &season, &episode, timestamp.as_ref(), None, None,
         )?;
         let conn = pool.get().await?;
         let count: Count = query.fetch_one(&conn).await?;
@@ -218,7 +219,7 @@ impl ImdbEpisodes {
             &show,
             &season,
             &episode,
-            &None,
+            None,
             offset,
             limit,
         )?;

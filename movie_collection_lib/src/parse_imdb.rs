@@ -127,7 +127,7 @@ impl ParseImdb {
         let episodes: Option<HashMap<(i32, i32), _>> = episodes.map(|v| v.into_iter().collect());
 
         if opts.do_update {
-            self.parse_imdb_update_worker(opts, &shows, &episodes, &mut output)
+            self.parse_imdb_update_worker(opts, &shows, episodes.as_ref(), &mut output)
                 .await?;
         }
         Ok(output)
@@ -138,7 +138,7 @@ impl ParseImdb {
         &self,
         opts: &ParseImdbOptions,
         shows: &HashMap<StackString, ImdbRatings>,
-        episodes: &Option<HashMap<(i32, i32), ImdbEpisodes>>,
+        episodes: Option<&HashMap<(i32, i32), ImdbEpisodes>>,
         output: &mut Vec<Vec<StackString>>,
     ) -> Result<(), Error> {
         let imdb_conn = ImdbConnection::new();

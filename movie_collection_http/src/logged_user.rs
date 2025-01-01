@@ -1,6 +1,6 @@
 pub use authorized_users::{
     get_random_key, get_secrets, token::Token, AuthorizedUser as ExternalUser, AUTHORIZED_USERS,
-    JWT_SECRET, KEY_LENGTH, LOGIN_HTML, SECRET_KEY, TRIGGER_DB_UPDATE,
+    JWT_SECRET, KEY_LENGTH, LOGIN_HTML, SECRET_KEY,
 };
 use futures::TryStreamExt;
 use log::debug;

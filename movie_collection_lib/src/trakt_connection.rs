@@ -87,7 +87,7 @@ impl TraktConnection {
         URL_SAFE_NO_PAD.encode(&random_bytes)
     }
 
-    fn _get_auth_url(&self, state: &str) -> Result<Url, Error> {
+    fn get_auth_url_impl(&self, state: &str) -> Result<Url, Error> {
         let domain = &self.config.domain;
         let redirect_uri = format_sstr!("https://{domain}/trakt/callback");
         let parameters = &[
@@ -103,7 +103,7 @@ impl TraktConnection {
     /// Return error if parsing url fails
     pub async fn get_auth_url(&self) -> Result<Url, Error> {
         let state = Self::get_random_string();
-        let url = self._get_auth_url(&state)?;
+        let url = self.get_auth_url_impl(&state)?;
         CSRF_TOKEN.lock().await.replace(state.into());
         Ok(url)
     }
@@ -754,7 +754,7 @@ mod tests {
         let config = Config::with_config()?;
         let conn = TraktConnection::new(config);
         let test_state = TraktConnection::get_random_string();
-        let url = conn._get_auth_url(test_state.as_str())?;
+        let url = conn.get_auth_url_impl(test_state.as_str())?;
         println!("url {}", url);
         let expected = format_sstr!(
             "https://trakt.tv/oauth/authorize?{a}{client_id}{b}{domain}%2Ftrakt%2Fcallback&state={state}",

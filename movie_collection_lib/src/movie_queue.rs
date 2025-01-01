@@ -318,7 +318,7 @@ impl MovieQueueDB {
     fn get_movie_queue_query<'a>(
         select_str: &'a str,
         order_str: &'a str,
-        timestamp: &'a Option<OffsetDateTime>,
+        timestamp: Option<&'a OffsetDateTime>,
         offset: Option<usize>,
         limit: Option<usize>,
     ) -> Result<Query<'a>, PqError> {
@@ -364,7 +364,7 @@ impl MovieQueueDB {
         let query = Self::get_movie_queue_query(
             "a.idx, a.collection_idx, b.path, b.show, a.last_modified",
             "ORDER BY a.idx",
-            &timestamp,
+            timestamp.as_ref(),
             offset,
             limit,
         )?;
@@ -380,7 +380,7 @@ impl MovieQueueDB {
             count: i64,
         }
 
-        let query = Self::get_movie_queue_query("count(*)", "", &timestamp, None, None)?;
+        let query = Self::get_movie_queue_query("count(*)", "", timestamp.as_ref(), None, None)?;
         let conn = self.pool.get().await?;
         let count: Count = query.fetch_one(&conn).await?;
 

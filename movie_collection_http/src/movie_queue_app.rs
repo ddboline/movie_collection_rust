@@ -25,7 +25,7 @@ use movie_collection_lib::{config::Config, pgpool::PgPool, trakt_connection::Tra
 use super::{
     errors::error_response,
     graphql::{ItemLoader, QueryRoot},
-    logged_user::{fill_from_db, get_secrets, TRIGGER_DB_UPDATE},
+    logged_user::{fill_from_db, get_secrets},
     movie_queue_routes::{
         find_new_episodes, frontpage, imdb_episodes_route, imdb_episodes_update,
         imdb_ratings_route, imdb_ratings_set_source, imdb_ratings_update, imdb_show,
@@ -53,14 +53,13 @@ pub struct AppState {
 /// # Errors
 /// Return error if app fails to start
 pub async fn start_app() -> Result<(), Error> {
-    async fn _update_db(pool: PgPool) {
+    async fn update_db(pool: PgPool) {
         let mut i = interval(Duration::from_secs(60));
         loop {
             fill_from_db(&pool).await.unwrap_or(());
             i.tick().await;
         }
     }
-    TRIGGER_DB_UPDATE.set();
     let config = Config::with_config()?;
     get_secrets(&config.secret_path, &config.jwt_secret_path).await?;
 
@@ -75,7 +74,7 @@ pub async fn start_app() -> Result<(), Error> {
     let pool = PgPool::new(&config.pgurl)?;
     let trakt = TraktConnection::new(config.clone());
 
-    tokio::task::spawn(_update_db(pool.clone()));
+    tokio::task::spawn(update_db(pool.clone()));
 
     run_app(config, pool, trakt).await
 }

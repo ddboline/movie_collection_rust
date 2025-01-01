@@ -285,7 +285,7 @@ pub async fn get_watchlist_shows_db_map(
         year: i32,
         source: Option<StackString>,
     }
-    async fn _get_watchlist_shows_db_map(
+    async fn get_watchlist_shows_db_map_impl(
         pool: &PgPool,
         search_query: Option<&str>,
         source: Option<&str>,
@@ -332,7 +332,7 @@ pub async fn get_watchlist_shows_db_map(
         query.fetch_streaming(&conn).await.map_err(Into::into)
     }
     let source = source.map(TvShowSource::to_str);
-    _get_watchlist_shows_db_map(pool, search_query, source, offset, limit)
+    get_watchlist_shows_db_map_impl(pool, search_query, source, offset, limit)
         .await?
         .map_ok(|row| {
             let source: Option<TvShowSource> = match row.source {

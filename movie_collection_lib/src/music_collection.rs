@@ -36,6 +36,7 @@ impl Default for MusicCollection {
 }
 
 impl MusicCollection {
+    #[allow(clippy::ref_option)]
     fn get_music_collection_query<'a>(
         select_str: &'a str,
         order_str: &'a str,

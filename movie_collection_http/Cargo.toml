@@ -9,14 +9,14 @@ anyhow = "1.0"
 async-graphql = {version="7.0", features=["dataloader", "time"]}
 async-graphql-warp = "7.0"
 async-trait = "0.1"
-authorized_users = { git = "https://github.com/ddboline/auth_server_rust.git", tag="0.12.1"}
+authorized_users = { git = "https://github.com/ddboline/auth_server_rust.git", tag="0.12.2"}
 bytes = "1.0"
 derive_more = {version="1.0", features=["full"]}
-dioxus = "0.5"
-dioxus-core = "0.5"
-dioxus-ssr = "0.5"
+dioxus = "0.6"
+dioxus-core = "0.6"
+dioxus-ssr = "0.6"
 futures = "0.3"
-itertools = "0.13"
+itertools = "0.14"
 log = "0.4"
 maplit = "1.0"
 movie_collection_lib = {path = "../movie_collection_lib"}
@@ -38,7 +38,7 @@ stdout-channel = "0.6"
 thiserror = "2.0"
 time = {version="0.3", features=["serde-human-readable", "macros", "formatting"]}
 time-tz = {version="2.0", features=["system"]}
-tokio = {version="1.41", features=["rt", "macros", "rt-multi-thread"]}
+tokio = {version="1.42", features=["rt", "macros", "rt-multi-thread"]}
 tokio-stream = "0.1"
 uuid = "1.0"
 url = "2.3"

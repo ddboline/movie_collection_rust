@@ -1,6 +1,7 @@
 use anyhow::{format_err, Error};
 use dioxus::prelude::{
-    component, dioxus_elements, rsx, Element, GlobalAttributes, IntoDynNode, Props, VirtualDom,
+    component, dioxus_elements, rsx, Element, GlobalSignal, IntoDynNode, Props, Readable,
+    VirtualDom,
 };
 use futures::{future::try_join_all, TryStreamExt};
 use rust_decimal_macros::dec;
@@ -2376,12 +2377,12 @@ fn TranscodeGetHtmlElement(status: TranscodeStatus) -> Element {
             }
         },
         div {
+            id: "local-file-table",
+        }
+        div {
             id: "procs-tables",
             {procs_node},
         },
-        div {
-            id: "local-file-table",
-        }
     }
 }
 
