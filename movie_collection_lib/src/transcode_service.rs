@@ -636,10 +636,16 @@ impl fmt::Display for ProcInfo {
 }
 
 #[derive(Debug, PartialEq, Eq, Clone)]
+pub struct CurrentJobInfo {
+    pub path: PathBuf,
+    pub last_line: StackString,
+}
+
+#[derive(Debug, PartialEq, Eq, Clone)]
 pub struct TranscodeStatus {
     pub procs: Vec<ProcInfo>,
     pub upcoming_jobs: Vec<TranscodeServiceRequest>,
-    pub current_jobs: Vec<(PathBuf, StackString)>,
+    pub current_jobs: Vec<CurrentJobInfo>,
     pub finished_jobs: Vec<PathBuf>,
 }
 
@@ -676,7 +682,8 @@ impl TranscodeStatus {
                 (f_key.into(), Some(ProcStatus::Upcoming))
             })
         });
-        let current = self.current_jobs.iter().filter_map(|(p, _)| {
+        let current = self.current_jobs.iter().filter_map(|job_info| {
+            let p = &job_info.path;
             p.file_name().map(|f| {
                 let f = f.to_string_lossy().into_owned();
                 let mut f_key = f.as_str();
@@ -730,7 +737,7 @@ impl fmt::Display for TranscodeStatus {
             write!(
                 f,
                 "Current jobs:\n\n{}\n\n",
-                self.current_jobs.iter().map(|(_, s)| s).join("\n")
+                self.current_jobs.iter().map(|j| &j.last_line).join("\n")
             )?;
         }
         if !self.finished_jobs.is_empty() {
@@ -821,11 +828,16 @@ async fn get_upcoming_jobs(p: impl AsRef<Path>) -> Result<Vec<TranscodeServiceRe
     Ok(upcoming_jobs)
 }
 
-async fn get_current_jobs(p: impl AsRef<Path>) -> Result<Vec<(PathBuf, StackString)>, Error> {
+async fn get_current_jobs(p: impl AsRef<Path>) -> Result<Vec<CurrentJobInfo>, Error> {
     let futures = get_paths(p, "out")
         .await?
         .into_iter()
-        .map(|fpath| async move { get_last_line(&fpath).await.map(|p| (fpath.clone(), p)) });
+        .map(|fpath| async move {
+            get_last_line(&fpath).await.map(|p| CurrentJobInfo {
+                path: fpath.clone(),
+                last_line: p,
+            })
+        });
     try_join_all(futures).await
 }
 
@@ -1004,10 +1016,10 @@ mod tests {
         let result: Vec<_> = get_current_jobs("../tests/data")
             .await?
             .into_iter()
-            .filter(|(p, _)| p.to_string_lossy().contains("fargo_2014_s04_ep02_mp4"))
+            .filter(|j| j.path.to_string_lossy().contains("fargo_2014_s04_ep02_mp4"))
             .collect();
         assert_eq!(
-            result[0].1,
+            result[0].last_line,
             "Encoding: task 1 of 1, 22.61 % (76.06 fps, avg 94.82 fps, ETA 00h12m06s)"
         );
         Ok(())
