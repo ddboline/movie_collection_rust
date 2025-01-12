@@ -2500,7 +2500,8 @@ fn procs_html_node(status: &TranscodeStatus) -> Element {
     let current = if status.current_jobs.is_empty() {
         None
     } else {
-        let jobs = status.current_jobs.iter().enumerate().map(|(i, (_, s))| {
+        let jobs = status.current_jobs.iter().enumerate().map(|(i, j)| {
+            let s = &j.last_line;
             rsx! {
                 br {
                     key: "job-key-{i}",
