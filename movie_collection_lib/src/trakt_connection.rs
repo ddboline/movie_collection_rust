@@ -3,7 +3,7 @@ use base64::{engine::general_purpose::URL_SAFE_NO_PAD, Engine};
 use log::debug;
 use maplit::hashmap;
 use once_cell::sync::Lazy;
-use rand::{thread_rng, Rng};
+use rand::{rng as thread_rng, Rng};
 use reqwest::{header::HeaderMap, Client, Url};
 use serde::{Deserialize, Serialize};
 use smallvec::SmallVec;
@@ -83,7 +83,8 @@ impl TraktConnection {
     }
 
     fn get_random_string() -> String {
-        let random_bytes: SmallVec<[u8; 16]> = (0..16).map(|_| thread_rng().gen::<u8>()).collect();
+        let random_bytes: SmallVec<[u8; 16]> =
+            (0..16).map(|_| thread_rng().random::<u8>()).collect();
         URL_SAFE_NO_PAD.encode(&random_bytes)
     }
 

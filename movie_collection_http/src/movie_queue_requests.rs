@@ -1,10 +1,11 @@
 use anyhow::format_err;
 use futures::TryStreamExt;
-use rweb::Schema;
-use rweb_helper::{derive_rweb_schema, DateTimeType};
 use serde::{Deserialize, Serialize};
 use stack_string::StackString;
 use stdout_channel::{MockStdout, StdoutChannel};
+use time::OffsetDateTime;
+use utoipa::ToSchema;
+use utoipa_helper::derive_utoipa_schema;
 
 use movie_collection_lib::{
     config::Config,
@@ -124,19 +125,19 @@ impl ImdbEpisodesRequest {
     }
 }
 
-#[derive(Deserialize, Default, Schema)]
+#[derive(Deserialize, Default, ToSchema)]
 pub struct ParseImdbRequest {
-    #[schema(description = "All Entries Flag")]
+    // All Entries Flag
     pub all: Option<bool>,
-    #[schema(description = "Database Flag")]
+    // Database Flag
     pub database: Option<bool>,
-    #[schema(description = "IsTv Flag")]
+    // IsTv Flag
     pub tv: Option<bool>,
-    #[schema(description = "Update Flag")]
+    // Update Flag
     pub update: Option<bool>,
-    #[schema(description = "IMDB ID")]
+    // IMDB ID
     pub link: Option<StackString>,
-    #[schema(description = "Season")]
+    // Season
     pub season: Option<i32>,
 }
 
@@ -185,14 +186,14 @@ impl ImdbShowRequest {
     }
 }
 
-#[derive(Schema)]
+#[derive(ToSchema)]
 #[allow(dead_code)]
 struct _ImdbEpisodesSyncRequest {
-    #[schema(description = "Start Timestamp")]
-    pub start_timestamp: DateTimeType,
-    #[schema(description = "Offset")]
+    // Start Timestamp
+    pub start_timestamp: OffsetDateTime,
+    // Offset
     pub offset: Option<usize>,
-    #[schema(description = "Limit")]
+    // Limit
     pub limit: Option<usize>,
 }
 
@@ -203,7 +204,7 @@ pub struct MovieQueueSyncRequest {
     pub limit: Option<usize>,
 }
 
-derive_rweb_schema!(MovieQueueSyncRequest, _ImdbEpisodesSyncRequest);
+derive_utoipa_schema!(MovieQueueSyncRequest, _ImdbEpisodesSyncRequest);
 
 impl MovieQueueSyncRequest {
     /// # Errors
@@ -236,7 +237,7 @@ pub struct MovieCollectionSyncRequest {
     pub limit: Option<usize>,
 }
 
-derive_rweb_schema!(MovieCollectionSyncRequest, _ImdbEpisodesSyncRequest);
+derive_utoipa_schema!(MovieCollectionSyncRequest, _ImdbEpisodesSyncRequest);
 
 impl MovieCollectionSyncRequest {
     /// # Errors
@@ -262,7 +263,7 @@ impl MovieCollectionSyncRequest {
     }
 }
 
-#[derive(Serialize, Deserialize, Schema)]
+#[derive(Serialize, Deserialize, ToSchema)]
 pub struct ImdbEpisodesUpdateRequest {
     pub episodes: Vec<ImdbEpisodesWrapper>,
 }
@@ -282,7 +283,7 @@ impl ImdbEpisodesUpdateRequest {
     }
 }
 
-#[derive(Serialize, Deserialize, Schema)]
+#[derive(Serialize, Deserialize, ToSchema)]
 pub struct ImdbRatingsUpdateRequest {
     pub shows: Vec<ImdbRatingsWrapper>,
 }
@@ -306,11 +307,11 @@ impl ImdbRatingsUpdateRequest {
     }
 }
 
-#[derive(Serialize, Deserialize, Schema)]
+#[derive(Serialize, Deserialize, ToSchema)]
 pub struct ImdbRatingsSetSourceRequest {
-    #[schema(description = "IMDB ID")]
+    // IMDB ID
     pub link: StackString,
-    #[schema(description = "TV Show Source")]
+    // TV Show Source
     pub source: TvShowSourceWrapper,
 }
 
@@ -333,7 +334,7 @@ impl ImdbRatingsSetSourceRequest {
     }
 }
 
-#[derive(Serialize, Deserialize, Schema)]
+#[derive(Serialize, Deserialize, ToSchema)]
 pub struct MovieQueueUpdateRequest {
     pub queue: Vec<MovieQueueRowWrapper>,
 }
@@ -367,7 +368,7 @@ impl MovieQueueUpdateRequest {
     }
 }
 
-#[derive(Serialize, Deserialize, Schema)]
+#[derive(Serialize, Deserialize, ToSchema)]
 pub struct MovieCollectionUpdateRequest {
     pub collection: Vec<MovieCollectionRowWrapper>,
 }

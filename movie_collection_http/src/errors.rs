@@ -1,29 +1,44 @@
 use anyhow::Error as AnyhowError;
+use axum::{
+    extract::Json,
+    http::{
+        header::{InvalidHeaderName, InvalidHeaderValue, ToStrError},
+        StatusCode,
+    },
+    response::{IntoResponse, Response},
+};
 use log::error;
 use postgres_query::Error as PqError;
-use rweb::{
-    http::StatusCode,
-    openapi::{
-        ComponentDescriptor, ComponentOrInlineSchema, Entity, Response, ResponseEntity, Responses,
-    },
-    reject::{InvalidHeader, MissingCookie, Reject},
-    Rejection, Reply,
-};
 use serde::Serialize;
-use stack_string::StackString;
+use serde_json::Error as SerdeJsonError;
+use serde_yml::Error as YamlError;
+use stack_string::{format_sstr, StackString};
 use std::{
-    borrow::Cow,
-    convert::Infallible,
     fmt::{Debug, Error as FmtError},
     io::Error as IoError,
+    net::AddrParseError,
 };
 use thiserror::Error;
+use utoipa::{
+    openapi::{content::ContentBuilder, ResponseBuilder, ResponsesBuilder},
+    IntoResponses, PartialSchema, ToSchema,
+};
+
+use authorized_users::errors::AuthUsersError;
 
 use crate::logged_user::LOGIN_HTML;
 
 #[derive(Error, Debug)]
 #[allow(clippy::used_underscore_binding)]
 pub enum ServiceError {
+    #[error("ToStrError {0}")]
+    ToStrError(#[from] ToStrError),
+    #[error("InvalidHeaderName {0}")]
+    InvalidHeaderName(#[from] InvalidHeaderName),
+    #[error("InvalidHeaderValue {0}")]
+    InvalidHeaderValue(#[from] InvalidHeaderValue),
+    #[error("AuthUsersError {0}")]
+    AuthUsersError(#[from] AuthUsersError),
     #[error("Internal Server Error")]
     InternalServerError,
     #[error("BadRequest: {0}")]
@@ -37,122 +52,126 @@ pub enum ServiceError {
     #[error("FmtError {0}")]
     FmtError(#[from] FmtError),
     #[error("PqError {0}")]
-    PqError(#[from] PqError),
+    PqError(Box<PqError>),
+    #[error("SerdeJsonError {0}")]
+    SerdeJsonError(#[from] SerdeJsonError),
+    #[error("YamlError {0}")]
+    YamlError(#[from] YamlError),
+    #[error("AddrParseError {0}")]
+    AddrParseError(#[from] AddrParseError),
 }
 
-impl Reject for ServiceError {}
-
-#[derive(Serialize)]
-struct ErrorMessage<'a> {
-    code: u16,
-    message: &'a str,
-}
-
-/// # Errors
-/// Function never returns an error
-#[allow(clippy::unused_async)]
-pub async fn error_response(err: Rejection) -> Result<Box<dyn Reply>, Infallible> {
-    let code: StatusCode;
-    let message: &str;
-
-    if err.is_not_found() {
-        code = StatusCode::NOT_FOUND;
-        message = "NOT FOUND";
-    } else if err.find::<InvalidHeader>().is_some() {
-        return Ok(Box::new(login_html()));
-    } else if let Some(missing_cookie) = err.find::<MissingCookie>() {
-        if missing_cookie.name() == "jwt" {
-            return Ok(Box::new(login_html()));
-        }
-        code = StatusCode::INTERNAL_SERVER_ERROR;
-        message = "Internal Server Error";
-    } else if let Some(service_err) = err.find::<ServiceError>() {
-        match service_err {
-            ServiceError::BadRequest(msg) => {
-                code = StatusCode::BAD_REQUEST;
-                message = msg.as_str();
-            }
-            ServiceError::Unauthorized => {
-                return Ok(Box::new(login_html()));
-            }
-            _ => {
-                error!("Other error: {:?}", service_err);
-                code = StatusCode::INTERNAL_SERVER_ERROR;
-                message = "Internal Server Error, Please try again later";
-            }
-        }
-    } else if err.find::<rweb::reject::MethodNotAllowed>().is_some() {
-        code = StatusCode::METHOD_NOT_ALLOWED;
-        message = "METHOD NOT ALLOWED";
-    } else {
-        error!("Unknown error: {:?}", err);
-        code = StatusCode::INTERNAL_SERVER_ERROR;
-        message = "Internal Server Error, Please try again later";
-    };
-
-    let reply = rweb::reply::json(&ErrorMessage {
-        code: code.as_u16(),
-        message,
-    });
-    let reply = rweb::reply::with_status(reply, code);
-
-    Ok(Box::new(reply))
-}
-
-fn login_html() -> impl Reply {
-    rweb::reply::html(LOGIN_HTML)
-}
-
-impl Entity for ServiceError {
-    fn type_name() -> Cow<'static, str> {
-        rweb::http::Error::type_name()
-    }
-    fn describe(comp_d: &mut ComponentDescriptor) -> ComponentOrInlineSchema {
-        rweb::http::Error::describe(comp_d)
+impl From<PqError> for ServiceError {
+    fn from(value: PqError) -> Self {
+        Self::PqError(value.into())
     }
 }
 
-impl ResponseEntity for ServiceError {
-    fn describe_responses(_: &mut ComponentDescriptor) -> Responses {
-        let mut map = Responses::new();
+#[derive(Serialize, ToSchema)]
+struct ErrorMessage {
+    message: StackString,
+}
 
-        let error_responses = [
-            (StatusCode::NOT_FOUND, "Not Found"),
-            (StatusCode::INTERNAL_SERVER_ERROR, "Internal Server Error"),
-            (StatusCode::BAD_REQUEST, "Bad Request"),
-            (StatusCode::METHOD_NOT_ALLOWED, "Method not allowed"),
-        ];
+impl axum::response::IntoResponse for ErrorMessage {
+    fn into_response(self) -> Response {
+        Json(self).into_response()
+    }
+}
 
-        for (code, msg) in &error_responses {
-            map.insert(
-                Cow::Owned(code.as_str().into()),
-                Response {
-                    description: Cow::Borrowed(*msg),
-                    ..Response::default()
+impl IntoResponse for ServiceError {
+    fn into_response(self) -> Response {
+        match self {
+            Self::Unauthorized | Self::AuthUsersError(AuthUsersError::InvalidHeaderValue(_)) => {
+                (StatusCode::OK, LOGIN_HTML).into_response()
+            }
+            Self::BadRequest(s) => {
+                (StatusCode::BAD_REQUEST, ErrorMessage { message: s.into() }).into_response()
+            }
+            e => (
+                StatusCode::INTERNAL_SERVER_ERROR,
+                ErrorMessage {
+                    message: format_sstr!("Internal Server Error: {e}"),
                 },
-            );
+            )
+                .into_response(),
         }
+    }
+}
 
-        map
+impl IntoResponses for ServiceError {
+    fn responses() -> std::collections::BTreeMap<
+        String,
+        utoipa::openapi::RefOr<utoipa::openapi::response::Response>,
+    > {
+        let error_message_content = ContentBuilder::new()
+            .schema(Some(ErrorMessage::schema()))
+            .build();
+        ResponsesBuilder::new()
+            .response(
+                StatusCode::UNAUTHORIZED.as_str(),
+                ResponseBuilder::new()
+                    .description("Not Authorized")
+                    .content(
+                        "text/html",
+                        ContentBuilder::new().schema(Some(String::schema())).build(),
+                    ),
+            )
+            .response(
+                StatusCode::BAD_REQUEST.as_str(),
+                ResponseBuilder::new()
+                    .description("Bad Request")
+                    .content("application/json", error_message_content.clone()),
+            )
+            .response(
+                StatusCode::INTERNAL_SERVER_ERROR.as_str(),
+                ResponseBuilder::new()
+                    .description("Internal Server Error")
+                    .content("application/json", error_message_content.clone()),
+            )
+            .build()
+            .into()
     }
 }
 
 #[cfg(test)]
 mod test {
-    use anyhow::Error;
-    use rweb::Reply;
+    use anyhow::Error as AnyhowError;
+    use axum::http::header::{InvalidHeaderName, InvalidHeaderValue, ToStrError};
+    use postgres_query::Error as PqError;
+    use serde_json::Error as SerdeJsonError;
+    use serde_yml::Error as YamlError;
+    use std::{fmt::Error as FmtError, io::Error as IoError, net::AddrParseError};
+    use tokio::{task::JoinError, time::error::Elapsed};
+    use url::ParseError as UrlParseError;
 
-    use crate::errors::{error_response, ServiceError};
+    use authorized_users::errors::AuthUsersError;
 
-    #[tokio::test]
-    async fn test_service_error() -> Result<(), Error> {
-        let err = ServiceError::BadRequest("TEST ERROR".into()).into();
-        let resp = error_response(err).await?.into_response();
-        assert_eq!(resp.status().as_u16(), 400);
+    use crate::errors::ServiceError as Error;
 
-        let err = ServiceError::InternalServerError.into();
-        let resp = error_response(err).await?.into_response();
-        assert_eq!(resp.status().as_u16(), 500);
-        Ok(())
+    #[test]
+    fn test_error_size() {
+        println!(
+            "InvalidHeaderName {}",
+            std::mem::size_of::<InvalidHeaderName>()
+        );
+        println!(
+            "InvalidHeaderValue {}",
+            std::mem::size_of::<InvalidHeaderValue>()
+        );
+        println!("YamlError {}", std::mem::size_of::<YamlError>());
+        println!("AddrParseError {}", std::mem::size_of::<AddrParseError>());
+        println!("ToStrError {}", std::mem::size_of::<ToStrError>());
+        println!("JoinError {}", std::mem::size_of::<JoinError>());
+        println!("UrlParseError {}", std::mem::size_of::<UrlParseError>());
+        println!("SerdeJsonError {}", std::mem::size_of::<SerdeJsonError>());
+        println!("Elapsed {}", std::mem::size_of::<Elapsed>());
+        println!("FmtError {}", std::mem::size_of::<FmtError>());
+        println!("AuthUsersError {}", std::mem::size_of::<AuthUsersError>());
+        println!("AnyhowError {}", std::mem::size_of::<AnyhowError>());
+        println!("IoError {}", std::mem::size_of::<IoError>());
+        println!("FmtError {}", std::mem::size_of::<FmtError>());
+        println!("PqError {}", std::mem::size_of::<PqError>());
+
+        assert_eq!(std::mem::size_of::<Error>(), 24);
     }
 }

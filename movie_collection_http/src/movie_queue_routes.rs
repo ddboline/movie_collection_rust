@@ -1,14 +1,11 @@
 #![allow(clippy::needless_pass_by_value)]
 
 use anyhow::format_err;
+use axum::extract::{Json, Multipart, Path, Query, State};
 use bytes::Buf;
+use derive_more::{From, Into};
 use futures::TryStreamExt;
 use log::error;
-use rweb::{delete, get, multipart::FormData, post, Json, Query, Rejection, Schema};
-use rweb_helper::{
-    derive_rweb_schema, html_response::HtmlResponse as HtmlBase,
-    json_response::JsonResponse as JsonBase, DateTimeType, RwebResponse, UuidWrapper,
-};
 use serde::{Deserialize, Serialize};
 use stack_string::{format_sstr, StackString};
 use std::{
@@ -18,11 +15,19 @@ use std::{
     hash::{Hash, Hasher},
     path,
     path::PathBuf,
+    sync::Arc,
 };
 use stdout_channel::{MockStdout, StdoutChannel};
 use time::OffsetDateTime;
 use tokio::fs::remove_file;
 use tokio_stream::StreamExt;
+use utoipa::{OpenApi, PartialSchema, ToSchema};
+use utoipa_axum::{router::OpenApiRouter, routes};
+use utoipa_helper::{
+    derive_utoipa_schema, html_response::HtmlResponse as HtmlBase,
+    json_response::JsonResponse as JsonBase, UtoipaResponse,
+};
+use uuid::Uuid;
 
 use movie_collection_lib::{
     config::Config,
@@ -44,7 +49,6 @@ use movie_collection_lib::{
     transcode_service::{transcode_status, TranscodeService, TranscodeServiceRequest},
     tv_show_source::TvShowSource,
 };
-use std::convert::Infallible;
 
 use crate::{
     errors::ServiceError as Error,
@@ -68,42 +72,43 @@ use crate::{
     PlexMetadataWrapper, TraktActionsWrapper, TraktWatchlistRequest, TvShowSourceWrapper,
 };
 
-pub type WarpResult<T> = Result<T, Rejection>;
-pub type HttpResult<T> = Result<T, Error>;
+type WarpResult<T> = Result<T, Error>;
 
-#[derive(RwebResponse)]
-#[response(description = "Scripts", content = "js")]
-struct JsScriptsResponse(HtmlBase<&'static str, Infallible>);
+#[derive(UtoipaResponse)]
+#[response(description = "Scripts", content = "text/javascript")]
+#[rustfmt::skip]
+struct JsScriptsResponse(HtmlBase::<&'static str>);
 
-#[get("/list/scripts.js")]
-pub async fn scripts_js() -> WarpResult<JsScriptsResponse> {
-    Ok(HtmlBase::new(include_str!("../../templates/scripts.js")).into())
+#[utoipa::path(get, path = "/list/scripts.js", responses(JsScriptsResponse))]
+async fn scripts_js() -> JsScriptsResponse {
+    HtmlBase::new(include_str!("../../templates/scripts.js")).into()
 }
 
-#[derive(RwebResponse)]
-#[response(description = "Movie Queue", content = "html")]
-struct MovieQueueResponse(HtmlBase<StackString, Error>);
+#[derive(UtoipaResponse)]
+#[response(description = "Movie Queue", content = "text/html")]
+#[rustfmt::skip]
+struct MovieQueueResponse(HtmlBase::<StackString>);
 
-#[derive(Serialize, Deserialize, Debug, Schema)]
-#[schema(component = "FullQueueRequest")]
-pub struct FullQueueRequest {
-    #[schema(description = "Search String")]
-    pub q: Option<StackString>,
-    #[schema(description = "Offset")]
-    pub offset: Option<usize>,
-    #[schema(description = "Limit")]
-    pub limit: Option<usize>,
-    #[schema(description = "Order By (asc/desc)")]
-    pub order_by: Option<OrderByWrapper>,
+#[derive(Serialize, Deserialize, Debug, ToSchema)]
+// FullQueueRequest
+struct FullQueueRequest {
+    // Search String
+    q: Option<StackString>,
+    // Offset
+    offset: Option<usize>,
+    // Limit
+    limit: Option<usize>,
+    // Order By (asc/desc)
+    order_by: Option<OrderByWrapper>,
 }
 
-#[get("/list/full_queue")]
-pub async fn movie_queue(
-    #[filter = "LoggedUser::filter"] user: LoggedUser,
-    #[data] state: AppState,
+#[utoipa::path(get, path = "/list/full_queue", responses(MovieQueueResponse, Error))]
+async fn movie_queue(
+    user: LoggedUser,
+    state: State<Arc<AppState>>,
     query: Query<FullQueueRequest>,
 ) -> WarpResult<MovieQueueResponse> {
-    let query = query.into_inner();
+    let Query(query) = query;
     let task = user
         .store_url_task(state.trakt.get_client(), &state.config, "/list/full_queue")
         .await;
@@ -136,12 +141,13 @@ pub async fn movie_queue(
     Ok(HtmlBase::new(body).into())
 }
 
-#[get("/list/queue/{path}")]
-pub async fn movie_queue_show(
-    path: StackString,
-    #[filter = "LoggedUser::filter"] user: LoggedUser,
-    #[data] state: AppState,
+#[utoipa::path(get, path = "/list/queue/{path}", responses(MovieQueueResponse, Error))]
+async fn movie_queue_show(
+    state: State<Arc<AppState>>,
+    path: Path<StackString>,
+    user: LoggedUser,
 ) -> WarpResult<MovieQueueResponse> {
+    let Path(path) = path;
     let url = format_sstr!("/list/queue/{path}");
     let task = user
         .store_url_task(state.trakt.get_client(), &state.config, &url)
@@ -170,16 +176,22 @@ pub async fn movie_queue_show(
     Ok(HtmlBase::new(body).into())
 }
 
-#[derive(RwebResponse)]
-#[response(description = "Delete Queue Entry", content = "html")]
-struct DeleteMovieQueueResponse(HtmlBase<StackString, Error>);
+#[derive(UtoipaResponse)]
+#[response(description = "Delete Queue Entry", content = "text/html")]
+#[rustfmt::skip]
+struct DeleteMovieQueueResponse(HtmlBase::<StackString>);
 
-#[delete("/list/delete/{path}")]
-pub async fn movie_queue_delete(
-    path: StackString,
-    #[filter = "LoggedUser::filter"] user: LoggedUser,
-    #[data] state: AppState,
+#[utoipa::path(
+    delete,
+    path = "/list/delete/{path}",
+    responses(DeleteMovieQueueResponse, Error)
+)]
+async fn movie_queue_delete(
+    state: State<Arc<AppState>>,
+    path: Path<StackString>,
+    user: LoggedUser,
 ) -> WarpResult<DeleteMovieQueueResponse> {
+    let Path(path) = path;
     let url = format_sstr!("/list/delete/{path}");
     let task = user
         .store_url_task(state.trakt.get_client(), &state.config, &url)
@@ -214,7 +226,7 @@ async fn transcode_worker(
     directory: Option<&path::Path>,
     entries: &[MovieQueueResult],
     pool: &PgPool,
-) -> HttpResult<StackString> {
+) -> WarpResult<StackString> {
     let mock_stdout = MockStdout::new();
     let stdout = StdoutChannel::with_mock_stdout(mock_stdout.clone(), mock_stdout.clone());
 
@@ -237,20 +249,26 @@ async fn transcode_worker(
     Ok(output.join("").into())
 }
 
-#[derive(RwebResponse)]
+#[derive(UtoipaResponse)]
 #[response(
     description = "Transcode Queue Item",
-    content = "html",
+    content = "text/html",
     status = "CREATED"
 )]
-struct TranscodeQueueResponse(HtmlBase<StackString, Error>);
+#[rustfmt::skip]
+struct TranscodeQueueResponse(HtmlBase::<StackString>);
 
-#[post("/list/transcode/queue/{path}")]
-pub async fn movie_queue_transcode(
-    path: StackString,
-    #[filter = "LoggedUser::filter"] user: LoggedUser,
-    #[data] state: AppState,
+#[utoipa::path(
+    post,
+    path = "/list/transcode/queue/{path}",
+    responses(TranscodeQueueResponse, Error)
+)]
+async fn movie_queue_transcode(
+    state: State<Arc<AppState>>,
+    path: Path<StackString>,
+    user: LoggedUser,
 ) -> WarpResult<TranscodeQueueResponse> {
+    let Path(path) = path;
     let url = format_sstr!("/list/transcode/queue/{path}");
     let task = user
         .store_url_task(state.trakt.get_client(), &state.config, &url)
@@ -267,13 +285,20 @@ pub async fn movie_queue_transcode(
     Ok(HtmlBase::new(body).into())
 }
 
-#[post("/list/transcode/queue/{directory}/{file}")]
-pub async fn movie_queue_transcode_directory(
-    directory: StackString,
-    file: StackString,
-    #[filter = "LoggedUser::filter"] user: LoggedUser,
-    #[data] state: AppState,
+#[utoipa::path(
+    post,
+    path = "/list/transcode/queue/{directory}/{file}",
+    responses(TranscodeQueueResponse, Error)
+)]
+async fn movie_queue_transcode_directory(
+    state: State<Arc<AppState>>,
+    directory: Path<StackString>,
+    file: Path<StackString>,
+    user: LoggedUser,
 ) -> WarpResult<TranscodeQueueResponse> {
+    let Path(directory) = directory;
+    let Path(file) = file;
+
     let url = format_sstr!("/list/transcode/queue/{directory}/{file}");
     let task = user
         .store_url_task(state.trakt.get_client(), &state.config, &url)
@@ -296,16 +321,18 @@ pub async fn movie_queue_transcode_directory(
     Ok(HtmlBase::new(body).into())
 }
 
-#[derive(RwebResponse)]
-#[response(description = "Play Queue Item", content = "html")]
-struct PlayQueueResponse(HtmlBase<StackString, Error>);
+#[derive(UtoipaResponse)]
+#[response(description = "Play Queue Item", content = "text/html")]
+#[rustfmt::skip]
+struct PlayQueueResponse(HtmlBase::<StackString>);
 
-#[get("/list/play/{idx}")]
-pub async fn movie_queue_play(
-    idx: UuidWrapper,
-    #[filter = "LoggedUser::filter"] user: LoggedUser,
-    #[data] state: AppState,
+#[utoipa::path(get, path = "/list/play/{idx}", responses(PlayQueueResponse, Error))]
+async fn movie_queue_play(
+    idx: Path<Uuid>,
+    user: LoggedUser,
+    state: State<Arc<AppState>>,
 ) -> WarpResult<PlayQueueResponse> {
+    let Path(idx) = idx;
     let last_url = user
         .get_url(state.trakt.get_client(), &state.config)
         .await
@@ -332,48 +359,51 @@ pub async fn movie_queue_play(
     Ok(HtmlBase::new(body).into())
 }
 
-#[derive(RwebResponse)]
-#[response(description = "List Imdb Show", content = "html")]
-struct ListImdbResponse(HtmlBase<StackString, Error>);
+#[derive(UtoipaResponse)]
+#[response(description = "List Imdb Show", content = "text/html")]
+#[rustfmt::skip]
+struct ListImdbResponse(HtmlBase::<StackString>);
 
-#[get("/list/imdb/{show}")]
-pub async fn imdb_show(
-    show: StackString,
+#[utoipa::path(get, path = "/list/imdb/{show}", responses(ListImdbResponse, Error))]
+async fn imdb_show(
+    state: State<Arc<AppState>>,
+    show: Path<StackString>,
     query: Query<ParseImdbRequest>,
-    #[filter = "LoggedUser::filter"] user: LoggedUser,
-    #[data] state: AppState,
+    user: LoggedUser,
 ) -> WarpResult<ListImdbResponse> {
+    let Path(show) = show;
     let url = format_sstr!("/list/imdb/{show}");
     let task = user
         .store_url_task(state.trakt.get_client(), &state.config, &url)
         .await;
-    let query = query.into_inner();
+    let Query(query) = query;
     let req = ImdbShowRequest { show, query };
     let body = req.process(&state.db, &state.config).await?;
     task.await.ok();
     Ok(HtmlBase::new(body).into())
 }
 
-#[derive(Serialize, Deserialize, Schema)]
-#[schema(component = "FindNewEpisodeRequest")]
-pub struct FindNewEpisodeRequest {
-    #[schema(description = "TV Show Source")]
-    pub source: Option<TvShowSourceWrapper>,
-    #[schema(description = "TV Show")]
-    pub shows: Option<StackString>,
+#[derive(Serialize, Deserialize, ToSchema)]
+// FindNewEpisodeRequest")]
+struct FindNewEpisodeRequest {
+    // TV Show Source")]
+    source: Option<TvShowSourceWrapper>,
+    // TV Show")]
+    shows: Option<StackString>,
 }
 
-#[derive(RwebResponse)]
-#[response(description = "List Calendar", content = "html")]
-struct ListCalendarResponse(HtmlBase<StackString, Error>);
+#[derive(UtoipaResponse)]
+#[response(description = "List Calendar", content = "text/html")]
+#[rustfmt::skip]
+struct ListCalendarResponse(HtmlBase::<StackString>);
 
-#[get("/list/cal")]
-pub async fn find_new_episodes(
+#[utoipa::path(get, path = "/list/cal", responses(ListCalendarResponse, Error))]
+async fn find_new_episodes(
     query: Query<FindNewEpisodeRequest>,
-    #[filter = "LoggedUser::filter"] user: LoggedUser,
-    #[data] state: AppState,
+    user: LoggedUser,
+    state: State<Arc<AppState>>,
 ) -> WarpResult<ListCalendarResponse> {
-    let query = query.into_inner();
+    let Query(query) = query;
 
     let task = user
         .store_url_task(state.trakt.get_client(), &state.config, "/list/cal")
@@ -398,54 +428,59 @@ pub async fn find_new_episodes(
 }
 
 #[derive(Serialize, Deserialize, Debug)]
-pub struct ImdbEpisodesSyncRequest {
-    pub start_timestamp: Option<DateTimeWrapper>,
-    pub offset: Option<usize>,
-    pub limit: Option<usize>,
+struct ImdbEpisodesSyncRequest {
+    start_timestamp: Option<DateTimeWrapper>,
+    offset: Option<usize>,
+    limit: Option<usize>,
 }
 
-derive_rweb_schema!(ImdbEpisodesSyncRequest, _ImdbEpisodesSyncRequest);
+derive_utoipa_schema!(ImdbEpisodesSyncRequest, _ImdbEpisodesSyncRequest);
 
-#[derive(Schema)]
+#[derive(ToSchema)]
 #[allow(dead_code)]
 struct _ImdbEpisodesSyncRequest {
-    #[schema(description = "Start Timestamp")]
-    pub start_timestamp: Option<DateTimeType>,
-    #[schema(description = "Offset")]
-    pub offset: Option<usize>,
-    #[schema(description = "Limit")]
-    pub limit: Option<usize>,
+    // Start Timestamp")]
+    start_timestamp: Option<OffsetDateTime>,
+    // Offset")]
+    offset: Option<usize>,
+    // Limit")]
+    limit: Option<usize>,
 }
 
-#[derive(Debug, Serialize, Deserialize, Schema)]
-#[schema(component = "Pagination")]
+#[derive(Debug, Serialize, Deserialize, ToSchema)]
+// Pagination")]
 struct Pagination {
-    #[schema(description = "Total Number of Entries")]
+    // Total Number of Entries")]
     total: usize,
-    #[schema(description = "Number of Entries to Skip")]
+    // Number of Entries to Skip")]
     offset: usize,
-    #[schema(description = "Number of Entries Returned")]
+    // Number of Entries Returned")]
     limit: usize,
 }
 
-#[derive(Debug, Serialize, Deserialize, Schema)]
-#[schema(component = "PaginatedImdbEpisodes")]
+#[derive(Debug, Serialize, Deserialize, ToSchema)]
+// PaginatedImdbEpisodes")]
 struct PaginatedImdbEpisodes {
     pagination: Pagination,
     data: Vec<ImdbEpisodesWrapper>,
 }
 
-#[derive(RwebResponse)]
+#[derive(UtoipaResponse)]
 #[response(description = "List Imdb Episodes")]
-struct ListImdbEpisodesResponse(JsonBase<PaginatedImdbEpisodes, Error>);
+#[rustfmt::skip]
+struct ListImdbEpisodesResponse(JsonBase::<PaginatedImdbEpisodes>);
 
-#[get("/list/imdb_episodes")]
-pub async fn imdb_episodes_route(
+#[utoipa::path(
+    get,
+    path = "/list/imdb_episodes",
+    responses(ListImdbEpisodesResponse, Error)
+)]
+async fn imdb_episodes_route(
     query: Query<ImdbEpisodesSyncRequest>,
-    #[filter = "LoggedUser::filter"] user: LoggedUser,
-    #[data] state: AppState,
+    user: LoggedUser,
+    state: State<Arc<AppState>>,
 ) -> WarpResult<ListImdbEpisodesResponse> {
-    let query = query.into_inner();
+    let Query(query) = query;
 
     let offset = query.offset.unwrap_or(0);
     let limit = query.limit.unwrap_or(10);
@@ -484,20 +519,26 @@ pub async fn imdb_episodes_route(
     Ok(JsonBase::new(PaginatedImdbEpisodes { pagination, data }).into())
 }
 
-#[derive(RwebResponse)]
+#[derive(UtoipaResponse)]
 #[response(
     description = "Imdb Episodes Update",
-    content = "html",
+    content = "text/html",
     status = "CREATED"
 )]
-struct ImdbEpisodesUpdateResponse(HtmlBase<&'static str, Error>);
+#[rustfmt::skip]
+struct ImdbEpisodesUpdateResponse(HtmlBase::<&'static str>);
 
-#[post("/list/imdb_episodes")]
-pub async fn imdb_episodes_update(
+#[utoipa::path(
+    post,
+    path = "/list/imdb_episodes",
+    responses(ImdbEpisodesUpdateResponse, Error)
+)]
+async fn imdb_episodes_update(
+    user: LoggedUser,
+    state: State<Arc<AppState>>,
     episodes: Json<ImdbEpisodesUpdateRequest>,
-    #[filter = "LoggedUser::filter"] user: LoggedUser,
-    #[data] state: AppState,
 ) -> WarpResult<ImdbEpisodesUpdateResponse> {
+    let Json(episodes) = episodes;
     let task = user
         .store_url_task(
             state.trakt.get_client(),
@@ -505,38 +546,43 @@ pub async fn imdb_episodes_update(
             "/list/imdb_episodes",
         )
         .await;
-    episodes.into_inner().run_update(&state.db).await?;
+    episodes.run_update(&state.db).await?;
     task.await.ok();
     Ok(HtmlBase::new("Success").into())
 }
 
 #[derive(Serialize, Deserialize)]
-pub struct ImdbRatingsSyncRequest {
-    pub start_timestamp: Option<DateTimeWrapper>,
-    pub offset: Option<usize>,
-    pub limit: Option<usize>,
+struct ImdbRatingsSyncRequest {
+    start_timestamp: Option<DateTimeWrapper>,
+    offset: Option<usize>,
+    limit: Option<usize>,
 }
 
-derive_rweb_schema!(ImdbRatingsSyncRequest, _ImdbEpisodesSyncRequest);
+derive_utoipa_schema!(ImdbRatingsSyncRequest, _ImdbEpisodesSyncRequest);
 
-#[derive(Debug, Serialize, Deserialize, Schema)]
-#[schema(component = "PaginatedImdbRatings")]
+#[derive(Debug, Serialize, Deserialize, ToSchema)]
+// PaginatedImdbRatings")]
 struct PaginatedImdbRatings {
     pagination: Pagination,
     data: Vec<ImdbRatingsWrapper>,
 }
 
-#[derive(RwebResponse)]
+#[derive(UtoipaResponse)]
 #[response(description = "List Imdb Shows")]
-struct ListImdbShowsResponse(JsonBase<PaginatedImdbRatings, Error>);
+#[rustfmt::skip]
+struct ListImdbShowsResponse(JsonBase::<PaginatedImdbRatings>);
 
-#[get("/list/imdb_ratings")]
-pub async fn imdb_ratings_route(
+#[utoipa::path(
+    get,
+    path = "/list/imdb_ratings",
+    responses(ListImdbShowsResponse, Error)
+)]
+async fn imdb_ratings_route(
     query: Query<ImdbRatingsSyncRequest>,
-    #[filter = "LoggedUser::filter"] user: LoggedUser,
-    #[data] state: AppState,
+    user: LoggedUser,
+    state: State<Arc<AppState>>,
 ) -> WarpResult<ListImdbShowsResponse> {
-    let query = query.into_inner();
+    let Query(query) = query;
 
     let task = user
         .store_url_task(
@@ -573,20 +619,26 @@ pub async fn imdb_ratings_route(
     Ok(JsonBase::new(PaginatedImdbRatings { pagination, data }).into())
 }
 
-#[derive(RwebResponse)]
+#[derive(UtoipaResponse)]
 #[response(
     description = "Update Imdb Shows",
-    content = "html",
+    content = "text/html",
     status = "CREATED"
 )]
-struct UpdateImdbShowsResponse(HtmlBase<&'static str, Error>);
+#[rustfmt::skip]
+struct UpdateImdbShowsResponse(HtmlBase::<&'static str>);
 
-#[post("/list/imdb_ratings")]
-pub async fn imdb_ratings_update(
+#[utoipa::path(
+    post,
+    path = "/list/imdb_ratings",
+    responses(UpdateImdbShowsResponse, Error)
+)]
+async fn imdb_ratings_update(
+    user: LoggedUser,
+    state: State<Arc<AppState>>,
     shows: Json<ImdbRatingsUpdateRequest>,
-    #[filter = "LoggedUser::filter"] user: LoggedUser,
-    #[data] state: AppState,
 ) -> WarpResult<UpdateImdbShowsResponse> {
+    let Json(shows) = shows;
     let task = user
         .store_url_task(
             state.trakt.get_client(),
@@ -594,21 +646,27 @@ pub async fn imdb_ratings_update(
             "/list/imdb_ratings",
         )
         .await;
-    shows.into_inner().run_update(&state.db).await?;
+    shows.run_update(&state.db).await?;
     task.await.ok();
     Ok(HtmlBase::new("Success").into())
 }
 
-#[derive(RwebResponse)]
-#[response(description = "Imdb Show Set Source", content = "html")]
-struct ImdbSetSourceResponse(HtmlBase<&'static str, Error>);
+#[derive(UtoipaResponse)]
+#[response(description = "Imdb Show Set Source", content = "text/html")]
+#[rustfmt::skip]
+struct ImdbSetSourceResponse(HtmlBase::<&'static str>);
 
-#[get("/list/imdb_ratings/set_source")]
-pub async fn imdb_ratings_set_source(
+#[utoipa::path(
+    get,
+    path = "/list/imdb_ratings/set_source",
+    responses(ImdbSetSourceResponse, Error)
+)]
+async fn imdb_ratings_set_source(
     query: Query<ImdbRatingsSetSourceRequest>,
-    #[filter = "LoggedUser::filter"] user: LoggedUser,
-    #[data] state: AppState,
+    user: LoggedUser,
+    state: State<Arc<AppState>>,
 ) -> WarpResult<ImdbSetSourceResponse> {
+    let Query(query) = query;
     let task = user
         .store_url_task(
             state.trakt.get_client(),
@@ -616,29 +674,34 @@ pub async fn imdb_ratings_set_source(
             "/list/imdb_ratings/set_source",
         )
         .await;
-    query.into_inner().set_source(&state.db).await?;
+    query.set_source(&state.db).await?;
     task.await.ok();
     Ok(HtmlBase::new("Success").into())
 }
 
-#[derive(Debug, Serialize, Deserialize, Schema)]
-#[schema(component = "PaginatedMovieQueueRow")]
+#[derive(Debug, Serialize, Deserialize, ToSchema)]
+// PaginatedMovieQueueRow")]
 struct PaginatedMovieQueueRow {
     pagination: Pagination,
     data: Vec<MovieQueueRowWrapper>,
 }
 
-#[derive(RwebResponse)]
+#[derive(UtoipaResponse)]
 #[response(description = "List Movie Queue Entries")]
-struct ListMovieQueueResponse(JsonBase<PaginatedMovieQueueRow, Error>);
+#[rustfmt::skip]
+struct ListMovieQueueResponse(JsonBase::<PaginatedMovieQueueRow>);
 
-#[get("/list/movie_queue")]
-pub async fn movie_queue_route(
+#[utoipa::path(
+    get,
+    path = "/list/movie_queue",
+    responses(ListMovieQueueResponse, Error)
+)]
+async fn movie_queue_route(
     query: Query<MovieQueueSyncRequest>,
-    #[filter = "LoggedUser::filter"] user: LoggedUser,
-    #[data] state: AppState,
+    user: LoggedUser,
+    state: State<Arc<AppState>>,
 ) -> WarpResult<ListMovieQueueResponse> {
-    let query = query.into_inner();
+    let Query(query) = query;
 
     let task = user
         .store_url_task(state.trakt.get_client(), &state.config, "/list/movie_queue")
@@ -656,52 +719,60 @@ pub async fn movie_queue_route(
     Ok(JsonBase::new(PaginatedMovieQueueRow { pagination, data }).into())
 }
 
-#[derive(RwebResponse)]
+#[derive(UtoipaResponse)]
 #[response(
     description = "Update Movie Queue Entries",
-    content = "html",
+    content = "text/html",
     status = "CREATED"
 )]
-struct UpdateMovieQueueResponse(HtmlBase<&'static str, Error>);
+#[rustfmt::skip]
+struct UpdateMovieQueueResponse(HtmlBase::<&'static str>);
 
-#[post("/list/movie_queue")]
-pub async fn movie_queue_update(
+#[utoipa::path(
+    post,
+    path = "/list/movie_queue",
+    responses(UpdateMovieQueueResponse, Error)
+)]
+async fn movie_queue_update(
+    user: LoggedUser,
+    state: State<Arc<AppState>>,
     queue: Json<MovieQueueUpdateRequest>,
-    #[filter = "LoggedUser::filter"] user: LoggedUser,
-    #[data] state: AppState,
 ) -> WarpResult<UpdateMovieQueueResponse> {
+    let Json(queue) = queue;
     let task = user
         .store_url_task(state.trakt.get_client(), &state.config, "/list/movie_queue")
         .await;
-    queue
-        .into_inner()
-        .run_update(&state.db, &state.config)
-        .await?;
+    queue.run_update(&state.db, &state.config).await?;
     task.await.ok();
     Ok(HtmlBase::new("Success").into())
 }
 
-#[derive(Debug, Serialize, Deserialize, Schema)]
-#[schema(component = "PaginatedMovieCollectionRow")]
+#[derive(Debug, Serialize, Deserialize, ToSchema)]
+// PaginatedMovieCollectionRow")]
 struct PaginatedMovieCollectionRow {
     pagination: Pagination,
     data: Vec<MovieCollectionRowWrapper>,
 }
 
-#[derive(RwebResponse)]
+#[derive(UtoipaResponse)]
 #[response(description = "List Movie Collection Entries")]
-struct ListMovieCollectionResponse(JsonBase<PaginatedMovieCollectionRow, Error>);
+#[rustfmt::skip]
+struct ListMovieCollectionResponse(JsonBase::<PaginatedMovieCollectionRow>);
 
-#[get("/list/movie_collection")]
-pub async fn movie_collection_route(
+#[utoipa::path(
+    get,
+    path = "/list/movie_collection",
+    responses(ListMovieCollectionResponse, Error)
+)]
+async fn movie_collection_route(
     query: Query<MovieCollectionSyncRequest>,
-    #[filter = "LoggedUser::filter"] user: LoggedUser,
-    #[data] state: AppState,
+    user: LoggedUser,
+    state: State<Arc<AppState>>,
 ) -> WarpResult<ListMovieCollectionResponse> {
     let task = user
         .store_url_task(state.trakt.get_client(), &state.config, "/list/movie_queue")
         .await;
-    let query = query.into_inner();
+    let Query(query) = query;
     let (total, data) = query.get_collection(&state.db, &state.config).await?;
     let offset = query.offset.unwrap_or(0);
     let limit = query.limit.unwrap_or(total);
@@ -715,20 +786,26 @@ pub async fn movie_collection_route(
     Ok(JsonBase::new(PaginatedMovieCollectionRow { pagination, data }).into())
 }
 
-#[derive(RwebResponse)]
+#[derive(UtoipaResponse)]
 #[response(
     description = "Update Movie Collection Entries",
-    content = "html",
+    content = "text/html",
     status = "CREATED"
 )]
-struct UpdateMovieCollectionResponse(HtmlBase<&'static str, Error>);
+#[rustfmt::skip]
+struct UpdateMovieCollectionResponse(HtmlBase::<&'static str>);
 
-#[post("/list/movie_collection")]
-pub async fn movie_collection_update(
+#[utoipa::path(
+    post,
+    path = "/list/movie_collection",
+    responses(UpdateMovieCollectionResponse, Error)
+)]
+async fn movie_collection_update(
+    user: LoggedUser,
+    state: State<Arc<AppState>>,
     collection: Json<MovieCollectionUpdateRequest>,
-    #[filter = "LoggedUser::filter"] user: LoggedUser,
-    #[data] state: AppState,
 ) -> WarpResult<UpdateMovieCollectionResponse> {
+    let Json(collection) = collection;
     let task = user
         .store_url_task(
             state.trakt.get_client(),
@@ -736,22 +813,27 @@ pub async fn movie_collection_update(
             "/list/movie_collection",
         )
         .await;
-    collection
-        .into_inner()
-        .run_update(&state.db, &state.config)
-        .await?;
+    collection.run_update(&state.db, &state.config).await?;
     task.await.ok();
     Ok(HtmlBase::new("Success").into())
 }
 
-#[derive(RwebResponse)]
-#[response(description = "Database Entries Last Modified Time")]
-struct ListLastModifiedResponse(JsonBase<Vec<LastModifiedResponseWrapper>, Error>);
+#[derive(ToSchema, Serialize, Into, From)]
+struct LastModifiedList(Vec<LastModifiedResponseWrapper>);
 
-#[get("/list/last_modified")]
-pub async fn last_modified_route(
-    #[filter = "LoggedUser::filter"] user: LoggedUser,
-    #[data] state: AppState,
+#[derive(UtoipaResponse)]
+#[response(description = "Database Entries Last Modified Time")]
+#[rustfmt::skip]
+struct ListLastModifiedResponse(JsonBase::<LastModifiedList>);
+
+#[utoipa::path(
+    get,
+    path = "/list/last_modified",
+    responses(ListLastModifiedResponse, Error)
+)]
+async fn last_modified_route(
+    state: State<Arc<AppState>>,
+    user: LoggedUser,
 ) -> WarpResult<ListLastModifiedResponse> {
     let task = user
         .store_url_task(
@@ -760,25 +842,24 @@ pub async fn last_modified_route(
             "/list/last_modified",
         )
         .await;
-    let last_modified = LastModifiedResponse::get_last_modified(&state.db)
+    let last_modified: Vec<_> = LastModifiedResponse::get_last_modified(&state.db)
         .await
         .map_err(Into::<Error>::into)?
         .into_iter()
         .map(Into::into)
         .collect();
     task.await.ok();
-    Ok(JsonBase::new(last_modified).into())
+    Ok(JsonBase::new(last_modified.into()).into())
 }
 
-#[derive(RwebResponse)]
-#[response(description = "Frontpage", content = "html")]
-struct FrontpageResponse(HtmlBase<StackString, Error>);
+#[derive(UtoipaResponse)]
+#[response(description = "Frontpage", content = "text/html")]
+#[rustfmt::skip]
+struct FrontpageResponse(HtmlBase::<StackString>);
 
-#[get("/list/index.html")]
+#[utoipa::path(get, path = "/list/index.html", responses(FrontpageResponse, Error))]
 #[allow(clippy::unused_async)]
-pub async fn frontpage(
-    #[filter = "LoggedUser::filter"] _: LoggedUser,
-) -> WarpResult<FrontpageResponse> {
+async fn frontpage(_: LoggedUser) -> WarpResult<FrontpageResponse> {
     let body = index_body().map_err(Into::<Error>::into)?.into();
     Ok(HtmlBase::new(body).into())
 }
@@ -825,17 +906,18 @@ impl From<TvShowsResult> for ProcessShowItem {
     }
 }
 
-#[derive(RwebResponse)]
-#[response(description = "List TvShows", content = "html")]
-struct ListTvShowsResponse(HtmlBase<StackString, Error>);
+#[derive(UtoipaResponse)]
+#[response(description = "List TvShows", content = "text/html")]
+#[rustfmt::skip]
+struct ListTvShowsResponse(HtmlBase::<StackString>);
 
-#[get("/list/tvshows")]
-pub async fn tvshows(
-    #[filter = "LoggedUser::filter"] user: LoggedUser,
-    #[data] state: AppState,
+#[utoipa::path(get, path = "/list/tvshows", responses(ListTvShowsResponse, Error))]
+async fn tvshows(
+    user: LoggedUser,
+    state: State<Arc<AppState>>,
     query: Query<TraktWatchlistRequest>,
 ) -> WarpResult<ListTvShowsResponse> {
-    let query = query.into_inner();
+    let Query(query) = query;
     let task = user
         .store_url_task(state.trakt.get_client(), &state.config, "/list/tvshows")
         .await;
@@ -878,23 +960,29 @@ pub async fn tvshows(
     Ok(HtmlBase::new(body).into())
 }
 
-#[derive(RwebResponse)]
+#[derive(UtoipaResponse)]
 #[response(description = "Logged in User")]
-struct UserResponse(JsonBase<LoggedUser, Error>);
+#[rustfmt::skip]
+struct UserResponse(JsonBase::<LoggedUser>);
 
-#[get("/list/user")]
-pub async fn user(#[filter = "LoggedUser::filter"] user: LoggedUser) -> WarpResult<UserResponse> {
-    Ok(JsonBase::new(user).into())
+#[utoipa::path(get, path = "/list/user", responses(UserResponse))]
+async fn user(user: LoggedUser) -> UserResponse {
+    JsonBase::new(user).into()
 }
 
-#[derive(RwebResponse)]
-#[response(description = "Transcode Status", content = "html")]
-struct TranscodeStatusResponse(HtmlBase<StackString, Error>);
+#[derive(UtoipaResponse)]
+#[response(description = "Transcode Status", content = "text/html")]
+#[rustfmt::skip]
+struct TranscodeStatusResponse(HtmlBase::<StackString>);
 
-#[get("/list/transcode/status")]
-pub async fn movie_queue_transcode_status(
-    #[filter = "LoggedUser::filter"] user: LoggedUser,
-    #[data] state: AppState,
+#[utoipa::path(
+    get,
+    path = "/list/transcode/status",
+    responses(TranscodeStatusResponse, Error)
+)]
+async fn movie_queue_transcode_status(
+    user: LoggedUser,
+    state: State<Arc<AppState>>,
 ) -> WarpResult<TranscodeStatusResponse> {
     let url_task = user
         .store_url_task(
@@ -913,14 +1001,19 @@ pub async fn movie_queue_transcode_status(
     Ok(HtmlBase::new(body).into())
 }
 
-#[derive(RwebResponse)]
-#[response(description = "Transcode Status File List", content = "html")]
-struct TranscodeStatusFileListResponse(HtmlBase<StackString, Error>);
+#[derive(UtoipaResponse)]
+#[response(description = "Transcode Status File List", content = "text/html")]
+#[rustfmt::skip]
+struct TranscodeStatusFileListResponse(HtmlBase::<StackString>);
 
-#[get("/list/transcode/status/file_list")]
-pub async fn movie_queue_transcode_status_file_list(
-    #[filter = "LoggedUser::filter"] _: LoggedUser,
-    #[data] state: AppState,
+#[utoipa::path(
+    get,
+    path = "/list/transcode/status/file_list",
+    responses(TranscodeStatusFileListResponse, Error)
+)]
+async fn movie_queue_transcode_status_file_list(
+    _: LoggedUser,
+    state: State<Arc<AppState>>,
 ) -> WarpResult<TranscodeStatusFileListResponse> {
     let mock_stdout = MockStdout::new();
     let stdout = StdoutChannel::with_mock_stdout(mock_stdout.clone(), mock_stdout.clone());
@@ -942,14 +1035,19 @@ pub async fn movie_queue_transcode_status_file_list(
     Ok(HtmlBase::new(body).into())
 }
 
-#[derive(RwebResponse)]
-#[response(description = "Transcode Status File List", content = "html")]
-struct TranscodeStatusProcsResponse(HtmlBase<StackString, Error>);
+#[derive(UtoipaResponse)]
+#[response(description = "Transcode Status File List", content = "text/html")]
+#[rustfmt::skip]
+struct TranscodeStatusProcsResponse(HtmlBase::<StackString>);
 
-#[get("/list/transcode/status/procs")]
-pub async fn movie_queue_transcode_status_procs(
-    #[filter = "LoggedUser::filter"] _: LoggedUser,
-    #[data] state: AppState,
+#[utoipa::path(
+    get,
+    path = "/list/transcode/status/procs",
+    responses(TranscodeStatusProcsResponse, Error)
+)]
+async fn movie_queue_transcode_status_procs(
+    _: LoggedUser,
+    state: State<Arc<AppState>>,
 ) -> WarpResult<TranscodeStatusProcsResponse> {
     let status = transcode_status(&state.config)
         .await
@@ -958,16 +1056,22 @@ pub async fn movie_queue_transcode_status_procs(
     Ok(HtmlBase::new(body).into())
 }
 
-#[derive(RwebResponse)]
-#[response(description = "Transcode File", content = "html", status = "CREATED")]
-struct TranscodeFileResponse(HtmlBase<StackString, Error>);
+#[derive(UtoipaResponse)]
+#[response(description = "Transcode File", content = "text/html", status = "CREATED")]
+#[rustfmt::skip]
+struct TranscodeFileResponse(HtmlBase::<StackString>);
 
-#[post("/list/transcode/file/{filename}")]
-pub async fn movie_queue_transcode_file(
-    filename: StackString,
-    #[filter = "LoggedUser::filter"] user: LoggedUser,
-    #[data] state: AppState,
+#[utoipa::path(
+    post,
+    path = "/list/transcode/file/{filename}",
+    responses(TranscodeFileResponse, Error)
+)]
+async fn movie_queue_transcode_file(
+    state: State<Arc<AppState>>,
+    filename: Path<StackString>,
+    user: LoggedUser,
 ) -> WarpResult<TranscodeFileResponse> {
+    let Path(filename) = filename;
     let url = format_sstr!("/list/transcode/file/{filename}");
     let task = user
         .store_url_task(state.trakt.get_client(), &state.config, &url)
@@ -1001,12 +1105,17 @@ pub async fn movie_queue_transcode_file(
     Ok(HtmlBase::new(body).into())
 }
 
-#[post("/list/transcode/remcom/file/{filename}")]
-pub async fn movie_queue_remcom_file(
-    filename: StackString,
-    #[filter = "LoggedUser::filter"] user: LoggedUser,
-    #[data] state: AppState,
+#[utoipa::path(
+    post,
+    path = "/list/transcode/remcom/file/{filename}",
+    responses(TranscodeFileResponse, Error)
+)]
+async fn movie_queue_remcom_file(
+    state: State<Arc<AppState>>,
+    filename: Path<StackString>,
+    user: LoggedUser,
 ) -> WarpResult<TranscodeFileResponse> {
+    let Path(filename) = filename;
     let url = format_sstr!("/list/transcode/remcom/file/{filename}");
     let task = user
         .store_url_task(state.trakt.get_client(), &state.config, &url)
@@ -1047,13 +1156,19 @@ pub async fn movie_queue_remcom_file(
     Ok(HtmlBase::new(body).into())
 }
 
-#[post("/list/transcode/remcom/directory/{directory}/{filename}")]
-pub async fn movie_queue_remcom_directory_file(
-    directory: StackString,
-    filename: StackString,
-    #[filter = "LoggedUser::filter"] user: LoggedUser,
-    #[data] state: AppState,
+#[utoipa::path(
+    post,
+    path = "/list/transcode/remcom/directory/{directory}/{filename}",
+    responses(TranscodeFileResponse, Error)
+)]
+async fn movie_queue_remcom_directory_file(
+    state: State<Arc<AppState>>,
+    directory: Path<StackString>,
+    filename: Path<StackString>,
+    user: LoggedUser,
 ) -> WarpResult<TranscodeFileResponse> {
+    let Path(filename) = filename;
+    let Path(directory) = directory;
     let url = format_sstr!("/list/transcode/remcom/directory/{directory}/{filename}");
     let task = user
         .store_url_task(state.trakt.get_client(), &state.config, &url)
@@ -1093,16 +1208,22 @@ pub async fn movie_queue_remcom_directory_file(
     Ok(HtmlBase::new(body).into())
 }
 
-#[derive(RwebResponse)]
-#[response(description = "Cleanup Transcode File", content = "html")]
-struct CleanupTranscodeFileResponse(HtmlBase<StackString, Error>);
+#[derive(UtoipaResponse)]
+#[response(description = "Cleanup Transcode File", content = "text/html")]
+#[rustfmt::skip]
+struct CleanupTranscodeFileResponse(HtmlBase::<StackString>);
 
-#[delete("/list/transcode/cleanup/{path}")]
-pub async fn movie_queue_transcode_cleanup(
-    path: StackString,
-    #[filter = "LoggedUser::filter"] user: LoggedUser,
-    #[data] state: AppState,
+#[utoipa::path(
+    delete,
+    path = "/list/transcode/cleanup/{path}",
+    responses(CleanupTranscodeFileResponse, Error)
+)]
+async fn movie_queue_transcode_cleanup(
+    state: State<Arc<AppState>>,
+    path: Path<StackString>,
+    user: LoggedUser,
 ) -> WarpResult<CleanupTranscodeFileResponse> {
+    let Path(path) = path;
     let url = format_sstr!("/list/transcode/cleanup/{path}");
     let task = user
         .store_url_task(state.trakt.get_client(), &state.config, &url)
@@ -1135,17 +1256,22 @@ pub async fn movie_queue_transcode_cleanup(
     Ok(HtmlBase::new(body).into())
 }
 
-#[derive(RwebResponse)]
-#[response(description = "Trakt Watchlist", content = "html")]
-struct TraktWatchlistResponse(HtmlBase<StackString, Error>);
+#[derive(UtoipaResponse)]
+#[response(description = "Trakt Watchlist", content = "text/html")]
+#[rustfmt::skip]
+struct TraktWatchlistResponse(HtmlBase::<StackString>);
 
-#[get("/trakt/watchlist")]
-pub async fn trakt_watchlist(
-    #[filter = "LoggedUser::filter"] user: LoggedUser,
-    #[data] state: AppState,
+#[utoipa::path(
+    get,
+    path = "/trakt/watchlist",
+    responses(TraktWatchlistResponse, Error)
+)]
+async fn trakt_watchlist(
+    user: LoggedUser,
+    state: State<Arc<AppState>>,
     query: Query<TraktWatchlistRequest>,
 ) -> WarpResult<TraktWatchlistResponse> {
-    let query = query.into_inner();
+    let Query(query) = query;
     let task = user
         .store_url_task(state.trakt.get_client(), &state.config, "/trakt/watchlist")
         .await;
@@ -1176,7 +1302,7 @@ async fn watchlist_action_worker(
     mc: &MovieCollection,
     action: TraktActions,
     show: &str,
-) -> HttpResult<StackString> {
+) -> WarpResult<StackString> {
     trakt.init().await;
     let mut body = StackString::new();
     match action {
@@ -1195,21 +1321,28 @@ async fn watchlist_action_worker(
     Ok(body)
 }
 
-#[derive(RwebResponse)]
+#[derive(UtoipaResponse)]
 #[response(
     description = "Trakt Watchlist Action",
-    content = "html",
+    content = "text/html",
     status = "CREATED"
 )]
-struct TraktWatchlistActionResponse(HtmlBase<StackString, Error>);
+#[rustfmt::skip]
+struct TraktWatchlistActionResponse(HtmlBase::<StackString>);
 
-#[post("/trakt/watchlist/{action}/{show}")]
-pub async fn trakt_watchlist_action(
-    action: TraktActionsWrapper,
-    show: StackString,
-    #[filter = "LoggedUser::filter"] user: LoggedUser,
-    #[data] state: AppState,
+#[utoipa::path(
+    post,
+    path = "/trakt/watchlist/{action}/{show}",
+    responses(TraktWatchlistActionResponse, Error)
+)]
+async fn trakt_watchlist_action(
+    state: State<Arc<AppState>>,
+    action: Path<TraktActionsWrapper>,
+    show: Path<StackString>,
+    user: LoggedUser,
 ) -> WarpResult<TraktWatchlistActionResponse> {
+    let Path(action) = action;
+    let Path(show) = show;
     let url = format_sstr!("/trakt/watchlist/{action}/{show}");
     let task = user
         .store_url_task(state.trakt.get_client(), &state.config, &url)
@@ -1222,16 +1355,22 @@ pub async fn trakt_watchlist_action(
     Ok(HtmlBase::new(body).into())
 }
 
-#[derive(RwebResponse)]
-#[response(description = "Trakt Watchlist Show List", content = "html")]
-struct TraktWatchlistShowListResponse(HtmlBase<StackString, Error>);
+#[derive(UtoipaResponse)]
+#[response(description = "Trakt Watchlist Show List", content = "text/html")]
+#[rustfmt::skip]
+struct TraktWatchlistShowListResponse(HtmlBase::<StackString>);
 
-#[get("/trakt/watched/list/{imdb_url}")]
-pub async fn trakt_watched_seasons(
-    imdb_url: StackString,
-    #[filter = "LoggedUser::filter"] user: LoggedUser,
-    #[data] state: AppState,
+#[utoipa::path(
+    get,
+    path = "/trakt/watched/list/{imdb_url}",
+    responses(TraktWatchlistShowListResponse, Error)
+)]
+async fn trakt_watched_seasons(
+    state: State<Arc<AppState>>,
+    imdb_url: Path<StackString>,
+    user: LoggedUser,
 ) -> WarpResult<TraktWatchlistShowListResponse> {
+    let Path(imdb_url) = imdb_url;
     let url = format_sstr!("/trakt/watched/list/{imdb_url}");
     let task = user
         .store_url_task(state.trakt.get_client(), &state.config, &url)
@@ -1253,17 +1392,24 @@ pub async fn trakt_watched_seasons(
     Ok(HtmlBase::new(body).into())
 }
 
-#[derive(RwebResponse)]
-#[response(description = "Trakt Watchlist Show Season", content = "html")]
-struct TraktWatchlistShowSeasonResponse(HtmlBase<StackString, Error>);
+#[derive(UtoipaResponse)]
+#[response(description = "Trakt Watchlist Show Season", content = "text/html")]
+#[rustfmt::skip]
+struct TraktWatchlistShowSeasonResponse(HtmlBase::<StackString>);
 
-#[get("/trakt/watched/list/{imdb_url}/{season}")]
-pub async fn trakt_watched_list(
-    imdb_url: StackString,
-    season: i32,
-    #[filter = "LoggedUser::filter"] user: LoggedUser,
-    #[data] state: AppState,
+#[utoipa::path(
+    get,
+    path = "/trakt/watched/list/{imdb_url}/{season}",
+    responses(TraktWatchlistShowSeasonResponse, Error)
+)]
+async fn trakt_watched_list(
+    state: State<Arc<AppState>>,
+    imdb_url: Path<StackString>,
+    season: Path<i32>,
+    user: LoggedUser,
 ) -> WarpResult<TraktWatchlistShowSeasonResponse> {
+    let Path(imdb_url) = imdb_url;
+    let Path(season) = season;
     let url = format_sstr!("/trakt/watched/list/{imdb_url}/{season}");
     let task = user
         .store_url_task(state.trakt.get_client(), &state.config, &url)
@@ -1279,23 +1425,32 @@ pub async fn trakt_watched_list(
     Ok(HtmlBase::new(body).into())
 }
 
-#[derive(RwebResponse)]
+#[derive(UtoipaResponse)]
 #[response(
     description = "Trakt Watchlist Episode Action",
-    content = "html",
+    content = "text/html",
     status = "CREATED"
 )]
-struct TraktWatchlistEpisodeActionResponse(HtmlBase<StackString, Error>);
+#[rustfmt::skip]
+struct TraktWatchlistEpisodeActionResponse(HtmlBase::<StackString>);
 
-#[post("/trakt/watched/{action}/{imdb_url}/{season}/{episode}")]
-pub async fn trakt_watched_action(
-    action: TraktActionsWrapper,
-    imdb_url: StackString,
-    season: i32,
-    episode: i32,
-    #[filter = "LoggedUser::filter"] user: LoggedUser,
-    #[data] state: AppState,
+#[utoipa::path(
+    post,
+    path = "/trakt/watched/{action}/{imdb_url}/{season}/{episode}",
+    responses(TraktWatchlistEpisodeActionResponse, Error)
+)]
+async fn trakt_watched_action(
+    state: State<Arc<AppState>>,
+    action: Path<TraktActionsWrapper>,
+    imdb_url: Path<StackString>,
+    season: Path<i32>,
+    episode: Path<i32>,
+    user: LoggedUser,
 ) -> WarpResult<TraktWatchlistEpisodeActionResponse> {
+    let Path(action) = action;
+    let Path(imdb_url) = imdb_url;
+    let Path(season) = season;
+    let Path(episode) = episode;
     let url = format_sstr!("/trakt/watched/{action}/{imdb_url}/{season}/{episode}");
     let task = user
         .store_url_task(state.trakt.get_client(), &state.config, &url)
@@ -1318,14 +1473,15 @@ pub async fn trakt_watched_action(
     Ok(HtmlBase::new(body).into())
 }
 
-#[derive(RwebResponse)]
-#[response(description = "Trakt Calendar", content = "html")]
-struct TraktCalendarResponse(HtmlBase<StackString, Error>);
+#[derive(UtoipaResponse)]
+#[response(description = "Trakt Calendar", content = "text/html")]
+#[rustfmt::skip]
+struct TraktCalendarResponse(HtmlBase::<StackString>);
 
-#[get("/trakt/cal")]
-pub async fn trakt_cal(
-    #[filter = "LoggedUser::filter"] user: LoggedUser,
-    #[data] state: AppState,
+#[utoipa::path(get, path = "/trakt/cal", responses(TraktCalendarResponse, Error))]
+async fn trakt_cal(
+    user: LoggedUser,
+    state: State<Arc<AppState>>,
 ) -> WarpResult<TraktCalendarResponse> {
     let task = user
         .store_url_task(state.trakt.get_client(), &state.config, "/trakt/cal")
@@ -1338,14 +1494,15 @@ pub async fn trakt_cal(
     Ok(HtmlBase::new(body).into())
 }
 
-#[derive(RwebResponse)]
-#[response(description = "Trakt Auth Url", content = "html")]
-struct TraktAuthUrlResponse(HtmlBase<StackString, Error>);
+#[derive(UtoipaResponse)]
+#[response(description = "Trakt Auth Url", content = "text/html")]
+#[rustfmt::skip]
+struct TraktAuthUrlResponse(HtmlBase::<StackString>);
 
-#[get("/trakt/auth_url")]
-pub async fn trakt_auth_url(
-    #[filter = "LoggedUser::filter"] user: LoggedUser,
-    #[data] state: AppState,
+#[utoipa::path(get, path = "/trakt/auth_url", responses(TraktAuthUrlResponse, Error))]
+async fn trakt_auth_url(
+    user: LoggedUser,
+    state: State<Arc<AppState>>,
 ) -> WarpResult<TraktAuthUrlResponse> {
     let task = user
         .store_url_task(state.trakt.get_client(), &state.config, "/trakt/auth_url")
@@ -1360,30 +1517,31 @@ pub async fn trakt_auth_url(
     Ok(HtmlBase::new(url.as_str().into()).into())
 }
 
-#[derive(Serialize, Deserialize, Schema)]
-#[schema(component = "TraktCallbackRequest")]
-pub struct TraktCallbackRequest {
-    #[schema(description = "Authorization Code")]
-    pub code: StackString,
-    #[schema(description = "CSRF State")]
-    pub state: StackString,
+#[derive(Serialize, Deserialize, ToSchema)]
+// TraktCallbackRequest")]
+struct TraktCallbackRequest {
+    // Authorization Code")]
+    code: StackString,
+    // CSRF State")]
+    state: StackString,
 }
 
-#[derive(RwebResponse)]
-#[response(description = "Trakt Callback", content = "html")]
-struct TraktCallbackResponse(HtmlBase<&'static str, Error>);
+#[derive(UtoipaResponse)]
+#[response(description = "Trakt Callback", content = "text/html")]
+#[rustfmt::skip]
+struct TraktCallbackResponse(HtmlBase::<&'static str>);
 
-#[get("/trakt/callback")]
-pub async fn trakt_callback(
+#[utoipa::path(get, path = "/trakt/callback", responses(TraktCallbackResponse, Error))]
+async fn trakt_callback(
     query: Query<TraktCallbackRequest>,
-    #[filter = "LoggedUser::filter"] user: LoggedUser,
-    #[data] state: AppState,
+    user: LoggedUser,
+    state: State<Arc<AppState>>,
 ) -> WarpResult<TraktCallbackResponse> {
     let task = user
         .store_url_task(state.trakt.get_client(), &state.config, "/trakt/callback")
         .await;
     state.trakt.init().await;
-    let query = query.into_inner();
+    let Query(query) = query;
     state
         .trakt
         .exchange_code_for_auth_token(query.code.as_str(), query.state.as_str())
@@ -1397,14 +1555,19 @@ pub async fn trakt_callback(
     Ok(HtmlBase::new(body).into())
 }
 
-#[derive(RwebResponse)]
-#[response(description = "Trakt Refresh Auth", content = "html")]
-struct TraktRefreshAuthResponse(HtmlBase<&'static str, Error>);
+#[derive(UtoipaResponse)]
+#[response(description = "Trakt Refresh Auth", content = "text/html")]
+#[rustfmt::skip]
+struct TraktRefreshAuthResponse(HtmlBase::<&'static str>);
 
-#[get("/trakt/refresh_auth")]
-pub async fn refresh_auth(
-    #[filter = "LoggedUser::filter"] user: LoggedUser,
-    #[data] state: AppState,
+#[utoipa::path(
+    get,
+    path = "/trakt/refresh_auth",
+    responses(TraktRefreshAuthResponse, Error)
+)]
+async fn refresh_auth(
+    user: LoggedUser,
+    state: State<Arc<AppState>>,
 ) -> WarpResult<TraktRefreshAuthResponse> {
     let task = user
         .store_url_task(
@@ -1433,7 +1596,7 @@ async fn watched_action_http_worker(
     episode: i32,
     config: &Config,
     stdout: &StdoutChannel<StackString>,
-) -> HttpResult<StackString> {
+) -> WarpResult<StackString> {
     let mc = MovieCollection::new(config, pool, stdout);
     trakt.init().await;
     let body = match action {
@@ -1491,22 +1654,23 @@ async fn watched_action_http_worker(
     Ok(body)
 }
 
-#[derive(Debug, Serialize, Deserialize, Schema)]
-#[schema(component = "PaginatedPlexEvent")]
+#[derive(Debug, Serialize, Deserialize, ToSchema)]
+// PaginatedPlexEvent")]
 struct PaginatedPlexEvent {
     pagination: Pagination,
     data: Vec<PlexEventWrapper>,
 }
 
-#[derive(RwebResponse)]
+#[derive(UtoipaResponse)]
 #[response(description = "Plex Events")]
-struct PlexEventResponse(JsonBase<PaginatedPlexEvent, Error>);
+#[rustfmt::skip]
+struct PlexEventResponse(JsonBase::<PaginatedPlexEvent>);
 
-#[get("/list/plex_event")]
-pub async fn plex_events(
+#[utoipa::path(get, path = "/list/plex_event", responses(PlexEventResponse, Error))]
+async fn plex_events(
     query: Query<PlexEventRequest>,
-    #[data] state: AppState,
-    #[filter = "LoggedUser::filter"] user: LoggedUser,
+    state: State<Arc<AppState>>,
+    user: LoggedUser,
 ) -> WarpResult<PlexEventResponse> {
     let task = user
         .store_url_task(
@@ -1515,7 +1679,7 @@ pub async fn plex_events(
             "/list/movie_collection",
         )
         .await;
-    let query = query.into_inner();
+    let Query(query) = query;
     let start_timestamp = query.start_timestamp.map(Into::into);
     let event_type = query.event_type.map(Into::into);
 
@@ -1547,30 +1711,35 @@ pub async fn plex_events(
     Ok(JsonBase::new(PaginatedPlexEvent { pagination, data }).into())
 }
 
-#[derive(Serialize, Deserialize, Debug, Schema)]
-#[schema(component = "PlexEventUpdateRequest")]
-pub struct PlexEventUpdateRequest {
+#[derive(Serialize, Deserialize, Debug, ToSchema)]
+// PlexEventUpdateRequest")]
+struct PlexEventUpdateRequest {
     events: Vec<PlexEventWrapper>,
 }
 
-#[derive(RwebResponse)]
+#[derive(UtoipaResponse)]
 #[response(
     description = "Update Plex Events",
-    content = "html",
+    content = "text/html",
     status = "CREATED"
 )]
-struct PlexEventUpdateResponse(HtmlBase<&'static str, Error>);
+#[rustfmt::skip]
+struct PlexEventUpdateResponse(HtmlBase::<&'static str>);
 
-#[post("/list/plex_event")]
-pub async fn plex_events_update(
+#[utoipa::path(
+    post,
+    path = "/list/plex_event",
+    responses(PlexEventUpdateResponse, Error)
+)]
+async fn plex_events_update(
+    state: State<Arc<AppState>>,
+    user: LoggedUser,
     payload: Json<PlexEventUpdateRequest>,
-    #[data] state: AppState,
-    #[filter = "LoggedUser::filter"] user: LoggedUser,
 ) -> WarpResult<PlexEventUpdateResponse> {
     let task = user
         .store_url_task(state.trakt.get_client(), &state.config, "/list/plex_event")
         .await;
-    let payload = payload.into_inner();
+    let Json(payload) = payload;
     for event in payload.events {
         let event: PlexEvent = event.into();
         event
@@ -1582,16 +1751,22 @@ pub async fn plex_events_update(
     Ok(HtmlBase::new("Success").into())
 }
 
-#[derive(RwebResponse)]
-#[response(description = "Plex Webhook", content = "html", status = "CREATED")]
-struct PlexWebhookResponse(HtmlBase<&'static str, Error>);
+#[derive(UtoipaResponse)]
+#[response(description = "Plex Webhook", content = "text/html", status = "CREATED")]
+#[rustfmt::skip]
+struct PlexWebhookResponse(HtmlBase::<&'static str>);
 
-#[post("/list/plex/webhook/{webhook_key}")]
-pub async fn plex_webhook(
-    #[filter = "rweb::multipart::form"] form: FormData,
-    #[data] state: AppState,
-    webhook_key: UuidWrapper,
+#[utoipa::path(
+    post,
+    path = "/list/plex/webhook/{webhook_key}",
+    responses(PlexWebhookResponse, Error)
+)]
+async fn plex_webhook(
+    state: State<Arc<AppState>>,
+    webhook_key: Path<Uuid>,
+    form: Multipart,
 ) -> WarpResult<PlexWebhookResponse> {
+    let Path(webhook_key) = webhook_key;
     if state.config.plex_webhook_key == webhook_key {
         process_payload(form, &state.db, &state.config)
             .await
@@ -1603,13 +1778,12 @@ pub async fn plex_webhook(
 }
 
 async fn process_payload(
-    mut form: FormData,
+    mut form: Multipart,
     pool: &PgPool,
     config: &Config,
 ) -> Result<(), anyhow::Error> {
     let mut buf = Vec::new();
-    if let Some(item) = form.next().await {
-        let mut stream = item?.stream();
+    if let Some(mut stream) = form.next_field().await? {
         while let Some(chunk) = stream.next().await {
             buf.extend_from_slice(chunk?.chunk());
         }
@@ -1634,20 +1808,21 @@ async fn process_payload(
     }
 }
 
-#[derive(RwebResponse)]
-#[response(description = "Plex Event List", content = "html")]
-struct PlexEventList(HtmlBase<StackString, Error>);
+#[derive(UtoipaResponse)]
+#[response(description = "Plex Event List", content = "text/html")]
+#[rustfmt::skip]
+struct PlexEventList(HtmlBase::<StackString>);
 
-#[get("/list/plex")]
-pub async fn plex_list(
-    #[filter = "LoggedUser::filter"] user: LoggedUser,
-    #[data] state: AppState,
+#[utoipa::path(get, path = "/list/plex", responses(PlexEventList, Error))]
+async fn plex_list(
+    user: LoggedUser,
+    state: State<Arc<AppState>>,
     query: Query<PlexEventRequest>,
 ) -> WarpResult<PlexEventList> {
     let task = user
         .store_url_task(state.trakt.get_client(), &state.config, "/list/plex")
         .await;
-    let query = query.into_inner();
+    let Query(query) = query;
     let section_type = query.section_type.map(Into::into);
     let events = PlexEvent::get_plex_events(
         &state.db,
@@ -1672,18 +1847,20 @@ pub async fn plex_list(
     Ok(HtmlBase::new(body).into())
 }
 
-#[derive(RwebResponse)]
-#[response(description = "Plex Event Detail", content = "html")]
-struct PlexEventDetail(HtmlBase<StackString, Error>);
+#[derive(UtoipaResponse)]
+#[response(description = "Plex Event Detail", content = "text/html")]
+#[rustfmt::skip]
+struct PlexEventDetail(HtmlBase::<StackString>);
 
-#[get("/list/plex/{id}")]
-pub async fn plex_detail(
-    #[filter = "LoggedUser::filter"] user: LoggedUser,
-    #[data] state: AppState,
-    id: UuidWrapper,
+#[utoipa::path(get, path = "/list/plex/{id}", responses(PlexEventDetail, Error))]
+async fn plex_detail(
+    state: State<Arc<AppState>>,
     query: Query<PlexEventRequest>,
+    user: LoggedUser,
+    id: Path<Uuid>,
 ) -> WarpResult<PlexEventDetail> {
-    let query = query.into_inner();
+    let Path(id) = id;
+    let Query(query) = query;
     let url = format_sstr!("/list/plex/{id}");
     let task = user
         .store_url_task(state.trakt.get_client(), &state.config, &url)
@@ -1702,22 +1879,27 @@ pub async fn plex_detail(
     Ok(HtmlBase::new(body).into())
 }
 
-#[derive(Debug, Serialize, Deserialize, Schema)]
-#[schema(component = "PaginatedPlexFilename")]
+#[derive(Debug, Serialize, Deserialize, ToSchema)]
+// PaginatedPlexFilename")]
 struct PaginatedPlexFilename {
     pagination: Pagination,
     data: Vec<PlexFilenameWrapper>,
 }
 
-#[derive(RwebResponse)]
+#[derive(UtoipaResponse)]
 #[response(description = "Plex Filenames")]
-struct PlexFilenameResponse(JsonBase<PaginatedPlexFilename, Error>);
+#[rustfmt::skip]
+struct PlexFilenameResponse(JsonBase::<PaginatedPlexFilename>);
 
-#[get("/list/plex_filename")]
-pub async fn plex_filename(
+#[utoipa::path(
+    get,
+    path = "/list/plex_filename",
+    responses(PlexFilenameResponse, Error)
+)]
+async fn plex_filename(
     query: Query<PlexFilenameRequest>,
-    #[data] state: AppState,
-    #[filter = "LoggedUser::filter"] user: LoggedUser,
+    state: State<Arc<AppState>>,
+    user: LoggedUser,
 ) -> WarpResult<PlexFilenameResponse> {
     let task = user
         .store_url_task(
@@ -1726,7 +1908,7 @@ pub async fn plex_filename(
             "/list/plex_filename",
         )
         .await;
-    let query = query.into_inner();
+    let Query(query) = query;
     let start_timestamp = query.start_timestamp.map(Into::into);
     let total = PlexFilename::get_total(&state.db, start_timestamp)
         .await
@@ -1755,25 +1937,30 @@ pub async fn plex_filename(
     Ok(JsonBase::new(PaginatedPlexFilename { pagination, data }).into())
 }
 
-#[derive(Serialize, Deserialize, Debug, Schema)]
-#[schema(component = "PlexFilenameUpdateRequest")]
-pub struct PlexFilenameUpdateRequest {
+#[derive(Serialize, Deserialize, Debug, ToSchema)]
+// PlexFilenameUpdateRequest")]
+struct PlexFilenameUpdateRequest {
     filenames: Vec<PlexFilenameWrapper>,
 }
 
-#[derive(RwebResponse)]
+#[derive(UtoipaResponse)]
 #[response(
     description = "Update Plex Filenames",
-    content = "html",
+    content = "text/html",
     status = "CREATED"
 )]
-struct PlexFilenameUpdateResponse(HtmlBase<&'static str, Error>);
+#[rustfmt::skip]
+struct PlexFilenameUpdateResponse(HtmlBase::<&'static str>);
 
-#[post("/list/plex_filename")]
-pub async fn plex_filename_update(
+#[utoipa::path(
+    post,
+    path = "/list/plex_filename",
+    responses(PlexFilenameUpdateResponse, Error)
+)]
+async fn plex_filename_update(
+    state: State<Arc<AppState>>,
+    user: LoggedUser,
     payload: Json<PlexFilenameUpdateRequest>,
-    #[data] state: AppState,
-    #[filter = "LoggedUser::filter"] user: LoggedUser,
 ) -> WarpResult<PlexFilenameUpdateResponse> {
     let task = user
         .store_url_task(
@@ -1782,7 +1969,7 @@ pub async fn plex_filename_update(
             "/list/plex_filename",
         )
         .await;
-    let payload = payload.into_inner();
+    let Json(payload) = payload;
     for filename in payload.filenames {
         let filename: PlexFilename = filename.into();
         filename
@@ -1794,22 +1981,27 @@ pub async fn plex_filename_update(
     Ok(HtmlBase::new("Success").into())
 }
 
-#[derive(Debug, Serialize, Deserialize, Schema)]
-#[schema(component = "PaginatedPlexMetadata")]
+#[derive(Debug, Serialize, Deserialize, ToSchema)]
+// PaginatedPlexMetadata")]
 struct PaginatedPlexMetadata {
     pagination: Pagination,
     data: Vec<PlexMetadataWrapper>,
 }
 
-#[derive(RwebResponse)]
+#[derive(UtoipaResponse)]
 #[response(description = "Plex Metadata")]
-struct PlexMetadataResponse(JsonBase<PaginatedPlexMetadata, Error>);
+#[rustfmt::skip]
+struct PlexMetadataResponse(JsonBase::<PaginatedPlexMetadata>);
 
-#[get("/list/plex_metadata")]
-pub async fn plex_metadata(
+#[utoipa::path(
+    get,
+    path = "/list/plex_metadata",
+    responses(PlexMetadataResponse, Error)
+)]
+async fn plex_metadata(
     query: Query<PlexFilenameRequest>,
-    #[data] state: AppState,
-    #[filter = "LoggedUser::filter"] user: LoggedUser,
+    state: State<Arc<AppState>>,
+    user: LoggedUser,
 ) -> WarpResult<PlexMetadataResponse> {
     let task = user
         .store_url_task(
@@ -1818,7 +2010,7 @@ pub async fn plex_metadata(
             "/list/plex_metadata",
         )
         .await;
-    let query = query.into_inner();
+    let Query(query) = query;
     let start_timestamp = query.start_timestamp.map(Into::into);
     let total = PlexMetadata::get_total(&state.db, start_timestamp)
         .await
@@ -1842,25 +2034,30 @@ pub async fn plex_metadata(
     Ok(JsonBase::new(PaginatedPlexMetadata { pagination, data }).into())
 }
 
-#[derive(Serialize, Deserialize, Debug, Schema)]
-#[schema(component = "PlexMetadataUpdateRequest")]
-pub struct PlexMetadataUpdateRequest {
+#[derive(Serialize, Deserialize, Debug, ToSchema)]
+// PlexMetadataUpdateRequest")]
+struct PlexMetadataUpdateRequest {
     entries: Vec<PlexMetadataWrapper>,
 }
 
-#[derive(RwebResponse)]
+#[derive(UtoipaResponse)]
 #[response(
     description = "Update Plex Metadata",
-    content = "html",
+    content = "text/html",
     status = "CREATED"
 )]
-struct PlexMetadataUpdateResponse(HtmlBase<&'static str, Error>);
+#[rustfmt::skip]
+struct PlexMetadataUpdateResponse(HtmlBase::<&'static str>);
 
-#[post("/list/plex_metadata")]
-pub async fn plex_metadata_update(
+#[utoipa::path(
+    post,
+    path = "/list/plex_metadata",
+    responses(PlexMetadataUpdateResponse, Error)
+)]
+async fn plex_metadata_update(
+    state: State<Arc<AppState>>,
+    user: LoggedUser,
     payload: Json<PlexMetadataUpdateRequest>,
-    #[data] state: AppState,
-    #[filter = "LoggedUser::filter"] user: LoggedUser,
 ) -> WarpResult<PlexMetadataUpdateResponse> {
     let task = user
         .store_url_task(
@@ -1869,7 +2066,7 @@ pub async fn plex_metadata_update(
             "/list/plex_metadata",
         )
         .await;
-    let payload = payload.into_inner();
+    let Json(payload) = payload;
     for metadata in payload.entries {
         let metadata: PlexMetadata = metadata.into();
         metadata
@@ -1881,22 +2078,27 @@ pub async fn plex_metadata_update(
     Ok(HtmlBase::new("Success").into())
 }
 
-#[derive(Debug, Serialize, Deserialize, Schema)]
-#[schema(component = "PaginatedMusicCollection")]
+#[derive(Debug, Serialize, Deserialize, ToSchema)]
+// PaginatedMusicCollection")]
 struct PaginatedMusicCollection {
     pagination: Pagination,
     data: Vec<MusicCollectionWrapper>,
 }
 
-#[derive(RwebResponse)]
+#[derive(UtoipaResponse)]
 #[response(description = "Music Collection")]
-struct MusicCollectionResponse(JsonBase<PaginatedMusicCollection, Error>);
+#[rustfmt::skip]
+struct MusicCollectionResponse(JsonBase::<PaginatedMusicCollection>);
 
-#[get("/list/music_collection")]
-pub async fn music_collection(
+#[utoipa::path(
+    get,
+    path = "/list/music_collection",
+    responses(MusicCollectionResponse, Error)
+)]
+async fn music_collection(
     query: Query<PlexFilenameRequest>,
-    #[data] state: AppState,
-    #[filter = "LoggedUser::filter"] user: LoggedUser,
+    state: State<Arc<AppState>>,
+    user: LoggedUser,
 ) -> WarpResult<MusicCollectionResponse> {
     let task = user
         .store_url_task(
@@ -1905,7 +2107,7 @@ pub async fn music_collection(
             "/list/music_collection",
         )
         .await;
-    let query = query.into_inner();
+    let Query(query) = query;
     let start_timestamp = query.start_timestamp.map(Into::into);
     let total = MusicCollection::get_count(&state.db, start_timestamp)
         .await
@@ -1929,24 +2131,29 @@ pub async fn music_collection(
     Ok(JsonBase::new(PaginatedMusicCollection { pagination, data }).into())
 }
 
-#[derive(Serialize, Deserialize, Debug, Schema)]
-pub struct MusicCollectionUpdateRequest {
+#[derive(Serialize, Deserialize, Debug, ToSchema)]
+struct MusicCollectionUpdateRequest {
     entries: Vec<MusicCollectionWrapper>,
 }
 
-#[derive(RwebResponse)]
+#[derive(UtoipaResponse)]
 #[response(
     description = "Update Music Collection",
-    content = "html",
+    content = "text/html",
     status = "CREATED"
 )]
-struct MusicCollectionUpdateResponse(HtmlBase<&'static str, Error>);
+#[rustfmt::skip]
+struct MusicCollectionUpdateResponse(HtmlBase::<&'static str>);
 
-#[post("/list/music_collection")]
-pub async fn music_collection_update(
+#[utoipa::path(
+    post,
+    path = "/list/music_collection",
+    responses(MusicCollectionUpdateResponse, Error)
+)]
+async fn music_collection_update(
+    state: State<Arc<AppState>>,
+    user: LoggedUser,
     payload: Json<MusicCollectionUpdateRequest>,
-    #[data] state: AppState,
-    #[filter = "LoggedUser::filter"] user: LoggedUser,
 ) -> WarpResult<MusicCollectionUpdateResponse> {
     let task = user
         .store_url_task(
@@ -1955,7 +2162,7 @@ pub async fn music_collection_update(
             "/list/music_collection",
         )
         .await;
-    let payload = payload.into_inner();
+    let Json(payload) = payload;
     for entry in payload.entries {
         if MusicCollection::get_by_id(&state.db, entry.id)
             .await
@@ -1970,22 +2177,30 @@ pub async fn music_collection_update(
     Ok(HtmlBase::new("Success").into())
 }
 
-#[derive(RwebResponse)]
+#[derive(UtoipaResponse)]
 #[response(
     description = "Extract Subtitles",
-    content = "html",
+    content = "text/html",
     status = "Created"
 )]
-struct ExtractSubtitlesResponse(HtmlBase<StackString, Error>);
+#[rustfmt::skip]
+struct ExtractSubtitlesResponse(HtmlBase::<StackString>);
 
-#[post("/list/transcode/subtitle/{filename}/{index}/{suffix}")]
-pub async fn movie_queue_extract_subtitle(
-    filename: StackString,
-    index: usize,
-    suffix: StackString,
-    #[filter = "LoggedUser::filter"] user: LoggedUser,
-    #[data] state: AppState,
+#[utoipa::path(
+    post,
+    path = "/list/transcode/subtitle/{filename}/{index}/{suffix}",
+    responses(ExtractSubtitlesResponse, Error)
+)]
+async fn movie_queue_extract_subtitle(
+    state: State<Arc<AppState>>,
+    filename: Path<StackString>,
+    index: Path<usize>,
+    suffix: Path<StackString>,
+    user: LoggedUser,
 ) -> WarpResult<ExtractSubtitlesResponse> {
+    let Path(filename) = filename;
+    let Path(index) = index;
+    let Path(suffix) = suffix;
     let url = format_sstr!("/list/transcode/subtitle/{filename}/{index}/{suffix}");
     let task = user
         .store_url_task(state.trakt.get_client(), &state.config, &url)
@@ -2013,3 +2228,70 @@ pub async fn movie_queue_extract_subtitle(
 
     Ok(HtmlBase::new(output).into())
 }
+
+pub fn get_full_path(app: &AppState) -> OpenApiRouter {
+    let app = Arc::new(app.clone());
+
+    OpenApiRouter::new()
+        .routes(routes!(frontpage))
+        .routes(routes!(scripts_js))
+        .routes(routes!(find_new_episodes))
+        .routes(routes!(tvshows))
+        .routes(routes!(movie_queue_delete))
+        .routes(routes!(movie_queue_transcode_status))
+        .routes(routes!(movie_queue_transcode_status_file_list))
+        .routes(routes!(movie_queue_transcode_status_procs))
+        .routes(routes!(movie_queue_transcode_file))
+        .routes(routes!(movie_queue_remcom_file))
+        .routes(routes!(movie_queue_remcom_directory_file))
+        .routes(routes!(movie_queue_transcode))
+        .routes(routes!(movie_queue_transcode_directory))
+        .routes(routes!(movie_queue_transcode_cleanup))
+        .routes(routes!(movie_queue_play))
+        .routes(routes!(imdb_episodes_route))
+        .routes(routes!(imdb_episodes_update))
+        .routes(routes!(imdb_ratings_set_source))
+        .routes(routes!(imdb_ratings_route))
+        .routes(routes!(imdb_ratings_update))
+        .routes(routes!(movie_queue_route))
+        .routes(routes!(movie_queue_update))
+        .routes(routes!(movie_collection_route))
+        .routes(routes!(movie_collection_update))
+        .routes(routes!(imdb_show))
+        .routes(routes!(last_modified_route))
+        .routes(routes!(user))
+        .routes(routes!(movie_queue))
+        .routes(routes!(movie_queue_show))
+        .routes(routes!(plex_webhook))
+        .routes(routes!(plex_events))
+        .routes(routes!(plex_events_update))
+        .routes(routes!(plex_list))
+        .routes(routes!(plex_detail))
+        .routes(routes!(plex_filename))
+        .routes(routes!(plex_filename_update))
+        .routes(routes!(plex_metadata))
+        .routes(routes!(plex_metadata_update))
+        .routes(routes!(music_collection))
+        .routes(routes!(music_collection_update))
+        .routes(routes!(movie_queue_extract_subtitle))
+        .routes(routes!(trakt_auth_url))
+        .routes(routes!(trakt_callback))
+        .routes(routes!(refresh_auth))
+        .routes(routes!(trakt_cal))
+        .routes(routes!(trakt_watchlist))
+        .routes(routes!(trakt_watchlist_action))
+        .routes(routes!(trakt_watched_seasons))
+        .routes(routes!(trakt_watched_list))
+        .routes(routes!(trakt_watched_action))
+        .with_state(app)
+}
+
+#[derive(OpenApi)]
+#[openapi(
+    info(
+        title = "Movie Queue WebApp",
+        description = "Web Frontend for Movie Queue",
+    ),
+    components(schemas(LoggedUser, Pagination, LastModifiedResponseWrapper))
+)]
+pub struct ApiDoc;

@@ -5,14 +5,17 @@ use jwalk::WalkDir;
 use log::error;
 use postgres_query::{query, Error as PqError, FromSqlRow};
 use rand::{
-    distributions::{Distribution, Uniform},
-    thread_rng,
+    distr::{Distribution, Uniform},
+    rng as thread_rng,
 };
 use reqwest::{Client, Response, Url};
 use serde::{Deserialize, Serialize};
 use smallvec::SmallVec;
 use stack_string::{format_sstr, StackString};
-use std::path::{Path, PathBuf};
+use std::{
+    convert::TryFrom,
+    path::{Path, PathBuf},
+};
 use time::OffsetDateTime;
 use tokio::{
     process::Command,
@@ -142,7 +145,7 @@ pub trait ExponentialRetry {
 
     async fn get(&self, url: &Url) -> Result<Response, Error> {
         let mut timeout: f64 = 1.0;
-        let range = Uniform::from(0..1000);
+        let range = Uniform::try_from(0..1000)?;
         loop {
             match self.get_client().get(url.clone()).send().await {
                 Ok(resp) => return Ok(resp),

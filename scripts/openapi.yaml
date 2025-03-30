@@ -1,57 +1,17 @@
-openapi: 3.0.1
+openapi: '3.1.0'
 info:
   title: Movie Queue WebApp
   description: Web Frontend for Movie Queue
-  version: 0.10.24
+  contact:
+    name: Daniel Boline
+    email: ddboline@gmail.com
+  license:
+    name: ''
+  version: '0.11.5'
 paths:
-  /list/index.html:
-    get:
-      responses:
-        '200':
-          description: Frontpage
-          content:
-            text/html:
-              schema:
-                type: string
-        '400':
-          description: Bad Request
-        '404':
-          description: Not Found
-        '405':
-          description: Method not allowed
-        '500':
-          description: Internal Server Error
-  /list/scripts.js:
-    get:
-      responses:
-        '200':
-          description: Scripts
-          content:
-            text/javascript:
-              schema:
-                type: string
   /list/cal:
     get:
-      parameters:
-      - name: source
-        in: query
-        required: false
-        schema:
-          description: TV Show Source
-          nullable: true
-          type: string
-          enum:
-          - all
-          - amazon
-          - hulu
-          - netflix
-      - name: shows
-        in: query
-        required: false
-        schema:
-          description: TV Show
-          nullable: true
-          type: string
+      operationId: find_new_episodes
       responses:
         '200':
           description: List Calendar
@@ -61,37 +21,35 @@ paths:
                 type: string
         '400':
           description: Bad Request
-        '404':
-          description: Not Found
-        '405':
-          description: Method not allowed
-        '500':
-          description: Internal Server Error
-  /list/tvshows:
-    get:
-      responses:
-        '200':
-          description: List TvShows
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                - message
+                properties:
+                  message:
+                    $ref: '#/components/schemas/str'
+        '401':
+          description: Not Authorized
           content:
             text/html:
               schema:
                 type: string
-        '400':
-          description: Bad Request
-        '404':
-          description: Not Found
-        '405':
-          description: Method not allowed
         '500':
           description: Internal Server Error
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                - message
+                properties:
+                  message:
+                    $ref: '#/components/schemas/str'
   /list/delete/{path}:
-    get:
-      parameters:
-      - name: path
-        in: path
-        required: true
-        schema:
-          type: string
+    delete:
+      operationId: movie_queue_delete
       responses:
         '200':
           description: Delete Queue Entry
@@ -101,276 +59,163 @@ paths:
                 type: string
         '400':
           description: Bad Request
-        '404':
-          description: Not Found
-        '405':
-          description: Method not allowed
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                - message
+                properties:
+                  message:
+                    $ref: '#/components/schemas/str'
+        '401':
+          description: Not Authorized
+          content:
+            text/html:
+              schema:
+                type: string
         '500':
           description: Internal Server Error
-  /list/transcode/status:
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                - message
+                properties:
+                  message:
+                    $ref: '#/components/schemas/str'
+  /list/full_queue:
     get:
+      operationId: movie_queue
       responses:
         '200':
-          description: Transcode Status
+          description: Movie Queue
           content:
             text/html:
               schema:
                 type: string
         '400':
           description: Bad Request
-        '404':
-          description: Not Found
-        '405':
-          description: Method not allowed
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                - message
+                properties:
+                  message:
+                    $ref: '#/components/schemas/str'
+        '401':
+          description: Not Authorized
+          content:
+            text/html:
+              schema:
+                type: string
         '500':
           description: Internal Server Error
-  /list/transcode/status/file_list:
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                - message
+                properties:
+                  message:
+                    $ref: '#/components/schemas/str'
+  /list/imdb/{show}:
     get:
+      operationId: imdb_show
       responses:
         '200':
-          description: Transcode Status File List
+          description: List Imdb Show
           content:
             text/html:
               schema:
                 type: string
         '400':
           description: Bad Request
-        '404':
-          description: Not Found
-        '405':
-          description: Method not allowed
-        '500':
-          description: Internal Server Error
-  /list/transcode/status/procs:
-    get:
-      responses:
-        '200':
-          description: Transcode Status File List
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                - message
+                properties:
+                  message:
+                    $ref: '#/components/schemas/str'
+        '401':
+          description: Not Authorized
           content:
             text/html:
               schema:
                 type: string
-        '400':
-          description: Bad Request
-        '404':
-          description: Not Found
-        '405':
-          description: Method not allowed
         '500':
           description: Internal Server Error
-  /list/transcode/file/{filename}:
-    get:
-      parameters:
-      - name: filename
-        in: path
-        required: true
-        schema:
-          type: string
-      responses:
-        '200':
-          description: Transcode File
           content:
-            text/html:
+            application/json:
               schema:
-                type: string
-        '400':
-          description: Bad Request
-        '404':
-          description: Not Found
-        '405':
-          description: Method not allowed
-        '500':
-          description: Internal Server Error
-  /list/transcode/remcom/file/{filename}:
-    get:
-      parameters:
-      - name: filename
-        in: path
-        required: true
-        schema:
-          type: string
-      responses:
-        '200':
-          description: Transcode File
-          content:
-            text/html:
-              schema:
-                type: string
-        '400':
-          description: Bad Request
-        '404':
-          description: Not Found
-        '405':
-          description: Method not allowed
-        '500':
-          description: Internal Server Error
-  /list/transcode/remcom/directory/{directory}/{filename}:
-    get:
-      parameters:
-      - name: directory
-        in: path
-        required: true
-        schema:
-          type: string
-      - name: filename
-        in: path
-        required: true
-        schema:
-          type: string
-      responses:
-        '200':
-          description: Transcode File
-          content:
-            text/html:
-              schema:
-                type: string
-        '400':
-          description: Bad Request
-        '404':
-          description: Not Found
-        '405':
-          description: Method not allowed
-        '500':
-          description: Internal Server Error
-  /list/transcode/queue/{path}:
-    get:
-      parameters:
-      - name: path
-        in: path
-        required: true
-        schema:
-          type: string
-      responses:
-        '200':
-          description: Transcode Queue Item
-          content:
-            text/html:
-              schema:
-                type: string
-        '400':
-          description: Bad Request
-        '404':
-          description: Not Found
-        '405':
-          description: Method not allowed
-        '500':
-          description: Internal Server Error
-  /list/transcode/queue/{directory}/{file}:
-    get:
-      parameters:
-      - name: directory
-        in: path
-        required: true
-        schema:
-          type: string
-      - name: file
-        in: path
-        required: true
-        schema:
-          type: string
-      responses:
-        '200':
-          description: Transcode Queue Item
-          content:
-            text/html:
-              schema:
-                type: string
-        '400':
-          description: Bad Request
-        '404':
-          description: Not Found
-        '405':
-          description: Method not allowed
-        '500':
-          description: Internal Server Error
-  /list/transcode/cleanup/{path}:
-    get:
-      parameters:
-      - name: path
-        in: path
-        required: true
-        schema:
-          type: string
-      responses:
-        '200':
-          description: Cleanup Transcode File
-          content:
-            text/html:
-              schema:
-                type: string
-        '400':
-          description: Bad Request
-        '404':
-          description: Not Found
-        '405':
-          description: Method not allowed
-        '500':
-          description: Internal Server Error
-  /list/play/{idx}:
-    get:
-      parameters:
-      - name: idx
-        in: path
-        required: true
-        schema:
-          format: uuid
-          example: 334518f4-1bfd-4f20-9978-bfad0dc033e1
-          type: string
-      responses:
-        '200':
-          description: Play Queue Item
-          content:
-            text/html:
-              schema:
-                type: string
-        '400':
-          description: Bad Request
-        '404':
-          description: Not Found
-        '405':
-          description: Method not allowed
-        '500':
-          description: Internal Server Error
+                type: object
+                required:
+                - message
+                properties:
+                  message:
+                    $ref: '#/components/schemas/str'
   /list/imdb_episodes:
     get:
-      parameters:
-      - name: start_timestamp
-        in: query
-        required: true
-        schema:
-          description: Start Timestamp
-          format: date-time
-          type: string
+      operationId: imdb_episodes_route
       responses:
         '200':
           description: List Imdb Episodes
           content:
-            application/json:
+            text/html:
               schema:
-                items:
-                  $ref: '#/components/schemas/ImdbEpisodes'
-                type: array
+                type: object
+                required:
+                - pagination
+                - data
+                properties:
+                  data:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/ImdbEpisodes'
+                  pagination:
+                    $ref: '#/components/schemas/Pagination'
         '400':
           description: Bad Request
-        '404':
-          description: Not Found
-        '405':
-          description: Method not allowed
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                - message
+                properties:
+                  message:
+                    $ref: '#/components/schemas/str'
+        '401':
+          description: Not Authorized
+          content:
+            text/html:
+              schema:
+                type: string
         '500':
           description: Internal Server Error
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                - message
+                properties:
+                  message:
+                    $ref: '#/components/schemas/str'
     post:
+      operationId: imdb_episodes_update
       requestBody:
         content:
           application/json:
             schema:
-              properties:
-                episodes:
-                  items:
-                    $ref: '#/components/schemas/ImdbEpisodes'
-                  type: array
-              type: object
-              required:
-              - episodes
+              $ref: '#/components/schemas/ImdbEpisodesUpdateRequest'
         required: true
       responses:
         '201':
@@ -381,87 +226,87 @@ paths:
                 type: string
         '400':
           description: Bad Request
-        '404':
-          description: Not Found
-        '405':
-          description: Method not allowed
-        '500':
-          description: Internal Server Error
-  /list/imdb_ratings/set_source:
-    get:
-      parameters:
-      - name: link
-        in: query
-        required: true
-        schema:
-          description: IMDB ID
-          type: string
-      - name: source
-        in: query
-        required: true
-        schema:
-          description: TV Show Source
-          type: string
-          enum:
-          - all
-          - amazon
-          - hulu
-          - netflix
-      responses:
-        '200':
-          description: Imdb Show Set Source
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                - message
+                properties:
+                  message:
+                    $ref: '#/components/schemas/str'
+        '401':
+          description: Not Authorized
           content:
             text/html:
               schema:
                 type: string
-        '400':
-          description: Bad Request
-        '404':
-          description: Not Found
-        '405':
-          description: Method not allowed
         '500':
           description: Internal Server Error
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                - message
+                properties:
+                  message:
+                    $ref: '#/components/schemas/str'
   /list/imdb_ratings:
     get:
-      parameters:
-      - name: start_timestamp
-        in: query
-        required: true
-        schema:
-          description: Start Timestamp
-          format: date-time
-          type: string
+      operationId: imdb_ratings_route
       responses:
         '200':
           description: List Imdb Shows
           content:
-            application/json:
+            text/html:
               schema:
-                items:
-                  $ref: '#/components/schemas/ImdbRatings'
-                type: array
+                type: object
+                required:
+                - pagination
+                - data
+                properties:
+                  data:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/ImdbRatings'
+                  pagination:
+                    $ref: '#/components/schemas/Pagination'
         '400':
           description: Bad Request
-        '404':
-          description: Not Found
-        '405':
-          description: Method not allowed
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                - message
+                properties:
+                  message:
+                    $ref: '#/components/schemas/str'
+        '401':
+          description: Not Authorized
+          content:
+            text/html:
+              schema:
+                type: string
         '500':
           description: Internal Server Error
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                - message
+                properties:
+                  message:
+                    $ref: '#/components/schemas/str'
     post:
+      operationId: imdb_ratings_update
       requestBody:
         content:
           application/json:
             schema:
-              properties:
-                shows:
-                  items:
-                    $ref: '#/components/schemas/ImdbRatings'
-                  type: array
-              type: object
-              required:
-              - shows
+              $ref: '#/components/schemas/ImdbRatingsUpdateRequest'
         required: true
       responses:
         '201':
@@ -472,108 +317,203 @@ paths:
                 type: string
         '400':
           description: Bad Request
-        '404':
-          description: Not Found
-        '405':
-          description: Method not allowed
-        '500':
-          description: Internal Server Error
-  /list/movie_queue:
-    get:
-      parameters:
-      - name: start_timestamp
-        in: query
-        required: true
-        schema:
-          description: Start Timestamp
-          format: date-time
-          type: string
-      responses:
-        '200':
-          description: List Movie Queue Entries
           content:
             application/json:
               schema:
-                items:
-                  $ref: '#/components/schemas/MovieQueueRow'
-                type: array
-        '400':
-          description: Bad Request
-        '404':
-          description: Not Found
-        '405':
-          description: Method not allowed
+                type: object
+                required:
+                - message
+                properties:
+                  message:
+                    $ref: '#/components/schemas/str'
+        '401':
+          description: Not Authorized
+          content:
+            text/html:
+              schema:
+                type: string
         '500':
           description: Internal Server Error
-    post:
-      requestBody:
-        content:
-          application/json:
-            schema:
-              properties:
-                queue:
-                  items:
-                    $ref: '#/components/schemas/MovieQueueRow'
-                  type: array
-              type: object
-              required:
-              - queue
-        required: true
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                - message
+                properties:
+                  message:
+                    $ref: '#/components/schemas/str'
+  /list/imdb_ratings/set_source:
+    get:
+      operationId: imdb_ratings_set_source
       responses:
-        '201':
-          description: Update Movie Queue Entries
+        '200':
+          description: Imdb Show Set Source
           content:
             text/html:
               schema:
                 type: string
         '400':
           description: Bad Request
-        '404':
-          description: Not Found
-        '405':
-          description: Method not allowed
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                - message
+                properties:
+                  message:
+                    $ref: '#/components/schemas/str'
+        '401':
+          description: Not Authorized
+          content:
+            text/html:
+              schema:
+                type: string
         '500':
           description: Internal Server Error
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                - message
+                properties:
+                  message:
+                    $ref: '#/components/schemas/str'
+  /list/index.html:
+    get:
+      operationId: frontpage
+      responses:
+        '200':
+          description: Frontpage
+          content:
+            text/html:
+              schema:
+                type: string
+        '400':
+          description: Bad Request
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                - message
+                properties:
+                  message:
+                    $ref: '#/components/schemas/str'
+        '401':
+          description: Not Authorized
+          content:
+            text/html:
+              schema:
+                type: string
+        '500':
+          description: Internal Server Error
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                - message
+                properties:
+                  message:
+                    $ref: '#/components/schemas/str'
+  /list/last_modified:
+    get:
+      operationId: last_modified_route
+      responses:
+        '200':
+          description: Database Entries Last Modified Time
+          content:
+            text/html:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/LastModifiedResponse'
+        '400':
+          description: Bad Request
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                - message
+                properties:
+                  message:
+                    $ref: '#/components/schemas/str'
+        '401':
+          description: Not Authorized
+          content:
+            text/html:
+              schema:
+                type: string
+        '500':
+          description: Internal Server Error
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                - message
+                properties:
+                  message:
+                    $ref: '#/components/schemas/str'
   /list/movie_collection:
     get:
-      parameters:
-      - name: start_timestamp
-        in: query
-        required: true
-        schema:
-          description: Start Timestamp
-          format: date-time
-          type: string
+      operationId: movie_collection_route
       responses:
         '200':
           description: List Movie Collection Entries
           content:
-            application/json:
+            text/html:
               schema:
-                items:
-                  $ref: '#/components/schemas/MovieCollectionRow'
-                type: array
+                type: object
+                required:
+                - pagination
+                - data
+                properties:
+                  data:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/MovieCollectionRow'
+                  pagination:
+                    $ref: '#/components/schemas/Pagination'
         '400':
           description: Bad Request
-        '404':
-          description: Not Found
-        '405':
-          description: Method not allowed
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                - message
+                properties:
+                  message:
+                    $ref: '#/components/schemas/str'
+        '401':
+          description: Not Authorized
+          content:
+            text/html:
+              schema:
+                type: string
         '500':
           description: Internal Server Error
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                - message
+                properties:
+                  message:
+                    $ref: '#/components/schemas/str'
     post:
+      operationId: movie_collection_update
       requestBody:
         content:
           application/json:
             schema:
-              properties:
-                collection:
-                  items:
-                    $ref: '#/components/schemas/MovieCollectionRow'
-                  type: array
-              type: object
-              required:
-              - collection
+              $ref: '#/components/schemas/MovieCollectionUpdateRequest'
         required: true
       responses:
         '201':
@@ -584,197 +524,307 @@ paths:
                 type: string
         '400':
           description: Bad Request
-        '404':
-          description: Not Found
-        '405':
-          description: Method not allowed
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                - message
+                properties:
+                  message:
+                    $ref: '#/components/schemas/str'
+        '401':
+          description: Not Authorized
+          content:
+            text/html:
+              schema:
+                type: string
         '500':
           description: Internal Server Error
-  /list/imdb/{show}:
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                - message
+                properties:
+                  message:
+                    $ref: '#/components/schemas/str'
+  /list/movie_queue:
     get:
+      operationId: movie_queue_route
+      responses:
+        '200':
+          description: List Movie Queue Entries
+          content:
+            text/html:
+              schema:
+                type: object
+                required:
+                - pagination
+                - data
+                properties:
+                  data:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/MovieQueueRow'
+                  pagination:
+                    $ref: '#/components/schemas/Pagination'
+        '400':
+          description: Bad Request
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                - message
+                properties:
+                  message:
+                    $ref: '#/components/schemas/str'
+        '401':
+          description: Not Authorized
+          content:
+            text/html:
+              schema:
+                type: string
+        '500':
+          description: Internal Server Error
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                - message
+                properties:
+                  message:
+                    $ref: '#/components/schemas/str'
+    post:
+      operationId: movie_queue_update
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/MovieQueueUpdateRequest'
+        required: true
+      responses:
+        '201':
+          description: Update Movie Queue Entries
+          content:
+            text/html:
+              schema:
+                type: string
+        '400':
+          description: Bad Request
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                - message
+                properties:
+                  message:
+                    $ref: '#/components/schemas/str'
+        '401':
+          description: Not Authorized
+          content:
+            text/html:
+              schema:
+                type: string
+        '500':
+          description: Internal Server Error
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                - message
+                properties:
+                  message:
+                    $ref: '#/components/schemas/str'
+  /list/music_collection:
+    get:
+      operationId: music_collection
+      responses:
+        '200':
+          description: Music Collection
+          content:
+            text/html:
+              schema:
+                type: object
+                required:
+                - pagination
+                - data
+                properties:
+                  data:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/MusicCollection'
+                  pagination:
+                    $ref: '#/components/schemas/Pagination'
+        '400':
+          description: Bad Request
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                - message
+                properties:
+                  message:
+                    $ref: '#/components/schemas/str'
+        '401':
+          description: Not Authorized
+          content:
+            text/html:
+              schema:
+                type: string
+        '500':
+          description: Internal Server Error
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                - message
+                properties:
+                  message:
+                    $ref: '#/components/schemas/str'
+    post:
+      operationId: music_collection_update
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/MusicCollectionUpdateRequest'
+        required: true
+      responses:
+        '201':
+          description: Update Music Collection
+          content:
+            text/html:
+              schema:
+                type: string
+        '400':
+          description: Bad Request
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                - message
+                properties:
+                  message:
+                    $ref: '#/components/schemas/str'
+        '401':
+          description: Not Authorized
+          content:
+            text/html:
+              schema:
+                type: string
+        '500':
+          description: Internal Server Error
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                - message
+                properties:
+                  message:
+                    $ref: '#/components/schemas/str'
+  /list/play/{idx}:
+    get:
+      operationId: movie_queue_play
       parameters:
-      - name: show
+      - name: idx
         in: path
         required: true
         schema:
           type: string
-      - name: all
-        in: query
-        required: false
-        schema:
-          description: All Entries Flag
-          nullable: true
-          type: boolean
-      - name: database
-        in: query
-        required: false
-        schema:
-          description: Database Flag
-          nullable: true
-          type: boolean
-      - name: tv
-        in: query
-        required: false
-        schema:
-          description: IsTv Flag
-          nullable: true
-          type: boolean
-      - name: update
-        in: query
-        required: false
-        schema:
-          description: Update Flag
-          nullable: true
-          type: boolean
-      - name: link
-        in: query
-        required: false
-        schema:
-          description: IMDB ID
-          nullable: true
-          type: string
-      - name: season
-        in: query
-        required: false
-        schema:
-          description: Season
-          nullable: true
-          type: integer
+          format: uuid
       responses:
         '200':
-          description: List Imdb Show
+          description: Play Queue Item
           content:
             text/html:
               schema:
                 type: string
         '400':
           description: Bad Request
-        '404':
-          description: Not Found
-        '405':
-          description: Method not allowed
-        '500':
-          description: Internal Server Error
-  /list/last_modified:
-    get:
-      responses:
-        '200':
-          description: Database Entries Last Modified Time
           content:
             application/json:
               schema:
-                items:
-                  $ref: '#/components/schemas/LastModifiedResponse'
-                type: array
-        '400':
-          description: Bad Request
-        '404':
-          description: Not Found
-        '405':
-          description: Method not allowed
+                type: object
+                required:
+                - message
+                properties:
+                  message:
+                    $ref: '#/components/schemas/str'
+        '401':
+          description: Not Authorized
+          content:
+            text/html:
+              schema:
+                type: string
         '500':
           description: Internal Server Error
-  /list/user:
-    get:
-      responses:
-        '200':
-          description: Logged in User
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/LoggedUser'
-        '400':
-          description: Bad Request
-        '404':
-          description: Not Found
-        '405':
-          description: Method not allowed
-        '500':
-          description: Internal Server Error
-  /list/full_queue:
+                type: object
+                required:
+                - message
+                properties:
+                  message:
+                    $ref: '#/components/schemas/str'
+  /list/plex:
     get:
-      parameters:
-      - name: q
-        in: query
-        required: false
-        schema:
-          description: Search String
-          nullable: true
-          type: string
-      - name: offset
-        in: query
-        required: false
-        schema:
-          description: Offset
-          nullable: true
-          type: integer
-          minimum: 0
-      - name: limit
-        in: query
-        required: false
-        schema:
-          description: Limit
-          nullable: true
-          type: integer
-          minimum: 0
-      - name: order_by
-        in: query
-        required: false
-        schema:
-          description: Order By (asc/desc)
-          nullable: true
-          type: string
-          enum:
-          - asc
-          - desc
+      operationId: plex_list
       responses:
         '200':
-          description: Movie Queue
+          description: Plex Event List
           content:
             text/html:
               schema:
                 type: string
         '400':
           description: Bad Request
-        '404':
-          description: Not Found
-        '405':
-          description: Method not allowed
-        '500':
-          description: Internal Server Error
-  /list/queue/{path}:
-    get:
-      parameters:
-      - name: path
-        in: path
-        required: true
-        schema:
-          type: string
-      responses:
-        '200':
-          description: Movie Queue
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                - message
+                properties:
+                  message:
+                    $ref: '#/components/schemas/str'
+        '401':
+          description: Not Authorized
           content:
             text/html:
               schema:
                 type: string
-        '400':
-          description: Bad Request
-        '404':
-          description: Not Found
-        '405':
-          description: Method not allowed
         '500':
           description: Internal Server Error
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                - message
+                properties:
+                  message:
+                    $ref: '#/components/schemas/str'
   /list/plex/webhook/{webhook_key}:
     post:
+      operationId: plex_webhook
       parameters:
       - name: webhook_key
         in: path
         required: true
         schema:
-          format: uuid
-          example: 334518f4-1bfd-4f20-9978-bfad0dc033e1
           type: string
+          format: uuid
       responses:
         '201':
           description: Plex Webhook
@@ -784,88 +834,127 @@ paths:
                 type: string
         '400':
           description: Bad Request
-        '404':
-          description: Not Found
-        '405':
-          description: Method not allowed
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                - message
+                properties:
+                  message:
+                    $ref: '#/components/schemas/str'
+        '401':
+          description: Not Authorized
+          content:
+            text/html:
+              schema:
+                type: string
         '500':
           description: Internal Server Error
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                - message
+                properties:
+                  message:
+                    $ref: '#/components/schemas/str'
+  /list/plex/{id}:
+    get:
+      operationId: plex_detail
+      parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+      responses:
+        '200':
+          description: Plex Event Detail
+          content:
+            text/html:
+              schema:
+                type: string
+        '400':
+          description: Bad Request
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                - message
+                properties:
+                  message:
+                    $ref: '#/components/schemas/str'
+        '401':
+          description: Not Authorized
+          content:
+            text/html:
+              schema:
+                type: string
+        '500':
+          description: Internal Server Error
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                - message
+                properties:
+                  message:
+                    $ref: '#/components/schemas/str'
   /list/plex_event:
     get:
-      parameters:
-      - name: start_timestamp
-        in: query
-        required: false
-        schema:
-          description: Start Timestamp
-          format: date-time
-          nullable: true
-          type: string
-      - name: event_type
-        in: query
-        required: false
-        schema:
-          description: Event Type
-          nullable: true
-          type: string
-          enum:
-          - library-on-deck
-          - library-new
-          - media-pause
-          - media-play
-          - media-rate
-          - media-resume
-          - media-scrobble
-          - media-stop
-          - admin-database-backup
-          - admin-database-corrupted
-          - device-new
-          - playback-started
-      - name: section_type
-        in: query
-        required: false
-        schema:
-          description: Section Type
-          nullable: true
-          type: string
-          enum:
-          - artist
-          - movie
-          - show
-      - name: offset
-        in: query
-        required: false
-        schema:
-          description: Offset
-          nullable: true
-          type: integer
-          minimum: 0
-      - name: limit
-        in: query
-        required: false
-        schema:
-          description: Limit
-          nullable: true
-          type: integer
-          minimum: 0
+      operationId: plex_events
       responses:
         '200':
           description: Plex Events
           content:
-            application/json:
+            text/html:
               schema:
-                items:
-                  $ref: '#/components/schemas/PlexEvent'
-                type: array
+                type: object
+                required:
+                - pagination
+                - data
+                properties:
+                  data:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/PlexEvent'
+                  pagination:
+                    $ref: '#/components/schemas/Pagination'
         '400':
           description: Bad Request
-        '404':
-          description: Not Found
-        '405':
-          description: Method not allowed
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                - message
+                properties:
+                  message:
+                    $ref: '#/components/schemas/str'
+        '401':
+          description: Not Authorized
+          content:
+            text/html:
+              schema:
+                type: string
         '500':
           description: Internal Server Error
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                - message
+                properties:
+                  message:
+                    $ref: '#/components/schemas/str'
     post:
+      operationId: plex_events_update
       requestBody:
         content:
           application/json:
@@ -881,210 +970,82 @@ paths:
                 type: string
         '400':
           description: Bad Request
-        '404':
-          description: Not Found
-        '405':
-          description: Method not allowed
-        '500':
-          description: Internal Server Error
-  /list/plex:
-    get:
-      parameters:
-      - name: start_timestamp
-        in: query
-        required: false
-        schema:
-          description: Start Timestamp
-          format: date-time
-          nullable: true
-          type: string
-      - name: event_type
-        in: query
-        required: false
-        schema:
-          description: Event Type
-          nullable: true
-          type: string
-          enum:
-          - library-on-deck
-          - library-new
-          - media-pause
-          - media-play
-          - media-rate
-          - media-resume
-          - media-scrobble
-          - media-stop
-          - admin-database-backup
-          - admin-database-corrupted
-          - device-new
-          - playback-started
-      - name: section_type
-        in: query
-        required: false
-        schema:
-          description: Section Type
-          nullable: true
-          type: string
-          enum:
-          - artist
-          - movie
-          - show
-      - name: offset
-        in: query
-        required: false
-        schema:
-          description: Offset
-          nullable: true
-          type: integer
-          minimum: 0
-      - name: limit
-        in: query
-        required: false
-        schema:
-          description: Limit
-          nullable: true
-          type: integer
-          minimum: 0
-      responses:
-        '200':
-          description: Plex Event List
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                - message
+                properties:
+                  message:
+                    $ref: '#/components/schemas/str'
+        '401':
+          description: Not Authorized
           content:
             text/html:
               schema:
                 type: string
-        '400':
-          description: Bad Request
-        '404':
-          description: Not Found
-        '405':
-          description: Method not allowed
         '500':
           description: Internal Server Error
-  /list/plex/{id}:
-    get:
-      parameters:
-      - name: id
-        in: path
-        required: true
-        schema:
-          format: uuid
-          example: 334518f4-1bfd-4f20-9978-bfad0dc033e1
-          type: string
-      - name: start_timestamp
-        in: query
-        required: false
-        schema:
-          description: Start Timestamp
-          format: date-time
-          nullable: true
-          type: string
-      - name: event_type
-        in: query
-        required: false
-        schema:
-          description: Event Type
-          nullable: true
-          type: string
-          enum:
-          - library-on-deck
-          - library-new
-          - media-pause
-          - media-play
-          - media-rate
-          - media-resume
-          - media-scrobble
-          - media-stop
-          - admin-database-backup
-          - admin-database-corrupted
-          - device-new
-          - playback-started
-      - name: section_type
-        in: query
-        required: false
-        schema:
-          description: Section Type
-          nullable: true
-          type: string
-          enum:
-          - artist
-          - movie
-          - show
-      - name: offset
-        in: query
-        required: false
-        schema:
-          description: Offset
-          nullable: true
-          type: integer
-          minimum: 0
-      - name: limit
-        in: query
-        required: false
-        schema:
-          description: Limit
-          nullable: true
-          type: integer
-          minimum: 0
-      responses:
-        '200':
-          description: Plex Event Detail
           content:
-            text/html:
+            application/json:
               schema:
-                type: string
-        '400':
-          description: Bad Request
-        '404':
-          description: Not Found
-        '405':
-          description: Method not allowed
-        '500':
-          description: Internal Server Error
+                type: object
+                required:
+                - message
+                properties:
+                  message:
+                    $ref: '#/components/schemas/str'
   /list/plex_filename:
     get:
-      parameters:
-      - name: start_timestamp
-        in: query
-        required: false
-        schema:
-          description: Start Timestamp
-          format: date-time
-          nullable: true
-          type: string
-      - name: offset
-        in: query
-        required: false
-        schema:
-          description: Offset
-          nullable: true
-          type: integer
-          minimum: 0
-      - name: limit
-        in: query
-        required: false
-        schema:
-          description: Limit
-          nullable: true
-          type: integer
-          minimum: 0
+      operationId: plex_filename
       responses:
         '200':
           description: Plex Filenames
           content:
-            application/json:
+            text/html:
               schema:
-                items:
-                  $ref: '#/components/schemas/PlexFilename'
-                type: array
+                type: object
+                required:
+                - pagination
+                - data
+                properties:
+                  data:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/PlexFilename'
+                  pagination:
+                    $ref: '#/components/schemas/Pagination'
         '400':
           description: Bad Request
-        '404':
-          description: Not Found
-        '405':
-          description: Method not allowed
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                - message
+                properties:
+                  message:
+                    $ref: '#/components/schemas/str'
+        '401':
+          description: Not Authorized
+          content:
+            text/html:
+              schema:
+                type: string
         '500':
           description: Internal Server Error
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                - message
+                properties:
+                  message:
+                    $ref: '#/components/schemas/str'
     post:
+      operationId: plex_filename_update
       requestBody:
         content:
           application/json:
@@ -1100,57 +1061,82 @@ paths:
                 type: string
         '400':
           description: Bad Request
-        '404':
-          description: Not Found
-        '405':
-          description: Method not allowed
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                - message
+                properties:
+                  message:
+                    $ref: '#/components/schemas/str'
+        '401':
+          description: Not Authorized
+          content:
+            text/html:
+              schema:
+                type: string
         '500':
           description: Internal Server Error
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                - message
+                properties:
+                  message:
+                    $ref: '#/components/schemas/str'
   /list/plex_metadata:
     get:
-      parameters:
-      - name: start_timestamp
-        in: query
-        required: false
-        schema:
-          description: Start Timestamp
-          format: date-time
-          nullable: true
-          type: string
-      - name: offset
-        in: query
-        required: false
-        schema:
-          description: Offset
-          nullable: true
-          type: integer
-          minimum: 0
-      - name: limit
-        in: query
-        required: false
-        schema:
-          description: Limit
-          nullable: true
-          type: integer
-          minimum: 0
+      operationId: plex_metadata
       responses:
         '200':
           description: Plex Metadata
           content:
-            application/json:
+            text/html:
               schema:
-                items:
-                  $ref: '#/components/schemas/PlexMetadata'
-                type: array
+                type: object
+                required:
+                - pagination
+                - data
+                properties:
+                  data:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/PlexMetadata'
+                  pagination:
+                    $ref: '#/components/schemas/Pagination'
         '400':
           description: Bad Request
-        '404':
-          description: Not Found
-        '405':
-          description: Method not allowed
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                - message
+                properties:
+                  message:
+                    $ref: '#/components/schemas/str'
+        '401':
+          description: Not Authorized
+          content:
+            text/html:
+              schema:
+                type: string
         '500':
           description: Internal Server Error
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                - message
+                properties:
+                  message:
+                    $ref: '#/components/schemas/str'
     post:
+      operationId: plex_metadata_update
       requestBody:
         content:
           application/json:
@@ -1166,87 +1152,534 @@ paths:
                 type: string
         '400':
           description: Bad Request
-        '404':
-          description: Not Found
-        '405':
-          description: Method not allowed
-        '500':
-          description: Internal Server Error
-  /list/music_collection:
-    get:
-      parameters:
-      - name: start_timestamp
-        in: query
-        required: false
-        schema:
-          description: Start Timestamp
-          format: date-time
-          nullable: true
-          type: string
-      - name: offset
-        in: query
-        required: false
-        schema:
-          description: Offset
-          nullable: true
-          type: integer
-          minimum: 0
-      - name: limit
-        in: query
-        required: false
-        schema:
-          description: Limit
-          nullable: true
-          type: integer
-          minimum: 0
-      responses:
-        '200':
-          description: Music Collection
           content:
             application/json:
               schema:
-                items:
-                  $ref: '#/components/schemas/MusicCollection'
-                type: array
-        '400':
-          description: Bad Request
-        '404':
-          description: Not Found
-        '405':
-          description: Method not allowed
+                type: object
+                required:
+                - message
+                properties:
+                  message:
+                    $ref: '#/components/schemas/str'
+        '401':
+          description: Not Authorized
+          content:
+            text/html:
+              schema:
+                type: string
         '500':
           description: Internal Server Error
-    post:
-      requestBody:
-        content:
-          application/json:
-            schema:
-              properties:
-                entries:
-                  items:
-                    $ref: '#/components/schemas/MusicCollection'
-                  type: array
-              type: object
-              required:
-              - entries
-        required: true
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                - message
+                properties:
+                  message:
+                    $ref: '#/components/schemas/str'
+  /list/queue/{path}:
+    get:
+      operationId: movie_queue_show
       responses:
-        '201':
-          description: Update Music Collection
+        '200':
+          description: Movie Queue
           content:
             text/html:
               schema:
                 type: string
         '400':
           description: Bad Request
-        '404':
-          description: Not Found
-        '405':
-          description: Method not allowed
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                - message
+                properties:
+                  message:
+                    $ref: '#/components/schemas/str'
+        '401':
+          description: Not Authorized
+          content:
+            text/html:
+              schema:
+                type: string
         '500':
           description: Internal Server Error
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                - message
+                properties:
+                  message:
+                    $ref: '#/components/schemas/str'
+  /list/scripts.js:
+    get:
+      operationId: scripts_js
+      responses:
+        '200':
+          description: Scripts
+          content:
+            text/javascript:
+              schema:
+                type: string
+  /list/transcode/cleanup/{path}:
+    delete:
+      operationId: movie_queue_transcode_cleanup
+      responses:
+        '200':
+          description: Cleanup Transcode File
+          content:
+            text/html:
+              schema:
+                type: string
+        '400':
+          description: Bad Request
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                - message
+                properties:
+                  message:
+                    $ref: '#/components/schemas/str'
+        '401':
+          description: Not Authorized
+          content:
+            text/html:
+              schema:
+                type: string
+        '500':
+          description: Internal Server Error
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                - message
+                properties:
+                  message:
+                    $ref: '#/components/schemas/str'
+  /list/transcode/file/{filename}:
+    post:
+      operationId: movie_queue_transcode_file
+      responses:
+        '201':
+          description: Transcode File
+          content:
+            text/html:
+              schema:
+                type: string
+        '400':
+          description: Bad Request
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                - message
+                properties:
+                  message:
+                    $ref: '#/components/schemas/str'
+        '401':
+          description: Not Authorized
+          content:
+            text/html:
+              schema:
+                type: string
+        '500':
+          description: Internal Server Error
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                - message
+                properties:
+                  message:
+                    $ref: '#/components/schemas/str'
+  /list/transcode/queue/{directory}/{file}:
+    post:
+      operationId: movie_queue_transcode_directory
+      responses:
+        '201':
+          description: Transcode Queue Item
+          content:
+            text/html:
+              schema:
+                type: string
+        '400':
+          description: Bad Request
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                - message
+                properties:
+                  message:
+                    $ref: '#/components/schemas/str'
+        '401':
+          description: Not Authorized
+          content:
+            text/html:
+              schema:
+                type: string
+        '500':
+          description: Internal Server Error
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                - message
+                properties:
+                  message:
+                    $ref: '#/components/schemas/str'
+  /list/transcode/queue/{path}:
+    post:
+      operationId: movie_queue_transcode
+      responses:
+        '201':
+          description: Transcode Queue Item
+          content:
+            text/html:
+              schema:
+                type: string
+        '400':
+          description: Bad Request
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                - message
+                properties:
+                  message:
+                    $ref: '#/components/schemas/str'
+        '401':
+          description: Not Authorized
+          content:
+            text/html:
+              schema:
+                type: string
+        '500':
+          description: Internal Server Error
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                - message
+                properties:
+                  message:
+                    $ref: '#/components/schemas/str'
+  /list/transcode/remcom/directory/{directory}/{filename}:
+    post:
+      operationId: movie_queue_remcom_directory_file
+      responses:
+        '201':
+          description: Transcode File
+          content:
+            text/html:
+              schema:
+                type: string
+        '400':
+          description: Bad Request
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                - message
+                properties:
+                  message:
+                    $ref: '#/components/schemas/str'
+        '401':
+          description: Not Authorized
+          content:
+            text/html:
+              schema:
+                type: string
+        '500':
+          description: Internal Server Error
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                - message
+                properties:
+                  message:
+                    $ref: '#/components/schemas/str'
+  /list/transcode/remcom/file/{filename}:
+    post:
+      operationId: movie_queue_remcom_file
+      responses:
+        '201':
+          description: Transcode File
+          content:
+            text/html:
+              schema:
+                type: string
+        '400':
+          description: Bad Request
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                - message
+                properties:
+                  message:
+                    $ref: '#/components/schemas/str'
+        '401':
+          description: Not Authorized
+          content:
+            text/html:
+              schema:
+                type: string
+        '500':
+          description: Internal Server Error
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                - message
+                properties:
+                  message:
+                    $ref: '#/components/schemas/str'
+  /list/transcode/status:
+    get:
+      operationId: movie_queue_transcode_status
+      responses:
+        '200':
+          description: Transcode Status
+          content:
+            text/html:
+              schema:
+                type: string
+        '400':
+          description: Bad Request
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                - message
+                properties:
+                  message:
+                    $ref: '#/components/schemas/str'
+        '401':
+          description: Not Authorized
+          content:
+            text/html:
+              schema:
+                type: string
+        '500':
+          description: Internal Server Error
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                - message
+                properties:
+                  message:
+                    $ref: '#/components/schemas/str'
+  /list/transcode/status/file_list:
+    get:
+      operationId: movie_queue_transcode_status_file_list
+      responses:
+        '200':
+          description: Transcode Status File List
+          content:
+            text/html:
+              schema:
+                type: string
+        '400':
+          description: Bad Request
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                - message
+                properties:
+                  message:
+                    $ref: '#/components/schemas/str'
+        '401':
+          description: Not Authorized
+          content:
+            text/html:
+              schema:
+                type: string
+        '500':
+          description: Internal Server Error
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                - message
+                properties:
+                  message:
+                    $ref: '#/components/schemas/str'
+  /list/transcode/status/procs:
+    get:
+      operationId: movie_queue_transcode_status_procs
+      responses:
+        '200':
+          description: Transcode Status File List
+          content:
+            text/html:
+              schema:
+                type: string
+        '400':
+          description: Bad Request
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                - message
+                properties:
+                  message:
+                    $ref: '#/components/schemas/str'
+        '401':
+          description: Not Authorized
+          content:
+            text/html:
+              schema:
+                type: string
+        '500':
+          description: Internal Server Error
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                - message
+                properties:
+                  message:
+                    $ref: '#/components/schemas/str'
+  /list/transcode/subtitle/{filename}/{index}/{suffix}:
+    post:
+      operationId: movie_queue_extract_subtitle
+      parameters:
+      - name: filename
+        in: path
+        required: true
+        schema:
+          type: integer
+          minimum: 0
+      responses:
+        '200':
+          description: Extract Subtitles
+          content:
+            text/html:
+              schema:
+                type: string
+        '400':
+          description: Bad Request
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                - message
+                properties:
+                  message:
+                    $ref: '#/components/schemas/str'
+        '401':
+          description: Not Authorized
+          content:
+            text/html:
+              schema:
+                type: string
+        '500':
+          description: Internal Server Error
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                - message
+                properties:
+                  message:
+                    $ref: '#/components/schemas/str'
+  /list/tvshows:
+    get:
+      operationId: tvshows
+      responses:
+        '200':
+          description: List TvShows
+          content:
+            text/html:
+              schema:
+                type: string
+        '400':
+          description: Bad Request
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                - message
+                properties:
+                  message:
+                    $ref: '#/components/schemas/str'
+        '401':
+          description: Not Authorized
+          content:
+            text/html:
+              schema:
+                type: string
+        '500':
+          description: Internal Server Error
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                - message
+                properties:
+                  message:
+                    $ref: '#/components/schemas/str'
+  /list/user:
+    get:
+      operationId: user
+      responses:
+        '200':
+          description: Logged in User
+          content:
+            text/html:
+              schema:
+                type: object
+                required:
+                - email
+                - session
+                - secret_key
+                - created_at
+                properties:
+                  created_at:
+                    type: string
+                    format: date-time
+                  email:
+                    $ref: '#/components/schemas/str'
+                  secret_key:
+                    $ref: '#/components/schemas/str'
+                  session:
+                    type: string
+                    format: uuid
   /trakt/auth_url:
     get:
+      operationId: trakt_auth_url
       responses:
         '200':
           description: Trakt Auth Url
@@ -1256,61 +1689,35 @@ paths:
                 type: string
         '400':
           description: Bad Request
-        '404':
-          description: Not Found
-        '405':
-          description: Method not allowed
-        '500':
-          description: Internal Server Error
-  /trakt/callback:
-    get:
-      parameters:
-      - name: code
-        in: query
-        required: true
-        schema:
-          description: Authorization Code
-          type: string
-      - name: state
-        in: query
-        required: true
-        schema:
-          description: CSRF State
-          type: string
-      responses:
-        '200':
-          description: Trakt Callback
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                - message
+                properties:
+                  message:
+                    $ref: '#/components/schemas/str'
+        '401':
+          description: Not Authorized
           content:
             text/html:
               schema:
                 type: string
-        '400':
-          description: Bad Request
-        '404':
-          description: Not Found
-        '405':
-          description: Method not allowed
         '500':
           description: Internal Server Error
-  /trakt/refresh_auth:
-    get:
-      responses:
-        '200':
-          description: Trakt Refresh Auth
           content:
-            text/html:
+            application/json:
               schema:
-                type: string
-        '400':
-          description: Bad Request
-        '404':
-          description: Not Found
-        '405':
-          description: Method not allowed
-        '500':
-          description: Internal Server Error
+                type: object
+                required:
+                - message
+                properties:
+                  message:
+                    $ref: '#/components/schemas/str'
   /trakt/cal:
     get:
+      operationId: trakt_cal
       responses:
         '200':
           description: Trakt Calendar
@@ -1320,70 +1727,111 @@ paths:
                 type: string
         '400':
           description: Bad Request
-        '404':
-          description: Not Found
-        '405':
-          description: Method not allowed
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                - message
+                properties:
+                  message:
+                    $ref: '#/components/schemas/str'
+        '401':
+          description: Not Authorized
+          content:
+            text/html:
+              schema:
+                type: string
         '500':
           description: Internal Server Error
-  /trakt/watchlist:
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                - message
+                properties:
+                  message:
+                    $ref: '#/components/schemas/str'
+  /trakt/callback:
     get:
+      operationId: trakt_callback
       responses:
         '200':
-          description: Trakt Watchlist
+          description: Trakt Callback
           content:
             text/html:
               schema:
                 type: string
         '400':
           description: Bad Request
-        '404':
-          description: Not Found
-        '405':
-          description: Method not allowed
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                - message
+                properties:
+                  message:
+                    $ref: '#/components/schemas/str'
+        '401':
+          description: Not Authorized
+          content:
+            text/html:
+              schema:
+                type: string
         '500':
           description: Internal Server Error
-  /trakt/watchlist/{action}/{imdb_url}:
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                - message
+                properties:
+                  message:
+                    $ref: '#/components/schemas/str'
+  /trakt/refresh_auth:
     get:
-      parameters:
-      - name: action
-        in: path
-        required: true
-        schema:
-          type: string
-          enum:
-          - none
-          - list
-          - add
-          - remove
-      - name: imdb_url
-        in: path
-        required: true
-        schema:
-          type: string
+      operationId: refresh_auth
       responses:
         '200':
-          description: Trakt Watchlist Action
+          description: Trakt Refresh Auth
           content:
             text/html:
               schema:
                 type: string
         '400':
           description: Bad Request
-        '404':
-          description: Not Found
-        '405':
-          description: Method not allowed
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                - message
+                properties:
+                  message:
+                    $ref: '#/components/schemas/str'
+        '401':
+          description: Not Authorized
+          content:
+            text/html:
+              schema:
+                type: string
         '500':
           description: Internal Server Error
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                - message
+                properties:
+                  message:
+                    $ref: '#/components/schemas/str'
   /trakt/watched/list/{imdb_url}:
     get:
-      parameters:
-      - name: imdb_url
-        in: path
-        required: true
-        schema:
-          type: string
+      operationId: trakt_watched_seasons
       responses:
         '200':
           description: Trakt Watchlist Show List
@@ -1393,25 +1841,42 @@ paths:
                 type: string
         '400':
           description: Bad Request
-        '404':
-          description: Not Found
-        '405':
-          description: Method not allowed
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                - message
+                properties:
+                  message:
+                    $ref: '#/components/schemas/str'
+        '401':
+          description: Not Authorized
+          content:
+            text/html:
+              schema:
+                type: string
         '500':
           description: Internal Server Error
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                - message
+                properties:
+                  message:
+                    $ref: '#/components/schemas/str'
   /trakt/watched/list/{imdb_url}/{season}:
     get:
+      operationId: trakt_watched_list
       parameters:
       - name: imdb_url
         in: path
         required: true
         schema:
-          type: string
-      - name: season
-        in: path
-        required: true
-        schema:
           type: integer
+          format: int32
       responses:
         '200':
           description: Trakt Watchlist Show Season
@@ -1421,42 +1886,50 @@ paths:
                 type: string
         '400':
           description: Bad Request
-        '404':
-          description: Not Found
-        '405':
-          description: Method not allowed
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                - message
+                properties:
+                  message:
+                    $ref: '#/components/schemas/str'
+        '401':
+          description: Not Authorized
+          content:
+            text/html:
+              schema:
+                type: string
         '500':
           description: Internal Server Error
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                - message
+                properties:
+                  message:
+                    $ref: '#/components/schemas/str'
   /trakt/watched/{action}/{imdb_url}/{season}/{episode}:
-    get:
+    post:
+      operationId: trakt_watched_action
       parameters:
       - name: action
         in: path
         required: true
         schema:
-          type: string
-          enum:
-          - none
-          - list
-          - add
-          - remove
+          type: integer
+          format: int32
       - name: imdb_url
         in: path
         required: true
         schema:
-          type: string
-      - name: season
-        in: path
-        required: true
-        schema:
           type: integer
-      - name: episode
-        in: path
-        required: true
-        schema:
-          type: integer
+          format: int32
       responses:
-        '200':
+        '201':
           description: Trakt Watchlist Episode Action
           content:
             text/html:
@@ -1464,62 +1937,111 @@ paths:
                 type: string
         '400':
           description: Bad Request
-        '404':
-          description: Not Found
-        '405':
-          description: Method not allowed
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                - message
+                properties:
+                  message:
+                    $ref: '#/components/schemas/str'
+        '401':
+          description: Not Authorized
+          content:
+            text/html:
+              schema:
+                type: string
         '500':
           description: Internal Server Error
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                - message
+                properties:
+                  message:
+                    $ref: '#/components/schemas/str'
+  /trakt/watchlist:
+    get:
+      operationId: trakt_watchlist
+      responses:
+        '200':
+          description: Trakt Watchlist
+          content:
+            text/html:
+              schema:
+                type: string
+        '400':
+          description: Bad Request
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                - message
+                properties:
+                  message:
+                    $ref: '#/components/schemas/str'
+        '401':
+          description: Not Authorized
+          content:
+            text/html:
+              schema:
+                type: string
+        '500':
+          description: Internal Server Error
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                - message
+                properties:
+                  message:
+                    $ref: '#/components/schemas/str'
+  /trakt/watchlist/{action}/{show}:
+    post:
+      operationId: trakt_watchlist_action
+      responses:
+        '201':
+          description: Trakt Watchlist Action
+          content:
+            text/html:
+              schema:
+                type: string
+        '400':
+          description: Bad Request
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                - message
+                properties:
+                  message:
+                    $ref: '#/components/schemas/str'
+        '401':
+          description: Not Authorized
+          content:
+            text/html:
+              schema:
+                type: string
+        '500':
+          description: Internal Server Error
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                - message
+                properties:
+                  message:
+                    $ref: '#/components/schemas/str'
 components:
   schemas:
-    FindNewEpisodeRequest:
-      properties:
-        source:
-          description: TV Show Source
-          nullable: true
-          type: string
-          enum:
-          - all
-          - amazon
-          - hulu
-          - netflix
-        shows:
-          description: TV Show
-          nullable: true
-          type: string
-      type: object
     ImdbEpisodes:
-      properties:
-        show:
-          description: TV Show Name
-          type: string
-        title:
-          description: Title
-          type: string
-        season:
-          description: Season
-          type: integer
-        episode:
-          description: Episode
-          type: integer
-        airdate:
-          description: Airdate
-          format: date
-          nullable: true
-          example: 2023-01-01
-          type: string
-        rating:
-          description: Rating
-          format: decimal
-          nullable: true
-          example: '1.234'
-          type: string
-        eptitle:
-          description: Episode Title
-          type: string
-        epurl:
-          description: Episode URL
-          type: string
       type: object
       required:
       - show
@@ -1528,247 +2050,223 @@ components:
       - episode
       - eptitle
       - epurl
-    ImdbRatings:
+      - id
       properties:
-        index:
-          description: Index
+        airdate:
+          type:
+          - string
+          - 'null'
+          format: date
+        episode:
+          type: integer
+          format: int32
+        eptitle:
+          $ref: '#/components/schemas/str'
+        epurl:
+          $ref: '#/components/schemas/str'
+        id:
+          type: string
           format: uuid
-          example: 334518f4-1bfd-4f20-9978-bfad0dc033e1
-          type: string
-        show:
-          description: TV Show Name
-          type: string
-        title:
-          description: Title
-          nullable: true
-          type: string
-        link:
-          description: IMDB ID
-          type: string
         rating:
-          description: Rating
-          nullable: true
-          type: number
-        istv:
-          description: IsTv Flag
-          nullable: true
-          type: boolean
-        source:
-          description: Source
-          nullable: true
-          type: string
-          enum:
-          - all
-          - amazon
-          - hulu
-          - netflix
+          type:
+          - string
+          - 'null'
+        season:
+          type: integer
+          format: int32
+        show:
+          $ref: '#/components/schemas/str'
+        title:
+          $ref: '#/components/schemas/str'
+    ImdbEpisodesUpdateRequest:
+      type: object
+      required:
+      - episodes
+      properties:
+        episodes:
+          type: array
+          items:
+            $ref: '#/components/schemas/ImdbEpisodes'
+    ImdbRatings:
       type: object
       required:
       - index
       - show
       - link
-    MovieQueueRow:
+      properties:
+        index:
+          type: string
+          format: uuid
+        istv:
+          type:
+          - boolean
+          - 'null'
+        link:
+          $ref: '#/components/schemas/str'
+        rating:
+          type:
+          - number
+          - 'null'
+          format: double
+        show:
+          $ref: '#/components/schemas/str'
+        source:
+          oneOf:
+          - type: 'null'
+          - $ref: '#/components/schemas/TvShowSource'
+        title:
+          oneOf:
+          - type: 'null'
+          - $ref: '#/components/schemas/str'
+    ImdbRatingsUpdateRequest:
+      type: object
+      required:
+      - shows
+      properties:
+        shows:
+          type: array
+          items:
+            $ref: '#/components/schemas/ImdbRatings'
+    LastModifiedResponse:
+      type: object
+      required:
+      - table
+      - last_modified
+      properties:
+        last_modified:
+          type: string
+          format: date-time
+        table:
+          $ref: '#/components/schemas/str'
+    LoggedUser:
+      type: object
+      required:
+      - email
+      - session
+      - secret_key
+      - created_at
+      properties:
+        created_at:
+          type: string
+          format: date-time
+        email:
+          $ref: '#/components/schemas/str'
+        secret_key:
+          $ref: '#/components/schemas/str'
+        session:
+          type: string
+          format: uuid
+    MovieCollectionRow:
+      type: object
+      required:
+      - idx
+      - path
+      - show
       properties:
         idx:
-          description: Queue Index
-          type: integer
-        collection_idx:
-          description: Collection Index
+          type: string
           format: uuid
-          example: 334518f4-1bfd-4f20-9978-bfad0dc033e1
-          type: string
         path:
-          description: Collection Path
-          type: string
+          $ref: '#/components/schemas/str'
         show:
-          description: TV Show Name
-          type: string
-        last_modified:
-          description: Last Modified
-          format: date-time
-          nullable: true
-          type: string
+          $ref: '#/components/schemas/str'
+    MovieCollectionUpdateRequest:
+      type: object
+      required:
+      - collection
+      properties:
+        collection:
+          type: array
+          items:
+            $ref: '#/components/schemas/MovieCollectionRow'
+    MovieQueueRow:
       type: object
       required:
       - idx
       - collection_idx
       - path
       - show
-    MovieCollectionRow:
       properties:
+        collection_idx:
+          type: string
+          format: uuid
         idx:
-          description: Collection Index
-          format: uuid
-          example: 334518f4-1bfd-4f20-9978-bfad0dc033e1
-          type: string
+          type: integer
+          format: int32
+        last_modified:
+          type:
+          - string
+          - 'null'
+          format: date-time
         path:
-          description: Collection Path
-          type: string
+          $ref: '#/components/schemas/str'
         show:
-          description: TV Show Name
-          type: string
+          $ref: '#/components/schemas/str'
+    MovieQueueUpdateRequest:
       type: object
       required:
-      - idx
+      - queue
+      properties:
+        queue:
+          type: array
+          items:
+            $ref: '#/components/schemas/MovieQueueRow'
+    MusicCollection:
+      type: object
+      required:
+      - id
       - path
-      - show
-    LastModifiedResponse:
-      properties:
-        table:
-          description: Table Name
-          type: string
-        last_modified:
-          description: Last Modified
-          format: date-time
-          type: string
-      type: object
-      required:
-      - table
       - last_modified
-    LoggedUser:
       properties:
-        email:
-          description: Email Address
+        album:
+          oneOf:
+          - type: 'null'
+          - $ref: '#/components/schemas/str'
+        artist:
+          oneOf:
+          - type: 'null'
+          - $ref: '#/components/schemas/str'
+        id:
           type: string
-        session:
-          description: Session UUID
           format: uuid
-          example: 334518f4-1bfd-4f20-9978-bfad0dc033e1
-          type: string
-        secret_key:
-          description: Secret Key
-          type: string
-      type: object
-      required:
-      - email
-      - session
-      - secret_key
-    FullQueueRequest:
-      properties:
-        q:
-          description: Search String
-          nullable: true
-          type: string
-        offset:
-          description: Offset
-          nullable: true
-          type: integer
-          minimum: 0
-        limit:
-          description: Limit
-          nullable: true
-          type: integer
-          minimum: 0
-        order_by:
-          description: Order By (asc/desc)
-          nullable: true
-          type: string
-          enum:
-          - asc
-          - desc
-      type: object
-    PlexEventRequest:
-      properties:
-        start_timestamp:
-          description: Start Timestamp
-          format: date-time
-          nullable: true
-          type: string
-        event_type:
-          description: Event Type
-          nullable: true
-          type: string
-          enum:
-          - library-on-deck
-          - library-new
-          - media-pause
-          - media-play
-          - media-rate
-          - media-resume
-          - media-scrobble
-          - media-stop
-          - admin-database-backup
-          - admin-database-corrupted
-          - device-new
-          - playback-started
-        section_type:
-          description: Section Type
-          nullable: true
-          type: string
-          enum:
-          - artist
-          - movie
-          - show
-        offset:
-          description: Offset
-          nullable: true
-          type: integer
-          minimum: 0
-        limit:
-          description: Limit
-          nullable: true
-          type: integer
-          minimum: 0
-      type: object
-    PlexEvent:
-      properties:
-        event:
-          description: Event
-          type: string
-        account:
-          description: Account
-          type: string
-        server:
-          description: Server
-          type: string
-        player_title:
-          description: Player Title
-          type: string
-        player_address:
-          description: Player Address
-          type: string
-        title:
-          description: Title
-          type: string
-        parent_title:
-          description: Parent Title
-          nullable: true
-          type: string
-        grandparent_title:
-          description: Grandparent Title
-          nullable: true
-          type: string
-        added_at:
-          description: Added At Timestamp
-          format: date-time
-          type: string
-        updated_at:
-          description: Updated At Timestamp
-          format: date-time
-          nullable: true
-          type: string
         last_modified:
-          description: Last Modified
+          type: string
           format: date-time
-          type: string
-        metadata_type:
-          description: Metadata Type
-          nullable: true
-          type: string
-        section_type:
-          description: Section Type
-          nullable: true
-          type: string
-        section_title:
-          description: Section Title
-          nullable: true
-          type: string
-        metadata_key:
-          description: Metadata Key
-          nullable: true
-          type: string
+        path:
+          $ref: '#/components/schemas/str'
+        title:
+          oneOf:
+          - type: 'null'
+          - $ref: '#/components/schemas/str'
+    MusicCollectionUpdateRequest:
       type: object
       required:
+      - entries
+      properties:
+        entries:
+          type: array
+          items:
+            $ref: '#/components/schemas/MusicCollection'
+    Pagination:
+      type: object
+      required:
+      - total
+      - offset
+      - limit
+      properties:
+        limit:
+          type: integer
+          minimum: 0
+        offset:
+          type: integer
+          minimum: 0
+        total:
+          type: integer
+          minimum: 0
+    PlexEvent:
+      type: object
+      required:
+      - id
       - event
       - account
       - server
@@ -1777,137 +2275,135 @@ components:
       - title
       - added_at
       - last_modified
-    PlexEventUpdateRequest:
       properties:
-        events:
-          items:
-            $ref: '#/components/schemas/PlexEvent'
-          type: array
+        account:
+          $ref: '#/components/schemas/str'
+        added_at:
+          type: string
+          format: date-time
+        event:
+          $ref: '#/components/schemas/str'
+        grandparent_title:
+          oneOf:
+          - type: 'null'
+          - $ref: '#/components/schemas/str'
+        id:
+          type: string
+          format: uuid
+        last_modified:
+          type: string
+          format: date-time
+        metadata_key:
+          oneOf:
+          - type: 'null'
+          - $ref: '#/components/schemas/str'
+        metadata_type:
+          oneOf:
+          - type: 'null'
+          - $ref: '#/components/schemas/str'
+        parent_title:
+          oneOf:
+          - type: 'null'
+          - $ref: '#/components/schemas/str'
+        player_address:
+          $ref: '#/components/schemas/str'
+        player_title:
+          $ref: '#/components/schemas/str'
+        section_title:
+          oneOf:
+          - type: 'null'
+          - $ref: '#/components/schemas/str'
+        section_type:
+          oneOf:
+          - type: 'null'
+          - $ref: '#/components/schemas/str'
+        server:
+          $ref: '#/components/schemas/str'
+        title:
+          $ref: '#/components/schemas/str'
+        updated_at:
+          type:
+          - string
+          - 'null'
+          format: date-time
+    PlexEventUpdateRequest:
       type: object
       required:
       - events
-    PlexEventFilenameRequest:
       properties:
-        start_timestamp:
-          description: Start Timestamp
-          format: date-time
-          nullable: true
-          type: string
-        offset:
-          description: Offset
-          nullable: true
-          type: integer
-          minimum: 0
-        limit:
-          description: Limit
-          nullable: true
-          type: integer
-          minimum: 0
-      type: object
+        events:
+          type: array
+          items:
+            $ref: '#/components/schemas/PlexEvent'
     PlexFilename:
-      properties:
-        metadata_key:
-          description: Metadata Key
-          type: string
-        filename:
-          description: Filename
-          type: string
-        collection_id:
-          description: Collection Id
-          format: uuid
-          nullable: true
-          example: 334518f4-1bfd-4f20-9978-bfad0dc033e1
-          type: string
       type: object
       required:
       - metadata_key
       - filename
-    PlexFilenameUpdateRequest:
       properties:
-        filenames:
-          items:
-            $ref: '#/components/schemas/PlexFilename'
-          type: array
+        collection_id:
+          type:
+          - string
+          - 'null'
+          format: uuid
+        filename:
+          $ref: '#/components/schemas/str'
+        metadata_key:
+          $ref: '#/components/schemas/str'
+        music_collection_id:
+          type:
+          - string
+          - 'null'
+          format: uuid
+    PlexFilenameUpdateRequest:
       type: object
       required:
       - filenames
-    PlexMetadata:
       properties:
-        metadata_key:
-          description: Metadata Key
-          type: string
-        object_type:
-          description: Object Type
-          type: string
-        title:
-          description: Title
-          type: string
-        parent_key:
-          description: Parent Key
-          nullable: true
-          type: string
-        grandparent_key:
-          description: Grandparent Key
-          nullable: true
-          type: string
-        show:
-          description: show
-          nullable: true
-          type: string
+        filenames:
+          type: array
+          items:
+            $ref: '#/components/schemas/PlexFilename'
+    PlexMetadata:
       type: object
       required:
       - metadata_key
       - object_type
       - title
-    PlexMetadataUpdateRequest:
       properties:
-        entries:
-          items:
-            $ref: '#/components/schemas/PlexMetadata'
-          type: array
+        grandparent_key:
+          oneOf:
+          - type: 'null'
+          - $ref: '#/components/schemas/str'
+        metadata_key:
+          $ref: '#/components/schemas/str'
+        object_type:
+          $ref: '#/components/schemas/str'
+        parent_key:
+          oneOf:
+          - type: 'null'
+          - $ref: '#/components/schemas/str'
+        show:
+          oneOf:
+          - type: 'null'
+          - $ref: '#/components/schemas/str'
+        title:
+          $ref: '#/components/schemas/str'
+    PlexMetadataUpdateRequest:
       type: object
       required:
       - entries
-    MusicCollection:
       properties:
-        id:
-          description: Id
-          format: uuid
-          example: 334518f4-1bfd-4f20-9978-bfad0dc033e1
-          type: string
-        path:
-          description: Path
-          type: string
-        artist:
-          description: Artist
-          nullable: true
-          type: string
-        album:
-          description: Album
-          nullable: true
-          type: string
-        title:
-          description: Title
-          nullable: true
-          type: string
-        last_modified:
-          description: Last Modified
-          format: date-time
-          type: string
-      type: object
-      required:
-      - id
-      - path
-      - last_modified
-    TraktCallbackRequest:
-      properties:
-        code:
-          description: Authorization Code
-          type: string
-        state:
-          description: CSRF State
-          type: string
-      type: object
-      required:
-      - code
-      - state
+        entries:
+          type: array
+          items:
+            $ref: '#/components/schemas/PlexMetadata'
+    TvShowSource:
+      type: string
+      enum:
+      - all
+      - amazon
+      - hulu
+      - netflix
+    str:
+      type: string

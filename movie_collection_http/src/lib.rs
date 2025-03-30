@@ -19,10 +19,13 @@ pub mod movie_queue_requests;
 pub mod movie_queue_routes;
 
 use derive_more::{Deref, Display, From, FromStr, Into};
-use rweb::Schema;
-use rweb_helper::{derive_rweb_schema, DateTimeType, DateType, DecimalWrapper, UuidWrapper};
+use rust_decimal::Decimal;
 use serde::{Deserialize, Serialize};
 use stack_string::StackString;
+use time::{Date, OffsetDateTime};
+use utoipa::ToSchema;
+use utoipa_helper::derive_utoipa_schema;
+use uuid::Uuid;
 
 use movie_collection_lib::{
     date_time_wrapper::DateTimeWrapper,
@@ -39,39 +42,41 @@ use movie_collection_lib::{
 #[derive(Clone, Serialize, Deserialize, Into, From, Debug)]
 pub struct ImdbEpisodesWrapper(ImdbEpisodes);
 
-derive_rweb_schema!(ImdbEpisodesWrapper, _ImdbEpisodesWrapper);
+derive_utoipa_schema!(ImdbEpisodesWrapper, _ImdbEpisodesWrapper);
 
 #[allow(dead_code)]
-#[derive(Schema)]
-#[schema(component = "ImdbEpisodes")]
+#[derive(ToSchema)]
+#[schema(as = ImdbEpisodes)]
+// ImdbEpisodes")]
 struct _ImdbEpisodesWrapper {
-    #[schema(description = "TV Show Name")]
+    // TV Show Name")]
     show: StackString,
-    #[schema(description = "Title")]
+    // Title")]
     title: StackString,
-    #[schema(description = "Season")]
+    // Season")]
     season: i32,
-    #[schema(description = "Episode")]
+    // Episode")]
     episode: i32,
-    #[schema(description = "Airdate")]
-    airdate: Option<DateType>,
-    #[schema(description = "Rating")]
-    rating: Option<DecimalWrapper>,
-    #[schema(description = "Episode Title")]
+    // Airdate")]
+    airdate: Option<Date>,
+    // Rating")]
+    rating: Option<Decimal>,
+    // Episode Title")]
     eptitle: StackString,
-    #[schema(description = "Episode URL")]
+    // Episode URL")]
     epurl: StackString,
-    #[schema(description = "ID")]
-    id: UuidWrapper,
+    // ID")]
+    id: Uuid,
 }
 
 #[derive(Serialize, Deserialize, Clone, Debug, Eq, Copy, PartialEq, Into, From)]
 pub struct TvShowSourceWrapper(TvShowSource);
 
-derive_rweb_schema!(TvShowSourceWrapper, _TvShowSourceWrapper);
+derive_utoipa_schema!(TvShowSourceWrapper, _TvShowSourceWrapper);
 
 #[allow(dead_code)]
-#[derive(Serialize, Schema)]
+#[derive(Serialize, ToSchema)]
+#[schema(as = TvShowSource)]
 enum _TvShowSourceWrapper {
     #[serde(rename = "all")]
     All,
@@ -86,196 +91,205 @@ enum _TvShowSourceWrapper {
 #[derive(Default, Clone, Debug, Serialize, Deserialize, Into, From)]
 pub struct ImdbRatingsWrapper(ImdbRatings);
 
-derive_rweb_schema!(ImdbRatingsWrapper, _ImdbRatingsWrapper);
+derive_utoipa_schema!(ImdbRatingsWrapper, _ImdbRatingsWrapper);
 
 #[allow(dead_code)]
-#[derive(Schema)]
-#[schema(component = "ImdbRatings")]
+#[derive(ToSchema)]
+#[schema(as = ImdbRatings)]
+// ImdbRatings")]
 struct _ImdbRatingsWrapper {
-    #[schema(description = "Index")]
-    index: UuidWrapper,
-    #[schema(description = "TV Show Name")]
+    // Index")]
+    index: Uuid,
+    // TV Show Name")]
     show: StackString,
-    #[schema(description = "Title")]
+    // Title")]
     title: Option<StackString>,
-    #[schema(description = "IMDB ID")]
+    // IMDB ID")]
     link: StackString,
-    #[schema(description = "Rating")]
+    // Rating")]
     rating: Option<f64>,
-    #[schema(description = "IsTv Flag")]
+    // IsTv Flag")]
     istv: Option<bool>,
-    #[schema(description = "Source")]
+    // Source")]
     source: Option<TvShowSourceWrapper>,
 }
 
 #[derive(Default, Debug, Serialize, Deserialize, Into, From, Deref)]
 pub struct MovieQueueRowWrapper(MovieQueueRow);
 
-derive_rweb_schema!(MovieQueueRowWrapper, _MovieQueueRowWrapper);
+derive_utoipa_schema!(MovieQueueRowWrapper, _MovieQueueRowWrapper);
 
 #[allow(dead_code)]
-#[derive(Schema)]
-#[schema(component = "MovieQueueRow")]
+#[derive(ToSchema)]
+#[schema(as = MovieQueueRow)]
+// MovieQueueRow")]
 struct _MovieQueueRowWrapper {
-    #[schema(description = "Queue Index")]
+    // Queue Index")]
     idx: i32,
-    #[schema(description = "Collection Index")]
-    collection_idx: UuidWrapper,
-    #[schema(description = "Collection Path")]
+    // Collection Index")]
+    collection_idx: Uuid,
+    // Collection Path")]
     path: StackString,
-    #[schema(description = "TV Show Name")]
+    // TV Show Name")]
     show: StackString,
-    #[schema(description = "Last Modified")]
-    last_modified: Option<DateTimeType>,
+    // Last Modified")]
+    last_modified: Option<OffsetDateTime>,
 }
 
 #[derive(Default, Serialize, Deserialize, Into, From, Deref, Debug)]
 pub struct MovieCollectionRowWrapper(MovieCollectionRow);
 
-derive_rweb_schema!(MovieCollectionRowWrapper, _MovieCollectionRowWrapper);
+derive_utoipa_schema!(MovieCollectionRowWrapper, _MovieCollectionRowWrapper);
 
 #[allow(dead_code)]
-#[derive(Schema)]
-#[schema(component = "MovieCollectionRow")]
+#[derive(ToSchema)]
+#[schema(as = MovieCollectionRow)]
+// MovieCollectionRow")]
 struct _MovieCollectionRowWrapper {
-    #[schema(description = "Collection Index")]
-    idx: UuidWrapper,
-    #[schema(description = "Collection Path")]
+    // Collection Index")]
+    idx: Uuid,
+    // Collection Path")]
     path: StackString,
-    #[schema(description = "TV Show Name")]
+    // TV Show Name")]
     show: StackString,
 }
 
 #[derive(Serialize, Deserialize, Into, From)]
 pub struct LastModifiedResponseWrapper(LastModifiedResponse);
 
-derive_rweb_schema!(LastModifiedResponseWrapper, _LastModifiedResponseWrapper);
+derive_utoipa_schema!(LastModifiedResponseWrapper, _LastModifiedResponseWrapper);
 
 #[allow(dead_code)]
-#[derive(Schema)]
-#[schema(component = "LastModifiedResponse")]
+#[derive(ToSchema)]
+#[schema(as = LastModifiedResponse)]
+// LastModifiedResponse")]
 struct _LastModifiedResponseWrapper {
-    #[schema(description = "Table Name")]
+    // Table Name")]
     table: StackString,
-    #[schema(description = "Last Modified")]
-    last_modified: DateTimeType,
+    // Last Modified")]
+    last_modified: OffsetDateTime,
 }
 
 #[derive(Debug, Serialize, Deserialize, Into, From)]
 pub struct PlexEventWrapper(PlexEvent);
 
-derive_rweb_schema!(PlexEventWrapper, _PlexEventWrapper);
+derive_utoipa_schema!(PlexEventWrapper, _PlexEventWrapper);
 
 #[allow(dead_code)]
-#[derive(Schema)]
-#[schema(component = "PlexEvent")]
+#[derive(ToSchema)]
+#[schema(as = PlexEvent)]
+// PlexEvent")]
 struct _PlexEventWrapper {
-    #[schema(description = "ID")]
-    id: UuidWrapper,
-    #[schema(description = "Event")]
+    // ID")]
+    id: Uuid,
+    // Event")]
     event: StackString,
-    #[schema(description = "Account")]
+    // Account")]
     account: StackString,
-    #[schema(description = "Server")]
+    // Server")]
     server: StackString,
-    #[schema(description = "Player Title")]
+    // Player Title")]
     player_title: StackString,
-    #[schema(description = "Player Address")]
+    // Player Address")]
     player_address: StackString,
-    #[schema(description = "Title")]
+    // Title")]
     title: StackString,
-    #[schema(description = "Parent Title")]
+    // Parent Title")]
     parent_title: Option<StackString>,
-    #[schema(description = "Grandparent Title")]
+    // Grandparent Title")]
     grandparent_title: Option<StackString>,
-    #[schema(description = "Added At Timestamp")]
-    added_at: DateTimeType,
-    #[schema(description = "Updated At Timestamp")]
-    updated_at: Option<DateTimeType>,
-    #[schema(description = "Last Modified")]
-    last_modified: DateTimeType,
-    #[schema(description = "Metadata Type")]
+    // Added At Timestamp")]
+    added_at: OffsetDateTime,
+    // Updated At Timestamp")]
+    updated_at: Option<OffsetDateTime>,
+    // Last Modified")]
+    last_modified: OffsetDateTime,
+    // Metadata Type")]
     metadata_type: Option<StackString>,
-    #[schema(description = "Section Type")]
+    // Section Type")]
     section_type: Option<StackString>,
-    #[schema(description = "Section Title")]
+    // Section Title")]
     section_title: Option<StackString>,
-    #[schema(description = "Metadata Key")]
+    // Metadata Key")]
     metadata_key: Option<StackString>,
 }
 
 #[derive(Default, Debug, Serialize, Deserialize, Into, From, Deref)]
 pub struct PlexFilenameWrapper(PlexFilename);
 
-derive_rweb_schema!(PlexFilenameWrapper, _PlexFilenameWrapper);
+derive_utoipa_schema!(PlexFilenameWrapper, _PlexFilenameWrapper);
 
 #[allow(dead_code)]
-#[derive(Schema)]
-#[schema(component = "PlexFilename")]
+#[derive(ToSchema)]
+#[schema(as = PlexFilename)]
+// PlexFilename")]
 struct _PlexFilenameWrapper {
-    #[schema(description = "Metadata Key")]
+    // Metadata Key")]
     metadata_key: StackString,
-    #[schema(description = "Filename")]
+    // Filename")]
     filename: StackString,
-    #[schema(description = "Collection Id")]
-    collection_id: Option<UuidWrapper>,
-    #[schema(description = "Music Collection Id")]
-    music_collection_id: Option<UuidWrapper>,
+    // Collection Id")]
+    collection_id: Option<Uuid>,
+    // Music Collection Id")]
+    music_collection_id: Option<Uuid>,
 }
 
 #[derive(Default, Debug, Serialize, Deserialize, Into, From, Deref)]
 pub struct PlexMetadataWrapper(PlexMetadata);
 
-derive_rweb_schema!(PlexMetadataWrapper, _PlexMetadataWrapper);
+derive_utoipa_schema!(PlexMetadataWrapper, _PlexMetadataWrapper);
 
 #[allow(dead_code)]
-#[derive(Schema)]
-#[schema(component = "PlexMetadata")]
+#[derive(ToSchema)]
+#[schema(as = PlexMetadata)]
+// PlexMetadata")]
 struct _PlexMetadataWrapper {
-    #[schema(description = "Metadata Key")]
+    // Metadata Key")]
     metadata_key: StackString,
-    #[schema(description = "Object Type")]
+    // Object Type")]
     object_type: StackString,
-    #[schema(description = "Title")]
+    // Title")]
     title: StackString,
-    #[schema(description = "Parent Key")]
+    // Parent Key")]
     parent_key: Option<StackString>,
-    #[schema(description = "Grandparent Key")]
+    // Grandparent Key")]
     grandparent_key: Option<StackString>,
-    #[schema(description = "show")]
+    // show")]
     show: Option<StackString>,
 }
 
 #[derive(Default, Debug, Serialize, Deserialize, Into, From, Deref)]
 pub struct MusicCollectionWrapper(MusicCollection);
 
-derive_rweb_schema!(MusicCollectionWrapper, _MusicCollectionWrapper);
+derive_utoipa_schema!(MusicCollectionWrapper, _MusicCollectionWrapper);
 
 #[allow(dead_code)]
-#[derive(Schema)]
-#[schema(component = "MusicCollection")]
+#[derive(ToSchema)]
+#[schema(as = MusicCollection)]
+// MusicCollection")]
 struct _MusicCollectionWrapper {
-    #[schema(description = "Id")]
-    id: UuidWrapper,
-    #[schema(description = "Path")]
+    // Id")]
+    id: Uuid,
+    // Path")]
     path: StackString,
-    #[schema(description = "Artist")]
+    // Artist")]
     artist: Option<StackString>,
-    #[schema(description = "Album")]
+    // Album")]
     album: Option<StackString>,
-    #[schema(description = "Title")]
+    // Title")]
     title: Option<StackString>,
-    #[schema(description = "Last Modified")]
-    last_modified: DateTimeType,
+    // Last Modified")]
+    last_modified: OffsetDateTime,
 }
 
 #[derive(Clone, Copy, Deserialize, Serialize, Into, From, Deref, FromStr, Display)]
 pub struct TraktActionsWrapper(TraktActions);
 
-derive_rweb_schema!(TraktActionsWrapper, _TraktActionsWrapper);
+derive_utoipa_schema!(TraktActionsWrapper, _TraktActionsWrapper);
 
 #[allow(dead_code)]
-#[derive(Schema, Serialize)]
+#[derive(ToSchema, Serialize)]
+#[schema(as = TraktActions)]
 enum _TraktActionsWrapper {
     #[serde(rename = "none")]
     None,
@@ -290,9 +304,10 @@ enum _TraktActionsWrapper {
 #[derive(Serialize, Deserialize, Debug, Clone, Copy, Deref, Into, From, PartialEq, Eq)]
 pub struct OrderByWrapper(OrderBy);
 
-derive_rweb_schema!(OrderByWrapper, _OrderByWrapper);
+derive_utoipa_schema!(OrderByWrapper, _OrderByWrapper);
 
-#[derive(Serialize, Deserialize, Schema)]
+#[derive(Serialize, Deserialize, ToSchema)]
+#[schema(as = OrderBy)]
 pub enum _OrderByWrapper {
     #[serde(rename = "asc")]
     Asc,
@@ -303,9 +318,10 @@ pub enum _OrderByWrapper {
 #[derive(Serialize, Deserialize, Debug, Clone, Copy, Deref, Into, From)]
 pub struct PlexSectionTypeWrapper(PlexSectionType);
 
-derive_rweb_schema!(PlexSectionTypeWrapper, _PlexSectionTypeWrapper);
+derive_utoipa_schema!(PlexSectionTypeWrapper, _PlexSectionTypeWrapper);
 
-#[derive(Serialize, Deserialize, Schema)]
+#[derive(Serialize, Deserialize, ToSchema)]
+#[schema(as = PlexSectionType)]
 pub enum _PlexSectionTypeWrapper {
     #[serde(rename = "artist")]
     Music,
@@ -318,9 +334,10 @@ pub enum _PlexSectionTypeWrapper {
 #[derive(Serialize, Deserialize, Debug, Clone, Copy, Deref, Into, From)]
 pub struct PlexEventTypeWrapper(PlexEventType);
 
-derive_rweb_schema!(PlexEventTypeWrapper, _PlexEventTypeWrapper);
+derive_utoipa_schema!(PlexEventTypeWrapper, _PlexEventTypeWrapper);
 
-#[derive(Serialize, Deserialize, Schema)]
+#[derive(Serialize, Deserialize, ToSchema)]
+#[schema(as = PlexEventType)]
 pub enum _PlexEventTypeWrapper {
     #[serde(rename = "library-on-deck")]
     LibraryOnDeck,
@@ -357,21 +374,22 @@ pub struct PlexEventRequest {
     pub limit: Option<usize>,
 }
 
-derive_rweb_schema!(PlexEventRequest, _PlexEventRequest);
+derive_utoipa_schema!(PlexEventRequest, _PlexEventRequest);
 
 #[allow(dead_code)]
-#[derive(Schema)]
-#[schema(component = "PlexEventRequest")]
+#[derive(ToSchema)]
+#[schema(as = PlexEventRequest)]
+// PlexEventRequest")]
 struct _PlexEventRequest {
-    #[schema(description = "Start Timestamp")]
-    start_timestamp: Option<DateTimeType>,
-    #[schema(description = "Event Type")]
+    // Start Timestamp")]
+    start_timestamp: Option<OffsetDateTime>,
+    // Event Type")]
     event_type: Option<PlexEventTypeWrapper>,
-    #[schema(description = "Section Type")]
+    // Section Type")]
     section_type: Option<PlexSectionTypeWrapper>,
-    #[schema(description = "Offset")]
+    // Offset")]
     offset: Option<usize>,
-    #[schema(description = "Limit")]
+    // Limit")]
     limit: Option<usize>,
 }
 
@@ -382,17 +400,18 @@ pub struct PlexFilenameRequest {
     pub limit: Option<usize>,
 }
 
-derive_rweb_schema!(PlexFilenameRequest, _PlexFilenameRequest);
+derive_utoipa_schema!(PlexFilenameRequest, _PlexFilenameRequest);
 
 #[allow(dead_code)]
-#[derive(Schema)]
-#[schema(component = "PlexEventFilenameRequest")]
+#[derive(ToSchema)]
+#[schema(as = PlexFilenameRequest)]
+// PlexEventFilenameRequest")]
 struct _PlexFilenameRequest {
-    #[schema(description = "Start Timestamp")]
-    start_timestamp: Option<DateTimeType>,
-    #[schema(description = "Offset")]
+    // Start Timestamp")]
+    start_timestamp: Option<OffsetDateTime>,
+    // Offset")]
     offset: Option<usize>,
-    #[schema(description = "Limit")]
+    // Limit")]
     limit: Option<usize>,
 }
 
@@ -404,25 +423,26 @@ pub struct TraktWatchlistRequest {
     pub limit: Option<usize>,
 }
 
-derive_rweb_schema!(TraktWatchlistRequest, _TraktWatchlistRequest);
+derive_utoipa_schema!(TraktWatchlistRequest, _TraktWatchlistRequest);
 
 #[allow(dead_code)]
-#[derive(Schema)]
-#[schema(component = "TraktWatchlistRequest")]
+#[derive(ToSchema)]
+#[schema(as = TraktWatchlistRequest)]
+// TraktWatchlistRequest")]
 pub struct _TraktWatchlistRequest {
-    #[schema(description = "Search Query")]
+    // Search Query")]
     pub query: Option<StackString>,
-    #[schema(description = "Tv Show Source")]
+    // Tv Show Source")]
     pub source: Option<TvShowSourceWrapper>,
-    #[schema(description = "Offset")]
+    // Offset")]
     pub offset: Option<StackString>,
-    #[schema(description = "Limit")]
+    // Limit")]
     pub limit: Option<StackString>,
 }
 
 #[cfg(test)]
 mod test {
-    use rweb_helper::derive_rweb_test;
+    use utoipa_helper::derive_utoipa_test;
 
     use crate::{
         ImdbEpisodesWrapper, ImdbRatingsWrapper, LastModifiedResponseWrapper,
@@ -435,15 +455,15 @@ mod test {
 
     #[test]
     fn test_type() {
-        derive_rweb_test!(ImdbEpisodesWrapper, _ImdbEpisodesWrapper);
-        derive_rweb_test!(TvShowSourceWrapper, _TvShowSourceWrapper);
-        derive_rweb_test!(ImdbRatingsWrapper, _ImdbRatingsWrapper);
-        derive_rweb_test!(MovieQueueRowWrapper, _MovieQueueRowWrapper);
-        derive_rweb_test!(MovieCollectionRowWrapper, _MovieCollectionRowWrapper);
-        derive_rweb_test!(LastModifiedResponseWrapper, _LastModifiedResponseWrapper);
-        derive_rweb_test!(PlexEventWrapper, _PlexEventWrapper);
-        derive_rweb_test!(PlexFilenameWrapper, _PlexFilenameWrapper);
-        derive_rweb_test!(TraktActionsWrapper, _TraktActionsWrapper);
-        derive_rweb_test!(PlexEventTypeWrapper, _PlexEventTypeWrapper);
+        derive_utoipa_test!(ImdbEpisodesWrapper, _ImdbEpisodesWrapper);
+        derive_utoipa_test!(TvShowSourceWrapper, _TvShowSourceWrapper);
+        derive_utoipa_test!(ImdbRatingsWrapper, _ImdbRatingsWrapper);
+        derive_utoipa_test!(MovieQueueRowWrapper, _MovieQueueRowWrapper);
+        derive_utoipa_test!(MovieCollectionRowWrapper, _MovieCollectionRowWrapper);
+        derive_utoipa_test!(LastModifiedResponseWrapper, _LastModifiedResponseWrapper);
+        derive_utoipa_test!(PlexEventWrapper, _PlexEventWrapper);
+        derive_utoipa_test!(PlexFilenameWrapper, _PlexFilenameWrapper);
+        derive_utoipa_test!(TraktActionsWrapper, _TraktActionsWrapper);
+        derive_utoipa_test!(PlexEventTypeWrapper, _PlexEventTypeWrapper);
     }
 }
