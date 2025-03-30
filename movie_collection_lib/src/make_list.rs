@@ -177,7 +177,7 @@ pub async fn make_list(stdout: &StdoutChannel<StackString>) -> Result<(), Error>
     }
 
     let proc_map = transcode_task.await??.get_proc_map();
-    debug!("{:?}", proc_map);
+    debug!("{proc_map:?}",);
 
     for f in &file_lists.local_file_list {
         let mut f_key = f.as_str();

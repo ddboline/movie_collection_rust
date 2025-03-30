@@ -346,7 +346,7 @@ async fn movie_queue_play(
     let stdout = StdoutChannel::with_mock_stdout(mock_stdout.clone(), mock_stdout);
 
     let movie_path = MovieCollection::new(&state.config, &state.db, &stdout)
-        .get_collection_path(idx.into())
+        .get_collection_path(idx)
         .await
         .map_err(Into::<Error>::into)?;
 
@@ -1865,7 +1865,7 @@ async fn plex_detail(
     let task = user
         .store_url_task(state.trakt.get_client(), &state.config, &url)
         .await;
-    let body = if let Some(event) = PlexEvent::get_event_by_id(&state.db, id.into())
+    let body = if let Some(event) = PlexEvent::get_event_by_id(&state.db, id)
         .await
         .map_err(Into::<Error>::into)?
     {

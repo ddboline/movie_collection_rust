@@ -204,13 +204,13 @@ impl MovieCollection {
             }
 
             let query = format_sstr!(
-                r#"
+                r"
                         SELECT index, show, title, link, rating
                         FROM imdb_ratings
                         WHERE link is not null AND
                               rating is not null AND
                               show = $show {}
-                    "#,
+                ",
                 if istv { "AND istv" } else { "" },
             );
 
@@ -284,7 +284,7 @@ impl MovieCollection {
         }
 
         let query = format_sstr!(
-            r#"
+            r"
                 SELECT a.path, a.show,
                 COALESCE(b.rating, -1) as rating,
                 COALESCE(b.title, '') as title,
@@ -292,7 +292,7 @@ impl MovieCollection {
                 FROM movie_collection a
                 LEFT JOIN imdb_ratings b ON a.show_id = b.index
                 WHERE a.is_deleted = false {search_constr}
-            "#
+            "
         );
 
         let query = query_dyn!(&query,)?;
@@ -788,7 +788,6 @@ impl MovieCollection {
             })
             .try_collect()
             .await
-            .map_err(Into::into)
     }
 
     /// # Errors
@@ -810,7 +809,7 @@ impl MovieCollection {
             }
         }
         let query = format_sstr!(
-            r#"
+            r"
                 SELECT b.show, c.link, c.title, c.source, count(*) as count
                 FROM movie_queue a
                 JOIN movie_collection b ON a.collection_idx=b.idx
@@ -820,7 +819,7 @@ impl MovieCollection {
                 ORDER BY 1,2,3,4
                 {offset}
                 {limit}
-            "#,
+            ",
             where_str = if constraints.is_empty() {
                 StackString::new()
             } else {
@@ -857,7 +856,7 @@ impl MovieCollection {
             None => write!(source_str, "AND c.source is null")?,
         }
         let query = format_sstr!(
-            r#"
+            r"
                 WITH active_links AS (
                     SELECT c.link
                     FROM movie_queue a
@@ -888,7 +887,7 @@ impl MovieCollection {
                     d.airdate <= $maxdate {source_str}
                 GROUP BY 1,2,3,4,5,6,7,8,9,10
                 ORDER BY d.airdate, c.show, d.season, d.episode
-            "#
+            "
         );
         let query = query_dyn!(&query, mindate = mindate, maxdate = maxdate)?;
         let conn = self.pool.get().await?;
@@ -960,12 +959,12 @@ impl MovieCollection {
             format_sstr!("WHERE {}", constraints.join(" AND "))
         };
         let mut query = format_sstr!(
-            r#"
+            r"
                 SELECT {select_str}
                 FROM movie_collection
                 {where_str}
                 {order_str}
-            "#
+            "
         );
         if let Some(offset) = &offset {
             query.push_str(&format_sstr!(" OFFSET {offset}"));
@@ -974,7 +973,7 @@ impl MovieCollection {
             query.push_str(&format_sstr!(" LIMIT {limit}"));
         }
         query_bindings.shrink_to_fit();
-        debug!("query:\n{}", query);
+        debug!("query:\n{query}",);
         query_dyn!(&query, ..query_bindings)
     }
 

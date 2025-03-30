@@ -138,13 +138,13 @@ impl ImdbEpisodes {
             format_sstr!("WHERE {}", constraints.join(" AND "))
         };
         let mut query = format_sstr!(
-            r#"
+            r"
                     SELECT {select_str}
                     FROM imdb_episodes a
                     JOIN imdb_ratings b ON a.show = b.show
                     {where_str}
                     {order_str}
-                "#
+            "
         );
         if let Some(offset) = &offset {
             query.push_str(&format_sstr!(" OFFSET {offset}"));
@@ -153,7 +153,7 @@ impl ImdbEpisodes {
             query.push_str(&format_sstr!(" LIMIT {limit}"));
         }
         query_bindings.shrink_to_fit();
-        debug!("query:\n{}", query);
+        debug!("query:\n{query}",);
         query_dyn!(&query, ..query_bindings)
     }
 

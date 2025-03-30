@@ -79,7 +79,7 @@ impl LoggedUser {
         let base_url: Url = format_sstr!("https://{}", config.domain).parse()?;
         let session: Option<SessionData> = ExternalUser::get_session_data(
             &base_url,
-            self.session.into(),
+            self.session,
             &self.secret_key,
             client,
             "movie-queue",
@@ -102,7 +102,7 @@ impl LoggedUser {
         };
         ExternalUser::set_session_data(
             &base_url,
-            self.session.into(),
+            self.session,
             &self.secret_key,
             client,
             "movie-queue",
@@ -131,9 +131,9 @@ impl From<ExternalUser> for LoggedUser {
     fn from(user: ExternalUser) -> Self {
         Self {
             email: user.email,
-            session: user.session.into(),
+            session: user.session,
             secret_key: user.secret_key,
-            created_at: user.created_at.into(),
+            created_at: user.created_at,
         }
     }
 }
@@ -145,7 +145,7 @@ impl TryFrom<Token> for LoggedUser {
             if AUTHORIZED_USERS.is_authorized(&user) {
                 return Ok(user.into());
             }
-            debug!("NOT AUTHORIZED {:?}", user);
+            debug!("NOT AUTHORIZED {user:?}",);
         }
         Err(Error::Unauthorized)
     }

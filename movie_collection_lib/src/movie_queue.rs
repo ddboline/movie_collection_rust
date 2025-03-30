@@ -259,7 +259,7 @@ impl MovieQueueDB {
         }
         let order_by = order_by.unwrap_or(OrderBy::Desc);
         let query = &format_sstr!(
-            r#"
+            r"
                 SELECT a.idx, b.path, c.link, c.istv
                 FROM movie_queue a
                 JOIN movie_collection b ON a.collection_idx = b.idx
@@ -268,7 +268,7 @@ impl MovieQueueDB {
                 ORDER BY a.idx {order_by}
                 {offset_str}
                 {limit_str}
-            "#
+            "
         );
         let query = query_dyn!(query,)?;
         let conn = self.pool.get().await?;
@@ -334,13 +334,13 @@ impl MovieQueueDB {
             format_sstr!("WHERE {}", constraints.join(" AND "))
         };
         let mut query = format_sstr!(
-            r#"
+            r"
                 SELECT {select_str}
                 FROM movie_queue a
                 JOIN movie_collection b ON a.collection_idx = b.idx
                 {where_str}
                 {order_str}
-            "#,
+            ",
         );
         if let Some(offset) = &offset {
             query.push_str(&format_sstr!(" OFFSET {offset}"));
@@ -349,7 +349,7 @@ impl MovieQueueDB {
             query.push_str(&format_sstr!(" LIMIT {limit}"));
         }
         query_bindings.shrink_to_fit();
-        debug!("query:\n{}", query);
+        debug!("query:\n{query}",);
         query_dyn!(&query, ..query_bindings)
     }
 

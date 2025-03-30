@@ -99,7 +99,7 @@ impl PlexEvent {
     pub fn get_from_payload(buf: &[u8]) -> Result<Self, Error> {
         info!("buf {}", std::str::from_utf8(buf).unwrap_or_default());
         let object: WebhookPayload = serde_json::from_slice(buf)?;
-        info!("{:#?}", object);
+        info!("{object:#?}",);
         object.try_into()
     }
 
@@ -142,7 +142,7 @@ impl PlexEvent {
             query.push_str(&format_sstr!(" LIMIT {limit}"));
         }
         query_bindings.shrink_to_fit();
-        debug!("query:\n{}", query);
+        debug!("query:\n{query}",);
         query_dyn!(&query, ..query_bindings)
     }
 
@@ -575,7 +575,7 @@ impl PlexFilename {
             query.push_str(&format_sstr!(" LIMIT {limit}"));
         }
         bindings.shrink_to_fit();
-        debug!("query:\n{}", query);
+        debug!("query:\n{query}",);
         query_dyn!(&query, ..bindings)
     }
 
@@ -755,7 +755,7 @@ impl PlexMetadata {
             query.push_str(&format_sstr!(" LIMIT {limit}"));
         }
         bindings.shrink_to_fit();
-        debug!("query:\n{}", query);
+        debug!("query:\n{query}",);
         query_dyn!(&query, ..bindings)
     }
 

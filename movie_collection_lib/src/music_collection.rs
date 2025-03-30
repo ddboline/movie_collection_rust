@@ -69,7 +69,7 @@ impl MusicCollection {
             query.push_str(&format_sstr!(" LIMIT {limit}"));
         }
         bindings.shrink_to_fit();
-        debug!("query:\n{}", query);
+        debug!("query:\n{query}",);
         query_dyn!(&query, ..bindings)
     }
 

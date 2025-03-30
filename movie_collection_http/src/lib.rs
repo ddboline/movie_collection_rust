@@ -9,6 +9,7 @@
 #![allow(clippy::implicit_hasher)]
 #![allow(clippy::too_many_arguments)]
 #![allow(clippy::ignored_unit_patterns)]
+#![allow(clippy::similar_names)]
 
 pub mod errors;
 pub mod graphql;

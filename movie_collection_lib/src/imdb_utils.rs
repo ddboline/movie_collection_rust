@@ -206,7 +206,7 @@ impl ImdbConnection {
         };
 
         let url = Url::parse("http://www.imdb.com/title/")?.join(title)?;
-        debug!("{:?}", url);
+        debug!("{url:?}",);
         let body = self.get(&url).await?.text().await?;
         Self::parse_imdb_rating_body(&body)
     }
@@ -234,7 +234,7 @@ impl ImdbConnection {
                 continue;
             }
             let rating: RatingStruct = serde_json::from_str(&rating_str)?;
-            debug!("{}", rating_str);
+            debug!("{rating_str}",);
             return Ok(RatingOutput {
                 rating: Some(rating.aggregate_rating.rating_value),
                 count: Some(rating.aggregate_rating.rating_count),
