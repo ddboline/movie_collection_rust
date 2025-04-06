@@ -7,7 +7,7 @@ info:
     email: ddboline@gmail.com
   license:
     name: ''
-  version: '0.11.5'
+  version: '0.12.1'
 paths:
   /list/cal:
     get:
@@ -1305,6 +1305,17 @@ paths:
   /list/transcode/queue/{directory}/{file}:
     post:
       operationId: movie_queue_transcode_directory
+      parameters:
+      - name: directory
+        in: path
+        required: true
+        schema:
+          $ref: '#/components/schemas/str'
+      - name: file
+        in: path
+        required: true
+        schema:
+          $ref: '#/components/schemas/str'
       responses:
         '201':
           description: Transcode Queue Item
@@ -1381,6 +1392,17 @@ paths:
   /list/transcode/remcom/directory/{directory}/{filename}:
     post:
       operationId: movie_queue_remcom_directory_file
+      parameters:
+      - name: directory
+        in: path
+        required: true
+        schema:
+          $ref: '#/components/schemas/str'
+      - name: filename
+        in: path
+        required: true
+        schema:
+          $ref: '#/components/schemas/str'
       responses:
         '201':
           description: Transcode File
@@ -1576,8 +1598,18 @@ paths:
         in: path
         required: true
         schema:
+          $ref: '#/components/schemas/str'
+      - name: index
+        in: path
+        required: true
+        schema:
           type: integer
           minimum: 0
+      - name: suffix
+        in: path
+        required: true
+        schema:
+          $ref: '#/components/schemas/str'
       responses:
         '200':
           description: Extract Subtitles
@@ -1875,6 +1907,11 @@ paths:
         in: path
         required: true
         schema:
+          $ref: '#/components/schemas/str'
+      - name: season
+        in: path
+        required: true
+        schema:
           type: integer
           format: int32
       responses:
@@ -1920,9 +1957,19 @@ paths:
         in: path
         required: true
         schema:
+          $ref: '#/components/schemas/TraktActions'
+      - name: imdb_url
+        in: path
+        required: true
+        schema:
+          $ref: '#/components/schemas/str'
+      - name: season
+        in: path
+        required: true
+        schema:
           type: integer
           format: int32
-      - name: imdb_url
+      - name: episode
         in: path
         required: true
         schema:
@@ -2004,6 +2051,17 @@ paths:
   /trakt/watchlist/{action}/{show}:
     post:
       operationId: trakt_watchlist_action
+      parameters:
+      - name: action
+        in: path
+        required: true
+        schema:
+          $ref: '#/components/schemas/TraktActions'
+      - name: show
+        in: path
+        required: true
+        schema:
+          $ref: '#/components/schemas/str'
       responses:
         '201':
           description: Trakt Watchlist Action
