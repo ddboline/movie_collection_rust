@@ -1435,7 +1435,7 @@ async fn trakt_watched_action(
     paths: Path<(TraktActionsWrapper, StackString, i32, i32)>,
     user: LoggedUser,
 ) -> WarpResult<TraktWatchlistEpisodeActionResponse> {
-    let Path((action,imdb_url,season,episode)) = paths;
+    let Path((action, imdb_url, season, episode)) = paths;
     let url = format_sstr!("/trakt/watched/{action}/{imdb_url}/{season}/{episode}");
     let task = user
         .store_url_task(state.trakt.get_client(), &state.config, &url)
