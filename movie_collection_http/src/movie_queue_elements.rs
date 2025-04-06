@@ -18,7 +18,7 @@ use time::{macros::format_description, Duration, OffsetDateTime};
 use time_tz::OffsetDateTimeExt;
 use uuid::Uuid;
 
-#[allow(unused_imports)]
+#[cfg(debug_assertions)]
 use dioxus::prelude::{GlobalSignal, Readable};
 
 use movie_collection_lib::{
