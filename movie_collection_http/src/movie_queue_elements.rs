@@ -1,8 +1,5 @@
 use anyhow::{format_err, Error};
-use dioxus::prelude::{
-    component, dioxus_elements, rsx, Element, IntoDynNode, Props, 
-    VirtualDom,
-};
+use dioxus::prelude::{component, dioxus_elements, rsx, Element, IntoDynNode, Props, VirtualDom};
 use futures::{future::try_join_all, TryStreamExt};
 use rust_decimal_macros::dec;
 use stack_string::{format_sstr, StackString};
