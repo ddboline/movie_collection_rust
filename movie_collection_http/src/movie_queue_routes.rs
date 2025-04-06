@@ -292,12 +292,10 @@ async fn movie_queue_transcode(
 )]
 async fn movie_queue_transcode_directory(
     state: State<Arc<AppState>>,
-    directory: Path<StackString>,
-    file: Path<StackString>,
+    paths: Path<(StackString, StackString)>,
     user: LoggedUser,
 ) -> WarpResult<TranscodeQueueResponse> {
-    let Path(directory) = directory;
-    let Path(file) = file;
+    let Path((directory, file)) = paths;
 
     let url = format_sstr!("/list/transcode/queue/{directory}/{file}");
     let task = user
@@ -351,7 +349,6 @@ async fn movie_queue_play(
         .map_err(Into::<Error>::into)?;
 
     let movie_path = path::Path::new(movie_path.as_str());
-    println!("movie_path {movie_path:?}");
     let body = play_worker_body(&state.config, movie_path, last_url)
         .map_err(Into::<Error>::into)?
         .into();
@@ -1163,12 +1160,10 @@ async fn movie_queue_remcom_file(
 )]
 async fn movie_queue_remcom_directory_file(
     state: State<Arc<AppState>>,
-    directory: Path<StackString>,
-    filename: Path<StackString>,
+    paths: Path<(StackString, StackString)>,
     user: LoggedUser,
 ) -> WarpResult<TranscodeFileResponse> {
-    let Path(filename) = filename;
-    let Path(directory) = directory;
+    let Path((filename, directory)) = paths;
     let url = format_sstr!("/list/transcode/remcom/directory/{directory}/{filename}");
     let task = user
         .store_url_task(state.trakt.get_client(), &state.config, &url)
@@ -1337,12 +1332,10 @@ struct TraktWatchlistActionResponse(HtmlBase::<StackString>);
 )]
 async fn trakt_watchlist_action(
     state: State<Arc<AppState>>,
-    action: Path<TraktActionsWrapper>,
-    show: Path<StackString>,
+    paths: Path<(TraktActionsWrapper, StackString)>,
     user: LoggedUser,
 ) -> WarpResult<TraktWatchlistActionResponse> {
-    let Path(action) = action;
-    let Path(show) = show;
+    let Path((action, show)) = paths;
     let url = format_sstr!("/trakt/watchlist/{action}/{show}");
     let task = user
         .store_url_task(state.trakt.get_client(), &state.config, &url)
@@ -1404,12 +1397,10 @@ struct TraktWatchlistShowSeasonResponse(HtmlBase::<StackString>);
 )]
 async fn trakt_watched_list(
     state: State<Arc<AppState>>,
-    imdb_url: Path<StackString>,
-    season: Path<i32>,
+    paths: Path<(StackString, i32)>,
     user: LoggedUser,
 ) -> WarpResult<TraktWatchlistShowSeasonResponse> {
-    let Path(imdb_url) = imdb_url;
-    let Path(season) = season;
+    let Path((imdb_url, season)) = paths;
     let url = format_sstr!("/trakt/watched/list/{imdb_url}/{season}");
     let task = user
         .store_url_task(state.trakt.get_client(), &state.config, &url)
@@ -1441,16 +1432,10 @@ struct TraktWatchlistEpisodeActionResponse(HtmlBase::<StackString>);
 )]
 async fn trakt_watched_action(
     state: State<Arc<AppState>>,
-    action: Path<TraktActionsWrapper>,
-    imdb_url: Path<StackString>,
-    season: Path<i32>,
-    episode: Path<i32>,
+    paths: Path<(TraktActionsWrapper, StackString, i32, i32)>,
     user: LoggedUser,
 ) -> WarpResult<TraktWatchlistEpisodeActionResponse> {
-    let Path(action) = action;
-    let Path(imdb_url) = imdb_url;
-    let Path(season) = season;
-    let Path(episode) = episode;
+    let Path((action,imdb_url,season,episode)) = paths;
     let url = format_sstr!("/trakt/watched/{action}/{imdb_url}/{season}/{episode}");
     let task = user
         .store_url_task(state.trakt.get_client(), &state.config, &url)
@@ -2193,14 +2178,10 @@ struct ExtractSubtitlesResponse(HtmlBase::<StackString>);
 )]
 async fn movie_queue_extract_subtitle(
     state: State<Arc<AppState>>,
-    filename: Path<StackString>,
-    index: Path<usize>,
-    suffix: Path<StackString>,
+    paths: Path<(StackString, usize, StackString)>,
     user: LoggedUser,
 ) -> WarpResult<ExtractSubtitlesResponse> {
-    let Path(filename) = filename;
-    let Path(index) = index;
-    let Path(suffix) = suffix;
+    let Path((filename, index, suffix)) = paths;
     let url = format_sstr!("/list/transcode/subtitle/{filename}/{index}/{suffix}");
     let task = user
         .store_url_task(state.trakt.get_client(), &state.config, &url)
