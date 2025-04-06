@@ -6,10 +6,10 @@ use async_graphql::{
     EmptyMutation, EmptySubscription, Schema,
 };
 use async_graphql_axum::GraphQL;
-use axum::http::{Method, StatusCode};
+use axum::http::{header::CONTENT_TYPE, Method, StatusCode};
 use log::debug;
 use stack_string::format_sstr;
-use std::{convert::TryInto, net::SocketAddr, time::Duration};
+use std::{net::SocketAddr, time::Duration};
 use tokio::{
     fs::{create_dir, remove_dir_all},
     net::TcpListener,
@@ -79,27 +79,6 @@ async fn run_app(
         ))
         .finish();
 
-    // let graphql_post = rweb::path!("list" / "graphql" / "graphql")
-    //     .and(async_graphql_warp::graphql(schema))
-    //     .and_then(
-    //         |(schema, request): (
-    //             Schema<QueryRoot, EmptyMutation, EmptySubscription>,
-    //             async_graphql::Request,
-    //         )| async move {
-    //             Ok::<_,
-    // Infallible>(GraphQLResponse::from(schema.execute(request).await))
-    //         },
-    //     );
-    // let graphql_playground = rweb::path!("list" / "graphql" / "playground")
-    //     .and(rweb::path::end())
-    //     .and(rweb::get())
-    //     .map(|| {
-    //         HttpResponse::builder()
-    //             .header("content-type", "text/html")
-    //             .body(playground_source(GraphQLPlaygroundConfig::new("/")))
-    //     })
-    //     .boxed();
-
     let app = AppState {
         config,
         db: pool,
@@ -108,7 +87,7 @@ async fn run_app(
 
     let cors = CorsLayer::new()
         .allow_methods([Method::GET, Method::POST])
-        .allow_headers(["content-type".try_into()?, "jwt".try_into()?])
+        .allow_headers([CONTENT_TYPE])
         .allow_origin(Any);
 
     let (router, api) = OpenApiRouter::with_openapi(ApiDoc::openapi())
@@ -125,7 +104,7 @@ async fn run_app(
             axum::routing::get(|| async move {
                 (
                     StatusCode::OK,
-                    [("content-type", "application/json")],
+                    [(CONTENT_TYPE, mime::APPLICATION_JSON.essence_str())],
                     spec_json,
                 )
             }),
@@ -133,7 +112,7 @@ async fn run_app(
         .route(
             "/list/openapi/yaml",
             axum::routing::get(|| async move {
-                (StatusCode::OK, [("content-type", "text/yaml")], spec_yaml)
+                (StatusCode::OK, [(CONTENT_TYPE, "text/yaml")], spec_yaml)
             }),
         )
         .route(
@@ -152,7 +131,7 @@ async fn run_app(
             axum::routing::get(|| async move {
                 (
                     StatusCode::OK,
-                    [("content-type", "text/html")],
+                    [(CONTENT_TYPE, "text/html")],
                     playground_source(GraphQLPlaygroundConfig::new("/list/graphql/graphql")),
                 )
             }),

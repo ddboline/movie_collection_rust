@@ -45,6 +45,8 @@ pub struct ConfigInner {
     pub remcom_queue: StackString,
     #[serde(default = "default_trakt_endpoint")]
     pub trakt_endpoint: StackString,
+    #[serde(default = "default_trakt_api_endpoint")]
+    pub trakt_api_endpoint: StackString,
     #[serde(default = "default_trakt_endpoint")]
     pub trakt_client_id: StackString,
     #[serde(default = "default_trakt_endpoint")]
@@ -113,6 +115,9 @@ fn default_remcom_queue() -> StackString {
     "remcom_worker_queue".into()
 }
 fn default_trakt_endpoint() -> StackString {
+    "https://trakt.tv".into()
+}
+fn default_trakt_api_endpoint() -> StackString {
     "https://api.trakt.tv".into()
 }
 fn default_secret_path() -> PathBuf {
