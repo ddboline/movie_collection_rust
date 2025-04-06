@@ -1,6 +1,6 @@
 use anyhow::{format_err, Error};
 use dioxus::prelude::{
-    component, dioxus_elements, rsx, Element, GlobalSignal, IntoDynNode, Props, Readable,
+    component, dioxus_elements, rsx, Element, IntoDynNode, Props, 
     VirtualDom,
 };
 use futures::{future::try_join_all, TryStreamExt};
@@ -17,6 +17,9 @@ use stdout_channel::{MockStdout, StdoutChannel};
 use time::{macros::format_description, Duration, OffsetDateTime};
 use time_tz::OffsetDateTimeExt;
 use uuid::Uuid;
+
+#[allow(unused_imports)]
+use dioxus::prelude::{GlobalSignal, Readable};
 
 use movie_collection_lib::{
     config::Config,
