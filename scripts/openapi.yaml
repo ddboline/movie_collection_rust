@@ -2456,6 +2456,13 @@ components:
           type: array
           items:
             $ref: '#/components/schemas/PlexMetadata'
+    TraktActions:
+      type: string
+      enum:
+      - none
+      - list
+      - add
+      - remove
     TvShowSource:
       type: string
       enum:

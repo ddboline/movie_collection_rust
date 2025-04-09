@@ -2273,6 +2273,6 @@ pub fn get_full_path(app: &AppState) -> OpenApiRouter {
         title = "Movie Queue WebApp",
         description = "Web Frontend for Movie Queue",
     ),
-    components(schemas(LoggedUser, Pagination, LastModifiedResponseWrapper))
+    components(schemas(LoggedUser, Pagination, LastModifiedResponseWrapper, TraktActionsWrapper))
 )]
 pub struct ApiDoc;
