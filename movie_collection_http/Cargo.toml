@@ -11,7 +11,7 @@ async-graphql-axum = "7.0"
 async-trait = "0.1"
 axum = { version = "0.8", features = ["multipart"] }
 axum-extra = {version="0.10", features=["cookie"]}
-authorized_users = { git = "https://github.com/ddboline/auth_server_rust.git", tag="0.13.0"}
+authorized_users = { git = "https://github.com/ddboline/auth_server_rust.git", tag="0.13.1"}
 bytes = "1.0"
 derive_more = {version="2.0", features=["full"]}
 dioxus = "0.6"
