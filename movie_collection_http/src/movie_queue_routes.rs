@@ -1343,7 +1343,7 @@ async fn watchlist_action_worker(
     action: TraktActions,
     show: &str,
 ) -> WarpResult<StackString> {
-    trakt.init().await;
+    trakt.init().await?;
     let mut body = StackString::new();
     match action {
         TraktActions::Add => {
@@ -1552,7 +1552,7 @@ async fn trakt_auth_url(
     let task = user
         .store_url_task(state.trakt.get_client(), &state.config, "/trakt/auth_url")
         .await;
-    state.trakt.init().await;
+    state.trakt.init().await?;
     let url = state
         .trakt
         .get_auth_url()
@@ -1594,7 +1594,7 @@ async fn trakt_callback(
     let task = user
         .store_url_task(state.trakt.get_client(), &state.config, "/trakt/callback")
         .await;
-    state.trakt.init().await;
+    state.trakt.init().await?;
     let Query(query) = query;
     state
         .trakt
@@ -1630,7 +1630,7 @@ async fn refresh_auth(
             "/trakt/refresh_auth",
         )
         .await;
-    state.trakt.init().await;
+    state.trakt.init().await?;
     state
         .trakt
         .exchange_refresh_token()
@@ -1652,7 +1652,7 @@ async fn watched_action_http_worker(
     stdout: &StdoutChannel<StackString>,
 ) -> WarpResult<StackString> {
     let mc = MovieCollection::new(config, pool, stdout);
-    trakt.init().await;
+    trakt.init().await?;
     let body = match action {
         TraktActions::Add => {
             let result = if season != -1 && episode != -1 {

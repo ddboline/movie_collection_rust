@@ -1342,7 +1342,7 @@ struct CalEntry {
 /// # Errors
 /// Returns error if db query fails
 pub async fn trakt_cal_http_body(pool: &PgPool, trakt: &TraktConnection) -> Result<String, Error> {
-    trakt.init().await;
+    trakt.init().await?;
     let cal_list = trakt.get_calendar().await?;
     let mut entries = Vec::new();
     for cal in cal_list {

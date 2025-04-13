@@ -13,6 +13,7 @@ use std::{
     path::PathBuf,
     sync::Arc,
 };
+use time::OffsetDateTime;
 use time_tz::OffsetDateTimeExt;
 use tokio::{
     fs::{read, write},
@@ -59,12 +60,13 @@ impl TraktConnection {
 
     /// # Errors
     /// Return error if `read_auth_token` fails
-    pub async fn init(&self) {
-        if let Ok(auth_token) = self.read_auth_token().await {
-            AUTH_TOKEN.write().await.replace(Arc::new(auth_token));
-        } else {
-            println!("read_auth_token failed...");
-        }
+    pub async fn init(&self) -> Result<(), Error> {
+        let auth_token = self.read_auth_token().await?;
+        let auth_token = if auth_token.has_expired() {
+            self.get_refresh_token().await?
+        } else {auth_token};
+        AUTH_TOKEN.write().await.replace(Arc::new(auth_token));
+        Ok(())
     }
 
     fn token_path() -> Result<PathBuf, Error> {
@@ -681,6 +683,13 @@ struct AccessTokenResponse {
     created_at: u64,
 }
 
+impl AccessTokenResponse {
+    pub fn has_expired(&self) -> bool {
+        let expires_at = (self.created_at + self.expires_in) as i64;
+        expires_at < OffsetDateTime::now_utc().unix_timestamp()
+    }
+}
+
 #[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct TraktIdObject {
     pub trakt: i32,
@@ -782,6 +791,7 @@ mod tests {
         let conn = TraktConnection::new(config);
         let auth_token = conn.read_auth_token().await?;
         assert_eq!(auth_token.scope, "public");
+        assert_eq!(auth_token.has_expired(), false);
         Ok(())
     }
 
@@ -790,7 +800,7 @@ mod tests {
     async fn test_get_watchlist_shows() -> Result<(), Error> {
         let config = Config::with_config()?;
         let conn = TraktConnection::new(config);
-        conn.init().await;
+        conn.init().await?;
         let result = conn.get_watchlist_shows().await?;
         assert!(result.len() > 10);
         Ok(())
@@ -802,7 +812,7 @@ mod tests {
         let imdb_id = "tt4270492";
         let config = Config::with_config()?;
         let conn = TraktConnection::new(config);
-        conn.init().await;
+        conn.init().await?;
         let result = conn.get_show_by_imdb_id(imdb_id).await?;
         assert_eq!(result[0].show.title, "Billions");
         Ok(())
@@ -813,7 +823,7 @@ mod tests {
     async fn test_get_watched_shows() -> Result<(), Error> {
         let config = Config::with_config()?;
         let conn = TraktConnection::new(config);
-        conn.init().await;
+        conn.init().await?;
         let result = conn.get_watched_shows().await?;
         assert!(result.len() > 10);
         Ok(())
@@ -824,7 +834,7 @@ mod tests {
     async fn test_get_watched_movies() -> Result<(), Error> {
         let config = Config::with_config()?;
         let conn = TraktConnection::new(config);
-        conn.init().await;
+        conn.init().await?;
         let result = conn.get_watched_movies().await?;
         println!("{}", result.len());
         assert!(result.len() > 5);
@@ -836,7 +846,7 @@ mod tests {
     async fn test_get_calendar() -> Result<(), Error> {
         let config = Config::with_config()?;
         let conn = TraktConnection::new(config);
-        conn.init().await;
+        conn.init().await?;
         let result = conn.get_calendar().await?;
         println!("{}", result.len());
         assert!(result.len() > 1);

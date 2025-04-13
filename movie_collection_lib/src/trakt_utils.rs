@@ -617,7 +617,7 @@ pub async fn sync_trakt_with_db(
     mc: &MovieCollection,
 ) -> Result<(), Error> {
     let watchlist_shows_db = Arc::new(get_watchlist_shows_db(&mc.pool).await?);
-    trakt.init().await;
+    trakt.init().await?;
     let watchlist_shows = trakt.get_watchlist_shows().await?;
     if watchlist_shows.is_empty() {
         return Ok(());
@@ -736,7 +736,7 @@ async fn get_imdb_url_from_show(
 }
 
 async fn trakt_cal_list(trakt: &TraktConnection, mc: &MovieCollection) -> Result<(), Error> {
-    trakt.init().await;
+    trakt.init().await?;
     let cal_entries = trakt.get_calendar().await?;
     for cal in cal_entries {
         let show = match ImdbRatings::get_show_by_link(&cal.link, &mc.pool).await? {
@@ -771,7 +771,7 @@ pub async fn watchlist_add(
     show: &str,
     imdb_link: Option<&str>,
 ) -> Result<Option<TraktResult>, Error> {
-    trakt.init().await;
+    trakt.init().await?;
     let imdb_url = if let Some(link) = imdb_link {
         link.into()
     } else if let Some(link) = get_imdb_url_from_show(mc, show).await? {
@@ -803,7 +803,7 @@ pub async fn watchlist_rm(
 ) -> Result<Option<TraktResult>, Error> {
     if let Some(imdb_url) = get_imdb_url_from_show(mc, show).await? {
         let imdb_url_ = imdb_url.clone();
-        trakt.init().await;
+        trakt.init().await?;
         let result = trakt.remove_watchlist_show(&imdb_url_).await?;
         mc.stdout.send(format_sstr!("result: {result}"));
         if let Some(show) = WatchListShow::get_show_by_link(&imdb_url, &mc.pool).await? {
@@ -829,7 +829,7 @@ async fn watched_add(
     season: i32,
     episode: &[i32],
 ) -> Result<(), Error> {
-    trakt.init().await;
+    trakt.init().await?;
     if let Some(imdb_url) = get_imdb_url_from_show(mc, show).await? {
         if season != -1 && !episode.is_empty() {
             for epi in episode {
@@ -868,7 +868,7 @@ async fn watched_rm(
     season: i32,
     episode: &[i32],
 ) -> Result<(), Error> {
-    trakt.init().await;
+    trakt.init().await?;
     if let Some(imdb_url) = get_imdb_url_from_show(mc, show).await? {
         if season != -1 && !episode.is_empty() {
             for epi in episode {
