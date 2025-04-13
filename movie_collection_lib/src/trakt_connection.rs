@@ -64,7 +64,9 @@ impl TraktConnection {
         let auth_token = self.read_auth_token().await?;
         let auth_token = if auth_token.has_expired() {
             self.get_refresh_token().await?
-        } else {auth_token};
+        } else {
+            auth_token
+        };
         AUTH_TOKEN.write().await.replace(Arc::new(auth_token));
         Ok(())
     }
