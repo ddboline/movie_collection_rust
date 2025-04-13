@@ -1630,12 +1630,14 @@ async fn refresh_auth(
             "/trakt/refresh_auth",
         )
         .await;
-    state.trakt.init().await?;
-    state
-        .trakt
-        .exchange_refresh_token()
-        .await
-        .map_err(Into::<Error>::into)?;
+    let access_token = state.trakt.init().await?;
+    if access_token.has_expired() {
+        state
+            .trakt
+            .exchange_refresh_token(&access_token)
+            .await
+            .map_err(Into::<Error>::into)?;
+    }
     task.await.ok();
     Ok(HtmlBase::new("Finished").into())
 }

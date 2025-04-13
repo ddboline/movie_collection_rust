@@ -60,15 +60,18 @@ impl TraktConnection {
 
     /// # Errors
     /// Return error if `read_auth_token` fails
-    pub async fn init(&self) -> Result<(), Error> {
+    pub async fn init(&self) -> Result<AccessTokenResponse, Error> {
         let auth_token = self.read_auth_token().await?;
         let auth_token = if auth_token.has_expired() {
-            self.get_refresh_token().await?
+            self.get_refresh_token(&auth_token).await?
         } else {
             auth_token
         };
-        AUTH_TOKEN.write().await.replace(Arc::new(auth_token));
-        Ok(())
+        AUTH_TOKEN
+            .write()
+            .await
+            .replace(Arc::new(auth_token.clone()));
+        Ok(auth_token)
     }
 
     fn token_path() -> Result<PathBuf, Error> {
@@ -153,35 +156,33 @@ impl TraktConnection {
         }
     }
 
-    async fn get_refresh_token(&self) -> Result<AccessTokenResponse, Error> {
-        let current_auth_token = AUTH_TOKEN.read().await.clone();
-        if let Some(current_auth_token) = current_auth_token {
-            let domain = &self.config.domain;
-            let redirect_uri = format_sstr!("https://{domain}/trakt/callback");
-            let trakt_endpoint = &self.config.trakt_api_endpoint;
-            let url = format_sstr!("{trakt_endpoint}/oauth/token");
-            let body = hashmap! {
-                "refresh_token" => current_auth_token.refresh_token.as_str(),
-                "client_id" => self.config.trakt_client_id.as_str(),
-                "client_secret" => self.config.trakt_client_secret.as_str(),
-                "redirect_uri" => redirect_uri.as_str(),
-                "grant_type" => "refresh_token",
-            };
-            let mut headers = HeaderMap::new();
-            headers.insert("Content-Type", "application/json".parse()?);
-            self.client
-                .post(url.as_str())
-                .headers(headers)
-                .json(&body)
-                .send()
-                .await?
-                .error_for_status()?
-                .json()
-                .await
-                .map_err(Into::into)
-        } else {
-            Err(format_err!("No refresh_token"))
-        }
+    async fn get_refresh_token(
+        &self,
+        current_auth_token: &AccessTokenResponse,
+    ) -> Result<AccessTokenResponse, Error> {
+        let domain = &self.config.domain;
+        let redirect_uri = format_sstr!("https://{domain}/trakt/callback");
+        let trakt_endpoint = &self.config.trakt_api_endpoint;
+        let url = format_sstr!("{trakt_endpoint}/oauth/token");
+        let body = hashmap! {
+            "refresh_token" => current_auth_token.refresh_token.as_str(),
+            "client_id" => self.config.trakt_client_id.as_str(),
+            "client_secret" => self.config.trakt_client_secret.as_str(),
+            "redirect_uri" => redirect_uri.as_str(),
+            "grant_type" => "refresh_token",
+        };
+        let mut headers = HeaderMap::new();
+        headers.insert("Content-Type", "application/json".parse()?);
+        self.client
+            .post(url.as_str())
+            .headers(headers)
+            .json(&body)
+            .send()
+            .await?
+            .error_for_status()?
+            .json()
+            .await
+            .map_err(Into::into)
     }
 
     /// # Errors
@@ -195,8 +196,11 @@ impl TraktConnection {
 
     /// # Errors
     /// Return error if `get_refresh_token` or `write_auth_token` fail
-    pub async fn exchange_refresh_token(&self) -> Result<(), Error> {
-        let auth_token = self.get_refresh_token().await?;
+    pub async fn exchange_refresh_token(
+        &self,
+        current_auth_token: &AccessTokenResponse,
+    ) -> Result<(), Error> {
+        let auth_token = self.get_refresh_token(current_auth_token).await?;
         self.write_auth_token(&auth_token).await?;
         AUTH_TOKEN.write().await.replace(Arc::new(auth_token));
         Ok(())
@@ -675,8 +679,8 @@ struct WatchedEpisodeRequest {
     pub ids: TraktIdObject,
 }
 
-#[derive(Serialize, Deserialize, Debug)]
-struct AccessTokenResponse {
+#[derive(Serialize, Deserialize, Debug, Clone)]
+pub struct AccessTokenResponse {
     access_token: StackString,
     token_type: StackString,
     expires_in: u64,
@@ -686,6 +690,7 @@ struct AccessTokenResponse {
 }
 
 impl AccessTokenResponse {
+    #[must_use]
     pub fn has_expired(&self) -> bool {
         let expires_at = (self.created_at + self.expires_in) as i64;
         expires_at < OffsetDateTime::now_utc().unix_timestamp()
