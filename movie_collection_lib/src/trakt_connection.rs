@@ -79,7 +79,9 @@ impl TraktConnection {
         Ok(home_dir.join(".trakt").join("auth_token_web.json"))
     }
 
-    async fn read_auth_token(&self) -> Result<AccessTokenResponse, Error> {
+    /// # Errors
+    /// Return error if parsing url fails
+    pub async fn read_auth_token(&self) -> Result<AccessTokenResponse, Error> {
         serde_json::from_slice(&read(Self::token_path()?).await?).map_err(Into::into)
     }
 

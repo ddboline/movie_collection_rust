@@ -1552,7 +1552,6 @@ async fn trakt_auth_url(
     let task = user
         .store_url_task(state.trakt.get_client(), &state.config, "/trakt/auth_url")
         .await;
-    state.trakt.init().await?;
     let url = state
         .trakt
         .get_auth_url()
@@ -1594,7 +1593,6 @@ async fn trakt_callback(
     let task = user
         .store_url_task(state.trakt.get_client(), &state.config, "/trakt/callback")
         .await;
-    state.trakt.init().await?;
     let Query(query) = query;
     state
         .trakt
@@ -1630,7 +1628,7 @@ async fn refresh_auth(
             "/trakt/refresh_auth",
         )
         .await;
-    let access_token = state.trakt.init().await?;
+    let access_token = state.trakt.read_auth_token().await?;
     if access_token.has_expired() {
         state
             .trakt
