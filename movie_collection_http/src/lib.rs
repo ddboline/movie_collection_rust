@@ -24,8 +24,8 @@ use rust_decimal::Decimal;
 use serde::{Deserialize, Serialize};
 use stack_string::StackString;
 use time::{Date, OffsetDateTime};
-use utoipa::ToSchema;
-use utoipa_helper::derive_utoipa_schema;
+use utoipa::{IntoParams, ToSchema};
+use utoipa_helper::{derive_utoipa_params, derive_utoipa_schema};
 use uuid::Uuid;
 
 use movie_collection_lib::{
@@ -48,25 +48,29 @@ derive_utoipa_schema!(ImdbEpisodesWrapper, _ImdbEpisodesWrapper);
 #[allow(dead_code)]
 #[derive(ToSchema)]
 #[schema(as = ImdbEpisodes)]
-// ImdbEpisodes")]
+// ImdbEpisodes
 struct _ImdbEpisodesWrapper {
-    // TV Show Name")]
+    // TV Show Name
+    #[schema(inline)]
     show: StackString,
-    // Title")]
+    // Title
+    #[schema(inline)]
     title: StackString,
-    // Season")]
+    // Season
     season: i32,
-    // Episode")]
+    // Episode
     episode: i32,
-    // Airdate")]
+    // Airdate
     airdate: Option<Date>,
-    // Rating")]
+    // Rating
     rating: Option<Decimal>,
-    // Episode Title")]
+    // Episode Title
+    #[schema(inline)]
     eptitle: StackString,
-    // Episode URL")]
+    // Episode URL
+    #[schema(inline)]
     epurl: StackString,
-    // ID")]
+    // ID
     id: Uuid,
 }
 
@@ -97,21 +101,24 @@ derive_utoipa_schema!(ImdbRatingsWrapper, _ImdbRatingsWrapper);
 #[allow(dead_code)]
 #[derive(ToSchema)]
 #[schema(as = ImdbRatings)]
-// ImdbRatings")]
+// ImdbRatings
 struct _ImdbRatingsWrapper {
-    // Index")]
+    // Index
     index: Uuid,
-    // TV Show Name")]
+    // TV Show Name
+    #[schema(inline)]
     show: StackString,
-    // Title")]
+    // Title
+    #[schema(inline)]
     title: Option<StackString>,
-    // IMDB ID")]
+    // IMDB ID
+    #[schema(inline)]
     link: StackString,
-    // Rating")]
+    // Rating
     rating: Option<f64>,
-    // IsTv Flag")]
+    // IsTv Flag
     istv: Option<bool>,
-    // Source")]
+    // Source
     source: Option<TvShowSourceWrapper>,
 }
 
@@ -123,17 +130,19 @@ derive_utoipa_schema!(MovieQueueRowWrapper, _MovieQueueRowWrapper);
 #[allow(dead_code)]
 #[derive(ToSchema)]
 #[schema(as = MovieQueueRow)]
-// MovieQueueRow")]
+// MovieQueueRow
 struct _MovieQueueRowWrapper {
-    // Queue Index")]
+    // Queue Index
     idx: i32,
-    // Collection Index")]
+    // Collection Index
     collection_idx: Uuid,
-    // Collection Path")]
+    // Collection Path
+    #[schema(inline)]
     path: StackString,
-    // TV Show Name")]
+    // TV Show Name
+    #[schema(inline)]
     show: StackString,
-    // Last Modified")]
+    // Last Modified
     last_modified: Option<OffsetDateTime>,
 }
 
@@ -145,13 +154,15 @@ derive_utoipa_schema!(MovieCollectionRowWrapper, _MovieCollectionRowWrapper);
 #[allow(dead_code)]
 #[derive(ToSchema)]
 #[schema(as = MovieCollectionRow)]
-// MovieCollectionRow")]
+// MovieCollectionRow
 struct _MovieCollectionRowWrapper {
-    // Collection Index")]
+    // Collection Index
     idx: Uuid,
-    // Collection Path")]
+    // Collection Path
+    #[schema(inline)]
     path: StackString,
-    // TV Show Name")]
+    // TV Show Name
+    #[schema(inline)]
     show: StackString,
 }
 
@@ -163,11 +174,12 @@ derive_utoipa_schema!(LastModifiedResponseWrapper, _LastModifiedResponseWrapper)
 #[allow(dead_code)]
 #[derive(ToSchema)]
 #[schema(as = LastModifiedResponse)]
-// LastModifiedResponse")]
+// LastModifiedResponse
 struct _LastModifiedResponseWrapper {
-    // Table Name")]
+    // Table Name
+    #[schema(inline)]
     table: StackString,
-    // Last Modified")]
+    // Last Modified
     last_modified: OffsetDateTime,
 }
 
@@ -179,39 +191,51 @@ derive_utoipa_schema!(PlexEventWrapper, _PlexEventWrapper);
 #[allow(dead_code)]
 #[derive(ToSchema)]
 #[schema(as = PlexEvent)]
-// PlexEvent")]
+// PlexEvent
 struct _PlexEventWrapper {
-    // ID")]
+    // ID
     id: Uuid,
-    // Event")]
+    // Event
+    #[schema(inline)]
     event: StackString,
-    // Account")]
+    // Account
+    #[schema(inline)]
     account: StackString,
-    // Server")]
+    // Server
+    #[schema(inline)]
     server: StackString,
-    // Player Title")]
+    // Player Title
+    #[schema(inline)]
     player_title: StackString,
-    // Player Address")]
+    // Player Address
+    #[schema(inline)]
     player_address: StackString,
-    // Title")]
+    // Title
+    #[schema(inline)]
     title: StackString,
-    // Parent Title")]
+    // Parent Title
+    #[schema(inline)]
     parent_title: Option<StackString>,
-    // Grandparent Title")]
+    // Grandparent Title
+    #[schema(inline)]
     grandparent_title: Option<StackString>,
-    // Added At Timestamp")]
+    // Added At Timestamp
     added_at: OffsetDateTime,
-    // Updated At Timestamp")]
+    // Updated At Timestamp
     updated_at: Option<OffsetDateTime>,
-    // Last Modified")]
+    // Last Modified
     last_modified: OffsetDateTime,
-    // Metadata Type")]
+    // Metadata Type
+    #[schema(inline)]
     metadata_type: Option<StackString>,
-    // Section Type")]
+    // Section Type
+    #[schema(inline)]
     section_type: Option<StackString>,
-    // Section Title")]
+    // Section Title
+    #[schema(inline)]
     section_title: Option<StackString>,
-    // Metadata Key")]
+    // Metadata Key
+    #[schema(inline)]
     metadata_key: Option<StackString>,
 }
 
@@ -223,15 +247,17 @@ derive_utoipa_schema!(PlexFilenameWrapper, _PlexFilenameWrapper);
 #[allow(dead_code)]
 #[derive(ToSchema)]
 #[schema(as = PlexFilename)]
-// PlexFilename")]
+// PlexFilename
 struct _PlexFilenameWrapper {
-    // Metadata Key")]
+    // Metadata Key
+    #[schema(inline)]
     metadata_key: StackString,
-    // Filename")]
+    // Filename
+    #[schema(inline)]
     filename: StackString,
-    // Collection Id")]
+    // Collection Id
     collection_id: Option<Uuid>,
-    // Music Collection Id")]
+    // Music Collection Id
     music_collection_id: Option<Uuid>,
 }
 
@@ -243,19 +269,25 @@ derive_utoipa_schema!(PlexMetadataWrapper, _PlexMetadataWrapper);
 #[allow(dead_code)]
 #[derive(ToSchema)]
 #[schema(as = PlexMetadata)]
-// PlexMetadata")]
+// PlexMetadata
 struct _PlexMetadataWrapper {
-    // Metadata Key")]
+    // Metadata Key
+    #[schema(inline)]
     metadata_key: StackString,
-    // Object Type")]
+    // Object Type
+    #[schema(inline)]
     object_type: StackString,
-    // Title")]
+    // Title
+    #[schema(inline)]
     title: StackString,
-    // Parent Key")]
+    // Parent Key
+    #[schema(inline)]
     parent_key: Option<StackString>,
-    // Grandparent Key")]
+    // Grandparent Key
+    #[schema(inline)]
     grandparent_key: Option<StackString>,
-    // show")]
+    // show
+    #[schema(inline)]
     show: Option<StackString>,
 }
 
@@ -267,19 +299,23 @@ derive_utoipa_schema!(MusicCollectionWrapper, _MusicCollectionWrapper);
 #[allow(dead_code)]
 #[derive(ToSchema)]
 #[schema(as = MusicCollection)]
-// MusicCollection")]
+// MusicCollection
 struct _MusicCollectionWrapper {
-    // Id")]
+    // Id
     id: Uuid,
-    // Path")]
+    // Path
+    #[schema(inline)]
     path: StackString,
-    // Artist")]
+    // Artist
+    #[schema(inline)]
     artist: Option<StackString>,
-    // Album")]
+    // Album
+    #[schema(inline)]
     album: Option<StackString>,
-    // Title")]
+    // Title
+    #[schema(inline)]
     title: Option<StackString>,
-    // Last Modified")]
+    // Last Modified
     last_modified: OffsetDateTime,
 }
 
@@ -376,21 +412,22 @@ pub struct PlexEventRequest {
 }
 
 derive_utoipa_schema!(PlexEventRequest, _PlexEventRequest);
+derive_utoipa_params!(PlexEventRequest, _PlexEventRequest);
 
 #[allow(dead_code)]
-#[derive(ToSchema)]
+#[derive(ToSchema, IntoParams)]
 #[schema(as = PlexEventRequest)]
-// PlexEventRequest")]
+// PlexEventRequest
 struct _PlexEventRequest {
-    // Start Timestamp")]
+    // Start Timestamp
     start_timestamp: Option<OffsetDateTime>,
-    // Event Type")]
+    // Event Type
     event_type: Option<PlexEventTypeWrapper>,
-    // Section Type")]
+    // Section Type
     section_type: Option<PlexSectionTypeWrapper>,
-    // Offset")]
+    // Offset
     offset: Option<usize>,
-    // Limit")]
+    // Limit
     limit: Option<usize>,
 }
 
@@ -402,17 +439,18 @@ pub struct PlexFilenameRequest {
 }
 
 derive_utoipa_schema!(PlexFilenameRequest, _PlexFilenameRequest);
+derive_utoipa_params!(PlexFilenameRequest, _PlexFilenameRequest);
 
 #[allow(dead_code)]
-#[derive(ToSchema)]
+#[derive(ToSchema, IntoParams)]
 #[schema(as = PlexFilenameRequest)]
-// PlexEventFilenameRequest")]
+// PlexEventFilenameRequest
 struct _PlexFilenameRequest {
-    // Start Timestamp")]
+    // Start Timestamp
     start_timestamp: Option<OffsetDateTime>,
-    // Offset")]
+    // Offset
     offset: Option<usize>,
-    // Limit")]
+    // Limit
     limit: Option<usize>,
 }
 
@@ -425,19 +463,26 @@ pub struct TraktWatchlistRequest {
 }
 
 derive_utoipa_schema!(TraktWatchlistRequest, _TraktWatchlistRequest);
+derive_utoipa_params!(TraktWatchlistRequest, _TraktWatchlistRequest);
 
 #[allow(dead_code)]
-#[derive(ToSchema)]
+#[derive(ToSchema, IntoParams)]
 #[schema(as = TraktWatchlistRequest)]
-// TraktWatchlistRequest")]
+// TraktWatchlistRequest
 pub struct _TraktWatchlistRequest {
-    // Search Query")]
+    // Search Query
+    #[schema(inline)]
+    #[param(inline)]
     pub query: Option<StackString>,
-    // Tv Show Source")]
+    // Tv Show Source
     pub source: Option<TvShowSourceWrapper>,
-    // Offset")]
+    // Offset
+    #[schema(inline)]
+    #[param(inline)]
     pub offset: Option<StackString>,
-    // Limit")]
+    // Limit
+    #[schema(inline)]
+    #[param(inline)]
     pub limit: Option<StackString>,
 }
 

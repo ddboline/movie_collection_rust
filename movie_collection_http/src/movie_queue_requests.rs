@@ -4,8 +4,8 @@ use serde::{Deserialize, Serialize};
 use stack_string::StackString;
 use stdout_channel::{MockStdout, StdoutChannel};
 use time::OffsetDateTime;
-use utoipa::ToSchema;
-use utoipa_helper::derive_utoipa_schema;
+use utoipa::{IntoParams, ToSchema};
+use utoipa_helper::{derive_utoipa_params, derive_utoipa_schema};
 
 use movie_collection_lib::{
     config::Config,
@@ -125,7 +125,7 @@ impl ImdbEpisodesRequest {
     }
 }
 
-#[derive(Deserialize, Default, ToSchema)]
+#[derive(Deserialize, Default, ToSchema, IntoParams)]
 pub struct ParseImdbRequest {
     // All Entries Flag
     pub all: Option<bool>,
@@ -136,6 +136,8 @@ pub struct ParseImdbRequest {
     // Update Flag
     pub update: Option<bool>,
     // IMDB ID
+    #[schema(inline)]
+    #[param(inline)]
     pub link: Option<StackString>,
     // Season
     pub season: Option<i32>,
@@ -186,7 +188,7 @@ impl ImdbShowRequest {
     }
 }
 
-#[derive(ToSchema)]
+#[derive(ToSchema, IntoParams)]
 #[allow(dead_code)]
 struct _ImdbEpisodesSyncRequest {
     // Start Timestamp
@@ -205,6 +207,7 @@ pub struct MovieQueueSyncRequest {
 }
 
 derive_utoipa_schema!(MovieQueueSyncRequest, _ImdbEpisodesSyncRequest);
+derive_utoipa_params!(MovieQueueSyncRequest, _ImdbEpisodesSyncRequest);
 
 impl MovieQueueSyncRequest {
     /// # Errors
@@ -238,6 +241,7 @@ pub struct MovieCollectionSyncRequest {
 }
 
 derive_utoipa_schema!(MovieCollectionSyncRequest, _ImdbEpisodesSyncRequest);
+derive_utoipa_params!(MovieCollectionSyncRequest, _ImdbEpisodesSyncRequest);
 
 impl MovieCollectionSyncRequest {
     /// # Errors
@@ -307,9 +311,11 @@ impl ImdbRatingsUpdateRequest {
     }
 }
 
-#[derive(Serialize, Deserialize, ToSchema)]
+#[derive(Serialize, Deserialize, ToSchema, IntoParams)]
 pub struct ImdbRatingsSetSourceRequest {
     // IMDB ID
+    #[schema(inline)]
+    #[param(inline)]
     pub link: StackString,
     // TV Show Source
     pub source: TvShowSourceWrapper,

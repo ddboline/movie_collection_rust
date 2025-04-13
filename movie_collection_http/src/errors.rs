@@ -69,6 +69,7 @@ impl From<PqError> for ServiceError {
 
 #[derive(Serialize, ToSchema)]
 struct ErrorMessage {
+    #[schema(inline)]
     message: StackString,
 }
 

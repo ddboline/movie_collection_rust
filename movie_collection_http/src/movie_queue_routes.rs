@@ -21,10 +21,10 @@ use stdout_channel::{MockStdout, StdoutChannel};
 use time::OffsetDateTime;
 use tokio::fs::remove_file;
 use tokio_stream::StreamExt;
-use utoipa::{OpenApi, PartialSchema, ToSchema};
+use utoipa::{IntoParams, OpenApi, PartialSchema, ToSchema};
 use utoipa_axum::{router::OpenApiRouter, routes};
 use utoipa_helper::{
-    derive_utoipa_schema, html_response::HtmlResponse as HtmlBase,
+    derive_utoipa_params, derive_utoipa_schema, html_response::HtmlResponse as HtmlBase,
     json_response::JsonResponse as JsonBase, UtoipaResponse,
 };
 use uuid::Uuid;
@@ -68,8 +68,9 @@ use crate::{
     },
     ImdbEpisodesWrapper, ImdbRatingsWrapper, LastModifiedResponseWrapper,
     MovieCollectionRowWrapper, MovieQueueRowWrapper, MusicCollectionWrapper, OrderByWrapper,
-    PlexEventRequest, PlexEventWrapper, PlexFilenameRequest, PlexFilenameWrapper,
-    PlexMetadataWrapper, TraktActionsWrapper, TraktWatchlistRequest, TvShowSourceWrapper,
+    PlexEventRequest, PlexEventTypeWrapper, PlexEventWrapper, PlexFilenameRequest,
+    PlexFilenameWrapper, PlexMetadataWrapper, PlexSectionTypeWrapper, TraktActionsWrapper,
+    TraktWatchlistRequest, TvShowSourceWrapper,
 };
 
 type WarpResult<T> = Result<T, Error>;
@@ -89,10 +90,12 @@ async fn scripts_js() -> JsScriptsResponse {
 #[rustfmt::skip]
 struct MovieQueueResponse(HtmlBase::<StackString>);
 
-#[derive(Serialize, Deserialize, Debug, ToSchema)]
+#[derive(Serialize, Deserialize, Debug, ToSchema, IntoParams)]
 // FullQueueRequest
 struct FullQueueRequest {
     // Search String
+    #[schema(inline)]
+    #[param(inline)]
     q: Option<StackString>,
     // Offset
     offset: Option<usize>,
@@ -102,7 +105,12 @@ struct FullQueueRequest {
     order_by: Option<OrderByWrapper>,
 }
 
-#[utoipa::path(get, path = "/list/full_queue", responses(MovieQueueResponse, Error))]
+#[utoipa::path(
+    get,
+    path = "/list/full_queue",
+    params(FullQueueRequest),
+    responses(MovieQueueResponse, Error)
+)]
 async fn movie_queue(
     user: LoggedUser,
     state: State<Arc<AppState>>,
@@ -141,7 +149,7 @@ async fn movie_queue(
     Ok(HtmlBase::new(body).into())
 }
 
-#[utoipa::path(get, path = "/list/queue/{path}", responses(MovieQueueResponse, Error))]
+#[utoipa::path(get, path = "/list/queue/{path}", params(("path" = inline(StackString), description = "Path")), responses(MovieQueueResponse, Error))]
 async fn movie_queue_show(
     state: State<Arc<AppState>>,
     path: Path<StackString>,
@@ -184,6 +192,7 @@ struct DeleteMovieQueueResponse(HtmlBase::<StackString>);
 #[utoipa::path(
     delete,
     path = "/list/delete/{path}",
+    params(("path" = inline(StackString), description = "Path")),
     responses(DeleteMovieQueueResponse, Error)
 )]
 async fn movie_queue_delete(
@@ -261,6 +270,7 @@ struct TranscodeQueueResponse(HtmlBase::<StackString>);
 #[utoipa::path(
     post,
     path = "/list/transcode/queue/{path}",
+    params(("path" = inline(StackString), description = "Path")),
     responses(TranscodeQueueResponse, Error)
 )]
 async fn movie_queue_transcode(
@@ -288,6 +298,10 @@ async fn movie_queue_transcode(
 #[utoipa::path(
     post,
     path = "/list/transcode/queue/{directory}/{file}",
+    params(
+        ("directory" = inline(StackString), description = "Directory"),
+        ("file" = inline(StackString), description = "File"),
+    ),
     responses(TranscodeQueueResponse, Error)
 )]
 async fn movie_queue_transcode_directory(
@@ -324,7 +338,7 @@ async fn movie_queue_transcode_directory(
 #[rustfmt::skip]
 struct PlayQueueResponse(HtmlBase::<StackString>);
 
-#[utoipa::path(get, path = "/list/play/{idx}", responses(PlayQueueResponse, Error))]
+#[utoipa::path(get, path = "/list/play/{idx}", params(("idx" = Uuid, description = "Index")), responses(PlayQueueResponse, Error))]
 async fn movie_queue_play(
     idx: Path<Uuid>,
     user: LoggedUser,
@@ -361,7 +375,7 @@ async fn movie_queue_play(
 #[rustfmt::skip]
 struct ListImdbResponse(HtmlBase::<StackString>);
 
-#[utoipa::path(get, path = "/list/imdb/{show}", responses(ListImdbResponse, Error))]
+#[utoipa::path(get, path = "/list/imdb/{show}", params(("show" = inline(StackString), description = "Show"), ParseImdbRequest), responses(ListImdbResponse, Error))]
 async fn imdb_show(
     state: State<Arc<AppState>>,
     show: Path<StackString>,
@@ -380,12 +394,14 @@ async fn imdb_show(
     Ok(HtmlBase::new(body).into())
 }
 
-#[derive(Serialize, Deserialize, ToSchema)]
-// FindNewEpisodeRequest")]
+#[derive(Serialize, Deserialize, ToSchema, IntoParams)]
+// FindNewEpisodeRequest
 struct FindNewEpisodeRequest {
-    // TV Show Source")]
+    // TV Show Source
     source: Option<TvShowSourceWrapper>,
-    // TV Show")]
+    // TV Show
+    #[schema(inline)]
+    #[param(inline)]
     shows: Option<StackString>,
 }
 
@@ -394,7 +410,12 @@ struct FindNewEpisodeRequest {
 #[rustfmt::skip]
 struct ListCalendarResponse(HtmlBase::<StackString>);
 
-#[utoipa::path(get, path = "/list/cal", responses(ListCalendarResponse, Error))]
+#[utoipa::path(
+    get,
+    path = "/list/cal",
+    params(FindNewEpisodeRequest),
+    responses(ListCalendarResponse, Error)
+)]
 async fn find_new_episodes(
     query: Query<FindNewEpisodeRequest>,
     user: LoggedUser,
@@ -432,31 +453,32 @@ struct ImdbEpisodesSyncRequest {
 }
 
 derive_utoipa_schema!(ImdbEpisodesSyncRequest, _ImdbEpisodesSyncRequest);
+derive_utoipa_params!(ImdbEpisodesSyncRequest, _ImdbEpisodesSyncRequest);
 
-#[derive(ToSchema)]
+#[derive(ToSchema, IntoParams)]
 #[allow(dead_code)]
 struct _ImdbEpisodesSyncRequest {
-    // Start Timestamp")]
+    // Start Timestamp
     start_timestamp: Option<OffsetDateTime>,
-    // Offset")]
+    // Offset
     offset: Option<usize>,
-    // Limit")]
+    // Limit
     limit: Option<usize>,
 }
 
 #[derive(Debug, Serialize, Deserialize, ToSchema)]
-// Pagination")]
+// Pagination
 struct Pagination {
-    // Total Number of Entries")]
+    // Total Number of Entries
     total: usize,
-    // Number of Entries to Skip")]
+    // Number of Entries to Skip
     offset: usize,
-    // Number of Entries Returned")]
+    // Number of Entries Returned
     limit: usize,
 }
 
 #[derive(Debug, Serialize, Deserialize, ToSchema)]
-// PaginatedImdbEpisodes")]
+// PaginatedImdbEpisodes
 struct PaginatedImdbEpisodes {
     pagination: Pagination,
     data: Vec<ImdbEpisodesWrapper>,
@@ -470,6 +492,7 @@ struct ListImdbEpisodesResponse(JsonBase::<PaginatedImdbEpisodes>);
 #[utoipa::path(
     get,
     path = "/list/imdb_episodes",
+    params(ImdbEpisodesSyncRequest),
     responses(ListImdbEpisodesResponse, Error)
 )]
 async fn imdb_episodes_route(
@@ -528,6 +551,7 @@ struct ImdbEpisodesUpdateResponse(HtmlBase::<&'static str>);
 #[utoipa::path(
     post,
     path = "/list/imdb_episodes",
+    request_body = ImdbEpisodesUpdateRequest,
     responses(ImdbEpisodesUpdateResponse, Error)
 )]
 async fn imdb_episodes_update(
@@ -556,9 +580,10 @@ struct ImdbRatingsSyncRequest {
 }
 
 derive_utoipa_schema!(ImdbRatingsSyncRequest, _ImdbEpisodesSyncRequest);
+derive_utoipa_params!(ImdbRatingsSyncRequest, _ImdbEpisodesSyncRequest);
 
-#[derive(Debug, Serialize, Deserialize, ToSchema)]
-// PaginatedImdbRatings")]
+#[derive(Debug, Serialize, Deserialize, ToSchema, IntoParams)]
+// PaginatedImdbRatings
 struct PaginatedImdbRatings {
     pagination: Pagination,
     data: Vec<ImdbRatingsWrapper>,
@@ -572,6 +597,7 @@ struct ListImdbShowsResponse(JsonBase::<PaginatedImdbRatings>);
 #[utoipa::path(
     get,
     path = "/list/imdb_ratings",
+    params(ImdbRatingsSyncRequest),
     responses(ListImdbShowsResponse, Error)
 )]
 async fn imdb_ratings_route(
@@ -628,6 +654,7 @@ struct UpdateImdbShowsResponse(HtmlBase::<&'static str>);
 #[utoipa::path(
     post,
     path = "/list/imdb_ratings",
+    request_body = ImdbRatingsUpdateRequest,
     responses(UpdateImdbShowsResponse, Error)
 )]
 async fn imdb_ratings_update(
@@ -656,6 +683,7 @@ struct ImdbSetSourceResponse(HtmlBase::<&'static str>);
 #[utoipa::path(
     get,
     path = "/list/imdb_ratings/set_source",
+    params(ImdbRatingsSetSourceRequest),
     responses(ImdbSetSourceResponse, Error)
 )]
 async fn imdb_ratings_set_source(
@@ -677,7 +705,7 @@ async fn imdb_ratings_set_source(
 }
 
 #[derive(Debug, Serialize, Deserialize, ToSchema)]
-// PaginatedMovieQueueRow")]
+// PaginatedMovieQueueRow
 struct PaginatedMovieQueueRow {
     pagination: Pagination,
     data: Vec<MovieQueueRowWrapper>,
@@ -691,6 +719,7 @@ struct ListMovieQueueResponse(JsonBase::<PaginatedMovieQueueRow>);
 #[utoipa::path(
     get,
     path = "/list/movie_queue",
+    params(MovieQueueSyncRequest),
     responses(ListMovieQueueResponse, Error)
 )]
 async fn movie_queue_route(
@@ -728,6 +757,7 @@ struct UpdateMovieQueueResponse(HtmlBase::<&'static str>);
 #[utoipa::path(
     post,
     path = "/list/movie_queue",
+    request_body = MovieQueueUpdateRequest,
     responses(UpdateMovieQueueResponse, Error)
 )]
 async fn movie_queue_update(
@@ -745,7 +775,7 @@ async fn movie_queue_update(
 }
 
 #[derive(Debug, Serialize, Deserialize, ToSchema)]
-// PaginatedMovieCollectionRow")]
+// PaginatedMovieCollectionRow
 struct PaginatedMovieCollectionRow {
     pagination: Pagination,
     data: Vec<MovieCollectionRowWrapper>,
@@ -759,6 +789,7 @@ struct ListMovieCollectionResponse(JsonBase::<PaginatedMovieCollectionRow>);
 #[utoipa::path(
     get,
     path = "/list/movie_collection",
+    params(MovieCollectionSyncRequest),
     responses(ListMovieCollectionResponse, Error)
 )]
 async fn movie_collection_route(
@@ -795,6 +826,7 @@ struct UpdateMovieCollectionResponse(HtmlBase::<&'static str>);
 #[utoipa::path(
     post,
     path = "/list/movie_collection",
+    request_body = MovieCollectionUpdateRequest,
     responses(UpdateMovieCollectionResponse, Error)
 )]
 async fn movie_collection_update(
@@ -908,7 +940,12 @@ impl From<TvShowsResult> for ProcessShowItem {
 #[rustfmt::skip]
 struct ListTvShowsResponse(HtmlBase::<StackString>);
 
-#[utoipa::path(get, path = "/list/tvshows", responses(ListTvShowsResponse, Error))]
+#[utoipa::path(
+    get,
+    path = "/list/tvshows",
+    params(TraktWatchlistRequest),
+    responses(ListTvShowsResponse, Error)
+)]
 async fn tvshows(
     user: LoggedUser,
     state: State<Arc<AppState>>,
@@ -1061,6 +1098,7 @@ struct TranscodeFileResponse(HtmlBase::<StackString>);
 #[utoipa::path(
     post,
     path = "/list/transcode/file/{filename}",
+    params(("filename" = inline(StackString), description = "Filename")),
     responses(TranscodeFileResponse, Error)
 )]
 async fn movie_queue_transcode_file(
@@ -1105,6 +1143,7 @@ async fn movie_queue_transcode_file(
 #[utoipa::path(
     post,
     path = "/list/transcode/remcom/file/{filename}",
+    params(("filename" = inline(StackString), description = "Filename")),
     responses(TranscodeFileResponse, Error)
 )]
 async fn movie_queue_remcom_file(
@@ -1156,6 +1195,10 @@ async fn movie_queue_remcom_file(
 #[utoipa::path(
     post,
     path = "/list/transcode/remcom/directory/{directory}/{filename}",
+    params(
+        ("directory" = inline(StackString), description = "Directory"),
+        ("filename" = inline(StackString), description = "Filename"),
+    ),
     responses(TranscodeFileResponse, Error)
 )]
 async fn movie_queue_remcom_directory_file(
@@ -1163,7 +1206,7 @@ async fn movie_queue_remcom_directory_file(
     paths: Path<(StackString, StackString)>,
     user: LoggedUser,
 ) -> WarpResult<TranscodeFileResponse> {
-    let Path((filename, directory)) = paths;
+    let Path((directory, filename)) = paths;
     let url = format_sstr!("/list/transcode/remcom/directory/{directory}/{filename}");
     let task = user
         .store_url_task(state.trakt.get_client(), &state.config, &url)
@@ -1211,6 +1254,7 @@ struct CleanupTranscodeFileResponse(HtmlBase::<StackString>);
 #[utoipa::path(
     delete,
     path = "/list/transcode/cleanup/{path}",
+    params(("path" = inline(StackString), description = "Path")),
     responses(CleanupTranscodeFileResponse, Error)
 )]
 async fn movie_queue_transcode_cleanup(
@@ -1259,6 +1303,7 @@ struct TraktWatchlistResponse(HtmlBase::<StackString>);
 #[utoipa::path(
     get,
     path = "/trakt/watchlist",
+    params(TraktWatchlistRequest),
     responses(TraktWatchlistResponse, Error)
 )]
 async fn trakt_watchlist(
@@ -1328,6 +1373,10 @@ struct TraktWatchlistActionResponse(HtmlBase::<StackString>);
 #[utoipa::path(
     post,
     path = "/trakt/watchlist/{action}/{show}",
+    params(
+        ("action" = TraktActionsWrapper, description = "Action"),
+        ("show" = inline(StackString), description = "Show"),
+    ),
     responses(TraktWatchlistActionResponse, Error)
 )]
 async fn trakt_watchlist_action(
@@ -1356,6 +1405,7 @@ struct TraktWatchlistShowListResponse(HtmlBase::<StackString>);
 #[utoipa::path(
     get,
     path = "/trakt/watched/list/{imdb_url}",
+    params(("imdb_url" = inline(StackString), description = "IMDB Url")),
     responses(TraktWatchlistShowListResponse, Error)
 )]
 async fn trakt_watched_seasons(
@@ -1393,6 +1443,10 @@ struct TraktWatchlistShowSeasonResponse(HtmlBase::<StackString>);
 #[utoipa::path(
     get,
     path = "/trakt/watched/list/{imdb_url}/{season}",
+    params(
+        ("imdb_url" = inline(StackString), description = "IMDB Url"),
+        ("season" = i32, description = "Season"),
+    ),
     responses(TraktWatchlistShowSeasonResponse, Error)
 )]
 async fn trakt_watched_list(
@@ -1428,6 +1482,12 @@ struct TraktWatchlistEpisodeActionResponse(HtmlBase::<StackString>);
 #[utoipa::path(
     post,
     path = "/trakt/watched/{action}/{imdb_url}/{season}/{episode}",
+    params(
+        ("action" = TraktActionsWrapper, description = "Action"),
+        ("imdb_url" = inline(StackString), description = "IMDB Url"),
+        ("season" = i32, description = "Season"),
+        ("episode" = i32, description = "Episode"),
+    ),
     responses(TraktWatchlistEpisodeActionResponse, Error)
 )]
 async fn trakt_watched_action(
@@ -1502,12 +1562,16 @@ async fn trakt_auth_url(
     Ok(HtmlBase::new(url.as_str().into()).into())
 }
 
-#[derive(Serialize, Deserialize, ToSchema)]
-// TraktCallbackRequest")]
+#[derive(Serialize, Deserialize, ToSchema, IntoParams)]
+// TraktCallbackRequest
 struct TraktCallbackRequest {
-    // Authorization Code")]
+    // Authorization Code
+    #[schema(inline)]
+    #[param(inline)]
     code: StackString,
-    // CSRF State")]
+    // CSRF State
+    #[schema(inline)]
+    #[param(inline)]
     state: StackString,
 }
 
@@ -1516,7 +1580,12 @@ struct TraktCallbackRequest {
 #[rustfmt::skip]
 struct TraktCallbackResponse(HtmlBase::<&'static str>);
 
-#[utoipa::path(get, path = "/trakt/callback", responses(TraktCallbackResponse, Error))]
+#[utoipa::path(
+    get,
+    path = "/trakt/callback",
+    params(TraktCallbackRequest),
+    responses(TraktCallbackResponse, Error)
+)]
 async fn trakt_callback(
     query: Query<TraktCallbackRequest>,
     user: LoggedUser,
@@ -1640,7 +1709,7 @@ async fn watched_action_http_worker(
 }
 
 #[derive(Debug, Serialize, Deserialize, ToSchema)]
-// PaginatedPlexEvent")]
+// PaginatedPlexEvent
 struct PaginatedPlexEvent {
     pagination: Pagination,
     data: Vec<PlexEventWrapper>,
@@ -1651,7 +1720,12 @@ struct PaginatedPlexEvent {
 #[rustfmt::skip]
 struct PlexEventResponse(JsonBase::<PaginatedPlexEvent>);
 
-#[utoipa::path(get, path = "/list/plex_event", responses(PlexEventResponse, Error))]
+#[utoipa::path(
+    get,
+    path = "/list/plex_event",
+    params(PlexEventRequest),
+    responses(PlexEventResponse, Error)
+)]
 async fn plex_events(
     query: Query<PlexEventRequest>,
     state: State<Arc<AppState>>,
@@ -1697,7 +1771,7 @@ async fn plex_events(
 }
 
 #[derive(Serialize, Deserialize, Debug, ToSchema)]
-// PlexEventUpdateRequest")]
+// PlexEventUpdateRequest
 struct PlexEventUpdateRequest {
     events: Vec<PlexEventWrapper>,
 }
@@ -1714,6 +1788,7 @@ struct PlexEventUpdateResponse(HtmlBase::<&'static str>);
 #[utoipa::path(
     post,
     path = "/list/plex_event",
+    request_body = PlexEventUpdateRequest,
     responses(PlexEventUpdateResponse, Error)
 )]
 async fn plex_events_update(
@@ -1744,6 +1819,8 @@ struct PlexWebhookResponse(HtmlBase::<&'static str>);
 #[utoipa::path(
     post,
     path = "/list/plex/webhook/{webhook_key}",
+    params(("webhook_key" = Uuid, description = "Webhook Key")),
+    request_body = PlexEventWrapper,
     responses(PlexWebhookResponse, Error)
 )]
 async fn plex_webhook(
@@ -1798,7 +1875,12 @@ async fn process_payload(
 #[rustfmt::skip]
 struct PlexEventList(HtmlBase::<StackString>);
 
-#[utoipa::path(get, path = "/list/plex", responses(PlexEventList, Error))]
+#[utoipa::path(
+    get,
+    path = "/list/plex",
+    params(PlexEventRequest),
+    responses(PlexEventList, Error)
+)]
 async fn plex_list(
     user: LoggedUser,
     state: State<Arc<AppState>>,
@@ -1837,7 +1919,7 @@ async fn plex_list(
 #[rustfmt::skip]
 struct PlexEventDetail(HtmlBase::<StackString>);
 
-#[utoipa::path(get, path = "/list/plex/{id}", responses(PlexEventDetail, Error))]
+#[utoipa::path(get, path = "/list/plex/{id}", params(("id" = Uuid, description = "ID"), PlexEventRequest), responses(PlexEventDetail, Error))]
 async fn plex_detail(
     state: State<Arc<AppState>>,
     query: Query<PlexEventRequest>,
@@ -1865,7 +1947,7 @@ async fn plex_detail(
 }
 
 #[derive(Debug, Serialize, Deserialize, ToSchema)]
-// PaginatedPlexFilename")]
+// PaginatedPlexFilename
 struct PaginatedPlexFilename {
     pagination: Pagination,
     data: Vec<PlexFilenameWrapper>,
@@ -1879,6 +1961,7 @@ struct PlexFilenameResponse(JsonBase::<PaginatedPlexFilename>);
 #[utoipa::path(
     get,
     path = "/list/plex_filename",
+    params(PlexFilenameRequest),
     responses(PlexFilenameResponse, Error)
 )]
 async fn plex_filename(
@@ -1923,7 +2006,7 @@ async fn plex_filename(
 }
 
 #[derive(Serialize, Deserialize, Debug, ToSchema)]
-// PlexFilenameUpdateRequest")]
+// PlexFilenameUpdateRequest
 struct PlexFilenameUpdateRequest {
     filenames: Vec<PlexFilenameWrapper>,
 }
@@ -1940,6 +2023,7 @@ struct PlexFilenameUpdateResponse(HtmlBase::<&'static str>);
 #[utoipa::path(
     post,
     path = "/list/plex_filename",
+    request_body = PlexFilenameUpdateRequest,
     responses(PlexFilenameUpdateResponse, Error)
 )]
 async fn plex_filename_update(
@@ -1967,7 +2051,7 @@ async fn plex_filename_update(
 }
 
 #[derive(Debug, Serialize, Deserialize, ToSchema)]
-// PaginatedPlexMetadata")]
+// PaginatedPlexMetadata
 struct PaginatedPlexMetadata {
     pagination: Pagination,
     data: Vec<PlexMetadataWrapper>,
@@ -1981,6 +2065,7 @@ struct PlexMetadataResponse(JsonBase::<PaginatedPlexMetadata>);
 #[utoipa::path(
     get,
     path = "/list/plex_metadata",
+    params(PlexFilenameRequest),
     responses(PlexMetadataResponse, Error)
 )]
 async fn plex_metadata(
@@ -2020,7 +2105,7 @@ async fn plex_metadata(
 }
 
 #[derive(Serialize, Deserialize, Debug, ToSchema)]
-// PlexMetadataUpdateRequest")]
+// PlexMetadataUpdateRequest
 struct PlexMetadataUpdateRequest {
     entries: Vec<PlexMetadataWrapper>,
 }
@@ -2037,6 +2122,7 @@ struct PlexMetadataUpdateResponse(HtmlBase::<&'static str>);
 #[utoipa::path(
     post,
     path = "/list/plex_metadata",
+    request_body = PlexMetadataUpdateRequest,
     responses(PlexMetadataUpdateResponse, Error)
 )]
 async fn plex_metadata_update(
@@ -2064,7 +2150,7 @@ async fn plex_metadata_update(
 }
 
 #[derive(Debug, Serialize, Deserialize, ToSchema)]
-// PaginatedMusicCollection")]
+// PaginatedMusicCollection
 struct PaginatedMusicCollection {
     pagination: Pagination,
     data: Vec<MusicCollectionWrapper>,
@@ -2078,6 +2164,7 @@ struct MusicCollectionResponse(JsonBase::<PaginatedMusicCollection>);
 #[utoipa::path(
     get,
     path = "/list/music_collection",
+    params(PlexFilenameRequest),
     responses(MusicCollectionResponse, Error)
 )]
 async fn music_collection(
@@ -2133,6 +2220,7 @@ struct MusicCollectionUpdateResponse(HtmlBase::<&'static str>);
 #[utoipa::path(
     post,
     path = "/list/music_collection",
+    request_body = MusicCollectionUpdateRequest,
     responses(MusicCollectionUpdateResponse, Error)
 )]
 async fn music_collection_update(
@@ -2174,6 +2262,11 @@ struct ExtractSubtitlesResponse(HtmlBase::<StackString>);
 #[utoipa::path(
     post,
     path = "/list/transcode/subtitle/{filename}/{index}/{suffix}",
+    params(
+        ("filename" = inline(StackString), description = "Filename"),
+        ("index" = usize, description = "Index"),
+        ("suffix" = inline(StackString), description = "Suffix"),
+    ),
     responses(ExtractSubtitlesResponse, Error)
 )]
 async fn movie_queue_extract_subtitle(
@@ -2273,6 +2366,14 @@ pub fn get_full_path(app: &AppState) -> OpenApiRouter {
         title = "Movie Queue WebApp",
         description = "Web Frontend for Movie Queue",
     ),
-    components(schemas(LoggedUser, Pagination, LastModifiedResponseWrapper, TraktActionsWrapper))
+    components(schemas(
+        LoggedUser,
+        Pagination,
+        LastModifiedResponseWrapper,
+        TraktActionsWrapper,
+        PlexEventTypeWrapper,
+        PlexSectionTypeWrapper,
+        OrderByWrapper,
+    ))
 )]
 pub struct ApiDoc;

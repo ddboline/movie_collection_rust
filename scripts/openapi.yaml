@@ -12,6 +12,21 @@ paths:
   /list/cal:
     get:
       operationId: find_new_episodes
+      parameters:
+      - name: source
+        in: query
+        required: false
+        schema:
+          oneOf:
+          - type: 'null'
+          - $ref: '#/components/schemas/TvShowSource'
+      - name: shows
+        in: query
+        required: false
+        schema:
+          oneOf:
+          - type: 'null'
+          - type: string
       responses:
         '200':
           description: List Calendar
@@ -29,7 +44,7 @@ paths:
                 - message
                 properties:
                   message:
-                    $ref: '#/components/schemas/str'
+                    type: string
         '401':
           description: Not Authorized
           content:
@@ -46,10 +61,17 @@ paths:
                 - message
                 properties:
                   message:
-                    $ref: '#/components/schemas/str'
+                    type: string
   /list/delete/{path}:
     delete:
       operationId: movie_queue_delete
+      parameters:
+      - name: path
+        in: path
+        description: Path
+        required: true
+        schema:
+          type: string
       responses:
         '200':
           description: Delete Queue Entry
@@ -67,7 +89,7 @@ paths:
                 - message
                 properties:
                   message:
-                    $ref: '#/components/schemas/str'
+                    type: string
         '401':
           description: Not Authorized
           content:
@@ -84,10 +106,41 @@ paths:
                 - message
                 properties:
                   message:
-                    $ref: '#/components/schemas/str'
+                    type: string
   /list/full_queue:
     get:
       operationId: movie_queue
+      parameters:
+      - name: q
+        in: query
+        required: false
+        schema:
+          oneOf:
+          - type: 'null'
+          - type: string
+      - name: offset
+        in: query
+        required: false
+        schema:
+          type:
+          - integer
+          - 'null'
+          minimum: 0
+      - name: limit
+        in: query
+        required: false
+        schema:
+          type:
+          - integer
+          - 'null'
+          minimum: 0
+      - name: order_by
+        in: query
+        required: false
+        schema:
+          oneOf:
+          - type: 'null'
+          - $ref: '#/components/schemas/OrderBy'
       responses:
         '200':
           description: Movie Queue
@@ -105,7 +158,7 @@ paths:
                 - message
                 properties:
                   message:
-                    $ref: '#/components/schemas/str'
+                    type: string
         '401':
           description: Not Authorized
           content:
@@ -122,10 +175,60 @@ paths:
                 - message
                 properties:
                   message:
-                    $ref: '#/components/schemas/str'
+                    type: string
   /list/imdb/{show}:
     get:
       operationId: imdb_show
+      parameters:
+      - name: show
+        in: path
+        description: Show
+        required: true
+        schema:
+          type: string
+      - name: all
+        in: query
+        required: false
+        schema:
+          type:
+          - boolean
+          - 'null'
+      - name: database
+        in: query
+        required: false
+        schema:
+          type:
+          - boolean
+          - 'null'
+      - name: tv
+        in: query
+        required: false
+        schema:
+          type:
+          - boolean
+          - 'null'
+      - name: update
+        in: query
+        required: false
+        schema:
+          type:
+          - boolean
+          - 'null'
+      - name: link
+        in: query
+        required: false
+        schema:
+          oneOf:
+          - type: 'null'
+          - type: string
+      - name: season
+        in: query
+        required: false
+        schema:
+          type:
+          - integer
+          - 'null'
+          format: int32
       responses:
         '200':
           description: List Imdb Show
@@ -143,7 +246,7 @@ paths:
                 - message
                 properties:
                   message:
-                    $ref: '#/components/schemas/str'
+                    type: string
         '401':
           description: Not Authorized
           content:
@@ -160,10 +263,35 @@ paths:
                 - message
                 properties:
                   message:
-                    $ref: '#/components/schemas/str'
+                    type: string
   /list/imdb_episodes:
     get:
       operationId: imdb_episodes_route
+      parameters:
+      - name: start_timestamp
+        in: query
+        required: false
+        schema:
+          type:
+          - string
+          - 'null'
+          format: date-time
+      - name: offset
+        in: query
+        required: false
+        schema:
+          type:
+          - integer
+          - 'null'
+          minimum: 0
+      - name: limit
+        in: query
+        required: false
+        schema:
+          type:
+          - integer
+          - 'null'
+          minimum: 0
       responses:
         '200':
           description: List Imdb Episodes
@@ -191,7 +319,7 @@ paths:
                 - message
                 properties:
                   message:
-                    $ref: '#/components/schemas/str'
+                    type: string
         '401':
           description: Not Authorized
           content:
@@ -208,7 +336,7 @@ paths:
                 - message
                 properties:
                   message:
-                    $ref: '#/components/schemas/str'
+                    type: string
     post:
       operationId: imdb_episodes_update
       requestBody:
@@ -234,7 +362,7 @@ paths:
                 - message
                 properties:
                   message:
-                    $ref: '#/components/schemas/str'
+                    type: string
         '401':
           description: Not Authorized
           content:
@@ -251,10 +379,35 @@ paths:
                 - message
                 properties:
                   message:
-                    $ref: '#/components/schemas/str'
+                    type: string
   /list/imdb_ratings:
     get:
       operationId: imdb_ratings_route
+      parameters:
+      - name: start_timestamp
+        in: query
+        required: false
+        schema:
+          type:
+          - string
+          - 'null'
+          format: date-time
+      - name: offset
+        in: query
+        required: false
+        schema:
+          type:
+          - integer
+          - 'null'
+          minimum: 0
+      - name: limit
+        in: query
+        required: false
+        schema:
+          type:
+          - integer
+          - 'null'
+          minimum: 0
       responses:
         '200':
           description: List Imdb Shows
@@ -282,7 +435,7 @@ paths:
                 - message
                 properties:
                   message:
-                    $ref: '#/components/schemas/str'
+                    type: string
         '401':
           description: Not Authorized
           content:
@@ -299,7 +452,7 @@ paths:
                 - message
                 properties:
                   message:
-                    $ref: '#/components/schemas/str'
+                    type: string
     post:
       operationId: imdb_ratings_update
       requestBody:
@@ -325,7 +478,7 @@ paths:
                 - message
                 properties:
                   message:
-                    $ref: '#/components/schemas/str'
+                    type: string
         '401':
           description: Not Authorized
           content:
@@ -342,10 +495,21 @@ paths:
                 - message
                 properties:
                   message:
-                    $ref: '#/components/schemas/str'
+                    type: string
   /list/imdb_ratings/set_source:
     get:
       operationId: imdb_ratings_set_source
+      parameters:
+      - name: link
+        in: query
+        required: true
+        schema:
+          type: string
+      - name: source
+        in: query
+        required: true
+        schema:
+          $ref: '#/components/schemas/TvShowSource'
       responses:
         '200':
           description: Imdb Show Set Source
@@ -363,7 +527,7 @@ paths:
                 - message
                 properties:
                   message:
-                    $ref: '#/components/schemas/str'
+                    type: string
         '401':
           description: Not Authorized
           content:
@@ -380,7 +544,7 @@ paths:
                 - message
                 properties:
                   message:
-                    $ref: '#/components/schemas/str'
+                    type: string
   /list/index.html:
     get:
       operationId: frontpage
@@ -401,7 +565,7 @@ paths:
                 - message
                 properties:
                   message:
-                    $ref: '#/components/schemas/str'
+                    type: string
         '401':
           description: Not Authorized
           content:
@@ -418,7 +582,7 @@ paths:
                 - message
                 properties:
                   message:
-                    $ref: '#/components/schemas/str'
+                    type: string
   /list/last_modified:
     get:
       operationId: last_modified_route
@@ -441,7 +605,7 @@ paths:
                 - message
                 properties:
                   message:
-                    $ref: '#/components/schemas/str'
+                    type: string
         '401':
           description: Not Authorized
           content:
@@ -458,10 +622,33 @@ paths:
                 - message
                 properties:
                   message:
-                    $ref: '#/components/schemas/str'
+                    type: string
   /list/movie_collection:
     get:
       operationId: movie_collection_route
+      parameters:
+      - name: start_timestamp
+        in: query
+        required: true
+        schema:
+          type: string
+          format: date-time
+      - name: offset
+        in: query
+        required: false
+        schema:
+          type:
+          - integer
+          - 'null'
+          minimum: 0
+      - name: limit
+        in: query
+        required: false
+        schema:
+          type:
+          - integer
+          - 'null'
+          minimum: 0
       responses:
         '200':
           description: List Movie Collection Entries
@@ -489,7 +676,7 @@ paths:
                 - message
                 properties:
                   message:
-                    $ref: '#/components/schemas/str'
+                    type: string
         '401':
           description: Not Authorized
           content:
@@ -506,7 +693,7 @@ paths:
                 - message
                 properties:
                   message:
-                    $ref: '#/components/schemas/str'
+                    type: string
     post:
       operationId: movie_collection_update
       requestBody:
@@ -532,7 +719,7 @@ paths:
                 - message
                 properties:
                   message:
-                    $ref: '#/components/schemas/str'
+                    type: string
         '401':
           description: Not Authorized
           content:
@@ -549,10 +736,33 @@ paths:
                 - message
                 properties:
                   message:
-                    $ref: '#/components/schemas/str'
+                    type: string
   /list/movie_queue:
     get:
       operationId: movie_queue_route
+      parameters:
+      - name: start_timestamp
+        in: query
+        required: true
+        schema:
+          type: string
+          format: date-time
+      - name: offset
+        in: query
+        required: false
+        schema:
+          type:
+          - integer
+          - 'null'
+          minimum: 0
+      - name: limit
+        in: query
+        required: false
+        schema:
+          type:
+          - integer
+          - 'null'
+          minimum: 0
       responses:
         '200':
           description: List Movie Queue Entries
@@ -580,7 +790,7 @@ paths:
                 - message
                 properties:
                   message:
-                    $ref: '#/components/schemas/str'
+                    type: string
         '401':
           description: Not Authorized
           content:
@@ -597,7 +807,7 @@ paths:
                 - message
                 properties:
                   message:
-                    $ref: '#/components/schemas/str'
+                    type: string
     post:
       operationId: movie_queue_update
       requestBody:
@@ -623,7 +833,7 @@ paths:
                 - message
                 properties:
                   message:
-                    $ref: '#/components/schemas/str'
+                    type: string
         '401':
           description: Not Authorized
           content:
@@ -640,10 +850,35 @@ paths:
                 - message
                 properties:
                   message:
-                    $ref: '#/components/schemas/str'
+                    type: string
   /list/music_collection:
     get:
       operationId: music_collection
+      parameters:
+      - name: start_timestamp
+        in: query
+        required: false
+        schema:
+          type:
+          - string
+          - 'null'
+          format: date-time
+      - name: offset
+        in: query
+        required: false
+        schema:
+          type:
+          - integer
+          - 'null'
+          minimum: 0
+      - name: limit
+        in: query
+        required: false
+        schema:
+          type:
+          - integer
+          - 'null'
+          minimum: 0
       responses:
         '200':
           description: Music Collection
@@ -671,7 +906,7 @@ paths:
                 - message
                 properties:
                   message:
-                    $ref: '#/components/schemas/str'
+                    type: string
         '401':
           description: Not Authorized
           content:
@@ -688,7 +923,7 @@ paths:
                 - message
                 properties:
                   message:
-                    $ref: '#/components/schemas/str'
+                    type: string
     post:
       operationId: music_collection_update
       requestBody:
@@ -714,7 +949,7 @@ paths:
                 - message
                 properties:
                   message:
-                    $ref: '#/components/schemas/str'
+                    type: string
         '401':
           description: Not Authorized
           content:
@@ -731,13 +966,14 @@ paths:
                 - message
                 properties:
                   message:
-                    $ref: '#/components/schemas/str'
+                    type: string
   /list/play/{idx}:
     get:
       operationId: movie_queue_play
       parameters:
       - name: idx
         in: path
+        description: Index
         required: true
         schema:
           type: string
@@ -759,7 +995,7 @@ paths:
                 - message
                 properties:
                   message:
-                    $ref: '#/components/schemas/str'
+                    type: string
         '401':
           description: Not Authorized
           content:
@@ -776,10 +1012,49 @@ paths:
                 - message
                 properties:
                   message:
-                    $ref: '#/components/schemas/str'
+                    type: string
   /list/plex:
     get:
       operationId: plex_list
+      parameters:
+      - name: start_timestamp
+        in: query
+        required: false
+        schema:
+          type:
+          - string
+          - 'null'
+          format: date-time
+      - name: event_type
+        in: query
+        required: false
+        schema:
+          oneOf:
+          - type: 'null'
+          - $ref: '#/components/schemas/PlexEventType'
+      - name: section_type
+        in: query
+        required: false
+        schema:
+          oneOf:
+          - type: 'null'
+          - $ref: '#/components/schemas/PlexSectionType'
+      - name: offset
+        in: query
+        required: false
+        schema:
+          type:
+          - integer
+          - 'null'
+          minimum: 0
+      - name: limit
+        in: query
+        required: false
+        schema:
+          type:
+          - integer
+          - 'null'
+          minimum: 0
       responses:
         '200':
           description: Plex Event List
@@ -797,7 +1072,7 @@ paths:
                 - message
                 properties:
                   message:
-                    $ref: '#/components/schemas/str'
+                    type: string
         '401':
           description: Not Authorized
           content:
@@ -814,17 +1089,24 @@ paths:
                 - message
                 properties:
                   message:
-                    $ref: '#/components/schemas/str'
+                    type: string
   /list/plex/webhook/{webhook_key}:
     post:
       operationId: plex_webhook
       parameters:
       - name: webhook_key
         in: path
+        description: Webhook Key
         required: true
         schema:
           type: string
           format: uuid
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PlexEvent'
+        required: true
       responses:
         '201':
           description: Plex Webhook
@@ -842,7 +1124,7 @@ paths:
                 - message
                 properties:
                   message:
-                    $ref: '#/components/schemas/str'
+                    type: string
         '401':
           description: Not Authorized
           content:
@@ -859,17 +1141,56 @@ paths:
                 - message
                 properties:
                   message:
-                    $ref: '#/components/schemas/str'
+                    type: string
   /list/plex/{id}:
     get:
       operationId: plex_detail
       parameters:
       - name: id
         in: path
+        description: ID
         required: true
         schema:
           type: string
           format: uuid
+      - name: start_timestamp
+        in: query
+        required: false
+        schema:
+          type:
+          - string
+          - 'null'
+          format: date-time
+      - name: event_type
+        in: query
+        required: false
+        schema:
+          oneOf:
+          - type: 'null'
+          - $ref: '#/components/schemas/PlexEventType'
+      - name: section_type
+        in: query
+        required: false
+        schema:
+          oneOf:
+          - type: 'null'
+          - $ref: '#/components/schemas/PlexSectionType'
+      - name: offset
+        in: query
+        required: false
+        schema:
+          type:
+          - integer
+          - 'null'
+          minimum: 0
+      - name: limit
+        in: query
+        required: false
+        schema:
+          type:
+          - integer
+          - 'null'
+          minimum: 0
       responses:
         '200':
           description: Plex Event Detail
@@ -887,7 +1208,7 @@ paths:
                 - message
                 properties:
                   message:
-                    $ref: '#/components/schemas/str'
+                    type: string
         '401':
           description: Not Authorized
           content:
@@ -904,10 +1225,49 @@ paths:
                 - message
                 properties:
                   message:
-                    $ref: '#/components/schemas/str'
+                    type: string
   /list/plex_event:
     get:
       operationId: plex_events
+      parameters:
+      - name: start_timestamp
+        in: query
+        required: false
+        schema:
+          type:
+          - string
+          - 'null'
+          format: date-time
+      - name: event_type
+        in: query
+        required: false
+        schema:
+          oneOf:
+          - type: 'null'
+          - $ref: '#/components/schemas/PlexEventType'
+      - name: section_type
+        in: query
+        required: false
+        schema:
+          oneOf:
+          - type: 'null'
+          - $ref: '#/components/schemas/PlexSectionType'
+      - name: offset
+        in: query
+        required: false
+        schema:
+          type:
+          - integer
+          - 'null'
+          minimum: 0
+      - name: limit
+        in: query
+        required: false
+        schema:
+          type:
+          - integer
+          - 'null'
+          minimum: 0
       responses:
         '200':
           description: Plex Events
@@ -935,7 +1295,7 @@ paths:
                 - message
                 properties:
                   message:
-                    $ref: '#/components/schemas/str'
+                    type: string
         '401':
           description: Not Authorized
           content:
@@ -952,7 +1312,7 @@ paths:
                 - message
                 properties:
                   message:
-                    $ref: '#/components/schemas/str'
+                    type: string
     post:
       operationId: plex_events_update
       requestBody:
@@ -978,7 +1338,7 @@ paths:
                 - message
                 properties:
                   message:
-                    $ref: '#/components/schemas/str'
+                    type: string
         '401':
           description: Not Authorized
           content:
@@ -995,10 +1355,35 @@ paths:
                 - message
                 properties:
                   message:
-                    $ref: '#/components/schemas/str'
+                    type: string
   /list/plex_filename:
     get:
       operationId: plex_filename
+      parameters:
+      - name: start_timestamp
+        in: query
+        required: false
+        schema:
+          type:
+          - string
+          - 'null'
+          format: date-time
+      - name: offset
+        in: query
+        required: false
+        schema:
+          type:
+          - integer
+          - 'null'
+          minimum: 0
+      - name: limit
+        in: query
+        required: false
+        schema:
+          type:
+          - integer
+          - 'null'
+          minimum: 0
       responses:
         '200':
           description: Plex Filenames
@@ -1026,7 +1411,7 @@ paths:
                 - message
                 properties:
                   message:
-                    $ref: '#/components/schemas/str'
+                    type: string
         '401':
           description: Not Authorized
           content:
@@ -1043,7 +1428,7 @@ paths:
                 - message
                 properties:
                   message:
-                    $ref: '#/components/schemas/str'
+                    type: string
     post:
       operationId: plex_filename_update
       requestBody:
@@ -1069,7 +1454,7 @@ paths:
                 - message
                 properties:
                   message:
-                    $ref: '#/components/schemas/str'
+                    type: string
         '401':
           description: Not Authorized
           content:
@@ -1086,10 +1471,35 @@ paths:
                 - message
                 properties:
                   message:
-                    $ref: '#/components/schemas/str'
+                    type: string
   /list/plex_metadata:
     get:
       operationId: plex_metadata
+      parameters:
+      - name: start_timestamp
+        in: query
+        required: false
+        schema:
+          type:
+          - string
+          - 'null'
+          format: date-time
+      - name: offset
+        in: query
+        required: false
+        schema:
+          type:
+          - integer
+          - 'null'
+          minimum: 0
+      - name: limit
+        in: query
+        required: false
+        schema:
+          type:
+          - integer
+          - 'null'
+          minimum: 0
       responses:
         '200':
           description: Plex Metadata
@@ -1117,7 +1527,7 @@ paths:
                 - message
                 properties:
                   message:
-                    $ref: '#/components/schemas/str'
+                    type: string
         '401':
           description: Not Authorized
           content:
@@ -1134,7 +1544,7 @@ paths:
                 - message
                 properties:
                   message:
-                    $ref: '#/components/schemas/str'
+                    type: string
     post:
       operationId: plex_metadata_update
       requestBody:
@@ -1160,7 +1570,7 @@ paths:
                 - message
                 properties:
                   message:
-                    $ref: '#/components/schemas/str'
+                    type: string
         '401':
           description: Not Authorized
           content:
@@ -1177,10 +1587,17 @@ paths:
                 - message
                 properties:
                   message:
-                    $ref: '#/components/schemas/str'
+                    type: string
   /list/queue/{path}:
     get:
       operationId: movie_queue_show
+      parameters:
+      - name: path
+        in: path
+        description: Path
+        required: true
+        schema:
+          type: string
       responses:
         '200':
           description: Movie Queue
@@ -1198,7 +1615,7 @@ paths:
                 - message
                 properties:
                   message:
-                    $ref: '#/components/schemas/str'
+                    type: string
         '401':
           description: Not Authorized
           content:
@@ -1215,7 +1632,7 @@ paths:
                 - message
                 properties:
                   message:
-                    $ref: '#/components/schemas/str'
+                    type: string
   /list/scripts.js:
     get:
       operationId: scripts_js
@@ -1229,6 +1646,13 @@ paths:
   /list/transcode/cleanup/{path}:
     delete:
       operationId: movie_queue_transcode_cleanup
+      parameters:
+      - name: path
+        in: path
+        description: Path
+        required: true
+        schema:
+          type: string
       responses:
         '200':
           description: Cleanup Transcode File
@@ -1246,7 +1670,7 @@ paths:
                 - message
                 properties:
                   message:
-                    $ref: '#/components/schemas/str'
+                    type: string
         '401':
           description: Not Authorized
           content:
@@ -1263,10 +1687,17 @@ paths:
                 - message
                 properties:
                   message:
-                    $ref: '#/components/schemas/str'
+                    type: string
   /list/transcode/file/{filename}:
     post:
       operationId: movie_queue_transcode_file
+      parameters:
+      - name: filename
+        in: path
+        description: Filename
+        required: true
+        schema:
+          type: string
       responses:
         '201':
           description: Transcode File
@@ -1284,7 +1715,7 @@ paths:
                 - message
                 properties:
                   message:
-                    $ref: '#/components/schemas/str'
+                    type: string
         '401':
           description: Not Authorized
           content:
@@ -1301,21 +1732,23 @@ paths:
                 - message
                 properties:
                   message:
-                    $ref: '#/components/schemas/str'
+                    type: string
   /list/transcode/queue/{directory}/{file}:
     post:
       operationId: movie_queue_transcode_directory
       parameters:
       - name: directory
         in: path
+        description: Directory
         required: true
         schema:
-          $ref: '#/components/schemas/str'
+          type: string
       - name: file
         in: path
+        description: File
         required: true
         schema:
-          $ref: '#/components/schemas/str'
+          type: string
       responses:
         '201':
           description: Transcode Queue Item
@@ -1333,7 +1766,7 @@ paths:
                 - message
                 properties:
                   message:
-                    $ref: '#/components/schemas/str'
+                    type: string
         '401':
           description: Not Authorized
           content:
@@ -1350,10 +1783,17 @@ paths:
                 - message
                 properties:
                   message:
-                    $ref: '#/components/schemas/str'
+                    type: string
   /list/transcode/queue/{path}:
     post:
       operationId: movie_queue_transcode
+      parameters:
+      - name: path
+        in: path
+        description: Path
+        required: true
+        schema:
+          type: string
       responses:
         '201':
           description: Transcode Queue Item
@@ -1371,7 +1811,7 @@ paths:
                 - message
                 properties:
                   message:
-                    $ref: '#/components/schemas/str'
+                    type: string
         '401':
           description: Not Authorized
           content:
@@ -1388,21 +1828,23 @@ paths:
                 - message
                 properties:
                   message:
-                    $ref: '#/components/schemas/str'
+                    type: string
   /list/transcode/remcom/directory/{directory}/{filename}:
     post:
       operationId: movie_queue_remcom_directory_file
       parameters:
       - name: directory
         in: path
+        description: Directory
         required: true
         schema:
-          $ref: '#/components/schemas/str'
+          type: string
       - name: filename
         in: path
+        description: Filename
         required: true
         schema:
-          $ref: '#/components/schemas/str'
+          type: string
       responses:
         '201':
           description: Transcode File
@@ -1420,7 +1862,7 @@ paths:
                 - message
                 properties:
                   message:
-                    $ref: '#/components/schemas/str'
+                    type: string
         '401':
           description: Not Authorized
           content:
@@ -1437,10 +1879,17 @@ paths:
                 - message
                 properties:
                   message:
-                    $ref: '#/components/schemas/str'
+                    type: string
   /list/transcode/remcom/file/{filename}:
     post:
       operationId: movie_queue_remcom_file
+      parameters:
+      - name: filename
+        in: path
+        description: Filename
+        required: true
+        schema:
+          type: string
       responses:
         '201':
           description: Transcode File
@@ -1458,7 +1907,7 @@ paths:
                 - message
                 properties:
                   message:
-                    $ref: '#/components/schemas/str'
+                    type: string
         '401':
           description: Not Authorized
           content:
@@ -1475,7 +1924,7 @@ paths:
                 - message
                 properties:
                   message:
-                    $ref: '#/components/schemas/str'
+                    type: string
   /list/transcode/status:
     get:
       operationId: movie_queue_transcode_status
@@ -1496,7 +1945,7 @@ paths:
                 - message
                 properties:
                   message:
-                    $ref: '#/components/schemas/str'
+                    type: string
         '401':
           description: Not Authorized
           content:
@@ -1513,7 +1962,7 @@ paths:
                 - message
                 properties:
                   message:
-                    $ref: '#/components/schemas/str'
+                    type: string
   /list/transcode/status/file_list:
     get:
       operationId: movie_queue_transcode_status_file_list
@@ -1534,7 +1983,7 @@ paths:
                 - message
                 properties:
                   message:
-                    $ref: '#/components/schemas/str'
+                    type: string
         '401':
           description: Not Authorized
           content:
@@ -1551,7 +2000,7 @@ paths:
                 - message
                 properties:
                   message:
-                    $ref: '#/components/schemas/str'
+                    type: string
   /list/transcode/status/procs:
     get:
       operationId: movie_queue_transcode_status_procs
@@ -1572,7 +2021,7 @@ paths:
                 - message
                 properties:
                   message:
-                    $ref: '#/components/schemas/str'
+                    type: string
         '401':
           description: Not Authorized
           content:
@@ -1589,27 +2038,30 @@ paths:
                 - message
                 properties:
                   message:
-                    $ref: '#/components/schemas/str'
+                    type: string
   /list/transcode/subtitle/{filename}/{index}/{suffix}:
     post:
       operationId: movie_queue_extract_subtitle
       parameters:
       - name: filename
         in: path
+        description: Filename
         required: true
         schema:
-          $ref: '#/components/schemas/str'
+          type: string
       - name: index
         in: path
+        description: Index
         required: true
         schema:
           type: integer
           minimum: 0
       - name: suffix
         in: path
+        description: Suffix
         required: true
         schema:
-          $ref: '#/components/schemas/str'
+          type: string
       responses:
         '200':
           description: Extract Subtitles
@@ -1627,7 +2079,7 @@ paths:
                 - message
                 properties:
                   message:
-                    $ref: '#/components/schemas/str'
+                    type: string
         '401':
           description: Not Authorized
           content:
@@ -1644,10 +2096,39 @@ paths:
                 - message
                 properties:
                   message:
-                    $ref: '#/components/schemas/str'
+                    type: string
   /list/tvshows:
     get:
       operationId: tvshows
+      parameters:
+      - name: query
+        in: query
+        required: false
+        schema:
+          oneOf:
+          - type: 'null'
+          - type: string
+      - name: source
+        in: query
+        required: false
+        schema:
+          oneOf:
+          - type: 'null'
+          - $ref: '#/components/schemas/TvShowSource'
+      - name: offset
+        in: query
+        required: false
+        schema:
+          oneOf:
+          - type: 'null'
+          - type: string
+      - name: limit
+        in: query
+        required: false
+        schema:
+          oneOf:
+          - type: 'null'
+          - type: string
       responses:
         '200':
           description: List TvShows
@@ -1665,7 +2146,7 @@ paths:
                 - message
                 properties:
                   message:
-                    $ref: '#/components/schemas/str'
+                    type: string
         '401':
           description: Not Authorized
           content:
@@ -1682,7 +2163,7 @@ paths:
                 - message
                 properties:
                   message:
-                    $ref: '#/components/schemas/str'
+                    type: string
   /list/user:
     get:
       operationId: user
@@ -1703,9 +2184,9 @@ paths:
                     type: string
                     format: date-time
                   email:
-                    $ref: '#/components/schemas/str'
+                    type: string
                   secret_key:
-                    $ref: '#/components/schemas/str'
+                    type: string
                   session:
                     type: string
                     format: uuid
@@ -1729,7 +2210,7 @@ paths:
                 - message
                 properties:
                   message:
-                    $ref: '#/components/schemas/str'
+                    type: string
         '401':
           description: Not Authorized
           content:
@@ -1746,7 +2227,7 @@ paths:
                 - message
                 properties:
                   message:
-                    $ref: '#/components/schemas/str'
+                    type: string
   /trakt/cal:
     get:
       operationId: trakt_cal
@@ -1767,7 +2248,7 @@ paths:
                 - message
                 properties:
                   message:
-                    $ref: '#/components/schemas/str'
+                    type: string
         '401':
           description: Not Authorized
           content:
@@ -1784,10 +2265,21 @@ paths:
                 - message
                 properties:
                   message:
-                    $ref: '#/components/schemas/str'
+                    type: string
   /trakt/callback:
     get:
       operationId: trakt_callback
+      parameters:
+      - name: code
+        in: query
+        required: true
+        schema:
+          type: string
+      - name: state
+        in: query
+        required: true
+        schema:
+          type: string
       responses:
         '200':
           description: Trakt Callback
@@ -1805,7 +2297,7 @@ paths:
                 - message
                 properties:
                   message:
-                    $ref: '#/components/schemas/str'
+                    type: string
         '401':
           description: Not Authorized
           content:
@@ -1822,7 +2314,7 @@ paths:
                 - message
                 properties:
                   message:
-                    $ref: '#/components/schemas/str'
+                    type: string
   /trakt/refresh_auth:
     get:
       operationId: refresh_auth
@@ -1843,7 +2335,7 @@ paths:
                 - message
                 properties:
                   message:
-                    $ref: '#/components/schemas/str'
+                    type: string
         '401':
           description: Not Authorized
           content:
@@ -1860,10 +2352,17 @@ paths:
                 - message
                 properties:
                   message:
-                    $ref: '#/components/schemas/str'
+                    type: string
   /trakt/watched/list/{imdb_url}:
     get:
       operationId: trakt_watched_seasons
+      parameters:
+      - name: imdb_url
+        in: path
+        description: IMDB Url
+        required: true
+        schema:
+          type: string
       responses:
         '200':
           description: Trakt Watchlist Show List
@@ -1881,7 +2380,7 @@ paths:
                 - message
                 properties:
                   message:
-                    $ref: '#/components/schemas/str'
+                    type: string
         '401':
           description: Not Authorized
           content:
@@ -1898,18 +2397,20 @@ paths:
                 - message
                 properties:
                   message:
-                    $ref: '#/components/schemas/str'
+                    type: string
   /trakt/watched/list/{imdb_url}/{season}:
     get:
       operationId: trakt_watched_list
       parameters:
       - name: imdb_url
         in: path
+        description: IMDB Url
         required: true
         schema:
-          $ref: '#/components/schemas/str'
+          type: string
       - name: season
         in: path
+        description: Season
         required: true
         schema:
           type: integer
@@ -1931,7 +2432,7 @@ paths:
                 - message
                 properties:
                   message:
-                    $ref: '#/components/schemas/str'
+                    type: string
         '401':
           description: Not Authorized
           content:
@@ -1948,29 +2449,33 @@ paths:
                 - message
                 properties:
                   message:
-                    $ref: '#/components/schemas/str'
+                    type: string
   /trakt/watched/{action}/{imdb_url}/{season}/{episode}:
     post:
       operationId: trakt_watched_action
       parameters:
       - name: action
         in: path
+        description: Action
         required: true
         schema:
           $ref: '#/components/schemas/TraktActions'
       - name: imdb_url
         in: path
+        description: IMDB Url
         required: true
         schema:
-          $ref: '#/components/schemas/str'
+          type: string
       - name: season
         in: path
+        description: Season
         required: true
         schema:
           type: integer
           format: int32
       - name: episode
         in: path
+        description: Episode
         required: true
         schema:
           type: integer
@@ -1992,7 +2497,7 @@ paths:
                 - message
                 properties:
                   message:
-                    $ref: '#/components/schemas/str'
+                    type: string
         '401':
           description: Not Authorized
           content:
@@ -2009,10 +2514,39 @@ paths:
                 - message
                 properties:
                   message:
-                    $ref: '#/components/schemas/str'
+                    type: string
   /trakt/watchlist:
     get:
       operationId: trakt_watchlist
+      parameters:
+      - name: query
+        in: query
+        required: false
+        schema:
+          oneOf:
+          - type: 'null'
+          - type: string
+      - name: source
+        in: query
+        required: false
+        schema:
+          oneOf:
+          - type: 'null'
+          - $ref: '#/components/schemas/TvShowSource'
+      - name: offset
+        in: query
+        required: false
+        schema:
+          oneOf:
+          - type: 'null'
+          - type: string
+      - name: limit
+        in: query
+        required: false
+        schema:
+          oneOf:
+          - type: 'null'
+          - type: string
       responses:
         '200':
           description: Trakt Watchlist
@@ -2030,7 +2564,7 @@ paths:
                 - message
                 properties:
                   message:
-                    $ref: '#/components/schemas/str'
+                    type: string
         '401':
           description: Not Authorized
           content:
@@ -2047,21 +2581,23 @@ paths:
                 - message
                 properties:
                   message:
-                    $ref: '#/components/schemas/str'
+                    type: string
   /trakt/watchlist/{action}/{show}:
     post:
       operationId: trakt_watchlist_action
       parameters:
       - name: action
         in: path
+        description: Action
         required: true
         schema:
           $ref: '#/components/schemas/TraktActions'
       - name: show
         in: path
+        description: Show
         required: true
         schema:
-          $ref: '#/components/schemas/str'
+          type: string
       responses:
         '201':
           description: Trakt Watchlist Action
@@ -2079,7 +2615,7 @@ paths:
                 - message
                 properties:
                   message:
-                    $ref: '#/components/schemas/str'
+                    type: string
         '401':
           description: Not Authorized
           content:
@@ -2096,7 +2632,7 @@ paths:
                 - message
                 properties:
                   message:
-                    $ref: '#/components/schemas/str'
+                    type: string
 components:
   schemas:
     ImdbEpisodes:
@@ -2119,9 +2655,9 @@ components:
           type: integer
           format: int32
         eptitle:
-          $ref: '#/components/schemas/str'
+          type: string
         epurl:
-          $ref: '#/components/schemas/str'
+          type: string
         id:
           type: string
           format: uuid
@@ -2133,9 +2669,9 @@ components:
           type: integer
           format: int32
         show:
-          $ref: '#/components/schemas/str'
+          type: string
         title:
-          $ref: '#/components/schemas/str'
+          type: string
     ImdbEpisodesUpdateRequest:
       type: object
       required:
@@ -2160,14 +2696,14 @@ components:
           - boolean
           - 'null'
         link:
-          $ref: '#/components/schemas/str'
+          type: string
         rating:
           type:
           - number
           - 'null'
           format: double
         show:
-          $ref: '#/components/schemas/str'
+          type: string
         source:
           oneOf:
           - type: 'null'
@@ -2175,7 +2711,7 @@ components:
         title:
           oneOf:
           - type: 'null'
-          - $ref: '#/components/schemas/str'
+          - type: string
     ImdbRatingsUpdateRequest:
       type: object
       required:
@@ -2195,7 +2731,7 @@ components:
           type: string
           format: date-time
         table:
-          $ref: '#/components/schemas/str'
+          type: string
     LoggedUser:
       type: object
       required:
@@ -2208,9 +2744,9 @@ components:
           type: string
           format: date-time
         email:
-          $ref: '#/components/schemas/str'
+          type: string
         secret_key:
-          $ref: '#/components/schemas/str'
+          type: string
         session:
           type: string
           format: uuid
@@ -2225,9 +2761,9 @@ components:
           type: string
           format: uuid
         path:
-          $ref: '#/components/schemas/str'
+          type: string
         show:
-          $ref: '#/components/schemas/str'
+          type: string
     MovieCollectionUpdateRequest:
       type: object
       required:
@@ -2257,9 +2793,9 @@ components:
           - 'null'
           format: date-time
         path:
-          $ref: '#/components/schemas/str'
+          type: string
         show:
-          $ref: '#/components/schemas/str'
+          type: string
     MovieQueueUpdateRequest:
       type: object
       required:
@@ -2279,11 +2815,11 @@ components:
         album:
           oneOf:
           - type: 'null'
-          - $ref: '#/components/schemas/str'
+          - type: string
         artist:
           oneOf:
           - type: 'null'
-          - $ref: '#/components/schemas/str'
+          - type: string
         id:
           type: string
           format: uuid
@@ -2291,11 +2827,11 @@ components:
           type: string
           format: date-time
         path:
-          $ref: '#/components/schemas/str'
+          type: string
         title:
           oneOf:
           - type: 'null'
-          - $ref: '#/components/schemas/str'
+          - type: string
     MusicCollectionUpdateRequest:
       type: object
       required:
@@ -2305,6 +2841,11 @@ components:
           type: array
           items:
             $ref: '#/components/schemas/MusicCollection'
+    OrderBy:
+      type: string
+      enum:
+      - asc
+      - desc
     Pagination:
       type: object
       required:
@@ -2335,16 +2876,16 @@ components:
       - last_modified
       properties:
         account:
-          $ref: '#/components/schemas/str'
+          type: string
         added_at:
           type: string
           format: date-time
         event:
-          $ref: '#/components/schemas/str'
+          type: string
         grandparent_title:
           oneOf:
           - type: 'null'
-          - $ref: '#/components/schemas/str'
+          - type: string
         id:
           type: string
           format: uuid
@@ -2354,36 +2895,51 @@ components:
         metadata_key:
           oneOf:
           - type: 'null'
-          - $ref: '#/components/schemas/str'
+          - type: string
         metadata_type:
           oneOf:
           - type: 'null'
-          - $ref: '#/components/schemas/str'
+          - type: string
         parent_title:
           oneOf:
           - type: 'null'
-          - $ref: '#/components/schemas/str'
+          - type: string
         player_address:
-          $ref: '#/components/schemas/str'
+          type: string
         player_title:
-          $ref: '#/components/schemas/str'
+          type: string
         section_title:
           oneOf:
           - type: 'null'
-          - $ref: '#/components/schemas/str'
+          - type: string
         section_type:
           oneOf:
           - type: 'null'
-          - $ref: '#/components/schemas/str'
+          - type: string
         server:
-          $ref: '#/components/schemas/str'
+          type: string
         title:
-          $ref: '#/components/schemas/str'
+          type: string
         updated_at:
           type:
           - string
           - 'null'
           format: date-time
+    PlexEventType:
+      type: string
+      enum:
+      - library-on-deck
+      - library-new
+      - media-pause
+      - media-play
+      - media-rate
+      - media-resume
+      - media-scrobble
+      - media-stop
+      - admin-database-backup
+      - admin-database-corrupted
+      - device-new
+      - playback-started
     PlexEventUpdateRequest:
       type: object
       required:
@@ -2405,9 +2961,9 @@ components:
           - 'null'
           format: uuid
         filename:
-          $ref: '#/components/schemas/str'
+          type: string
         metadata_key:
-          $ref: '#/components/schemas/str'
+          type: string
         music_collection_id:
           type:
           - string
@@ -2432,21 +2988,21 @@ components:
         grandparent_key:
           oneOf:
           - type: 'null'
-          - $ref: '#/components/schemas/str'
+          - type: string
         metadata_key:
-          $ref: '#/components/schemas/str'
+          type: string
         object_type:
-          $ref: '#/components/schemas/str'
+          type: string
         parent_key:
           oneOf:
           - type: 'null'
-          - $ref: '#/components/schemas/str'
+          - type: string
         show:
           oneOf:
           - type: 'null'
-          - $ref: '#/components/schemas/str'
+          - type: string
         title:
-          $ref: '#/components/schemas/str'
+          type: string
     PlexMetadataUpdateRequest:
       type: object
       required:
@@ -2456,6 +3012,12 @@ components:
           type: array
           items:
             $ref: '#/components/schemas/PlexMetadata'
+    PlexSectionType:
+      type: string
+      enum:
+      - artist
+      - movie
+      - show
     TraktActions:
       type: string
       enum:
@@ -2470,5 +3032,3 @@ components:
       - amazon
       - hulu
       - netflix
-    str:
-      type: string
