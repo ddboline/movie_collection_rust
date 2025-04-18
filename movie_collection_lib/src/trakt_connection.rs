@@ -62,7 +62,7 @@ impl TraktConnection {
     /// Return error if `read_auth_token` fails
     pub async fn init(&self) -> Result<AccessTokenResponse, Error> {
         let auth_token = self.read_auth_token().await?;
-        let auth_token = if auth_token.has_expired() {
+        let auth_token = if auth_token.expires_soon() {
             self.get_refresh_token(&auth_token).await?
         } else {
             auth_token
@@ -146,10 +146,10 @@ impl TraktConnection {
                 .json(&body)
                 .send()
                 .await?;
-            println!("{resp:?}");
-            if resp.status() == StatusCode::FORBIDDEN {
+            if resp.status().as_u16() >= 400 {
+                debug!("{resp:?}");
                 let text = resp.text().await?;
-                println!("text {text}");
+                debug!("text {text}");
                 return Err(format_err!("Forbidden"));
             }
             resp.error_for_status()?.json().await.map_err(Into::into)
@@ -175,16 +175,15 @@ impl TraktConnection {
         };
         let mut headers = HeaderMap::new();
         headers.insert("Content-Type", "application/json".parse()?);
-        self.client
-            .post(url.as_str())
-            .headers(headers)
-            .json(&body)
-            .send()
-            .await?
-            .error_for_status()?
-            .json()
-            .await
-            .map_err(Into::into)
+        let resp = self.client
+        .post(url.as_str())
+        .headers(headers)
+        .json(&body)
+        .send().await?;
+        if resp.status().as_u16() >= 400 {
+            debug!("{resp:?}");
+        }
+        resp.error_for_status()?.json().await.map_err(Into::into)
     }
 
     /// # Errors
@@ -696,6 +695,12 @@ impl AccessTokenResponse {
     pub fn has_expired(&self) -> bool {
         let expires_at = (self.created_at + self.expires_in) as i64;
         expires_at < OffsetDateTime::now_utc().unix_timestamp()
+    }
+
+    #[must_use]
+    pub fn expires_soon(&self) -> bool {
+        let expires_at = (self.created_at + self.expires_in) as i64;
+        expires_at < OffsetDateTime::now_utc().unix_timestamp() + 3600
     }
 }
 
