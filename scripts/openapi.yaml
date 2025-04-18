@@ -2277,9 +2277,11 @@ paths:
           type: string
       - name: state
         in: query
-        required: true
+        required: false
         schema:
-          type: string
+          oneOf:
+          - type: 'null'
+          - type: string
       responses:
         '200':
           description: Trakt Callback
