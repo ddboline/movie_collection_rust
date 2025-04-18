@@ -4,7 +4,7 @@ use log::debug;
 use maplit::hashmap;
 use once_cell::sync::Lazy;
 use rand::{rng as thread_rng, Rng};
-use reqwest::{header::HeaderMap, Client, StatusCode, Url};
+use reqwest::{header::HeaderMap, Client, Url};
 use serde::{Deserialize, Serialize};
 use smallvec::SmallVec;
 use stack_string::{format_sstr, StackString};
@@ -175,11 +175,13 @@ impl TraktConnection {
         };
         let mut headers = HeaderMap::new();
         headers.insert("Content-Type", "application/json".parse()?);
-        let resp = self.client
-        .post(url.as_str())
-        .headers(headers)
-        .json(&body)
-        .send().await?;
+        let resp = self
+            .client
+            .post(url.as_str())
+            .headers(headers)
+            .json(&body)
+            .send()
+            .await?;
         if resp.status().as_u16() >= 400 {
             debug!("{resp:?}");
         }
@@ -700,7 +702,7 @@ impl AccessTokenResponse {
     #[must_use]
     pub fn expires_soon(&self) -> bool {
         let expires_at = (self.created_at + self.expires_in) as i64;
-        expires_at < OffsetDateTime::now_utc().unix_timestamp() + 3600
+        expires_at < OffsetDateTime::now_utc().unix_timestamp() + 5400
     }
 }
 
