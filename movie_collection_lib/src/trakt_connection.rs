@@ -120,42 +120,49 @@ impl TraktConnection {
         Ok(url)
     }
 
-    async fn get_auth_token(&self, code: &str, state: &str) -> Result<AccessTokenResponse, Error> {
-        let current_state = CSRF_TOKEN.lock().await.take();
-        if let Some(current_state) = current_state {
-            if state != current_state.as_str() {
-                return Err(format_err!("Incorrect state"));
+    async fn get_auth_token(
+        &self,
+        code: &str,
+        state: Option<&str>,
+    ) -> Result<AccessTokenResponse, Error> {
+        if let Some(state) = state {
+            let current_state = CSRF_TOKEN.lock().await.take();
+            if let Some(current_state) = current_state {
+                if state != current_state.as_str() {
+                    return Err(format_err!("Incorrect state"));
+                }
+            } else {
+                return Err(format_err!("Missing State"));
             }
-            let domain = &self.config.domain;
-            let redirect_uri = format_sstr!("https://{domain}/trakt/callback");
-            let trakt_endpoint = &self.config.trakt_api_endpoint;
-            let url = format_sstr!("{trakt_endpoint}/oauth/token");
-            let body = hashmap! {
-                "code" => code,
-                "client_id" => self.config.trakt_client_id.as_str(),
-                "client_secret" => self.config.trakt_client_secret.as_str(),
-                "redirect_uri" => redirect_uri.as_str(),
-                "grant_type" => "authorization_code",
-            };
-            let mut headers = HeaderMap::new();
-            headers.insert("Content-Type", "application/json".parse()?);
-            let resp = self
-                .client
-                .post(url.as_str())
-                .headers(headers)
-                .json(&body)
-                .send()
-                .await?;
-            if resp.status().as_u16() >= 400 {
-                debug!("{resp:?}");
-                let text = resp.text().await?;
-                debug!("text {text}");
-                return Err(format_err!("Forbidden"));
-            }
-            resp.error_for_status()?.json().await.map_err(Into::into)
-        } else {
-            Err(format_err!("No state"))
         }
+
+        let domain = &self.config.domain;
+        let redirect_uri = format_sstr!("https://{domain}/trakt/callback");
+        let trakt_endpoint = &self.config.trakt_api_endpoint;
+        let url = format_sstr!("{trakt_endpoint}/oauth/token");
+        let body = hashmap! {
+            "code" => code,
+            "client_id" => self.config.trakt_client_id.as_str(),
+            "client_secret" => self.config.trakt_client_secret.as_str(),
+            "redirect_uri" => redirect_uri.as_str(),
+            "grant_type" => "authorization_code",
+        };
+        let mut headers = HeaderMap::new();
+        headers.insert("Content-Type", "application/json".parse()?);
+        let resp = self
+            .client
+            .post(url.as_str())
+            .headers(headers)
+            .json(&body)
+            .send()
+            .await?;
+        if resp.status().as_u16() >= 400 {
+            debug!("{resp:?}");
+            let text = resp.text().await?;
+            debug!("text {text}");
+            return Err(format_err!("Forbidden"));
+        }
+        resp.error_for_status()?.json().await.map_err(Into::into)
     }
 
     async fn get_refresh_token(
@@ -190,7 +197,11 @@ impl TraktConnection {
 
     /// # Errors
     /// Return error if `get_auth_token` or `write_auth_token` fail
-    pub async fn exchange_code_for_auth_token(&self, code: &str, state: &str) -> Result<(), Error> {
+    pub async fn exchange_code_for_auth_token(
+        &self,
+        code: &str,
+        state: Option<&str>,
+    ) -> Result<(), Error> {
         let auth_token = self.get_auth_token(code, state).await?;
         self.write_auth_token(&auth_token).await?;
         AUTH_TOKEN.write().await.replace(Arc::new(auth_token));

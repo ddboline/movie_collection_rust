@@ -1571,7 +1571,7 @@ struct TraktCallbackRequest {
     // CSRF State
     #[schema(inline)]
     #[param(inline)]
-    state: StackString,
+    state: Option<StackString>,
 }
 
 #[derive(UtoipaResponse)]
@@ -1596,7 +1596,10 @@ async fn trakt_callback(
     let Query(query) = query;
     state
         .trakt
-        .exchange_code_for_auth_token(query.code.as_str(), query.state.as_str())
+        .exchange_code_for_auth_token(
+            query.code.as_str(),
+            query.state.as_ref().map(StackString::as_str),
+        )
         .await
         .map_err(Into::<Error>::into)?;
     let body = r#"
