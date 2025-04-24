@@ -62,12 +62,17 @@ impl TraktConnection {
     /// Return error if `read_auth_token` fails
     pub async fn init(&self) -> Result<AccessTokenResponse, Error> {
         let auth_token = self.read_auth_token().await?;
-        let auth_token = self.exchange_refresh_token(&auth_token).await?;
+        let auth_token = if auth_token.has_expired() {
+            self.exchange_refresh_token(&auth_token).await?
+        } else {
+            auth_token
+        };
         AUTH_TOKEN
-            .write()
-            .await
-            .replace(Arc::new(auth_token.clone()));
-        Ok(auth_token)
+        .write()
+        .await
+        .replace(Arc::new(auth_token.clone()));
+    Ok(auth_token)
+
     }
 
     fn token_path() -> Result<PathBuf, Error> {
