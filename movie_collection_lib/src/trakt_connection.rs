@@ -2,7 +2,6 @@ use anyhow::{format_err, Error};
 use base64::{engine::general_purpose::URL_SAFE_NO_PAD, Engine};
 use log::debug;
 use maplit::hashmap;
-use once_cell::sync::Lazy;
 use rand::{rng as thread_rng, Rng};
 use reqwest::{header::HeaderMap, Client, Url};
 use serde::{Deserialize, Serialize};
@@ -11,7 +10,7 @@ use stack_string::{format_sstr, StackString};
 use std::{
     collections::{HashMap, HashSet},
     path::PathBuf,
-    sync::Arc,
+    sync::{Arc, LazyLock},
 };
 use time::OffsetDateTime;
 use time_tz::OffsetDateTimeExt;
@@ -28,8 +27,9 @@ use crate::{
     },
 };
 
-static CSRF_TOKEN: Lazy<Mutex<Option<StackString>>> = Lazy::new(|| Mutex::new(None));
-static AUTH_TOKEN: Lazy<RwLock<Option<Arc<AccessTokenResponse>>>> = Lazy::new(|| RwLock::new(None));
+static CSRF_TOKEN: LazyLock<Mutex<Option<StackString>>> = LazyLock::new(|| Mutex::new(None));
+static AUTH_TOKEN: LazyLock<RwLock<Option<Arc<AccessTokenResponse>>>> =
+    LazyLock::new(|| RwLock::new(None));
 
 #[derive(Clone)]
 pub struct TraktConnection {
@@ -62,7 +62,7 @@ impl TraktConnection {
     /// Return error if `read_auth_token` fails
     pub async fn init(&self) -> Result<AccessTokenResponse, Error> {
         let auth_token = self.read_auth_token().await?;
-        let auth_token = self.get_refresh_token(&auth_token).await?;
+        let auth_token = self.exchange_refresh_token(&auth_token).await?;
         AUTH_TOKEN
             .write()
             .await
@@ -209,11 +209,14 @@ impl TraktConnection {
     pub async fn exchange_refresh_token(
         &self,
         current_auth_token: &AccessTokenResponse,
-    ) -> Result<(), Error> {
+    ) -> Result<AccessTokenResponse, Error> {
         let auth_token = self.get_refresh_token(current_auth_token).await?;
         self.write_auth_token(&auth_token).await?;
-        AUTH_TOKEN.write().await.replace(Arc::new(auth_token));
-        Ok(())
+        AUTH_TOKEN
+            .write()
+            .await
+            .replace(Arc::new(auth_token.clone()));
+        Ok(auth_token)
     }
 
     fn get_ro_headers(&self) -> Result<HeaderMap, Error> {

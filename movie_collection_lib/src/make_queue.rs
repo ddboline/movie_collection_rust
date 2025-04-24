@@ -78,7 +78,7 @@ pub async fn make_queue_worker(
                     mq.remove_from_queue_by_path(&path.to_string_lossy())
                         .await?;
                 }
-            };
+            }
             mq.reorder_queue().await?;
         }
     } else if add_files.is_empty() {

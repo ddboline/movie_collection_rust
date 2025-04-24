@@ -1700,7 +1700,7 @@ async fn watched_action_http_worker(
                 }
             } else if let Some(movie) = WatchedMovie::get_watched_movie(&mc.pool, imdb_url).await? {
                 movie.delete_movie(&mc.pool).await?;
-            };
+            }
 
             format_sstr!("{result}")
         }

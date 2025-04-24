@@ -78,7 +78,7 @@ impl ImdbSeasonsRequest {
         let mock_stdout = MockStdout::new();
         let stdout = StdoutChannel::with_mock_stdout(mock_stdout.clone(), mock_stdout);
 
-        if &self.show == "" {
+        if self.show.is_empty() {
             Ok(Vec::new())
         } else {
             MovieCollection::new(config, pool, &stdout)

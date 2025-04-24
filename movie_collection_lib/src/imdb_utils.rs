@@ -201,14 +201,14 @@ impl ImdbConnection {
     /// # Errors
     /// Returns error if `parse_imdb_rating_body` fails
     pub async fn parse_imdb_rating(&self, title: &str) -> Result<RatingOutput, Error> {
-        if !title.starts_with("tt") {
-            return Ok(RatingOutput::default());
-        };
-
-        let url = Url::parse("http://www.imdb.com/title/")?.join(title)?;
-        debug!("{url:?}",);
-        let body = self.get(&url).await?.text().await?;
-        Self::parse_imdb_rating_body(&body)
+        if title.starts_with("tt") {
+            let url = Url::parse("http://www.imdb.com/title/")?.join(title)?;
+            debug!("{url:?}",);
+            let body = self.get(&url).await?.text().await?;
+            Self::parse_imdb_rating_body(&body)
+        } else {
+            Ok(RatingOutput::default())
+        }
     }
 
     fn parse_imdb_rating_body(body: &str) -> Result<RatingOutput, Error> {

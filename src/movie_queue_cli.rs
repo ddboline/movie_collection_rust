@@ -109,7 +109,7 @@ impl MovieQueueCli {
                                 match episode.get_index(&pool).await? {
                                     Some(_) => episode.update_episode(&pool).await?,
                                     None => episode.insert_episode(&pool).await?,
-                                };
+                                }
                                 Ok(())
                             }
                         });

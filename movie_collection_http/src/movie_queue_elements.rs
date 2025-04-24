@@ -1808,7 +1808,7 @@ fn PlexElement(
             .as_ref()
             .map_or("", StackString::as_str);
         let filename = event.filename.as_ref().map_or("", StackString::as_str);
-        let filestem = filename.split('/').last().unwrap_or("");
+        let filestem = filename.split('/').next_back().unwrap_or("");
 
         let mut display_title = StackString::new();
         if let Some(show) = &event.show {
@@ -2029,7 +2029,7 @@ fn PlexDetailElement(
         .as_ref()
         .map_or("", StackString::as_str);
     let filename = event.filename.as_ref().map_or("", StackString::as_str);
-    let filestem = filename.split('/').last().unwrap_or("");
+    let filestem = filename.split('/').next_back().unwrap_or("");
     let mut display_title = StackString::new();
     if let Some(show) = &event.show {
         display_title.push_str(show.as_str());
