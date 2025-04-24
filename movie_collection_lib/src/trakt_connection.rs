@@ -62,11 +62,7 @@ impl TraktConnection {
     /// Return error if `read_auth_token` fails
     pub async fn init(&self) -> Result<AccessTokenResponse, Error> {
         let auth_token = self.read_auth_token().await?;
-        let auth_token = if auth_token.expires_soon() {
-            self.get_refresh_token(&auth_token).await?
-        } else {
-            auth_token
-        };
+        let auth_token = self.get_refresh_token(&auth_token).await?;
         AUTH_TOKEN
             .write()
             .await
