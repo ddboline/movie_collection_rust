@@ -551,7 +551,7 @@ pub fn movie_dir(config: &Config) -> PathBuf {
 }
 
 #[must_use]
-fn dvdrip_dir(config: &Config) -> PathBuf {
+pub fn dvdrip_dir(config: &Config) -> PathBuf {
     config.home_dir.join("dvdrip")
 }
 

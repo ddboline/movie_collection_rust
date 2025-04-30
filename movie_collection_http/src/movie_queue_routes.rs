@@ -46,7 +46,7 @@ use movie_collection_lib::{
         get_watchlist_shows_db_map, watchlist_add, watchlist_rm, TraktActions, WatchListShow,
         WatchedEpisode, WatchedMovie,
     },
-    transcode_service::{transcode_status, TranscodeService, TranscodeServiceRequest},
+    transcode_service::{dvdrip_dir, transcode_status, TranscodeService, TranscodeServiceRequest},
     tv_show_source::TvShowSource,
 };
 
@@ -1025,12 +1025,16 @@ async fn movie_queue_transcode_status(
             "/list/transcode/status",
         )
         .await;
-    let status = transcode_status(&state.config)
-        .await
-        .map_err(Into::<Error>::into)?;
-    let body = transcode_get_html_body(status)
-        .map_err(Into::<Error>::into)?
-        .into();
+    let body = if dvdrip_dir(&state.config).exists() {
+        let status = transcode_status(&state.config)
+            .await
+            .map_err(Into::<Error>::into)?;
+        transcode_get_html_body(status)
+            .map_err(Into::<Error>::into)?
+            .into()
+    } else {
+        "".into()
+    };
     url_task.await.ok();
     Ok(HtmlBase::new(body).into())
 }

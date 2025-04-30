@@ -68,11 +68,10 @@ impl TraktConnection {
             auth_token
         };
         AUTH_TOKEN
-        .write()
-        .await
-        .replace(Arc::new(auth_token.clone()));
-    Ok(auth_token)
-
+            .write()
+            .await
+            .replace(Arc::new(auth_token.clone()));
+        Ok(auth_token)
     }
 
     fn token_path() -> Result<PathBuf, Error> {
