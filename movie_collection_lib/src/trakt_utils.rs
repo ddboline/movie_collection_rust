@@ -682,11 +682,11 @@ pub async fn sync_trakt_with_db(
         .map(|movie: &WatchedMovie| {
             let watched_movies_db = watched_movies_db.clone();
             async move {
-                if !watched_movies_db.contains(movie.imdb_url.as_str()) {
-                    if !movie.imdb_url.is_empty() {
-                        movie.insert_movie(&mc.pool).await?;
-                        mc.stdout.send(format_sstr!("insert watched movie {movie}"));    
-                    }
+                if !watched_movies_db.contains(movie.imdb_url.as_str())
+                    && !movie.imdb_url.is_empty()
+                {
+                    movie.insert_movie(&mc.pool).await?;
+                    mc.stdout.send(format_sstr!("insert watched movie {movie}"));
                 }
                 Ok(())
             }
