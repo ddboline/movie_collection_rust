@@ -1,6 +1,6 @@
 [package]
 name = "movie_collection_rust"
-version = "0.12.12"
+version = "0.12.13"
 authors = ["Daniel Boline <ddboline@gmail.com>"]
 edition = "2018"
 
@@ -27,7 +27,7 @@ stack-string = { version="1.1", features=["postgres_types"] }
 stdout-channel = "0.6"
 time = {version="0.3", features=["serde-human-readable", "macros", "formatting"]}
 time-tz = {version="2.0", features=["system"]}
-tokio = {version="1.44", features=["rt", "macros", "rt-multi-thread"]}
+tokio = {version="1.46", features=["rt", "macros", "rt-multi-thread"]}
 transcode_lib = {path = "transcode_lib"}
 
 [workspace]

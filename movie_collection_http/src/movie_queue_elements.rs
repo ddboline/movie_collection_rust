@@ -450,7 +450,11 @@ pub fn play_worker_body(
             std::fs::create_dir_all(&partial_path)?;
         }
         let partial_path = partial_path.join(file_name.as_str());
-        println!("full_path {full_path:?} partial_path {partial_path:?}");
+        println!(
+            "full_path {} partial_path {}",
+            full_path.display(),
+            partial_path.display()
+        );
         if partial_path.exists() {
             std::fs::remove_file(&partial_path)?;
         }
