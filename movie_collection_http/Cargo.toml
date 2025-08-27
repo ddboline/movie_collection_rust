@@ -1,6 +1,6 @@
 [package]
 name = "movie_collection_http"
-version = "0.12.13"
+version = "0.12.14"
 authors = ["Daniel Boline <ddboline@gmail.com>"]
 edition = "2018"
 
@@ -11,7 +11,7 @@ async-graphql-axum = "7.0"
 async-trait = "0.1"
 axum = { version = "0.8", features = ["multipart"] }
 axum-extra = {version="0.10", features=["cookie"]}
-authorized_users = { git = "https://github.com/ddboline/auth_server_rust.git", tag="0.13.2"}
+authorized_users = { git = "https://github.com/ddboline/auth_server_rust.git", tag="0.13.3"}
 bytes = "1.0"
 derive_more = {version="2.0", features=["full"]}
 dioxus = "0.6"
@@ -39,13 +39,13 @@ stdout-channel = "0.6"
 thiserror = "2.0"
 time = {version="0.3", features=["serde-human-readable", "macros", "formatting"]}
 time-tz = {version="2.0", features=["system"]}
-tokio = {version="1.46", features=["rt", "macros", "rt-multi-thread"]}
+tokio = {version="1.47", features=["rt", "macros", "rt-multi-thread"]}
 tokio-stream = "0.1"
 tower-http = {version="0.6", features=["cors"]}
 utoipa = { version = "5.3", features = ["axum_extras", "yaml", "time", "uuid", "smallvec", "url", "openapi_extensions", "decimal"] }
 utoipa-helper = "0.1"
 utoipa-axum = { version = "0.2" }
-uuid = "1.0"
+uuid = "1.18"
 url = "2.3"
 
 [dev-dependencies]

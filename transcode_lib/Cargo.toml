@@ -1,6 +1,6 @@
 [package]
 name = "transcode_lib"
-version = "0.12.13"
+version = "0.12.14"
 authors = ["Daniel Boline <ddboline@gmail.com>"]
 edition = "2018"
 
@@ -9,8 +9,8 @@ edition = "2018"
 [dependencies]
 anyhow = "1.0"
 deadpool = "0.12"
-deadpool-lapin = {version="0.12", features=["serde"]}
-lapin = {version="2.0", default-features=false, features=["rustls"]}
+deadpool-lapin = {version="0.13", features=["serde"]}
+lapin = {version="3.2", default-features=false, features=["rustls"]}
 derive_more = {version="2.0", features=["full"]}
 futures = "0.3"
 log = "0.4"
