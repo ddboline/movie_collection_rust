@@ -51,6 +51,8 @@ pub struct ConfigInner {
     pub trakt_client_id: StackString,
     #[serde(default = "default_trakt_endpoint")]
     pub trakt_client_secret: StackString,
+    #[serde(default = "default_trakt_user_agent")]
+    pub trakt_user_agent: StackString,
     #[serde(default = "default_secret_path")]
     pub secret_path: PathBuf,
     #[serde(default = "default_secret_path")]
@@ -119,6 +121,9 @@ fn default_trakt_endpoint() -> StackString {
 }
 fn default_trakt_api_endpoint() -> StackString {
     "https://api.trakt.tv".into()
+}
+fn default_trakt_user_agent() -> StackString {
+    "rust-reqwest/0.12".into()
 }
 fn default_secret_path() -> PathBuf {
     dirs::config_dir()

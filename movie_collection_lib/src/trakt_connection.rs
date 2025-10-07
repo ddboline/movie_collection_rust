@@ -149,7 +149,8 @@ impl TraktConnection {
         };
         let mut headers = HeaderMap::new();
         headers.insert("Content-Type", "application/json".parse()?);
-        headers.insert("User-Agent", "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/141.0.0.0 Safari/537.36".parse()?);
+        let user_agent = &self.config.trakt_user_agent;
+        headers.insert("User-Agent", user_agent.parse()?);
         let resp = self
             .client
             .post(url.as_str())
@@ -183,7 +184,8 @@ impl TraktConnection {
         };
         let mut headers = HeaderMap::new();
         headers.insert("Content-Type", "application/json".parse()?);
-        headers.insert("User-Agent", "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/141.0.0.0 Safari/537.36".parse()?);
+        let user_agent = &self.config.trakt_user_agent;
+        headers.insert("User-Agent", user_agent.parse()?);
         let resp = self
             .client
             .post(url.as_str())
@@ -230,7 +232,8 @@ impl TraktConnection {
         headers.insert("Content-Type", "application/json".parse()?);
         headers.insert("trakt-api-key", self.config.trakt_client_id.parse()?);
         headers.insert("trakt-api-version", "2".parse()?);
-        headers.insert("User-Agent", "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/141.0.0.0 Safari/537.36".parse()?);
+        let user_agent = &self.config.trakt_user_agent;
+        headers.insert("User-Agent", user_agent.parse()?);
         Ok(headers)
     }
 
@@ -244,7 +247,8 @@ impl TraktConnection {
         let access_token = &auth_token.access_token;
         let bearer = format_sstr!("Bearer {access_token}");
         headers.insert("Authorization", bearer.parse()?);
-        headers.insert("User-Agent", "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/141.0.0.0 Safari/537.36".parse()?);
+        let user_agent = &self.config.trakt_user_agent;
+        headers.insert("User-Agent", user_agent.parse()?);
         Ok(headers)
     }
 
