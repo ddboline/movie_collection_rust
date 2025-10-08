@@ -87,7 +87,7 @@ impl fmt::Display for ImdbEpisodeResult {
             self.episode,
             option_string_wrapper(self.epurl.as_ref()),
             option_string_wrapper(self.eptitle.as_ref()),
-            self.airdate.unwrap_or_else(|| date!(1970 - 01 - 01)),
+            self.airdate.unwrap_or(date!(1970 - 01 - 01)),
             self.rating.unwrap_or(-1.0),
             self.nrating.unwrap_or(0),
         )
@@ -186,16 +186,21 @@ impl ImdbConnection {
             if let Some(year) = year {
                 write!(&mut title, " ({year})").unwrap();
             }
+            println!("imdbtype {imdb_type:?}");
             if let Some(imdb_type) = imdb_type {
                 write!(&mut title, " ({imdb_type})").unwrap();
+                Ok(Some(ImdbTuple {
+                    title,
+                    link: s.id,
+                    rating,
+                }))
+            } else {
+                Ok(None)
             }
-            Ok(ImdbTuple {
-                title,
-                link: s.id,
-                rating,
-            })
         });
-        try_join_all(futures).await
+        let results: Result<Vec<Option<ImdbTuple>>, Error> = try_join_all(futures).await;
+        let results = results?.into_iter().flatten().collect();
+        Ok(results)
     }
 
     /// # Errors

@@ -123,7 +123,7 @@ pub async fn make_queue_worker(
                     mq.insert_into_queue(max_idx + 1, &path.to_string_lossy())
                         .await?;
                 } else {
-                    return Err(format_err!("{} is not a path", file));
+                    return Err(format_err!("{file} is not a path"));
                 }
             }
         }
@@ -136,7 +136,7 @@ pub async fn make_queue_worker(
                     .await?;
                 mq.reorder_queue().await?;
             } else {
-                return Err(format_err!("{} is not a path", file));
+                return Err(format_err!("{file} is not a path"));
             }
         }
     }

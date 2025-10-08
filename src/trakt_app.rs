@@ -8,6 +8,7 @@ use tokio::time::{sleep, Duration};
 use movie_collection_lib::{
     config::Config,
     imdb_episodes::ImdbEpisodes,
+    imdb_ratings::ImdbRatings,
     movie_collection::MovieCollection,
     pgpool::PgPool,
     plex_events::PlexMetadata,
@@ -73,6 +74,7 @@ async fn trakt_app() -> Result<(), Error> {
         sync_trakt_with_db(&trakt, &mc).await?;
         mc.clear_plex_filename_bad_collection_id().await?;
         mc.fix_plex_filename_collection_id().await?;
+        ImdbRatings::fill_in_missing_ratings_from_trakt(&pool).await?;
         let episodes: Vec<_> = ImdbEpisodes::get_episodes_not_recorded_in_trakt(&pool)
             .await?
             .try_collect()

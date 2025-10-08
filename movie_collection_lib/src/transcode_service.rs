@@ -247,7 +247,7 @@ impl TranscodeServiceRequest {
                 .await?;
             StackString::from_utf8_vec(output.stdout).map_err(Into::into)
         } else {
-            Err(format_err!("{cmd_path:?} does not exist"))
+            Err(format_err!("{} does not exist", cmd_path.display()))
         }
     }
 }
@@ -345,7 +345,7 @@ impl TranscodeService {
         }
 
         if !input_file.exists() {
-            return Err(format_err!("{input_file:?} does not exist"));
+            return Err(format_err!("{} does not exist", input_file.display()));
         }
         let output_path = output_file
             .file_name()
@@ -436,7 +436,7 @@ impl TranscodeService {
                 .join(input_file)
         };
         if !input_file.exists() {
-            return Err(format_err!("{input_file:?} does not exist"));
+            return Err(format_err!("{} does not exist", input_file.display()));
         }
 
         let debug_output_path = log_dir(&self.config).join(format_sstr!("{show}_copy.out"));
