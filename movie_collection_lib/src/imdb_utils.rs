@@ -27,7 +27,7 @@ impl ImdbType {
             "movie" => Some(Self::Movie),
             "tvSeries" => Some(Self::TvSeries),
             "tvMiniSeries" => Some(Self::MiniSeries),
-            "TvMovie" => Some(Self::TvMovie),
+            "tvMovie" | "TvMovie" => Some(Self::TvMovie),
             _ => None,
         }
     }
@@ -180,13 +180,14 @@ impl ImdbConnection {
         let futures = suggestions.d.into_iter().map(|s| async move {
             let mut title = s.l;
             let year = s.y;
+            println!("s.qid {:?}", s.qid);
             let imdb_type = s.qid.and_then(|s| ImdbType::from_str(&s));
             let r = self.parse_imdb_rating(&s.id).await?;
             let rating = r.rating.unwrap_or(-1.0);
             if let Some(year) = year {
                 write!(&mut title, " ({year})").unwrap();
             }
-            println!("imdbtype {imdb_type:?}");
+            println!("title {title} imdbtype {imdb_type:?}");
             if let Some(imdb_type) = imdb_type {
                 write!(&mut title, " ({imdb_type})").unwrap();
                 Ok(Some(ImdbTuple {
