@@ -473,11 +473,13 @@ impl TraktConnection {
                         let imdb_url = imdb_url.clone();
                         season_entry.episodes.into_iter().map(move |episode_entry| {
                             let episode = episode_entry.number;
+                            let last_watched_at = Some(episode_entry.last_watched_at);
                             let epi = WatchedEpisode {
                                 title: title.clone(),
                                 imdb_url: imdb_url.clone(),
                                 episode,
                                 season,
+                                last_watched_at,
                                 ..WatchedEpisode::default()
                             };
                             ((imdb_url.clone(), season, episode), epi)
@@ -515,6 +517,7 @@ impl TraktConnection {
                 WatchedMovie {
                     title: entry.movie.title,
                     imdb_url: imdb,
+                    last_watched_at: Some(entry.last_watched_at),
                 }
             })
             .collect();
@@ -770,6 +773,7 @@ pub struct TraktMovieSearchResponse {
 #[derive(Serialize, Deserialize, Debug)]
 pub struct TraktWatchedEpisode {
     pub number: i32,
+    pub last_watched_at: DateTimeWrapper,
 }
 
 #[derive(Serialize, Deserialize, Debug)]
@@ -782,11 +786,13 @@ pub struct TraktWatchedSeason {
 pub struct TraktWatchedShowResponse {
     pub show: TraktShowObject,
     pub seasons: Vec<TraktWatchedSeason>,
+    pub last_watched_at: DateTimeWrapper,
 }
 
 #[derive(Serialize, Deserialize, Debug)]
 pub struct TraktWatchedMovieResponse {
     pub movie: TraktShowObject,
+    pub last_watched_at: DateTimeWrapper,
 }
 
 #[derive(Serialize, Deserialize, Debug)]

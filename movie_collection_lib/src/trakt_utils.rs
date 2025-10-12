@@ -19,8 +19,9 @@ use time::Date;
 use uuid::Uuid;
 
 use crate::{
-    config::Config, imdb_episodes::ImdbEpisodes, imdb_ratings::ImdbRatings,
-    movie_collection::MovieCollection, pgpool::PgPool, trakt_connection::TraktConnection,
+    config::Config, date_time_wrapper::DateTimeWrapper, imdb_episodes::ImdbEpisodes,
+    imdb_ratings::ImdbRatings, movie_collection::MovieCollection, pgpool::PgPool,
+    trakt_connection::TraktConnection,
 };
 
 use crate::{tv_show_source::TvShowSource, utils::option_string_wrapper};
@@ -366,6 +367,7 @@ pub struct WatchedEpisode {
     pub imdb_url: StackString,
     pub episode: i32,
     pub season: i32,
+    pub last_watched_at: Option<DateTimeWrapper>,
 }
 
 impl fmt::Display for WatchedEpisode {
@@ -411,7 +413,8 @@ impl WatchedEpisode {
                        c.title,
                        c.show,
                        a.season,
-                       a.episode
+                       a.episode,
+                       a.last_watched_at
                 FROM trakt_watched_episodes a
                 JOIN trakt_watchlist b ON a.link = b.link
                 JOIN imdb_ratings c ON b.show = c.show
@@ -430,13 +433,34 @@ impl WatchedEpisode {
     pub async fn insert_episode(&self, pool: &PgPool) -> Result<u64, Error> {
         let query = query!(
             r#"
-                INSERT INTO trakt_watched_episodes (link, season, episode)
-                VALUES ($link, $season, $episode)
+                INSERT INTO trakt_watched_episodes (link, season, episode, last_watched_at)
+                VALUES ($link, $season, $episode, $last_watched_at)
                 ON CONFLICT DO NOTHING
             "#,
             link = self.imdb_url,
             season = self.season,
-            episode = self.episode
+            episode = self.episode,
+            last_watched_at = self.last_watched_at,
+        );
+        let conn = pool.get().await?;
+        query.execute(&conn).await.map_err(Into::into)
+    }
+
+    /// # Errors
+    /// Return error if db query fails
+    pub async fn update_episode(&self, pool: &PgPool) -> Result<u64, Error> {
+        let query = query!(
+            r#"
+                UPDATE trakt_watched_episodes
+                SET last_watched_at = $last_watched_at
+                WHERE link = $link
+                  AND season = $season
+                  AND episode = $episode
+            "#,
+            link = self.imdb_url,
+            season = self.season,
+            episode = self.episode,
+            last_watched_at = self.last_watched_at,
         );
         let conn = pool.get().await?;
         query.execute(&conn).await.map_err(Into::into)
@@ -484,7 +508,8 @@ pub async fn get_watched_shows_db(
                    c.show,
                    c.title,
                    a.season,
-                   a.episode
+                   a.episode,
+                   a.last_watched_at
             FROM trakt_watched_episodes a
             JOIN trakt_watchlist b ON a.link = b.link
             JOIN imdb_ratings c ON b.show = c.show
@@ -501,6 +526,7 @@ pub async fn get_watched_shows_db(
 pub struct WatchedMovie {
     pub title: StackString,
     pub imdb_url: StackString,
+    pub last_watched_at: Option<DateTimeWrapper>,
 }
 
 impl PartialEq for WatchedMovie {
@@ -553,7 +579,8 @@ impl WatchedMovie {
         let query = query!(
             r#"
                 SELECT a.link as imdb_url,
-                       b.title
+                       b.title,
+                       a.last_watched_at
                 FROM trakt_watched_movies a
                 JOIN imdb_ratings b ON a.link = b.link
                 WHERE a.link = $link
@@ -566,16 +593,33 @@ impl WatchedMovie {
 
     /// # Errors
     /// Return error if db query fails
-    pub async fn insert_movie(&self, pool: &PgPool) -> Result<(), Error> {
+    pub async fn insert_movie(&self, pool: &PgPool) -> Result<u64, Error> {
         let query = query!(
             r#"
-                INSERT INTO trakt_watched_movies (link)
-                VALUES ($link)
+                INSERT INTO trakt_watched_movies (link, last_watched_at)
+                VALUES ($link, $last_watched_at)
             "#,
-            link = self.imdb_url
+            link = self.imdb_url,
+            last_watched_at = self.last_watched_at,
         );
         let conn = pool.get().await?;
-        query.execute(&conn).await.map(|_| ()).map_err(Into::into)
+        query.execute(&conn).await.map_err(Into::into)
+    }
+
+    /// # Errors
+    /// Return error if db query fails
+    pub async fn update_movie(&self, pool: &PgPool) -> Result<u64, Error> {
+        let query = query!(
+            r#"
+                UPDATE trakt_watched_movies
+                SET last_watched_at = $last_watched_at
+                WHERE link = $link
+            "#,
+            link = self.imdb_url,
+            last_watched_at = self.last_watched_at,
+        );
+        let conn = pool.get().await?;
+        query.execute(&conn).await.map_err(Into::into)
     }
 
     /// # Errors
@@ -600,7 +644,7 @@ pub async fn get_watched_movies_db(
 ) -> Result<impl Stream<Item = Result<WatchedMovie, PqError>>, Error> {
     let query = query!(
         r#"
-            SELECT a.link as imdb_url, b.title
+            SELECT a.link as imdb_url, b.title, a.last_watched_at
             FROM trakt_watched_movies a
             JOIN imdb_ratings b ON a.link = b.link
             ORDER BY b.show
@@ -655,9 +699,14 @@ pub async fn sync_trakt_with_db(
         .map(|(key, episode)| {
             let watched_shows_db = watched_shows_db.clone();
             async move {
-                if !watched_shows_db.contains_key(&key)
-                    && episode.insert_episode(&mc.pool).await? > 0
-                {
+                if let Some(episode_db) = watched_shows_db.get(&key) {
+                    if episode_db.last_watched_at.is_none()
+                        && episode.update_episode(&mc.pool).await? > 0
+                    {
+                        mc.stdout
+                            .send(format_sstr!("update watched episode {episode}"));
+                    }
+                } else if episode.insert_episode(&mc.pool).await? > 0 {
                     mc.stdout
                         .send(format_sstr!("insert watched episode {episode}"));
                 }
@@ -682,10 +731,12 @@ pub async fn sync_trakt_with_db(
         .map(|movie: &WatchedMovie| {
             let watched_movies_db = watched_movies_db.clone();
             async move {
-                if !watched_movies_db.contains(movie.imdb_url.as_str())
-                    && !movie.imdb_url.is_empty()
-                {
-                    movie.insert_movie(&mc.pool).await?;
+                if let Some(movie_db) = watched_movies_db.get(movie.imdb_url.as_str()) {
+                    if movie_db.last_watched_at.is_none() && movie.update_movie(&mc.pool).await? > 0
+                    {
+                        mc.stdout.send(format_sstr!("update watched movie {movie}"));
+                    }
+                } else if !movie.imdb_url.is_empty() && movie.insert_movie(&mc.pool).await? > 0 {
                     mc.stdout.send(format_sstr!("insert watched movie {movie}"));
                 }
                 Ok(())
@@ -855,6 +906,7 @@ async fn watched_add(
             WatchedMovie {
                 imdb_url,
                 title: "".into(),
+                last_watched_at: None,
             }
             .insert_movie(&mc.pool)
             .await?;

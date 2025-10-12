@@ -1680,6 +1680,7 @@ async fn watched_action_http_worker(
                 WatchedMovie {
                     imdb_url: imdb_url.into(),
                     title: "".into(),
+                    last_watched_at: None,
                 }
                 .insert_movie(&mc.pool)
                 .await?;
