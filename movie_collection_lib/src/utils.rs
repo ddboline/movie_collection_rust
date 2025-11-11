@@ -9,7 +9,6 @@ use rand::{
     rng as thread_rng,
 };
 use reqwest::{Client, Response, Url};
-use serde::{Deserialize, Serialize};
 use smallvec::SmallVec;
 use stack_string::{format_sstr, StackString};
 use std::{
@@ -52,11 +51,6 @@ pub fn walk_directory(path: &Path, match_strs: &[impl AsRef<str>]) -> Result<Vec
             Err(e) => Some(Err(e.into())),
         })
         .collect()
-}
-
-#[derive(Serialize, Deserialize)]
-struct ScriptStruct {
-    script: PathBuf,
 }
 
 #[must_use]

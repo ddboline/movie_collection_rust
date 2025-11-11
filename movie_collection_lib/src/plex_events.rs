@@ -4,6 +4,7 @@ use log::{debug, info};
 use postgres_query::{
     client::GenericClient, query, query_dyn, Error as PqError, FromSqlRow, Parameter, Query,
 };
+use reqwest::StatusCode;
 use roxmltree::Document;
 use serde::{Deserialize, Serialize};
 use stack_string::{format_sstr, StackString};
@@ -936,12 +937,13 @@ impl PlexMetadata {
             .ok_or_else(|| format_err!("No Token"))?;
         let key = &self.metadata_key;
         let url = format_sstr!("http://{plex_host}:32400{key}/children?X-Plex-Token={plex_token}");
-        let data = reqwest::get(url.as_str())
-            .await?
-            .error_for_status()?
-            .text()
-            .await?;
-        Self::extract_children_from_xml(&data)
+        let resp = reqwest::get(url.as_str()).await?;
+        if resp.status() == StatusCode::NOT_FOUND {
+            Ok(vec![])
+        } else {
+            let data = resp.error_for_status()?.text().await?;
+            Self::extract_children_from_xml(&data)
+        }
     }
 
     async fn fill_plex_metadata_show(pool: &PgPool) -> Result<u64, Error> {
