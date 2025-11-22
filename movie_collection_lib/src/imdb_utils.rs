@@ -1,6 +1,6 @@
 use anyhow::{format_err, Error};
 use futures::future::try_join_all;
-use log::debug;
+use log::{debug, error};
 use reqwest::{Client, Url};
 use select::{
     document::Document,
@@ -113,8 +113,9 @@ impl ExponentialRetry for ImdbConnection {
 impl ImdbConnection {
     #[must_use]
     pub fn new() -> Self {
+        let client = Client::builder().user_agent("Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36").build().unwrap();
         Self {
-            client: Client::new(),
+            client,
         }
     }
 
@@ -122,9 +123,12 @@ impl ImdbConnection {
     /// Returns error if `parse_imdb_rating` fails
     #[allow(clippy::needless_collect)]
     pub async fn parse_imdb(&self, title: &str) -> Result<Vec<ImdbTuple>, Error> {
-        let endpoint = "http://www.imdb.com/find?";
+        let endpoint = "https://www.imdb.com/find?";
         let url = Url::parse_with_params(endpoint, &[("s", "all"), ("q", title)])?;
-        let body = self.get(&url).await?.text().await?;
+        let resp = self.get(&url).await?;
+        debug!("resp {}", resp.status());
+        resp.error_for_status_ref()?;
+        let body = resp.text().await?;
 
         let tl_vec: Vec<(StackString, StackString)> = Document::from(body.as_str())
             .find(Class("ipc-page-content-container"))
@@ -180,14 +184,14 @@ impl ImdbConnection {
         let futures = suggestions.d.into_iter().map(|s| async move {
             let mut title = s.l;
             let year = s.y;
-            println!("s.qid {:?}", s.qid);
             let imdb_type = s.qid.and_then(|s| ImdbType::from_str(&s));
+            debug!("s.id {}", s.id);
             let r = self.parse_imdb_rating(&s.id).await?;
             let rating = r.rating.unwrap_or(-1.0);
             if let Some(year) = year {
                 write!(&mut title, " ({year})").unwrap();
             }
-            println!("title {title} imdbtype {imdb_type:?}");
+            debug!("title {title} imdbtype {imdb_type:?}");
             if let Some(imdb_type) = imdb_type {
                 write!(&mut title, " ({imdb_type})").unwrap();
                 Ok(Some(ImdbTuple {
@@ -208,8 +212,8 @@ impl ImdbConnection {
     /// Returns error if `parse_imdb_rating_body` fails
     pub async fn parse_imdb_rating(&self, title: &str) -> Result<RatingOutput, Error> {
         if title.starts_with("tt") {
-            let url = Url::parse("http://www.imdb.com/title/")?.join(title)?;
-            debug!("{url:?}",);
+            let url = Url::parse("https://www.imdb.com/title/")?.join(title)?;
+            debug!("url {url}",);
             let body = self.get(&url).await?.text().await?;
             Self::parse_imdb_rating_body(&body)
         } else {
@@ -258,9 +262,9 @@ impl ImdbConnection {
         season: Option<i32>,
     ) -> Result<(Vec<usize>, Vec<ImdbEpisodeResult>), Error> {
         let endpoint = if let Some(season) = season {
-            format_sstr!("http://m.imdb.com/title/{imdb_id}/episodes?season={season}")
+            format_sstr!("https://m.imdb.com/title/{imdb_id}/episodes?season={season}")
         } else {
-            format_sstr!("http://m.imdb.com/title/{imdb_id}/episodes")
+            format_sstr!("https://m.imdb.com/title/{imdb_id}/episodes")
         };
         let url = Url::parse(&endpoint)?;
         let body = self.get(&url).await?.text().await?;
@@ -376,7 +380,7 @@ impl ImdbConnection {
                                 .collect();
                             return Ok((seasons, episodes));
                         }
-                        Err(e) => println!("error {e:?}"),
+                        Err(e) => error!("error {e:?}"),
                     }
                 }
             }
@@ -398,7 +402,7 @@ mod tests {
     fn test_parse_imdb_rating_body() -> Result<(), Error> {
         let body = include_str!("../../tests/data/imdb_rating_body.html");
         let rating = ImdbConnection::parse_imdb_rating_body(body)?;
-        println!("{:?}", rating);
+        debug!("{:?}", rating);
         assert_eq!(rating.rating, Some(7.5));
         Ok(())
     }
@@ -407,7 +411,7 @@ mod tests {
     async fn test_parse_imdb_rating() -> Result<(), Error> {
         let conn = ImdbConnection::default();
         let rating = conn.parse_imdb_rating("tt14418068").await?;
-        println!("{:?}", rating);
+        debug!("{:?}", rating);
         assert!(rating.rating.is_some());
         Ok(())
     }
