@@ -3,6 +3,7 @@ use futures::{stream::FuturesUnordered, Stream, TryStreamExt};
 use itertools::Itertools;
 use log::debug;
 use postgres_query::{query, query_dyn, Error as PqError, FromSqlRow, Query};
+use postgres_query::Parameter;
 use serde::{Deserialize, Serialize};
 use stack_string::{format_sstr, StackString};
 use std::{
@@ -16,7 +17,9 @@ use std::{
 };
 use stdout_channel::StdoutChannel;
 use time::Date;
+use time::OffsetDateTime;
 use uuid::Uuid;
+use rust_decimal::Decimal;
 
 use crate::{
     config::Config, date_time_wrapper::DateTimeWrapper, imdb_episodes::ImdbEpisodes,
@@ -185,10 +188,10 @@ impl WatchListShow {
         }
         let query = query!(
             "
-                SELECT a.show, a.title, a.year
-                FROM trakt_watchlist a
-                JOIN imdb_ratings b ON a.show = b.show
-                WHERE (a.link = $link OR b.link = $link)
+                SELECT tw.show, tw.title, tw.year
+                FROM trakt_watchlist tw
+                JOIN imdb_ratings ir ON tw.show = ir.show
+                WHERE (tw.link = $link OR ir.link = $link)
             ",
             link = link
         );
@@ -209,10 +212,10 @@ impl WatchListShow {
     pub async fn get_index(&self, pool: &PgPool) -> Result<Option<Uuid>, Error> {
         let query = query!(
             "
-                SELECT a.id
-                FROM trakt_watchlist a
-                JOIN imdb_ratings b ON a.show = b.show
-                WHERE (a.link = $link OR b.link = $link)
+                SELECT tw.id
+                FROM trakt_watchlist tw
+                JOIN imdb_ratings ir ON tw.show = ir.show
+                WHERE (tw.link = $link OR ir.link = $link)
             ",
             link = self.link
         );
@@ -244,7 +247,7 @@ impl WatchListShow {
         let query = query!(
             "
                 DELETE FROM trakt_watchlist
-                WHERE (link=$link OR show=(SELECT a.show FROM imdb_ratings a WHERE a.link = $link))
+                WHERE (link=$link OR show=(SELECT ir.show FROM imdb_ratings ir WHERE ir.link = $link))
             ",
             link = self.link
         );
@@ -258,8 +261,8 @@ impl WatchListShow {
 pub async fn get_watchlist_shows_db(pool: &PgPool) -> Result<HashSet<WatchListShow>, Error> {
     let query = query!(
         r#"
-        SELECT a.link, a.show, a.title, a.year
-        FROM trakt_watchlist a
+        SELECT tw.link, tw.show, tw.title, tw.year
+        FROM trakt_watchlist tw
     "#
     );
     let conn = pool.get().await?;
@@ -286,6 +289,7 @@ pub async fn get_watchlist_shows_db_map(
         year: i32,
         source: Option<StackString>,
     }
+
     async fn get_watchlist_shows_db_map_impl(
         pool: &PgPool,
         search_query: Option<&str>,
@@ -295,18 +299,18 @@ pub async fn get_watchlist_shows_db_map(
     ) -> Result<impl Stream<Item = Result<WatchlistShowDbMap, PqError>>, Error> {
         let mut constraints = Vec::new();
         if let Some(search_query) = search_query {
-            constraints.push(format_sstr!("b.show ilike '%{search_query}%'"));
+            constraints.push(format_sstr!("ir.show ilike '%{search_query}%'"));
         }
         if let Some(source) = source {
             if source != "all" {
-                constraints.push(format_sstr!("b.source = '{source}'"));
+                constraints.push(format_sstr!("ir.source = '{source}'"));
             }
         }
         let query = format_sstr!(
             "
-                SELECT b.show, b.link, a.title, a.year, b.source
-                FROM trakt_watchlist a
-                JOIN imdb_ratings b ON a.show=b.show
+                SELECT ir.show, ir.link, tw.title, tw.year, ir.source
+                FROM trakt_watchlist tw
+                JOIN imdb_ratings ir ON tw.show=ir.show
                 {where_str}
                 ORDER BY 1
                 {offset}
@@ -409,16 +413,16 @@ impl WatchedEpisode {
     ) -> Result<Option<Self>, Error> {
         let query = query!(
             r#"
-                SELECT a.link as imdb_url,
-                       c.title,
-                       c.show,
-                       a.season,
-                       a.episode,
-                       a.last_watched_at
-                FROM trakt_watched_episodes a
-                JOIN trakt_watchlist b ON a.link = b.link
-                JOIN imdb_ratings c ON b.show = c.show
-                WHERE c.link = $link AND a.season = $season AND a.episode = $episode
+                SELECT twe.link as imdb_url,
+                       ir.title,
+                       ir.show,
+                       twe.season,
+                       twe.episode,
+                       twe.last_watched_at
+                FROM trakt_watched_episodes twe
+                JOIN trakt_watchlist tw ON twe.link = tw.link
+                JOIN imdb_ratings ir ON tw.show = ir.show
+                WHERE ir.link = $link AND twe.season = $season AND twe.episode = $episode
             "#,
             link = link,
             season = season,
@@ -492,10 +496,10 @@ pub async fn get_watched_shows_db(
 ) -> Result<impl Stream<Item = Result<WatchedEpisode, PqError>>, Error> {
     let mut where_vec = Vec::new();
     if !show.is_empty() {
-        where_vec.push(format_sstr!("c.show='{show}'"));
+        where_vec.push(format_sstr!("ir.show='{show}'"));
     }
     if let Some(season) = season {
-        where_vec.push(format_sstr!("a.season={season}"));
+        where_vec.push(format_sstr!("twe.season={season}"));
     }
 
     let mut where_str = StackString::new();
@@ -504,15 +508,15 @@ pub async fn get_watched_shows_db(
     }
     let query = format_sstr!(
         r"
-            SELECT a.link as imdb_url,
-                   c.show,
-                   c.title,
-                   a.season,
-                   a.episode,
-                   a.last_watched_at
-            FROM trakt_watched_episodes a
-            JOIN trakt_watchlist b ON a.link = b.link
-            JOIN imdb_ratings c ON b.show = c.show
+            SELECT twe.link as imdb_url,
+                   ir.show,
+                   ir.title,
+                   twe.season,
+                   twe.episode,
+                   twe.last_watched_at
+            FROM trakt_watched_episodes twe
+            JOIN trakt_watchlist tw ON twe.link = tw.link
+            JOIN imdb_ratings ir ON tw.show = ir.show
             {where_str}
             ORDER BY 3,4,5
         "
@@ -578,12 +582,12 @@ impl WatchedMovie {
     pub async fn get_watched_movie(pool: &PgPool, link: &str) -> Result<Option<Self>, Error> {
         let query = query!(
             r#"
-                SELECT a.link as imdb_url,
-                       b.title,
-                       a.last_watched_at
-                FROM trakt_watched_movies a
-                JOIN imdb_ratings b ON a.link = b.link
-                WHERE a.link = $link
+                SELECT tw.link as imdb_url,
+                       ir.title,
+                       tw.last_watched_at
+                FROM trakt_watched_movies tw
+                JOIN imdb_ratings ir ON tw.link = ir.link
+                WHERE tw.link = $link
             "#,
             link = link
         );
@@ -644,10 +648,10 @@ pub async fn get_watched_movies_db(
 ) -> Result<impl Stream<Item = Result<WatchedMovie, PqError>>, Error> {
     let query = query!(
         r#"
-            SELECT a.link as imdb_url, b.title, a.last_watched_at
-            FROM trakt_watched_movies a
-            JOIN imdb_ratings b ON a.link = b.link
-            ORDER BY b.show
+            SELECT twm.link as imdb_url, ir.title, twm.last_watched_at
+            FROM trakt_watched_movies twm
+            JOIN imdb_ratings ir ON twm.link = ir.link
+            ORDER BY ir.show
         "#
     );
     let conn = pool.get().await?;
@@ -1051,4 +1055,91 @@ pub async fn trakt_app_parse(
         TraktCommands::None => {}
     }
     mc.stdout.close().await.map_err(Into::into)
+}
+
+#[derive(FromSqlRow, PartialEq, Clone, Debug)]
+pub struct TraktWatchedOutput {
+    pub title: StackString,
+    pub show_link: StackString,
+    pub episode_title: StackString,
+    pub season: i32,
+    pub episode: i32,
+    pub episode_url: StackString,
+    pub airdate: Option<Date>,
+    pub rating: Option<Decimal>,
+    pub last_watched_at: DateTimeWrapper,
+}
+
+/// # Errors
+/// Returns error if formatting fails
+pub async fn get_trakt_watched_output_db(
+    pool: &PgPool,
+    start_timestamp: Option<OffsetDateTime>,
+    offset: Option<usize>,
+    limit: Option<usize>,
+) -> Result<impl Stream<Item = Result<TraktWatchedOutput, PqError>>, Error> {
+    // WHERE twe.last_watched_at IS NOT NULL
+    let mut constraints = vec!["twe.last_watched_at IS NOT NULL"];
+    let mut bindings = Vec::new();
+    if let Some(start_timestamp) = &start_timestamp {
+        constraints.push("twe.last_watched_at > $start_timestamp");
+        bindings.push(("start_timestamp", start_timestamp as Parameter));
+    }
+ 
+    let query = format_sstr!(
+        r"
+            SELECT ir.title,
+                   ir.link as show_link,
+                   ie.eptitle as episode_title,
+                   twe.season,
+                   twe.episode,
+                   ie.epurl as episode_url,
+                   ie.airdate,
+                   ie.rating,
+                   twe.last_watched_at
+            FROM trakt_watched_episodes twe
+            JOIN imdb_ratings ir ON twe.link = ir.link
+            JOIN imdb_episodes ie ON ie.show = ir.show AND ie.season = twe.season AND ie.episode = twe.episode
+            {where_str}
+            ORDER BY twe.last_watched_at DESC
+            {limit}
+            {offset}
+        ",
+        where_str = format_sstr!("WHERE {}", constraints.join(" AND ")),
+        limit = if let Some(limit) = limit {
+            format_sstr!("LIMIT {limit}")
+        } else {
+            StackString::new()
+        },
+        offset = if let Some(offset) = offset {
+            format_sstr!("OFFSET {offset}")
+        } else {
+            StackString::new()
+        }
+    );
+    let query: Query = query_dyn!(&query, ..bindings)?;
+    let conn = pool.get().await?;
+    query.fetch_streaming(&conn).await.map_err(Into::into)
+}
+
+#[cfg(test)]
+mod tests {
+    use anyhow::Error;
+    use futures::TryStreamExt;
+    use crate::config::Config;
+    use crate::pgpool::PgPool;
+    use crate::trakt_utils::get_trakt_watched_output_db;
+
+    #[tokio::test]
+    #[ignore]
+    async fn test_trakt_watched_output_db() -> Result<(), Error> {
+        let config = Config::with_config()?;
+        let pool = PgPool::new(&config.pgurl)?;
+
+        let output: Vec<_> = get_trakt_watched_output_db(&pool, None, None, Some(10)).await?.try_collect().await?;
+
+        println!("{output:#?}");
+        assert_eq!(output.len(), 10);
+        Ok(())
+    }
 }

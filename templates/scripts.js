@@ -255,3 +255,7 @@ function extract_subtitles(file) {
     let out = `extract ${index} from ${file}`;
     document.getElementById("remcomoutput").innerHTML = out;
 }
+function loadWatchedList(offset=0, limit=10) {
+    let url = `/trakt/watched/list?limit=${limit}&offset=${offset}`;
+    updateMainArticle(url);
+}

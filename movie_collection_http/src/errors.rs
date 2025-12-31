@@ -7,7 +7,6 @@ use axum::{
     },
     response::{IntoResponse, Response},
 };
-use log::error;
 use postgres_query::Error as PqError;
 use serde::Serialize;
 use serde_json::Error as SerdeJsonError;

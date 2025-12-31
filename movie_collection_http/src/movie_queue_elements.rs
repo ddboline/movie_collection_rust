@@ -1,5 +1,5 @@
 use anyhow::{format_err, Error};
-use dioxus::prelude::{component, dioxus_elements, rsx, Element, IntoDynNode, Props, VirtualDom};
+use dioxus::prelude::{component, dioxus_elements, rsx, Element, Props, VirtualDom};
 use futures::{future::try_join_all, TryStreamExt};
 use rust_decimal_macros::dec;
 use stack_string::{format_sstr, StackString};
@@ -15,9 +15,6 @@ use time::{macros::format_description, Duration, OffsetDateTime};
 use time_tz::OffsetDateTimeExt;
 use uuid::Uuid;
 
-#[cfg(debug_assertions)]
-use dioxus::prelude::{GlobalSignal, Readable};
-
 use movie_collection_lib::{
     config::Config,
     date_time_wrapper::DateTimeWrapper,
@@ -30,7 +27,7 @@ use movie_collection_lib::{
     pgpool::PgPool,
     plex_events::{EventOutput, PlexSectionType},
     trakt_connection::TraktConnection,
-    trakt_utils::{get_watched_shows_db, TraktCalEntry, WatchListMap},
+    trakt_utils::{get_watched_shows_db, TraktCalEntry, WatchListMap, TraktWatchedOutput},
     transcode_service::{
         movie_directories, ProcInfo, ProcStatus, TranscodeServiceRequest, TranscodeStatus,
     },
@@ -99,6 +96,12 @@ fn index_element() -> Element {
                     "name": "plex",
                     value: "PlexList",
                     "onclick": "updateMainArticle('/list/plex?limit=10');"
+                },
+                input {
+                    "type": "button",
+                    "name": "trakt_watched",
+                    value: "TraktWatched",
+                    "onclick": "updateMainArticle('/trakt/watched/list?limit=10');"
                 },
                 input {
                     "type": "button",
@@ -2046,7 +2049,11 @@ fn PlexDetailElement(
     } else {
         display_title = format_sstr!("{filestem} {grandparent_title} {parent_title} {title}");
     }
-    let metadata_title = event.metadata_key.as_ref().map_or("".into(), Clone::clone);
+    let metadata_title: String = event
+        .metadata_key
+        .as_ref()
+        .map_or("".into(), Clone::clone)
+        .into();
     let metadata_key = if let (Some(metadata_key), Some(host), Some(server)) =
         (&event.metadata_key, host, server)
     {
@@ -2572,6 +2579,149 @@ fn procs_html_node(status: &TranscodeStatus) -> Element {
             {upcoming},
             {current},
             {finished},
+        }
+    }
+}
+
+/// # Errors
+/// Returns error if formatting fails
+pub fn trakt_watched_most_recent_body(
+    config: Config,
+    events: Vec<TraktWatchedOutput>,
+    offset: Option<usize>,
+    limit: Option<usize>,
+) -> Result<StackString, Error> {
+    let mut app = VirtualDom::new_with_props(
+        TraktWatchedMostRecentElement,
+        TraktWatchedMostRecentElementProps { config, events, offset, limit },
+    );
+    app.rebuild_in_place();
+    let mut renderer = dioxus_ssr::Renderer::default();
+    let mut buffer = String::new();
+    renderer
+        .render_to(&mut buffer, &app)
+        .map_err(Into::<Error>::into)?;
+    Ok(buffer.into())
+}
+
+#[component]
+fn TraktWatchedMostRecentElement(
+    config: Config,
+    events: Vec<TraktWatchedOutput>,
+    offset: Option<usize>,
+    limit: Option<usize>,
+) -> Element {
+
+    let entries = events.iter().enumerate().map(|(idx, event)| {
+        let title = &event.title;
+        let show_link = &event.show_link;
+        let eptitle = &event.episode_title;
+        let ep_url = &event.episode_url;
+        let season = event.season;
+        let episode = event.episode;
+        let airdate = event.airdate.map_or_else(StackString::new, StackString::from_display);
+        let rating = event.rating.unwrap_or_else(|| dec!(-1));
+        let last_watched = match config.default_time_zone {
+            Some(tz) => {
+                let tz = tz.into();
+                event.last_watched_at.to_timezone(tz)
+            }
+            None => event.last_watched_at.to_timezone(DateTimeWrapper::local_tz()),
+        };
+        let last_watched = last_watched
+            .format(format_description!(
+                "[year]-[month]-[day]T[hour]:[minute]:[second][offset_hour]:[offset_minute]"
+            ))
+            .unwrap_or_default();
+        let display_element = rsx! {
+            a {
+                href: "https://www.imdb.com/title/{show_link}",
+                target: "_blank",
+                "{title}",
+            }
+        };
+        let episode_title_element = rsx! {
+            a {
+                href: "https://www.imdb.com/title/{ep_url}",
+                target: "_blank",
+                "{eptitle}",
+            }
+        };
+        let season_element = rsx! {
+            a {
+                href: "javascript:updateMainArticle('/trakt/watched/list/{show_link}/{season}')",
+                "{season}",
+            }
+        };
+
+        rsx! {
+            tr {
+                key: "trakt-watched-most-recent-key-{idx}",
+                td { {display_element} },
+                td { {episode_title_element} },
+                td { {season_element} },
+                td {"{episode}"},
+                td {"{airdate}"},
+                td {"{rating:0.1}"},
+                td {"{last_watched}"},
+            }
+        }
+    });
+
+    let limit = limit.unwrap_or(10);
+    let previous_button = if let Some(offset) = offset {
+        if offset < limit {
+            None
+        } else {
+            let new_offset = offset - limit;
+            Some(rsx! {
+                button {
+                    "type": "submit",
+                    name: "previous",
+                    value: "Previous",
+                    "onclick": "loadWatchedList({new_offset}, {limit})",
+                    "Previous",
+                }
+            })
+        }
+    } else {
+        None
+    };
+    let offset = offset.unwrap_or(0);
+    let new_offset = offset + limit;
+    let next_button = rsx! {
+        button {
+            "type": "submit",
+            name: "next",
+            value: "Next",
+            "onclick": "loadWatchedList({new_offset}, {limit})",
+            "Next",
+        }
+    };
+
+    rsx! {
+        br {
+            {previous_button},
+            {next_button},
+        }
+        table {
+            "border": "1",
+            "align": "center",
+            class: "dataframe",
+            thead {
+                tr {
+                    th {"Title"},
+                    th {"Episode Title"},
+                    th {"Season"},
+                    th {"Episode"},
+                    th {"Airdate"},
+                    th {"Rating"},
+                    th {"Last Watched"},
+                }
+            },
+            tbody {
+                {entries}
+            }
         }
     }
 }
