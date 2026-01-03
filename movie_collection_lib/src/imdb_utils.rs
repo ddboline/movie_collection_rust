@@ -459,7 +459,12 @@ mod tests {
     #[ignore]
     async fn test_parse_imdb() -> Result<(), Error> {
         let conn = ImdbConnection::new();
-        let results: Vec<_> = conn.parse_imdb("the sopranos").await?.into_iter().filter(|r| r.title != "").collect();
+        let results: Vec<_> = conn
+            .parse_imdb("the sopranos")
+            .await?
+            .into_iter()
+            .filter(|r| r.title != "")
+            .collect();
         let top_result = &results[0];
         assert_eq!(&top_result.title, "The Sopranos");
         assert_eq!(&top_result.link, "tt0141842");

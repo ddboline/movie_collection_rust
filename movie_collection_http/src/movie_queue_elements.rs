@@ -27,7 +27,7 @@ use movie_collection_lib::{
     pgpool::PgPool,
     plex_events::{EventOutput, PlexSectionType},
     trakt_connection::TraktConnection,
-    trakt_utils::{get_watched_shows_db, TraktCalEntry, WatchListMap, TraktWatchedOutput},
+    trakt_utils::{get_watched_shows_db, TraktCalEntry, TraktWatchedOutput, WatchListMap},
     transcode_service::{
         movie_directories, ProcInfo, ProcStatus, TranscodeServiceRequest, TranscodeStatus,
     },
@@ -2593,7 +2593,12 @@ pub fn trakt_watched_most_recent_body(
 ) -> Result<StackString, Error> {
     let mut app = VirtualDom::new_with_props(
         TraktWatchedMostRecentElement,
-        TraktWatchedMostRecentElementProps { config, events, offset, limit },
+        TraktWatchedMostRecentElementProps {
+            config,
+            events,
+            offset,
+            limit,
+        },
     );
     app.rebuild_in_place();
     let mut renderer = dioxus_ssr::Renderer::default();
@@ -2611,7 +2616,6 @@ fn TraktWatchedMostRecentElement(
     offset: Option<usize>,
     limit: Option<usize>,
 ) -> Element {
-
     let entries = events.iter().enumerate().map(|(idx, event)| {
         let title = &event.title;
         let show_link = &event.show_link;
@@ -2619,14 +2623,18 @@ fn TraktWatchedMostRecentElement(
         let ep_url = &event.episode_url;
         let season = event.season;
         let episode = event.episode;
-        let airdate = event.airdate.map_or_else(StackString::new, StackString::from_display);
+        let airdate = event
+            .airdate
+            .map_or_else(StackString::new, StackString::from_display);
         let rating = event.rating.unwrap_or_else(|| dec!(-1));
         let last_watched = match config.default_time_zone {
             Some(tz) => {
                 let tz = tz.into();
                 event.last_watched_at.to_timezone(tz)
             }
-            None => event.last_watched_at.to_timezone(DateTimeWrapper::local_tz()),
+            None => event
+                .last_watched_at
+                .to_timezone(DateTimeWrapper::local_tz()),
         };
         let last_watched = last_watched
             .format(format_description!(

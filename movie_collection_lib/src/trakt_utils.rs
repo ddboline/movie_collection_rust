@@ -2,8 +2,8 @@ use anyhow::Error;
 use futures::{stream::FuturesUnordered, Stream, TryStreamExt};
 use itertools::Itertools;
 use log::debug;
-use postgres_query::{query, query_dyn, Error as PqError, FromSqlRow, Query};
-use postgres_query::Parameter;
+use postgres_query::{query, query_dyn, Error as PqError, FromSqlRow, Parameter, Query};
+use rust_decimal::Decimal;
 use serde::{Deserialize, Serialize};
 use stack_string::{format_sstr, StackString};
 use std::{
@@ -16,10 +16,8 @@ use std::{
     sync::Arc,
 };
 use stdout_channel::StdoutChannel;
-use time::Date;
-use time::OffsetDateTime;
+use time::{Date, OffsetDateTime};
 use uuid::Uuid;
-use rust_decimal::Decimal;
 
 use crate::{
     config::Config, date_time_wrapper::DateTimeWrapper, imdb_episodes::ImdbEpisodes,
@@ -247,7 +245,8 @@ impl WatchListShow {
         let query = query!(
             "
                 DELETE FROM trakt_watchlist
-                WHERE (link=$link OR show=(SELECT ir.show FROM imdb_ratings ir WHERE ir.link = $link))
+                WHERE (link=$link OR show=(SELECT ir.show FROM imdb_ratings ir WHERE ir.link = \
+             $link))
             ",
             link = self.link
         );
@@ -1085,7 +1084,7 @@ pub async fn get_trakt_watched_output_db(
         constraints.push("twe.last_watched_at > $start_timestamp");
         bindings.push(("start_timestamp", start_timestamp as Parameter));
     }
- 
+
     let query = format_sstr!(
         r"
             SELECT ir.title,
@@ -1124,11 +1123,9 @@ pub async fn get_trakt_watched_output_db(
 
 #[cfg(test)]
 mod tests {
+    use crate::{config::Config, pgpool::PgPool, trakt_utils::get_trakt_watched_output_db};
     use anyhow::Error;
     use futures::TryStreamExt;
-    use crate::config::Config;
-    use crate::pgpool::PgPool;
-    use crate::trakt_utils::get_trakt_watched_output_db;
 
     #[tokio::test]
     #[ignore]
@@ -1136,7 +1133,10 @@ mod tests {
         let config = Config::with_config()?;
         let pool = PgPool::new(&config.pgurl)?;
 
-        let output: Vec<_> = get_trakt_watched_output_db(&pool, None, None, Some(10)).await?.try_collect().await?;
+        let output: Vec<_> = get_trakt_watched_output_db(&pool, None, None, Some(10))
+            .await?
+            .try_collect()
+            .await?;
 
         println!("{output:#?}");
         assert_eq!(output.len(), 10);

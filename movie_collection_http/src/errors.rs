@@ -10,7 +10,7 @@ use axum::{
 use postgres_query::Error as PqError;
 use serde::Serialize;
 use serde_json::Error as SerdeJsonError;
-use serde_yml::Error as YamlError;
+use serde_yaml_ng::Error as YamlError;
 use stack_string::{format_sstr, StackString};
 use std::{
     fmt::{Debug, Error as FmtError},
@@ -150,7 +150,7 @@ mod test {
     use axum::http::header::{InvalidHeaderName, InvalidHeaderValue, ToStrError};
     use postgres_query::Error as PqError;
     use serde_json::Error as SerdeJsonError;
-    use serde_yml::Error as YamlError;
+    use serde_yaml_ng::Error as YamlError;
     use std::{fmt::Error as FmtError, io::Error as IoError, net::AddrParseError};
     use tokio::{task::JoinError, time::error::Elapsed};
     use url::ParseError as UrlParseError;
