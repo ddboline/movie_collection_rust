@@ -528,9 +528,10 @@ impl TraktConnection {
     /// Return error if api call fails
     pub async fn get_calendar(&self) -> Result<TraktCalEntryList, Error> {
         let local = DateTimeWrapper::local_tz();
+        let today = DateTimeWrapper::now().date();
         let headers = self.get_rw_headers().await?;
         let trakt_endpoint = &self.config.trakt_api_endpoint;
-        let url = format_sstr!("{trakt_endpoint}/calendars/my/shows");
+        let url = format_sstr!("{trakt_endpoint}/calendars/my/shows/{today}/7");
         let new_episodes: Vec<TraktCalendarResponse> = self
             .client
             .get(url.as_str())
@@ -891,6 +892,7 @@ mod tests {
         let config = Config::with_config()?;
         let conn = TraktConnection::new(config);
         conn.init().await?;
+
         let result = conn.get_calendar().await?;
         println!("{}", result.len());
         assert!(result.len() > 1);
