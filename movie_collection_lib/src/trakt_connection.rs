@@ -2,7 +2,7 @@ use anyhow::{format_err, Error};
 use base64::{engine::general_purpose::URL_SAFE_NO_PAD, Engine};
 use log::debug;
 use maplit::hashmap;
-use rand::{rng as thread_rng, Rng};
+use rand::{rng as thread_rng, RngExt};
 use reqwest::{header::HeaderMap, Client, Url};
 use serde::{Deserialize, Serialize};
 use smallvec::SmallVec;

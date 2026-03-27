@@ -13,7 +13,7 @@ clap = {version="4.5", features=["derive"]}
 derive_more = {version="2.1", features=["full"]}
 dirs = "6.0"
 dotenvy = "0.15"
-deadpool = "0.12"
+deadpool = "0.13"
 deadpool-postgres = "0.14"
 envy = "0.4"
 futures = "0.3"
@@ -24,7 +24,7 @@ maplit = "1.0"
 postgres_query = {git = "https://github.com/ddboline/rust-postgres-query", tag = "0.3.8", features=["deadpool"]}
 postgres-types = "0.2"
 procfs = "0.18"
-rand = "0.9"
+rand = "0.10"
 rayon = "1.11"
 reqwest = {version="0.13", features=["cookies", "json"]}
 roxmltree = "0.21"
