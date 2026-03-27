@@ -334,6 +334,24 @@ impl TraktConnection {
 
     /// # Errors
     /// Return error if api call fails
+    pub async fn search_show(&self, title: &str) -> Result<Vec<TraktShowSearchResponse>, Error> {
+        let headers = self.get_ro_headers()?;
+        let trakt_endpoint = &self.config.trakt_api_endpoint;
+        let endpoint = format_sstr!("{trakt_endpoint}/search/show?");
+        let url = Url::parse_with_params(&endpoint, &[("query", title)])?;
+        self.client
+            .get(url.as_str())
+            .headers(headers)
+            .send()
+            .await?
+            .error_for_status()?
+            .json()
+            .await
+            .map_err(Into::into)
+    }
+
+    /// # Errors
+    /// Return error if api call fails
     pub async fn get_movie_by_imdb_id(
         &self,
         imdb_id: &str,
@@ -354,16 +372,134 @@ impl TraktConnection {
 
     /// # Errors
     /// Return error if api call fails
+    pub async fn search_movie(&self, title: &str) -> Result<Vec<TraktMovieSearchResponse>, Error> {
+        let headers = self.get_ro_headers()?;
+        let trakt_endpoint = &self.config.trakt_api_endpoint;
+        let endpoint = format_sstr!("{trakt_endpoint}/search/movie?");
+        let url = Url::parse_with_params(&endpoint, &[("query", title)])?;
+        self.client
+            .get(url.as_str())
+            .headers(headers)
+            .send()
+            .await?
+            .error_for_status()?
+            .json()
+            .await
+            .map_err(Into::into)
+    }
+
+    /// # Errors
+    /// Return error if api call fails
+    pub async fn get_movie_rating(&self, imdb_id: &str) -> Result<TraktRating, Error> {
+        let headers = self.get_ro_headers()?;
+        let trakt_endpoint = &self.config.trakt_api_endpoint;
+        let url = format_sstr!("{trakt_endpoint}/movies/{imdb_id}/ratings");
+        self.client
+            .get(url.as_str())
+            .headers(headers)
+            .send()
+            .await?
+            .error_for_status()?
+            .json()
+            .await
+            .map_err(Into::into)
+    }
+
+    /// # Errors
+    /// Return error if api call fails
+    pub async fn get_seasons(&self, imdb_id: &str) -> Result<Vec<TraktSeasonObject>, Error> {
+        let headers = self.get_ro_headers()?;
+        let trakt_endpoint = &self.config.trakt_api_endpoint;
+        let url = format_sstr!("{trakt_endpoint}/shows/{imdb_id}/seasons");
+        self.client
+            .get(url.as_str())
+            .headers(headers)
+            .send()
+            .await?
+            .error_for_status()?
+            .json()
+            .await
+            .map_err(Into::into)
+    }
+
+    /// # Errors
+    /// Return error if api call fails
+    pub async fn get_season_episodes(
+        &self,
+        imdb_id: &str,
+        season: i32,
+    ) -> Result<Vec<TraktEpisodeObject>, Error> {
+        let headers = self.get_ro_headers()?;
+        let trakt_endpoint = &self.config.trakt_api_endpoint;
+        let url = format_sstr!("{trakt_endpoint}/shows/{imdb_id}/seasons/{season}");
+        self.client
+            .get(url.as_str())
+            .headers(headers)
+            .send()
+            .await?
+            .error_for_status()?
+            .json()
+            .await
+            .map_err(Into::into)
+    }
+
+    /// # Errors
+    /// Return error if api call fails
     pub async fn get_episode(
         &self,
         imdb_id: &str,
         season: i32,
         episode: i32,
+        extended: bool,
     ) -> Result<TraktEpisodeObject, Error> {
         let headers = self.get_ro_headers()?;
         let trakt_endpoint = &self.config.trakt_api_endpoint;
-        let url =
+        let mut url =
             format_sstr!("{trakt_endpoint}/shows/{imdb_id}/seasons/{season}/episodes/{episode}");
+        if extended {
+            url = format_sstr!("{url}?extended=full");
+        }
+        self.client
+            .get(url.as_str())
+            .headers(headers)
+            .send()
+            .await?
+            .error_for_status()?
+            .json()
+            .await
+            .map_err(Into::into)
+    }
+
+    /// # Errors
+    /// Return error if api call fails
+    pub async fn get_episode_rating(
+        &self,
+        imdb_id: &str,
+        season: i32,
+        episode: i32,
+    ) -> Result<TraktRating, Error> {
+        let headers = self.get_ro_headers()?;
+        let trakt_endpoint = &self.config.trakt_api_endpoint;
+        let url = format_sstr!(
+            "{trakt_endpoint}/shows/{imdb_id}/seasons/{season}/episodes/{episode}/ratings"
+        );
+        self.client
+            .get(url.as_str())
+            .headers(headers)
+            .send()
+            .await?
+            .error_for_status()?
+            .json()
+            .await
+            .map_err(Into::into)
+    }
+
+    /// # Errors
+    /// Return error if api call fails
+    pub async fn get_show_rating(&self, imdb_id: &str) -> Result<TraktRating, Error> {
+        let headers = self.get_ro_headers()?;
+        let trakt_endpoint = &self.config.trakt_api_endpoint;
+        let url = format_sstr!("{trakt_endpoint}/shows/{imdb_id}");
         self.client
             .get(url.as_str())
             .headers(headers)
@@ -566,7 +702,7 @@ impl TraktConnection {
         season: i32,
         episode: i32,
     ) -> Result<TraktResult, Error> {
-        let episode_obj = self.get_episode(imdb_id, season, episode).await?;
+        let episode_obj = self.get_episode(imdb_id, season, episode, false).await?;
         let headers = self.get_rw_headers().await?;
         let trakt_endpoint = &self.config.trakt_api_endpoint;
         let url = format_sstr!("{trakt_endpoint}/sync/history");
@@ -634,7 +770,7 @@ impl TraktConnection {
         season: i32,
         episode: i32,
     ) -> Result<TraktResult, Error> {
-        let episode_obj = self.get_episode(imdb_id, season, episode).await?;
+        let episode_obj = self.get_episode(imdb_id, season, episode, false).await?;
         let headers = self.get_rw_headers().await?;
         let trakt_endpoint = &self.config.trakt_api_endpoint;
         let url = format_sstr!("{trakt_endpoint}/sync/history/remove");
@@ -748,12 +884,21 @@ pub struct TraktShowObject {
     pub ids: TraktIdObject,
 }
 
+#[derive(Serialize, Deserialize, Debug, Clone)]
+pub struct TraktSeasonObject {
+    pub number: i32,
+    pub ids: TraktIdObject,
+}
+
 #[derive(Serialize, Deserialize, Debug)]
 pub struct TraktEpisodeObject {
     pub season: i32,
     pub number: i32,
     pub title: StackString,
     pub ids: TraktIdObject,
+    pub first_aired: Option<DateTimeWrapper>,
+    pub rating: Option<f64>,
+    pub nrating: Option<i32>,
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
@@ -803,10 +948,17 @@ pub struct TraktCalendarResponse {
     pub show: TraktShowObject,
 }
 
+#[derive(Serialize, Deserialize, Debug)]
+pub struct TraktRating {
+    pub rating: f64,
+    pub votes: i32,
+}
+
 #[cfg(test)]
 mod tests {
     use crate::{config::Config, trakt_connection::TraktConnection};
     use anyhow::Error;
+    use log::debug;
     use stack_string::format_sstr;
 
     #[test]
@@ -816,7 +968,7 @@ mod tests {
         let conn = TraktConnection::new(config);
         let test_state = TraktConnection::get_random_string();
         let url = conn.get_auth_url_impl(test_state.as_str())?;
-        println!("url {}", url);
+        debug!("url {}", url);
         let expected = format_sstr!(
             "https://trakt.tv/oauth/authorize?{a}{client_id}{b}{domain}%2Ftrakt%2Fcallback&state={state}",
             a="response_type=code&client_id=",
@@ -853,6 +1005,86 @@ mod tests {
 
     #[tokio::test]
     #[ignore]
+    async fn test_get_movie_rating() -> Result<(), Error> {
+        let config = Config::with_config()?;
+        let conn = TraktConnection::new(config);
+        conn.init().await?;
+        let result = conn.get_movie_rating("tt0457430").await?;
+        assert!(result.rating > 8.0);
+        Ok(())
+    }
+
+    #[tokio::test]
+    #[ignore]
+    async fn test_get_episode_rating() -> Result<(), Error> {
+        let config = Config::with_config()?;
+        let conn = TraktConnection::new(config);
+        conn.init().await?;
+        let result = conn.get_episode_rating("tt12708542", 1, 10).await?;
+        assert!(result.rating > 7.0);
+        Ok(())
+    }
+
+    #[tokio::test]
+    #[ignore]
+    async fn test_get_show_rating() -> Result<(), Error> {
+        let config = Config::with_config()?;
+        let conn = TraktConnection::new(config);
+        conn.init().await?;
+        let result = conn.get_show_rating("tt0141842").await?;
+        assert!(result.rating > 9.0);
+        Ok(())
+    }
+
+    #[tokio::test]
+    #[ignore]
+    async fn test_get_show_season_episodes() -> Result<(), Error> {
+        let config = Config::with_config()?;
+        let conn = TraktConnection::new(config);
+        conn.init().await?;
+        let result = conn.get_season_episodes("tt0141842", 1).await?;
+        assert!(result.len() == 13);
+        assert!(result[0].title == "The Sopranos");
+        assert!(result[0].ids.imdb == Some("tt0705282".into()));
+        Ok(())
+    }
+
+    #[tokio::test]
+    #[ignore]
+    async fn test_search_show() -> Result<(), Error> {
+        let config = Config::with_config()?;
+        let conn = TraktConnection::new(config);
+        conn.init().await?;
+        let result = conn.search_show("the sopranos").await?;
+        let top_result = result
+            .iter()
+            .filter(|s| &s.show.title == "The Sopranos")
+            .next()
+            .unwrap();
+        assert_eq!(top_result.show.ids.imdb, Some("tt0141842".into()));
+        Ok(())
+    }
+
+    #[tokio::test]
+    #[ignore]
+    async fn test_search_movie() -> Result<(), Error> {
+        let config = Config::with_config()?;
+        let conn = TraktConnection::new(config);
+        conn.init().await?;
+        let result = conn.search_movie("pans labyrinth").await?;
+        debug!("{:?}", result);
+        let top_result = result
+            .iter()
+            .filter(|s| &s.movie.title == "Pan's Labyrinth")
+            .next()
+            .unwrap();
+        assert_eq!(top_result.movie.ids.imdb, Some("tt0457430".into()));
+        assert_eq!(top_result.movie.year, Some(2006));
+        Ok(())
+    }
+
+    #[tokio::test]
+    #[ignore]
     async fn test_get_show_by_imdb_id() -> Result<(), Error> {
         let imdb_id = "tt4270492";
         let config = Config::with_config()?;
@@ -881,7 +1113,7 @@ mod tests {
         let conn = TraktConnection::new(config);
         conn.init().await?;
         let result = conn.get_watched_movies().await?;
-        println!("{}", result.len());
+        debug!("{}", result.len());
         assert!(result.len() > 5);
         Ok(())
     }
@@ -894,7 +1126,7 @@ mod tests {
         conn.init().await?;
 
         let result = conn.get_calendar().await?;
-        println!("{}", result.len());
+        debug!("{}", result.len());
         assert!(result.len() > 1);
         Ok(())
     }

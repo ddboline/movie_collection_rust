@@ -9,6 +9,7 @@ use uuid::Uuid;
 use crate::{
     config::Config, imdb_episodes::ImdbEpisodes, imdb_ratings::ImdbRatings,
     imdb_utils::ImdbConnection, movie_collection::MovieCollection, pgpool::PgPool,
+    trakt_connection::TraktConnection,
 };
 
 #[derive(Parser, Default, Debug, Clone)]
@@ -60,6 +61,7 @@ impl ParseImdb {
     pub async fn parse_imdb_worker(
         &self,
         opts: &ParseImdbOptions,
+        trakt: &TraktConnection,
     ) -> Result<Vec<Vec<StackString>>, Error> {
         let shows: Vec<_> = if let Some(ilink) = &opts.imdb_link {
             self.mc
@@ -127,7 +129,7 @@ impl ParseImdb {
         let episodes: Option<HashMap<(i32, i32), _>> = episodes.map(|v| v.into_iter().collect());
 
         if opts.do_update {
-            self.parse_imdb_update_worker(opts, &shows, episodes.as_ref(), &mut output)
+            self.parse_imdb_update_worker(opts, &shows, episodes.as_ref(), &mut output, trakt)
                 .await?;
         }
         Ok(output)
@@ -140,12 +142,13 @@ impl ParseImdb {
         shows: &HashMap<StackString, ImdbRatings>,
         episodes: Option<&HashMap<(i32, i32), ImdbEpisodes>>,
         output: &mut Vec<Vec<StackString>>,
+        trakt: &TraktConnection,
     ) -> Result<(), Error> {
         let imdb_conn = ImdbConnection::new();
         let title = opts.show.replace('_', " ");
-        let mut results = imdb_conn.get_suggestions(&title).await?;
+        let mut results = imdb_conn.get_suggestions(trakt, &title).await?;
         if results.is_empty() {
-            results = imdb_conn.parse_imdb(&title).await?;
+            results = imdb_conn.parse_imdb(trakt, &title).await?;
         }
         let results = if let Some(ilink) = &opts.imdb_link {
             results
@@ -204,7 +207,7 @@ impl ParseImdb {
             output.push(vec![format_sstr!("Using {link}",)]);
             if let Some(result) = shows.get(&link) {
                 let (season_list, episode_list) = imdb_conn
-                    .parse_imdb_episode_list(&link, opts.season)
+                    .parse_imdb_episode_list(trakt, &link, opts.season)
                     .await?;
                 if opts.season.is_none() {
                     output.push(vec![format_sstr!("seasons {season_list:?}")]);

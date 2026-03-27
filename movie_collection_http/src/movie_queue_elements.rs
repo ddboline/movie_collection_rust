@@ -1662,8 +1662,9 @@ pub async fn parse_imdb_http_body(
     imdb: &ParseImdb,
     opts: &ParseImdbOptions,
     watchlist: WatchListMap,
+    trakt: &TraktConnection,
 ) -> Result<String, Error> {
-    let imdb_urls = imdb.parse_imdb_worker(opts).await?;
+    let imdb_urls = imdb.parse_imdb_worker(opts, trakt).await?;
     let show = opts.show.clone();
 
     let mut app = VirtualDom::new_with_props(

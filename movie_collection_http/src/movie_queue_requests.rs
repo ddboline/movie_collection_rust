@@ -16,6 +16,7 @@ use movie_collection_lib::{
     movie_queue::{MovieQueueDB, MovieQueueResult, MovieQueueRow, OrderBy},
     parse_imdb::{ParseImdb, ParseImdbOptions},
     pgpool::PgPool,
+    trakt_connection::TraktConnection,
     trakt_utils::{get_watched_shows_db, get_watchlist_shows_db_map, WatchedEpisode},
     tv_show_source::TvShowSource,
 };
@@ -174,14 +175,19 @@ impl From<ImdbShowRequest> for ParseImdbOptions {
 impl ImdbShowRequest {
     /// # Errors
     /// Return error if `parse_imdb_http_worker` fails
-    pub async fn process(self, pool: &PgPool, config: &Config) -> Result<StackString, Error> {
+    pub async fn process(
+        self,
+        pool: &PgPool,
+        config: &Config,
+        trakt: &TraktConnection,
+    ) -> Result<StackString, Error> {
         let mock_stdout = MockStdout::new();
         let stdout = StdoutChannel::with_mock_stdout(mock_stdout.clone(), mock_stdout);
 
         let watchlist =
             get_watchlist_shows_db_map(pool, Some(&self.show), None, None, None).await?;
         let pi = ParseImdb::new(config, pool, &stdout);
-        let body = parse_imdb_http_body(&pi, &self.into(), watchlist)
+        let body = parse_imdb_http_body(&pi, &self.into(), watchlist, trakt)
             .await?
             .into();
         Ok(body)

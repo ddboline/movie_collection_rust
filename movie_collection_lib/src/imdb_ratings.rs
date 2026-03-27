@@ -11,8 +11,8 @@ use time::OffsetDateTime;
 use uuid::Uuid;
 
 use crate::{
-    imdb_utils::ImdbConnection, pgpool::PgPool, tv_show_source::TvShowSource,
-    utils::option_string_wrapper,
+    config::Config, imdb_utils::ImdbConnection, pgpool::PgPool, trakt_connection::TraktConnection,
+    tv_show_source::TvShowSource, utils::option_string_wrapper,
 };
 
 #[derive(Default, Clone, Debug, Serialize, Deserialize, FromSqlRow, PartialEq)]
@@ -244,15 +244,17 @@ impl ImdbRatings {
     /// # Errors
     /// Returns error if db query fails
     pub async fn fill_in_missing_ratings_from_trakt(pool: &PgPool) -> Result<(), Error> {
+        let config = Config::with_config()?;
         let imdb_conn = ImdbConnection::new();
+        let trakt = TraktConnection::new(config);
         let mut links = ImdbRatings::get_shows_in_trakt_not_recorded_in_ratings(pool).await?;
         links.extend(ImdbRatings::get_shows_in_trakt_not_in_episodes(pool).await?);
         for link in links {
             println!("link {link}");
-            for result in imdb_conn.get_suggestions(&link).await? {
+            for result in imdb_conn.get_suggestions(&trakt, &link).await? {
                 println!("result {}", result.link);
             }
-            if let Some(result) = imdb_conn.get_suggestions(&link).await?.first() {
+            if let Some(result) = imdb_conn.get_suggestions(&trakt, &link).await?.first() {
                 let title = result.title.clone();
                 let show: StackString = slugify(&title).replace('-', "_").into();
                 let rating = result.rating;

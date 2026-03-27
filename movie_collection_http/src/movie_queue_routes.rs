@@ -389,7 +389,7 @@ async fn imdb_show(
         .await;
     let Query(query) = query;
     let req = ImdbShowRequest { show, query };
-    let body = req.process(&state.db, &state.config).await?;
+    let body = req.process(&state.db, &state.config, &state.trakt).await?;
     task.await.ok();
     Ok(HtmlBase::new(body).into())
 }

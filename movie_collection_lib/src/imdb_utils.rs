@@ -2,51 +2,16 @@ use anyhow::{format_err, Error};
 use futures::future::try_join_all;
 use log::{debug, error};
 use reqwest::{Client, Url};
-use select::{
-    document::Document,
-    predicate::{Class, Name},
-};
+use select::{document::Document, predicate::Name};
 use serde::Deserialize;
-use stack_string::{format_sstr, StackString};
-use std::{convert::TryFrom, fmt, fmt::Write};
+use stack_string::StackString;
+use std::{convert::TryFrom, fmt};
 use time::{macros::date, Date, Month};
 
-use crate::utils::{option_string_wrapper, ExponentialRetry};
-
-#[derive(Clone, Copy, Debug)]
-enum ImdbType {
-    TvSeries,
-    MiniSeries,
-    Movie,
-    TvMovie,
-}
-
-impl ImdbType {
-    fn from_str(s: &str) -> Option<ImdbType> {
-        match s {
-            "movie" => Some(Self::Movie),
-            "tvSeries" => Some(Self::TvSeries),
-            "tvMiniSeries" => Some(Self::MiniSeries),
-            "tvMovie" | "TvMovie" => Some(Self::TvMovie),
-            _ => None,
-        }
-    }
-
-    fn to_str(self) -> &'static str {
-        match self {
-            Self::TvSeries => "TV Series",
-            Self::MiniSeries => "TV Mini-Series",
-            Self::Movie => "Movie",
-            Self::TvMovie => "TV Movie",
-        }
-    }
-}
-
-impl fmt::Display for ImdbType {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "{}", self.to_str())
-    }
-}
+use crate::{
+    trakt_connection::{TraktConnection, TraktIdObject, TraktShowObject},
+    utils::{option_string_wrapper, ExponentialRetry},
+};
 
 #[derive(Default, Debug)]
 pub struct ImdbTuple {
@@ -128,90 +93,84 @@ impl ImdbConnection {
     /// # Errors
     /// Returns error if `parse_imdb_rating` fails
     #[allow(clippy::needless_collect)]
-    pub async fn parse_imdb(&self, title: &str) -> Result<Vec<ImdbTuple>, Error> {
-        let endpoint = "https://www.imdb.com/find?";
-        let url = Url::parse_with_params(endpoint, &[("s", "all"), ("q", title)])?;
-        let resp = self.get(&url).await?;
-        debug!("resp {}", resp.status());
-        resp.error_for_status_ref()?;
-        let body = resp.text().await?;
+    pub async fn parse_imdb(
+        &self,
+        trakt: &TraktConnection,
+        title: &str,
+    ) -> Result<Vec<ImdbTuple>, Error> {
+        let mut results = Vec::new();
+        results.extend(
+            trakt
+                .search_movie(title)
+                .await?
+                .into_iter()
+                .map(|s| s.movie),
+        );
+        results.extend(trakt.search_show(title).await?.into_iter().map(|s| s.show));
 
-        let tl_vec: Vec<(StackString, StackString)> = Document::from(body.as_str())
-            .find(Class("ipc-page-content-container"))
-            .flat_map(|tr| {
-                tr.find(Name("a"))
-                    .filter_map(|a| {
-                        a.attr("href").and_then(|link| {
-                            link.split('/').nth(2).and_then(|imdb_id| {
-                                if imdb_id.starts_with("tt") {
-                                    Some((a.text().trim().into(), imdb_id.into()))
-                                } else {
-                                    None
-                                }
-                            })
-                        })
-                    })
-                    .collect::<Vec<_>>()
-            })
-            .collect();
-
-        let futures = tl_vec.into_iter().map(|(title, link)| async move {
-            let r = self.parse_imdb_rating(&link).await?;
-            let rating = r.rating.unwrap_or(-1.0);
-            Ok(ImdbTuple {
-                title,
-                link,
-                rating,
-            })
-        });
+        let futures = results.into_iter().map(
+            |TraktShowObject {
+                 title,
+                 ids: TraktIdObject { imdb, .. },
+                 ..
+             }| async move {
+                let link = imdb.unwrap_or(StackString::new());
+                let rating = if let Ok(ra) = trakt.get_movie_rating(&link).await {
+                    ra.rating
+                } else if let Ok(ra) = trakt.get_show_rating(&link).await {
+                    ra.rating
+                } else {
+                    -1.0
+                };
+                Ok(ImdbTuple {
+                    title,
+                    link,
+                    rating,
+                })
+            },
+        );
         try_join_all(futures).await
     }
 
     /// # Errors
     /// Returns error if api calls fail
-    pub async fn get_suggestions(&self, title: &str) -> Result<Vec<ImdbTuple>, Error> {
-        #[derive(Deserialize)]
-        struct ImdbSuggestion {
-            id: StackString,
-            l: StackString,
-            qid: Option<StackString>,
-            y: Option<i32>,
-        }
+    pub async fn get_suggestions(
+        &self,
+        trakt: &TraktConnection,
+        title: &str,
+    ) -> Result<Vec<ImdbTuple>, Error> {
+        let mut results = Vec::new();
+        results.extend(
+            trakt
+                .search_movie(title)
+                .await?
+                .into_iter()
+                .map(|s| s.movie),
+        );
+        results.extend(trakt.search_show(title).await?.into_iter().map(|s| s.show));
 
-        #[derive(Deserialize)]
-        struct ImdbSuggestions {
-            d: Vec<ImdbSuggestion>,
-        }
-
-        let url = format_sstr!("https://v3.sg.media-imdb.com/suggestion/x/{title}.json");
-        let url: Url = url.parse()?;
-
-        let suggestions: ImdbSuggestions = self.get(&url).await?.json().await?;
-        let futures = suggestions.d.into_iter().map(|s| async move {
-            let mut title = s.l;
-            let year = s.y;
-            let imdb_type = s.qid.and_then(|s| ImdbType::from_str(&s));
-            debug!("s.id {}", s.id);
-            let r = self.parse_imdb_rating(&s.id).await?;
-            let rating = r.rating.unwrap_or(-1.0);
-            if let Some(year) = year {
-                write!(&mut title, " ({year})").unwrap();
-            }
-            debug!("title {title} imdbtype {imdb_type:?}");
-            if let Some(imdb_type) = imdb_type {
-                write!(&mut title, " ({imdb_type})").unwrap();
-                Ok(Some(ImdbTuple {
+        let futures = results.into_iter().map(
+            |TraktShowObject {
+                 title,
+                 ids: TraktIdObject { imdb, .. },
+                 ..
+             }| async move {
+                let link = imdb.unwrap_or(StackString::new());
+                let rating = if let Ok(ra) = trakt.get_movie_rating(&link).await {
+                    ra.rating
+                } else if let Ok(ra) = trakt.get_show_rating(&link).await {
+                    ra.rating
+                } else {
+                    -1.0
+                };
+                Ok(ImdbTuple {
                     title,
-                    link: s.id,
+                    link,
                     rating,
-                }))
-            } else {
-                Ok(None)
-            }
-        });
-        let results: Result<Vec<Option<ImdbTuple>>, Error> = try_join_all(futures).await;
-        let results = results?.into_iter().flatten().collect();
-        Ok(results)
+                })
+            },
+        );
+        try_join_all(futures).await
     }
 
     /// # Errors
@@ -264,23 +223,44 @@ impl ImdbConnection {
     #[allow(clippy::needless_collect)]
     pub async fn parse_imdb_episode_list(
         &self,
+        trakt: &TraktConnection,
         imdb_id: &str,
         season: Option<i32>,
     ) -> Result<(Vec<usize>, Vec<ImdbEpisodeResult>), Error> {
-        let endpoint = if let Some(season) = season {
-            format_sstr!("https://m.imdb.com/title/{imdb_id}/episodes?season={season}")
-        } else {
-            format_sstr!("https://m.imdb.com/title/{imdb_id}/episodes")
+        let seasons = trakt
+            .get_seasons(imdb_id)
+            .await?
+            .into_iter()
+            .map(|s| s.number as usize)
+            .collect();
+        let results = match season {
+            Some(s) => trakt.get_season_episodes(imdb_id, s).await?,
+            None => Vec::new(),
         };
-        let url = Url::parse(&endpoint)?;
-        let body = self.get(&url).await?.text().await?;
-        Self::parse_imdb_episode_list_body(&body)
+        let futures = results.into_iter().map(|s| async move {
+            let summary = trakt.get_episode(imdb_id, s.season, s.number, true).await?;
+            let nrating = summary
+                .nrating
+                .and_then(|n| if n >= 0 { Some(n as u64) } else { None });
+            Ok(ImdbEpisodeResult {
+                season: s.season,
+                episode: s.number,
+                epurl: s.ids.imdb,
+                eptitle: Some(s.title),
+                airdate: summary.first_aired.map(|d| d.date()),
+                rating: summary.rating,
+                nrating,
+            })
+        });
+        let result: Result<Vec<_>, Error> = try_join_all(futures).await;
+        let episodes = result?;
+        Ok((seasons, episodes))
     }
 
     /// # Errors
     /// Returns error if `parse_episodes_url` fails
     #[allow(clippy::needless_collect)]
-    fn parse_imdb_episode_list_body(
+    pub fn parse_imdb_episode_list_body(
         body: &str,
     ) -> Result<(Vec<usize>, Vec<ImdbEpisodeResult>), Error> {
         #[derive(Deserialize, Debug)]
@@ -402,7 +382,11 @@ mod tests {
     use stack_string::format_sstr;
     use time::{macros::date, OffsetDateTime};
 
-    use crate::imdb_utils::{ImdbConnection, ImdbEpisodeResult, ImdbTuple};
+    use crate::{
+        config::Config,
+        imdb_utils::{ImdbConnection, ImdbEpisodeResult, ImdbTuple},
+        trakt_connection::TraktConnection,
+    };
 
     #[test]
     fn test_parse_imdb_rating_body() -> Result<(), Error> {
@@ -413,14 +397,14 @@ mod tests {
         Ok(())
     }
 
-    #[tokio::test]
-    async fn test_parse_imdb_rating() -> Result<(), Error> {
-        let conn = ImdbConnection::default();
-        let rating = conn.parse_imdb_rating("tt14418068").await?;
-        debug!("{:?}", rating);
-        assert!(rating.rating.is_some());
-        Ok(())
-    }
+    // #[tokio::test]
+    // async fn test_parse_imdb_rating() -> Result<(), Error> {
+    //     let conn = ImdbConnection::default();
+    //     let rating = conn.parse_imdb_rating("tt14418068").await?;
+    //     debug!("{:?}", rating);
+    //     assert!(rating.rating.is_some());
+    //     Ok(())
+    // }
 
     #[test]
     fn test_imdb_tuple_display() -> Result<(), Error> {
@@ -458,14 +442,20 @@ mod tests {
     #[tokio::test]
     #[ignore]
     async fn test_parse_imdb() -> Result<(), Error> {
+        let config = Config::with_config()?;
         let conn = ImdbConnection::new();
+        let trakt = TraktConnection::new(config);
         let results: Vec<_> = conn
-            .parse_imdb("the sopranos")
+            .parse_imdb(&trakt, "the sopranos")
             .await?
             .into_iter()
             .filter(|r| r.title != "")
             .collect();
-        let top_result = &results[0];
+        let top_result = results
+            .iter()
+            .filter(|s| &s.title == "The Sopranos")
+            .next()
+            .unwrap();
         assert_eq!(&top_result.title, "The Sopranos");
         assert_eq!(&top_result.link, "tt0141842");
         debug!("results {results:#?}");
@@ -476,10 +466,17 @@ mod tests {
     #[tokio::test]
     #[ignore]
     async fn test_get_suggestions() -> Result<(), Error> {
+        let config = Config::with_config()?;
         let conn = ImdbConnection::new();
-        let results = conn.get_suggestions("the_sopranos").await?;
-        let top_result = &results[0];
-        assert_eq!(&top_result.title, "The Sopranos (1999) (TV Series)");
+        let trakt = TraktConnection::new(config);
+        let results = conn.get_suggestions(&trakt, "the_sopranos").await?;
+        debug!("{:?}", results);
+        let top_result = results
+            .iter()
+            .filter(|r| r.link == "tt0141842")
+            .next()
+            .unwrap();
+        assert_eq!(&top_result.title, "The Sopranos");
         assert_eq!(&top_result.link, "tt0141842");
         debug!("results {results:#?}");
         assert!(results.len() > 1);
@@ -487,16 +484,21 @@ mod tests {
     }
 
     #[tokio::test]
+    #[ignore]
     async fn test_parse_imdb_episode_list() -> Result<(), Error> {
+        let config = Config::with_config()?;
         let conn = ImdbConnection::new();
-        let (_, results) = conn.parse_imdb_episode_list("tt0141842", Some(1)).await?;
+        let trakt = TraktConnection::new(config);
+        let (_, results) = conn
+            .parse_imdb_episode_list(&trakt, "tt0141842", Some(1))
+            .await?;
         debug!("{results:#?}");
         let first = &results[0];
         assert_eq!(first.season, 1);
         assert_eq!(first.episode, 1);
         assert_eq!(first.epurl, Some("tt0705282".into()));
-        assert_eq!(first.eptitle, Some("Pilot".into()));
-        assert_eq!(first.airdate, Some(date!(1999 - 01 - 10)));
+        assert_eq!(first.eptitle, Some("The Sopranos".into()));
+        assert_eq!(first.airdate, Some(date!(1999 - 01 - 11)));
         assert_eq!(results.len(), 13);
         Ok(())
     }

@@ -8,6 +8,7 @@ use movie_collection_lib::{
     movie_collection::MovieCollection,
     parse_imdb::{ParseImdb, ParseImdbOptions},
     pgpool::PgPool,
+    trakt_connection::TraktConnection,
 };
 
 async fn parse_imdb_parser() -> Result<(), Error> {
@@ -18,9 +19,10 @@ async fn parse_imdb_parser() -> Result<(), Error> {
 
     let mc = MovieCollection::new(&config, &pool, &stdout);
     let pi = ParseImdb::new(&config, &pool, &stdout);
+    let trakt = TraktConnection::new(config.clone());
 
     let output: Vec<_> = pi
-        .parse_imdb_worker(&opts)
+        .parse_imdb_worker(&opts, &trakt)
         .await?
         .into_iter()
         .map(|x| x.join(" "))
