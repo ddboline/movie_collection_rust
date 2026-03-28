@@ -265,6 +265,11 @@ impl ImdbEpisodes {
         if self.get_index(pool).await?.is_some() {
             return self.update_episode(pool).await;
         }
+        let rating = if self.airdate.is_some() && self.airdate > Some(OffsetDateTime::now_utc().date()) {
+            self.rating
+        } else {
+            None
+        };
         let query = query!(
             r#"
                 INSERT INTO imdb_episodes (
@@ -277,7 +282,7 @@ impl ImdbEpisodes {
             season = self.season,
             episode = self.episode,
             airdate = self.airdate,
-            rating = self.rating,
+            rating = rating,
             eptitle = self.eptitle,
             epurl = self.epurl,
             id = self.id,
@@ -289,13 +294,18 @@ impl ImdbEpisodes {
     /// # Errors
     /// Returns error if db query fails
     pub async fn update_episode(&self, pool: &PgPool) -> Result<(), Error> {
+        let rating = if self.airdate.is_some() && self.airdate > Some(OffsetDateTime::now_utc().date()) {
+            self.rating
+        } else {
+            None
+        };
         let query = query!(
             r#"
                 UPDATE imdb_episodes
                 SET rating=$rating,eptitle=$eptitle,epurl=$epurl,airdate=$airdate,last_modified=now()
                 WHERE show=$show AND season=$season AND episode=$episode
             "#,
-            rating = self.rating,
+            rating = rating,
             eptitle = self.eptitle,
             epurl = self.epurl,
             airdate = self.airdate,
