@@ -1051,6 +1051,21 @@ mod tests {
 
     #[tokio::test]
     #[ignore]
+    async fn test_get_show_season_episodes_alt() -> Result<(), Error> {
+        let config = Config::with_config()?;
+        let conn = TraktConnection::new(config);
+        conn.init().await?;
+        let result = conn.get_season_episodes("tt13629530", 1).await?;
+        debug!("{:?}", result[0]);
+        debug!("{}", result.len());
+        assert!(result.len() == 14);
+        assert!(result[0].title == "Element 1");
+        assert!(result[0].ids.imdb == Some("tt14260644".into()));
+        Ok(())
+    }
+
+    #[tokio::test]
+    #[ignore]
     async fn test_search_show() -> Result<(), Error> {
         let config = Config::with_config()?;
         let conn = TraktConnection::new(config);
@@ -1062,6 +1077,23 @@ mod tests {
             .next()
             .unwrap();
         assert_eq!(top_result.show.ids.imdb, Some("tt0141842".into()));
+        Ok(())
+    }
+
+    #[tokio::test]
+    #[ignore]
+    async fn test_search_show_alternate() -> Result<(), Error> {
+        let config = Config::with_config()?;
+        let conn = TraktConnection::new(config);
+        conn.init().await?;
+        let result = conn.search_show("ark the animated series").await?;
+        debug!("{:?}", result);
+        let top_result = result
+            .iter()
+            .filter(|s| &s.show.title == "ARK: The Animated Series")
+            .next()
+            .unwrap();
+        assert_eq!(top_result.show.ids.imdb, Some("tt13629530".into()));
         Ok(())
     }
 

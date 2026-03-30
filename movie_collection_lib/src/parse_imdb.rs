@@ -182,16 +182,12 @@ impl ParseImdb {
                         output.push(vec![format_sstr!("exists {show} {s} {rating}")]);
                     } else {
                         output.push(vec![format_sstr!("not exists {show} {result}")]);
-                        let istv = result.title.contains("TV Series")
-                            || result.title.contains("TV Mini-Series")
-                            || result.title.contains("TV Mini Series");
-
                         ImdbRatings {
                             show: show.clone(),
                             title: Some(result.title.clone()),
                             link: result.link.clone(),
                             rating: Some(rating),
-                            istv: Some(istv),
+                            istv: Some(result.istv),
                             index: Uuid::new_v4(),
                             ..ImdbRatings::default()
                         }

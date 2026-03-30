@@ -18,6 +18,7 @@ pub struct ImdbTuple {
     pub title: StackString,
     pub link: StackString,
     pub rating: f64,
+    pub istv: bool,
 }
 
 impl fmt::Display for ImdbTuple {
@@ -104,16 +105,16 @@ impl ImdbConnection {
                 .search_movie(title)
                 .await?
                 .into_iter()
-                .map(|s| s.movie),
+                .map(|s| (s.movie, false)),
         );
-        results.extend(trakt.search_show(title).await?.into_iter().map(|s| s.show));
+        results.extend(trakt.search_show(title).await?.into_iter().map(|s| (s.show, true)));
 
         let futures = results.into_iter().map(
-            |TraktShowObject {
+            |(TraktShowObject {
                  title,
                  ids: TraktIdObject { imdb, .. },
                  ..
-             }| async move {
+             }, istv)| async move {
                 let link = imdb.unwrap_or(StackString::new());
                 let rating = if let Ok(ra) = trakt.get_movie_rating(&link).await {
                     ra.rating
@@ -126,6 +127,7 @@ impl ImdbConnection {
                     title,
                     link,
                     rating,
+                    istv,
                 })
             },
         );
@@ -145,16 +147,16 @@ impl ImdbConnection {
                 .search_movie(title)
                 .await?
                 .into_iter()
-                .map(|s| s.movie),
+                .map(|s| (s.movie, false)),
         );
-        results.extend(trakt.search_show(title).await?.into_iter().map(|s| s.show));
+        results.extend(trakt.search_show(title).await?.into_iter().map(|s| (s.show, true)));
 
         let futures = results.into_iter().map(
-            |TraktShowObject {
+            |(TraktShowObject {
                  title,
                  ids: TraktIdObject { imdb, .. },
                  ..
-             }| async move {
+             }, istv)| async move {
                 let link = imdb.unwrap_or(StackString::new());
                 let rating = if let Ok(ra) = trakt.get_movie_rating(&link).await {
                     ra.rating
@@ -167,6 +169,7 @@ impl ImdbConnection {
                     title,
                     link,
                     rating,
+                    istv,
                 })
             },
         );
@@ -412,6 +415,7 @@ mod tests {
             title: "Test Title".into(),
             link: "https://example.com/link".into(),
             rating: 0.85,
+            istv: false,
         };
         assert_eq!(
             format_sstr!("{t}"),
