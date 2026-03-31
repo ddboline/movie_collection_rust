@@ -266,7 +266,7 @@ impl ImdbEpisodes {
             return self.update_episode(pool).await;
         }
         let rating =
-            if self.airdate.is_some() && self.airdate > Some(OffsetDateTime::now_utc().date()) {
+            if self.airdate.is_some() && self.airdate < Some(OffsetDateTime::now_utc().date()) {
                 self.rating
             } else {
                 None
