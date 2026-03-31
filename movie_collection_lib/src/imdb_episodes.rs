@@ -2,7 +2,7 @@ use anyhow::Error;
 use futures::Stream;
 use log::debug;
 use postgres_query::{query, query_dyn, Error as PqError, FromSqlRow, Parameter, Query};
-use rust_decimal::{Decimal, dec};
+use rust_decimal::{dec, Decimal};
 use serde::{Deserialize, Serialize};
 use stack_string::{format_sstr, StackString};
 use std::{convert::TryInto, fmt};
@@ -265,11 +265,13 @@ impl ImdbEpisodes {
         if self.get_index(pool).await?.is_some() {
             return self.update_episode(pool).await;
         }
-        let rating = if self.airdate.is_some() && self.airdate > Some(OffsetDateTime::now_utc().date()) {
-            self.rating
-        } else {
-            None
-        }.unwrap_or(dec!(-1.0));
+        let rating =
+            if self.airdate.is_some() && self.airdate > Some(OffsetDateTime::now_utc().date()) {
+                self.rating
+            } else {
+                None
+            }
+            .unwrap_or(dec!(-1.0));
         let query = query!(
             r#"
                 INSERT INTO imdb_episodes (
@@ -294,11 +296,13 @@ impl ImdbEpisodes {
     /// # Errors
     /// Returns error if db query fails
     pub async fn update_episode(&self, pool: &PgPool) -> Result<(), Error> {
-        let rating = if self.airdate.is_some() && self.airdate > Some(OffsetDateTime::now_utc().date()) {
-            self.rating
-        } else {
-            None
-        }.unwrap_or(dec!(-1.0));
+        let rating =
+            if self.airdate.is_some() && self.airdate > Some(OffsetDateTime::now_utc().date()) {
+                self.rating
+            } else {
+                None
+            }
+            .unwrap_or(dec!(-1.0));
         let query = query!(
             r#"
                 UPDATE imdb_episodes

@@ -107,14 +107,23 @@ impl ImdbConnection {
                 .into_iter()
                 .map(|s| (s.movie, false)),
         );
-        results.extend(trakt.search_show(title).await?.into_iter().map(|s| (s.show, true)));
+        results.extend(
+            trakt
+                .search_show(title)
+                .await?
+                .into_iter()
+                .map(|s| (s.show, true)),
+        );
 
         let futures = results.into_iter().map(
-            |(TraktShowObject {
-                 title,
-                 ids: TraktIdObject { imdb, .. },
-                 ..
-             }, istv)| async move {
+            |(
+                TraktShowObject {
+                    title,
+                    ids: TraktIdObject { imdb, .. },
+                    ..
+                },
+                istv,
+            )| async move {
                 let link = imdb.unwrap_or(StackString::new());
                 let rating = if let Ok(ra) = trakt.get_movie_rating(&link).await {
                     ra.rating
@@ -149,14 +158,23 @@ impl ImdbConnection {
                 .into_iter()
                 .map(|s| (s.movie, false)),
         );
-        results.extend(trakt.search_show(title).await?.into_iter().map(|s| (s.show, true)));
+        results.extend(
+            trakt
+                .search_show(title)
+                .await?
+                .into_iter()
+                .map(|s| (s.show, true)),
+        );
 
         let futures = results.into_iter().map(
-            |(TraktShowObject {
-                 title,
-                 ids: TraktIdObject { imdb, .. },
-                 ..
-             }, istv)| async move {
+            |(
+                TraktShowObject {
+                    title,
+                    ids: TraktIdObject { imdb, .. },
+                    ..
+                },
+                istv,
+            )| async move {
                 let link = imdb.unwrap_or(StackString::new());
                 let rating = if let Ok(ra) = trakt.get_movie_rating(&link).await {
                     ra.rating
