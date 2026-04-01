@@ -161,6 +161,8 @@ impl ParseImdb {
 
         let link = if let Some(link) = &opts.imdb_link {
             Some(link.clone())
+        } else if let Some(k) = shows.keys().next() {
+            Some(k.clone())
         } else {
             results.first().map(|result| result.link.clone())
         };
