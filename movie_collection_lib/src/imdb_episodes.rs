@@ -297,7 +297,7 @@ impl ImdbEpisodes {
     /// Returns error if db query fails
     pub async fn update_episode(&self, pool: &PgPool) -> Result<(), Error> {
         let rating =
-            if self.airdate.is_some() && self.airdate > Some(OffsetDateTime::now_utc().date()) {
+            if self.airdate.is_some() && self.airdate < Some(OffsetDateTime::now_utc().date()) {
                 self.rating
             } else {
                 None
