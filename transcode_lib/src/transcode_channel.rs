@@ -1,15 +1,17 @@
 use anyhow::{format_err, Error};
-use deadpool_lapin::{Config as LapinConfig, Runtime};
+use deadpool_lapin::{
+    lapin::{
+        options::{
+            BasicAckOptions, BasicConsumeOptions, BasicPublishOptions, QueueDeclareOptions,
+            QueueDeleteOptions, QueuePurgeOptions,
+        },
+        types::FieldTable,
+        BasicProperties, Channel, Queue,
+    },
+    Config as LapinConfig, Runtime,
+};
 use derive_more::{Deref, DerefMut};
 use futures::StreamExt;
-use lapin::{
-    options::{
-        BasicAckOptions, BasicConsumeOptions, BasicPublishOptions, QueueDeclareOptions,
-        QueueDeleteOptions, QueuePurgeOptions,
-    },
-    types::FieldTable,
-    BasicProperties, Channel, Queue,
-};
 use log::{debug, error};
 use serde::de::DeserializeOwned;
 use std::future::Future;
