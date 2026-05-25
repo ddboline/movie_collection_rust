@@ -199,7 +199,7 @@ impl ImdbConnection {
     pub async fn parse_imdb_rating(&self, title: &str) -> Result<RatingOutput, Error> {
         if title.starts_with("tt") {
             let url = Url::parse("https://www.imdb.com/title/")?.join(title)?;
-            debug!("url {url}",);
+            debug!("url {url}");
             let body = self.get(&url).await?.text().await?;
             Self::parse_imdb_rating_body(&body)
         } else {
@@ -230,7 +230,7 @@ impl ImdbConnection {
                 continue;
             }
             let rating: RatingStruct = serde_json::from_str(&rating_str)?;
-            debug!("{rating_str}",);
+            debug!("{rating_str}");
             return Ok(RatingOutput {
                 rating: Some(rating.aggregate_rating.rating_value),
                 count: Some(rating.aggregate_rating.rating_count),

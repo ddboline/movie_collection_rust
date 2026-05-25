@@ -6,12 +6,12 @@ edition = "2018"
 
 [dependencies]
 anyhow = "1.0"
-async-graphql = {version="7.1", features=["dataloader", "time"]}
-async-graphql-axum = "7.1"
+async-graphql = {version="7.2", features=["dataloader", "time"]}
+async-graphql-axum = "7.2"
 async-trait = "0.1"
 axum = { version = "0.8", features = ["multipart"] }
 axum-extra = {version="0.12", features=["cookie"]}
-authorized_users = { git = "https://github.com/ddboline/auth_server_rust.git", tag="0.13.5"}
+authorized_users = { git = "https://github.com/ddboline/auth_server_rust.git", tag="0.13.9"}
 bytes = "1.11"
 derive_more = {version="2.1", features=["full"]}
 dioxus = "0.7"
@@ -25,28 +25,28 @@ maplit = "1.0"
 mime = "0.3"
 movie_collection_lib = {path = "../movie_collection_lib"}
 parking_lot = "0.12"
-postgres_query = {git = "https://github.com/ddboline/rust-postgres-query", tag = "0.3.8", features=["deadpool"]}
+postgres_query = {git = "https://github.com/ddboline/rust-postgres-query", tag = "0.3.9", features=["deadpool"]}
 postgres-types = "0.2"
 serde = "1.0"
 serde_derive = "1.0"
 serde_json = "1.0"
 serde_yaml_ng = "0.10"
 reqwest = {version="0.13", features=["cookies", "json"]}
-rust_decimal = {version="1.39", features=["db-tokio-postgres"]}
-rust_decimal_macros = "1.39"
+rust_decimal = {version="1.42", features=["db-tokio-postgres"]}
+rust_decimal_macros = "1.40"
 smallvec = {version="1.15", features=["serde", "write"]}
 stack-string = { version="1.1", features=["postgres_types", "utoipa_types", "axum_types", "async_graphql"] }
 stdout-channel = "0.6"
 thiserror = "2.0"
 time = {version="0.3", features=["serde-human-readable", "macros", "formatting"]}
 time-tz = {version="2.0", features=["system"]}
-tokio = {version="1.49", features=["rt", "macros", "rt-multi-thread"]}
+tokio = {version="1.52", features=["rt", "macros", "rt-multi-thread"]}
 tokio-stream = "0.1"
 tower-http = {version="0.6", features=["cors"]}
-utoipa = { version = "5.4", features = ["axum_extras", "yaml", "time", "uuid", "smallvec", "url", "openapi_extensions", "decimal"] }
+utoipa = { version = "5.5", features = ["axum_extras", "yaml", "time", "uuid", "smallvec", "url", "openapi_extensions", "decimal"] }
 utoipa-helper = "0.1"
 utoipa-axum = { version = "0.2" }
-uuid = "1.19"
+uuid = "1.23"
 url = "2.5"
 
 [dev-dependencies]

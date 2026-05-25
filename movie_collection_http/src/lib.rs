@@ -492,12 +492,12 @@ mod test {
     use utoipa_helper::derive_utoipa_test;
 
     use crate::{
+        _ImdbEpisodesWrapper, _ImdbRatingsWrapper, _LastModifiedResponseWrapper,
+        _MovieCollectionRowWrapper, _MovieQueueRowWrapper, _PlexEventTypeWrapper,
+        _PlexEventWrapper, _PlexFilenameWrapper, _TraktActionsWrapper, _TvShowSourceWrapper,
         ImdbEpisodesWrapper, ImdbRatingsWrapper, LastModifiedResponseWrapper,
         MovieCollectionRowWrapper, MovieQueueRowWrapper, PlexEventTypeWrapper, PlexEventWrapper,
-        PlexFilenameWrapper, TraktActionsWrapper, TvShowSourceWrapper, _ImdbEpisodesWrapper,
-        _ImdbRatingsWrapper, _LastModifiedResponseWrapper, _MovieCollectionRowWrapper,
-        _MovieQueueRowWrapper, _PlexEventTypeWrapper, _PlexEventWrapper, _PlexFilenameWrapper,
-        _TraktActionsWrapper, _TvShowSourceWrapper,
+        PlexFilenameWrapper, TraktActionsWrapper, TvShowSourceWrapper,
     };
 
     #[test]

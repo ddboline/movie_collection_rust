@@ -65,7 +65,7 @@ impl ImdbRatings {
             source = source,
             index = self.index,
         );
-        debug!("{self:?}",);
+        debug!("{self:?}");
         let conn = pool.get().await?;
         query.execute(&conn).await.map_err(Into::into)
     }
@@ -155,7 +155,7 @@ impl ImdbRatings {
             query.push_str(&format_sstr!(" LIMIT {limit}"));
         }
         query_bindings.shrink_to_fit();
-        debug!("query:\n{query}",);
+        debug!("query:\n{query}");
         query_dyn!(&query, ..query_bindings)
     }
 

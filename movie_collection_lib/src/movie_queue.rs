@@ -349,7 +349,7 @@ impl MovieQueueDB {
             query.push_str(&format_sstr!(" LIMIT {limit}"));
         }
         query_bindings.shrink_to_fit();
-        debug!("query:\n{query}",);
+        debug!("query:\n{query}");
         query_dyn!(&query, ..query_bindings)
     }
 

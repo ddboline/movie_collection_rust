@@ -170,7 +170,7 @@ impl Borrow<str> for WatchListShow {
 
 impl fmt::Display for WatchListShow {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        write!(f, "{} {} {}", self.link, self.title, self.year,)
+        write!(f, "{} {} {}", self.link, self.title, self.year)
     }
 }
 
@@ -774,13 +774,13 @@ async fn get_imdb_url_from_show(
             Some(shows[0].link.clone())
         } else {
             for show in imdb_shows {
-                debug!("{show}",);
+                debug!("{show}");
             }
             None
         }
     } else if imdb_shows.len() > 1 {
         for show in imdb_shows {
-            debug!("{show}",);
+            debug!("{show}");
         }
         None
     } else {
@@ -842,7 +842,7 @@ pub async fn watchlist_add(
         .get_mut(imdb_url.as_str())
     {
         show_obj.show = Some(show.into());
-        debug!("INSERT SHOW {show_obj}",);
+        debug!("INSERT SHOW {show_obj}");
         show_obj.insert_show(&mc.pool).await?;
     }
     Ok(Some(result))

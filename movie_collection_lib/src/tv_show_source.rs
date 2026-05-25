@@ -40,7 +40,7 @@ impl TvShowSource {
 
 impl fmt::Display for TvShowSource {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        write!(f, "{}", self.to_str(),)
+        write!(f, "{}", self.to_str())
     }
 }
 

@@ -723,7 +723,7 @@ impl fmt::Display for TranscodeStatus {
                 .sorted_by_key(|p| p.pid)
                 .map(|p| format_sstr!("{p}"))
                 .join("\n");
-            write!(f, "Running procs:\n\n{s}\n\n",)?;
+            write!(f, "Running procs:\n\n{s}\n\n")?;
         }
         if !self.upcoming_jobs.is_empty() {
             let s = self

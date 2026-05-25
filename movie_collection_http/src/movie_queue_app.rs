@@ -39,7 +39,7 @@ pub struct AppState {
 /// Return error if app fails to start
 pub async fn start_app() -> Result<(), Error> {
     async fn update_db(pool: PgPool) {
-        let mut i = interval(Duration::from_secs(60));
+        let mut i = interval(Duration::from_mins(1));
         loop {
             fill_from_db(&pool).await.unwrap_or(());
             i.tick().await;

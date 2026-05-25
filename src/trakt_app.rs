@@ -80,7 +80,6 @@ async fn trakt_app() -> Result<(), Error> {
             .try_collect()
             .await?;
         for episode in episodes {
-            println!("episode {episode}");
             let trakt_command = TraktCommands::Watched;
             let trakt_action = TraktActions::Add;
             match trakt_app_parse(
