@@ -229,6 +229,7 @@ impl WatchListShow {
             "
                 INSERT INTO trakt_watchlist (link, show, title, year)
                 VALUES ($link, $show, $title, $year)
+                ON CONFLICT DO NOTHING
             ",
             link = self.link,
             show = self.show,
@@ -601,6 +602,7 @@ impl WatchedMovie {
             r#"
                 INSERT INTO trakt_watched_movies (link, last_watched_at)
                 VALUES ($link, $last_watched_at)
+                ON CONFLICT DO NOTHING
             "#,
             link = self.imdb_url,
             last_watched_at = self.last_watched_at,
@@ -669,7 +671,6 @@ pub async fn sync_trakt_with_db(
     if watchlist_shows.is_empty() {
         return Ok(());
     }
-
     let futures: FuturesUnordered<_> = watchlist_shows
         .into_iter()
         .map(|(link, show)| {
@@ -685,7 +686,6 @@ pub async fn sync_trakt_with_db(
         .collect();
     let results: Result<(), Error> = futures.try_collect().await;
     results?;
-
     let watched_shows_db: HashMap<(StackString, i32, i32), _> =
         get_watched_shows_db(&mc.pool, "", None)
             .await?
@@ -719,7 +719,6 @@ pub async fn sync_trakt_with_db(
         .collect();
     let results: Result<(), Error> = futures.try_collect().await;
     results?;
-
     let watched_movies_db: HashSet<_> =
         get_watched_movies_db(&mc.pool).await?.try_collect().await?;
     let watched_movies_db = Arc::new(watched_movies_db);
@@ -728,7 +727,6 @@ pub async fn sync_trakt_with_db(
     if watched_movies.is_empty() {
         return Ok(());
     }
-
     let futures: FuturesUnordered<_> = watched_movies
         .iter()
         .map(|movie: &WatchedMovie| {
