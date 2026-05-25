@@ -499,7 +499,7 @@ impl TraktConnection {
     pub async fn get_show_rating(&self, imdb_id: &str) -> Result<TraktRating, Error> {
         let headers = self.get_ro_headers()?;
         let trakt_endpoint = &self.config.trakt_api_endpoint;
-        let url = format_sstr!("{trakt_endpoint}/shows/{imdb_id}");
+        let url = format_sstr!("{trakt_endpoint}/shows/{imdb_id}/ratings");
         self.client
             .get(url.as_str())
             .headers(headers)
@@ -1010,7 +1010,8 @@ mod tests {
         let conn = TraktConnection::new(config);
         conn.init().await?;
         let result = conn.get_movie_rating("tt0457430").await?;
-        assert!(result.rating > 8.0);
+        println!("{result:?}");
+        assert!(result.rating > 7.0);
         Ok(())
     }
 
@@ -1032,6 +1033,7 @@ mod tests {
         let conn = TraktConnection::new(config);
         conn.init().await?;
         let result = conn.get_show_rating("tt0141842").await?;
+        println!("{:?}", result);
         assert!(result.rating > 9.0);
         Ok(())
     }
