@@ -219,9 +219,15 @@ impl ParseImdb {
 
                             if let Some(e) = episodes.get(&key) {
                                 let mut new = e.clone();
-                                if episode.eptitle.is_some() {
-                                    new.eptitle =
-                                        episode.eptitle.clone().unwrap_or_else(|| "".into());
+                                if let Some(epurl) = &episode.epurl {
+                                    if &new.epurl != epurl {
+                                        new.epurl = epurl.clone();
+                                    }
+                                }
+                                if let Some(eptitle) = &episode.eptitle {
+                                    if &new.eptitle != eptitle {
+                                        new.eptitle = eptitle.clone();
+                                    }
                                 }
                                 if let Some(rating) = &episode.rating {
                                     new.rating = Decimal::from_f64_retain(*rating);
