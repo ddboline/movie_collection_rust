@@ -149,22 +149,25 @@ impl ImdbConnection {
         &self,
         trakt: &TraktConnection,
         title: &str,
+        istv: Option<bool>,
     ) -> Result<Vec<ImdbTuple>, Error> {
         let mut results = Vec::new();
-        results.extend(
-            trakt
-                .search_movie(title)
-                .await?
-                .into_iter()
-                .map(|s| (s.movie, false)),
-        );
-        results.extend(
-            trakt
-                .search_show(title)
-                .await?
-                .into_iter()
-                .map(|s| (s.show, true)),
-        );
+
+        if istv.is_none() || istv == Some(false) {
+            if let Ok(result) = trakt.search_movie(title).await {
+                results.extend(
+                    result.into_iter().map(|s| (s.movie, false))
+                );
+            }
+        }
+
+        if istv.is_none() || istv == Some(true) {
+            if let Ok(result) = trakt.search_show(title).await {
+                results.extend(
+                    result.into_iter().map(|s| (s.show, true))
+                );
+            }
+        }
 
         let futures = results.into_iter().map(
             |(
@@ -491,7 +494,7 @@ mod tests {
         let config = Config::with_config()?;
         let conn = ImdbConnection::new();
         let trakt = TraktConnection::new(config);
-        let results = conn.get_suggestions(&trakt, "the_sopranos").await?;
+        let results = conn.get_suggestions(&trakt, "the_sopranos", Some(true)).await?;
         debug!("{:?}", results);
         let top_result = results
             .iter()

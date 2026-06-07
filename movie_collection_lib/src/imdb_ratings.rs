@@ -251,10 +251,10 @@ impl ImdbRatings {
         links.extend(ImdbRatings::get_shows_in_trakt_not_in_episodes(pool).await?);
         for link in links {
             println!("link {link}");
-            for result in imdb_conn.get_suggestions(&trakt, &link).await? {
+            for result in imdb_conn.get_suggestions(&trakt, &link, None).await? {
                 println!("result {}", result.link);
             }
-            if let Some(result) = imdb_conn.get_suggestions(&trakt, &link).await?.first() {
+            if let Some(result) = imdb_conn.get_suggestions(&trakt, &link, None).await?.first() {
                 let title = result.title.clone();
                 let show: StackString = slugify(&title).replace('-', "_").into();
                 let rating = result.rating;

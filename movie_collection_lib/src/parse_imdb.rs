@@ -146,7 +146,10 @@ impl ParseImdb {
     ) -> Result<(), Error> {
         let imdb_conn = ImdbConnection::new();
         let title = opts.show.replace('_', " ");
-        let mut results = imdb_conn.get_suggestions(trakt, &title).await?;
+
+        let istv = if opts.tv || episodes.is_none() {Some(true)} else {None};
+
+        let mut results = imdb_conn.get_suggestions(trakt, &title, istv).await?;
         if results.is_empty() {
             results = imdb_conn.parse_imdb(trakt, &title).await?;
         }
