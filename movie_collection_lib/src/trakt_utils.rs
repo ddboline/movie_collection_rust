@@ -1119,6 +1119,59 @@ pub async fn get_trakt_watched_output_db(
     query.fetch_streaming(&conn).await.map_err(Into::into)
 }
 
+#[derive(FromSqlRow, PartialEq, Clone, Debug)]
+pub struct TraktWatchedMovieOutput {
+    pub title: StackString,
+    pub show_link: StackString,
+    pub last_watched_at: DateTimeWrapper,
+    pub rating: Option<Decimal>,
+}
+
+/// # Errors
+/// Returns error if formatting fails
+pub async fn get_trakt_watched_movie_output_db(
+    pool: &PgPool,
+    start_timestamp: Option<OffsetDateTime>,
+    offset: Option<usize>,
+    limit: Option<usize>,
+) -> Result<impl Stream<Item = Result<TraktWatchedMovieOutput, PqError>>, Error> {
+    let mut constraints = vec!["twm.last_watched_at IS NOT NULL"];
+    let mut bindings = Vec::new();
+    if let Some(start_timestamp) = &start_timestamp {
+        constraints.push("twm.last_watched_at > $start_timestamp");
+        bindings.push(("start_timestamp", start_timestamp as Parameter));
+    }
+
+    let query = format_sstr!(
+        r"
+            SELECT ir.title,
+                   twm.link as show_link,
+                   twm.last_watched_at,
+                   cast(ir.rating as numeric(3,1)) as rating
+            FROM trakt_watched_movies twm
+            JOIN imdb_ratings ir ON twm.link = ir.link
+            {where_str}
+            ORDER BY twm.last_watched_at DESC
+            {limit}
+            {offset}
+        ",
+        where_str = format_sstr!("WHERE {}", constraints.join(" AND ")),
+        limit = if let Some(limit) = limit {
+            format_sstr!("LIMIT {limit}")
+        } else {
+            StackString::new()
+        },
+        offset = if let Some(offset) = offset {
+            format_sstr!("OFFSET {offset}")
+        } else {
+            StackString::new()
+        }
+    );
+    let query: Query = query_dyn!(&query, ..bindings)?;
+    let conn = pool.get().await?;
+    query.fetch_streaming(&conn).await.map_err(Into::into)
+}
+
 #[cfg(test)]
 mod tests {
     use crate::{config::Config, pgpool::PgPool, trakt_utils::get_trakt_watched_output_db};
