@@ -45,6 +45,7 @@ use movie_collection_lib::{
     trakt_utils::{
         get_trakt_watched_output_db, get_watchlist_shows_db_map, watchlist_add, watchlist_rm,
         TraktActions, WatchListShow, WatchedEpisode, WatchedMovie,
+        get_trakt_watched_movie_output_db,
     },
     transcode_service::{dvdrip_dir, transcode_status, TranscodeService, TranscodeServiceRequest},
     tv_show_source::TvShowSource,
@@ -58,7 +59,7 @@ use crate::{
         find_new_episodes_body, index_body, local_file_body, movie_queue_body, play_worker_body,
         plex_body, plex_detail_body, procs_html_body, trakt_cal_http_body,
         trakt_watched_most_recent_body, trakt_watched_seasons_body, transcode_get_html_body,
-        tvshows_body, watch_list_http_body, watchlist_body,
+        tvshows_body, watch_list_http_body, watchlist_body, trakt_watched_movies_most_recent_body,
     },
     movie_queue_requests::{
         ImdbEpisodesUpdateRequest, ImdbRatingsSetSourceRequest, ImdbRatingsUpdateRequest,
@@ -71,6 +72,7 @@ use crate::{
     PlexEventRequest, PlexEventTypeWrapper, PlexEventWrapper, PlexFilenameRequest,
     PlexFilenameWrapper, PlexMetadataWrapper, PlexSectionTypeWrapper, TraktActionsWrapper,
     TraktWatchlistRequest, TvShowSourceWrapper,
+    PlexSectionType,
 };
 
 type WarpResult<T> = Result<T, Error>;
@@ -1422,20 +1424,32 @@ async fn trakt_watched_most_recent(
         .store_url_task(state.trakt.get_client(), &state.config, url)
         .await;
     let Query(query) = query;
-    let events: Vec<_> = get_trakt_watched_output_db(
-        &state.db,
-        query.start_timestamp.map(Into::into),
-        query.offset,
-        query.limit,
-    )
-    .await
-    .map_err(Into::<Error>::into)?
-    .try_collect()
-    .await?;
 
-    let body =
-        trakt_watched_most_recent_body(state.config.clone(), events, query.offset, query.limit)
-            .map_err(Into::<Error>::into)?;
+    let section: Option<PlexSectionType> = query.section_type.map(Into::into);
+    let body = if section == Some(PlexSectionType::Movie) {
+        let events: Vec<_> = get_trakt_watched_movie_output_db(
+            &state.db,
+            query.start_timestamp.map(Into::into),
+            query.offset,
+            query.limit,
+        ).await.map_err(Into::<Error>::into)?.try_collect().await?;
+        trakt_watched_movies_most_recent_body(state.config.clone(), events, section, query.offset, query.limit)
+                .map_err(Into::<Error>::into)?
+    } else {
+        let events: Vec<_> = get_trakt_watched_output_db(
+            &state.db,
+            query.start_timestamp.map(Into::into),
+            query.offset,
+            query.limit,
+        )
+        .await
+        .map_err(Into::<Error>::into)?
+        .try_collect()
+        .await?;
+
+        trakt_watched_most_recent_body(state.config.clone(), events, section, query.offset, query.limit)
+                .map_err(Into::<Error>::into)?
+    };
     task.await.ok();
     Ok(HtmlBase::new(body).into())
 }
