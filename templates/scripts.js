@@ -255,7 +255,14 @@ function extract_subtitles(file) {
     let out = `extract ${index} from ${file}`;
     document.getElementById("remcomoutput").innerHTML = out;
 }
-function loadWatchedList(offset=0, limit=10) {
+function loadWatchedList(offset=0, limit=10, section=null) {
     let url = `/trakt/watched/list?limit=${limit}&offset=${offset}`;
+    if(section) {
+        url = url + '&section_type=' + section;
+    }
     updateMainArticle(url);
+}
+function loadWatchedListSection(section_id, offset=0, limit=10) {
+    let section = document.getElementById(section_id).value;
+    loadWatchedList(offset, limit, section);
 }
