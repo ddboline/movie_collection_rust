@@ -435,6 +435,7 @@ struct _PlexEventRequest {
 #[derive(Serialize, Deserialize, Debug)]
 pub struct PlexFilenameRequest {
     pub start_timestamp: Option<DateTimeWrapper>,
+    pub section_type: Option<PlexSectionTypeWrapper>,
     pub offset: Option<usize>,
     pub limit: Option<usize>,
 }
@@ -449,6 +450,8 @@ derive_utoipa_params!(PlexFilenameRequest, _PlexFilenameRequest);
 struct _PlexFilenameRequest {
     // Start Timestamp
     start_timestamp: Option<OffsetDateTime>,
+    // Section Type
+    section_type: Option<PlexSectionTypeWrapper>,
     // Offset
     offset: Option<usize>,
     // Limit
