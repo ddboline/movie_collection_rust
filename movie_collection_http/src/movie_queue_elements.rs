@@ -27,7 +27,7 @@ use movie_collection_lib::{
     pgpool::PgPool,
     plex_events::{EventOutput, PlexSectionType},
     trakt_connection::TraktConnection,
-    trakt_utils::{get_watched_shows_db, TraktCalEntry, TraktWatchedOutput, WatchListMap},
+    trakt_utils::{get_watched_shows_db, TraktCalEntry, TraktWatchedOutput, TraktWatchedMovieOutput, WatchListMap},
     transcode_service::{
         movie_directories, ProcInfo, ProcStatus, TranscodeServiceRequest, TranscodeStatus,
     },
@@ -2589,6 +2589,7 @@ fn procs_html_node(status: &TranscodeStatus) -> Element {
 pub fn trakt_watched_most_recent_body(
     config: Config,
     events: Vec<TraktWatchedOutput>,
+    section: Option<PlexSectionType>,
     offset: Option<usize>,
     limit: Option<usize>,
 ) -> Result<StackString, Error> {
@@ -2597,6 +2598,7 @@ pub fn trakt_watched_most_recent_body(
         TraktWatchedMostRecentElementProps {
             config,
             events,
+            section,
             offset,
             limit,
         },
@@ -2614,6 +2616,7 @@ pub fn trakt_watched_most_recent_body(
 fn TraktWatchedMostRecentElement(
     config: Config,
     events: Vec<TraktWatchedOutput>,
+    section: Option<PlexSectionType>,
     offset: Option<usize>,
     limit: Option<usize>,
 ) -> Element {
@@ -2678,6 +2681,7 @@ fn TraktWatchedMostRecentElement(
     });
 
     let limit = limit.unwrap_or(10);
+    let section_str = section.map_or_else(|| StackString::from("null"), |s| format_sstr!("'{s}'"));
     let previous_button = if let Some(offset) = offset {
         if offset < limit {
             None
@@ -2688,7 +2692,7 @@ fn TraktWatchedMostRecentElement(
                     "type": "submit",
                     name: "previous",
                     value: "Previous",
-                    "onclick": "loadWatchedList({new_offset}, {limit})",
+                    "onclick": "loadWatchedList({new_offset}, {limit}, {section_str})",
                     "Previous",
                 }
             })
@@ -2703,15 +2707,52 @@ fn TraktWatchedMostRecentElement(
             "type": "submit",
             name: "next",
             value: "Next",
-            "onclick": "loadWatchedList({new_offset}, {limit})",
+            "onclick": "loadWatchedList({new_offset}, {limit}, {section_str})",
             "Next",
         }
     };
+    let section_select = [
+        None,
+        Some(PlexSectionType::Movie),
+        Some(PlexSectionType::TvShow),
+    ]
+    .iter()
+    .enumerate()
+    .map(|(i, s)| {
+        let d = s.map_or_else(|| "", PlexSectionType::to_display);
+        let v = s.map_or_else(|| "", PlexSectionType::to_str);
+        if s == &section {
+            rsx! {
+                option {
+                    id: "section-{i}",
+                    value: "{v}",
+                    selected: true,
+                    "{d}"
+                }
+            }
+        } else {
+            rsx! {
+                option {
+                    id: "section-{i}",
+                    value: "{v}",
+                    "{d}"
+                }
+            }
+        }
+    });
 
     rsx! {
         br {
             {previous_button},
             {next_button},
+            form {
+                action: "javascript:loadWatchedListSection('trakt_watched_section_filter', {offset}, {limit})",
+                select {
+                    id: "trakt_watched_section_filter",
+                    "onchange": "loadWatchedListSection('trakt_watched_section_filter', {offset}, {limit})",
+                    {section_select},
+                }
+            }
         }
         table {
             "border": "1",
@@ -2724,6 +2765,171 @@ fn TraktWatchedMostRecentElement(
                     th {"Season"},
                     th {"Episode"},
                     th {"Airdate"},
+                    th {"Rating"},
+                    th {"Last Watched"},
+                }
+            },
+            tbody {
+                {entries}
+            }
+        }
+    }
+}
+
+
+/// # Errors
+/// Returns error if formatting fails
+pub fn trakt_watched_movies_most_recent_body(
+    config: Config,
+    events: Vec<TraktWatchedMovieOutput>,
+    section: Option<PlexSectionType>,
+    offset: Option<usize>,
+    limit: Option<usize>,
+) -> Result<StackString, Error> {
+    let mut app = VirtualDom::new_with_props(
+        TraktWatchedMoviesMostRecentElement,
+        TraktWatchedMoviesMostRecentElementProps {
+            config,
+            events,
+            section,
+            offset,
+            limit,
+        },
+    );
+    app.rebuild_in_place();
+    let mut renderer = dioxus_ssr::Renderer::default();
+    let mut buffer = String::new();
+    renderer
+        .render_to(&mut buffer, &app)
+        .map_err(Into::<Error>::into)?;
+    Ok(buffer.into())
+}
+
+#[component]
+fn TraktWatchedMoviesMostRecentElement(
+    config: Config,
+    events: Vec<TraktWatchedMovieOutput>,
+    section: Option<PlexSectionType>,
+    offset: Option<usize>,
+    limit: Option<usize>,
+) -> Element {
+    let entries = events.iter().enumerate().map(|(idx, event)| {
+        let title = &event.title;
+        let movie_link = &event.show_link;
+        let rating = event.rating.unwrap_or_else(|| dec!(-1));
+        let last_watched = match config.default_time_zone {
+            Some(tz) => {
+                let tz = tz.into();
+                event.last_watched_at.to_timezone(tz)
+            }
+            None => event
+                .last_watched_at
+                .to_timezone(DateTimeWrapper::local_tz()),
+        };
+        let last_watched = last_watched
+            .format(format_description!(
+                "[year]-[month]-[day]T[hour]:[minute]:[second][offset_hour]:[offset_minute]"
+            ))
+            .unwrap_or_default();
+        let display_element = rsx! {
+            a {
+                href: "https://www.imdb.com/title/{movie_link}",
+                target: "_blank",
+                "{title}",
+            }
+        };
+
+        rsx! {
+            tr {
+                key: "trakt-watched-movies-most-recent-key-{idx}",
+                td { {display_element} },
+                td {"{rating:0.1}"},
+                td {"{last_watched}"},
+            }
+        }
+    });
+
+    let limit = limit.unwrap_or(10);
+    let section_str = section.map_or_else(|| StackString::from("null"), |s| format_sstr!("'{s}'"));
+    let previous_button = if let Some(offset) = offset {
+        if offset < limit {
+            None
+        } else {
+            let new_offset = offset - limit;
+            Some(rsx! {
+                button {
+                    "type": "submit",
+                    name: "previous",
+                    value: "Previous",
+                    "onclick": "loadWatchedList({new_offset}, {limit}, {section_str})",
+                    "Previous",
+                }
+            })
+        }
+    } else {
+        None
+    };
+    let offset = offset.unwrap_or(0);
+    let new_offset = offset + limit;
+    let next_button = rsx! {
+        button {
+            "type": "submit",
+            name: "next",
+            value: "Next",
+            "onclick": "loadWatchedList({new_offset}, {limit}, {section_str})",
+            "Next",
+        }
+    };
+    let section_select = [
+        None,
+        Some(PlexSectionType::Movie),
+        Some(PlexSectionType::TvShow),
+    ]
+    .iter()
+    .enumerate()
+    .map(|(i, s)| {
+        let d = s.map_or_else(|| "", PlexSectionType::to_display);
+        let v = s.map_or_else(|| "", PlexSectionType::to_str);
+        if s == &section {
+            rsx! {
+                option {
+                    id: "section-{i}",
+                    value: "{v}",
+                    selected: true,
+                    "{d}"
+                }
+            }
+        } else {
+            rsx! {
+                option {
+                    id: "section-{i}",
+                    value: "{v}",
+                    "{d}"
+                }
+            }
+        }
+    });
+
+    rsx! {
+        br {
+            {previous_button},
+            {next_button},
+            form {
+                action: "javascript:loadWatchedListSection('trakt_watched_section_filter', {offset}, {limit})",
+                select {
+                    id: "trakt_watched_section_filter",
+                    "onchange": "loadWatchedListSection('trakt_watched_section_filter', {offset}, {limit})",
+                    {section_select},
+                }
+            }
+        }
+        table {
+            "border": "1",
+            "align": "center",
+            class: "dataframe",
+            thead {
+                tr {
+                    th {"Title"},
                     th {"Rating"},
                     th {"Last Watched"},
                 }
