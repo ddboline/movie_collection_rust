@@ -27,7 +27,10 @@ use movie_collection_lib::{
     pgpool::PgPool,
     plex_events::{EventOutput, PlexSectionType},
     trakt_connection::TraktConnection,
-    trakt_utils::{get_watched_shows_db, TraktCalEntry, TraktWatchedOutput, TraktWatchedMovieOutput, WatchListMap},
+    trakt_utils::{
+        get_watched_shows_db, TraktCalEntry, TraktWatchedMovieOutput, TraktWatchedOutput,
+        WatchListMap,
+    },
     transcode_service::{
         movie_directories, ProcInfo, ProcStatus, TranscodeServiceRequest, TranscodeStatus,
     },
@@ -2775,7 +2778,6 @@ fn TraktWatchedMostRecentElement(
         }
     }
 }
-
 
 /// # Errors
 /// Returns error if formatting fails
