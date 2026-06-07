@@ -254,7 +254,11 @@ impl ImdbRatings {
             for result in imdb_conn.get_suggestions(&trakt, &link, None).await? {
                 println!("result {}", result.link);
             }
-            if let Some(result) = imdb_conn.get_suggestions(&trakt, &link, None).await?.first() {
+            if let Some(result) = imdb_conn
+                .get_suggestions(&trakt, &link, None)
+                .await?
+                .first()
+            {
                 let title = result.title.clone();
                 let show: StackString = slugify(&title).replace('-', "_").into();
                 let rating = result.rating;

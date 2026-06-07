@@ -155,17 +155,13 @@ impl ImdbConnection {
 
         if istv.is_none() || istv == Some(false) {
             if let Ok(result) = trakt.search_movie(title).await {
-                results.extend(
-                    result.into_iter().map(|s| (s.movie, false))
-                );
+                results.extend(result.into_iter().map(|s| (s.movie, false)));
             }
         }
 
         if istv.is_none() || istv == Some(true) {
             if let Ok(result) = trakt.search_show(title).await {
-                results.extend(
-                    result.into_iter().map(|s| (s.show, true))
-                );
+                results.extend(result.into_iter().map(|s| (s.show, true)));
             }
         }
 
@@ -494,7 +490,9 @@ mod tests {
         let config = Config::with_config()?;
         let conn = ImdbConnection::new();
         let trakt = TraktConnection::new(config);
-        let results = conn.get_suggestions(&trakt, "the_sopranos", Some(true)).await?;
+        let results = conn
+            .get_suggestions(&trakt, "the_sopranos", Some(true))
+            .await?;
         debug!("{:?}", results);
         let top_result = results
             .iter()
