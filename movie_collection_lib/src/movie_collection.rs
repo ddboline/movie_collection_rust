@@ -880,7 +880,7 @@ impl MovieCollection {
                 FROM imdb_ratings c
                 JOIN imdb_episodes d ON c.show = d.show
                 LEFT JOIN trakt_watched_episodes e
-                    ON c.link=e.link AND d.season=e.season AND d.episode=e.episode
+                    ON d.epurl=e.imdb_link AND d.season=e.season AND d.episode=e.episode
                 WHERE c.link in (SELECT link FROM active_links GROUP BY link) AND
                     e.episode is null AND
                     c.istv AND d.airdate >= $mindate AND

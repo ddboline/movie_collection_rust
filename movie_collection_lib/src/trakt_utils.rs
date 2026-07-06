@@ -586,7 +586,7 @@ impl WatchedEpisode {
                        twe.episode,
                        twe.last_watched_at
                 FROM trakt_watched_episodes twe
-                JOIN imdb_episodes ie ON ie.epurl = twe.link
+                JOIN imdb_episodes ie ON ie.epurl = twe.imdb_link
                 JOIN imdb_ratings ir ON ie.show = ir.show
                 WHERE ir.link = $link AND twe.season = $season AND twe.episode = $episode
             "#,
@@ -624,7 +624,7 @@ impl WatchedEpisode {
         let query = query!(
             r#"
                 UPDATE trakt_watched_episodes
-                SET last_watched_at = $last_watched_at, title=$title
+                SET last_watched_at = $last_watched_at, title=$title, imdb_link=$imdb_link
                 WHERE link = $link
                   AND season = $season
                   AND episode = $episode
@@ -634,6 +634,7 @@ impl WatchedEpisode {
             episode = self.episode,
             last_watched_at = self.last_watched_at,
             title = self.title,
+            imdb_link = self.imdb_link,
         );
         let conn = pool.get().await?;
         query.execute(&conn).await.map_err(Into::into)
