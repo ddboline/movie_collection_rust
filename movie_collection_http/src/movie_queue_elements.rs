@@ -755,14 +755,11 @@ pub fn tvshows_body(
         .collect();
     let watchlist: HashSet<_> = show_map
         .into_iter()
-        .map(|(_, (show, s, source))| {
-            
-            ProcessShowItem {
-                show,
-                title: s.title.clone(),
-                link: s.imdb_link.unwrap_or(s.link.clone()),
-                source,
-            }
+        .map(|(_, (show, s, source))| ProcessShowItem {
+            show,
+            title: s.title.clone(),
+            link: s.imdb_link.unwrap_or(s.link.clone()),
+            source,
         })
         .collect();
 
