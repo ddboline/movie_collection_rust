@@ -773,7 +773,7 @@ impl WatchedMovie {
                        tw.slug,
                        tw.imdb_link
                 FROM trakt_watched_movies tw
-                JOIN imdb_ratings ir ON tw.link = ir.link
+                JOIN imdb_ratings ir ON tw.imdb_link = ir.link
                 WHERE tw.link = $link
             "#,
             link = link

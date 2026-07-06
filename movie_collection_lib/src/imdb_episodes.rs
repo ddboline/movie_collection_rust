@@ -283,8 +283,8 @@ impl ImdbEpisodes {
                 JOIN imdb_episodes ie ON ie.id = mc.episode_id
                 JOIN imdb_ratings ir ON ir.index = mc.show_id
                 JOIN trakt_watchlist tw ON tw.link = ir.link
-                LEFT JOIN trakt_watched_episodes twe ON twe.link = ie.epurl AND twe.season = ie.season AND twe.episode = ie.episode
-                WHERE twe.link IS NULL
+                LEFT JOIN trakt_watched_episodes twe ON twe.imdb_link = ie.epurl AND twe.season = ie.season AND twe.episode = ie.episode
+                WHERE twe.imdb_link IS NULL
                 GROUP BY 1,2,3,4,5,6,7,8,9
                 ORDER BY 1,2,3,4,5,6,7,8,9
             "#,
