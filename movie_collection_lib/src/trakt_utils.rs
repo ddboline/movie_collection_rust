@@ -922,7 +922,7 @@ pub async fn sync_trakt_with_db(
     debug!("watched_episodes {}", watched_episodes.len());
     for (key, mut episode) in watched_episodes {
         if let Some(episode_db) = watched_episodes_db.get(&key) {
-            if (episode.imdb_link == "" && episode_db.imdb_link == "")
+            if (episode.imdb_link.is_empty() && episode_db.imdb_link.is_empty())
                 || episode_db.last_watched_at.is_none()
                 || episode_db.last_watched_at < episode.last_watched_at
             {
@@ -941,7 +941,7 @@ pub async fn sync_trakt_with_db(
                 }
             }
         } else {
-            if episode.imdb_link == "" {
+            if episode.imdb_link.is_empty() {
                 if let Some(epi) = ImdbEpisodes::get_episode_by_eptitle_season_episode(
                     &mc.pool,
                     &episode.title,

@@ -304,10 +304,10 @@ impl TraktConnection {
                         link.clone(),
                         WatchListShow {
                             link,
-                            imdb_link,
                             title,
                             year,
                             slug,
+                            imdb_link,
                             ..WatchListShow::default()
                         },
                     )
@@ -595,10 +595,9 @@ impl TraktConnection {
                 .await?;
             if new_shows.is_empty() {
                 break;
-            } else {
-                watched_shows.extend(new_shows);
-                page += 1;
             }
+            watched_shows.extend(new_shows);
+            page += 1;
         }
         let watched_shows = watched_shows
             .into_iter()
@@ -615,10 +614,10 @@ impl TraktConnection {
                 let last_watched_at = entry.last_watched_at;
                 WatchedShow {
                     title,
-                    slug,
                     link,
-                    imdb_link,
+                    slug,
                     last_watched_at,
+                    imdb_link,
                     ..WatchedShow::default()
                 }
             })
@@ -648,10 +647,9 @@ impl TraktConnection {
                 .await?;
             if new_episodes.is_empty() {
                 break;
-            } else {
-                watched_episodes.extend(new_episodes);
-                page += 1;
             }
+            watched_episodes.extend(new_episodes);
+            page += 1;
         }
 
         #[allow(clippy::manual_filter_map)]
@@ -710,18 +708,18 @@ impl TraktConnection {
                 .error_for_status()?
                 .json()
                 .await?;
-            if !new_movies.is_empty() {
+            if new_movies.is_empty() {
+                break;
+            } else {
                 watched_movies.extend(new_movies);
                 page += 1;
-            } else {
-                break;
             }
         }
 
         let movie_map: HashSet<WatchedMovie> = watched_movies
             .into_iter()
             .map(|entry| {
-                let slug = entry.movie.ids.slug.as_ref().map(Clone::clone);
+                let slug = entry.movie.ids.slug.clone();
                 let link = format_sstr!("{}", entry.movie.ids.trakt);
                 let imdb_link = entry.movie.ids.imdb;
                 WatchedMovie {
