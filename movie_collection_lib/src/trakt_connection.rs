@@ -655,7 +655,7 @@ impl TraktConnection {
         #[allow(clippy::manual_filter_map)]
         let episode_map = watched_episodes
             .into_iter()
-            .filter_map(|episode_entry| {
+            .map(|episode_entry| {
                 let last_watched_at = Some(episode_entry.last_watched_at);
                 let title = episode_entry.episode.title.clone();
                 let episode = episode_entry.episode.number;
@@ -673,7 +673,7 @@ impl TraktConnection {
                         imdb_link,
                         ..WatchedEpisode::default()
                     };
-                    Some(((link, season, episode), epi))
+                    ((link, season, episode), epi)
                 } else {
                     let epi = WatchedEpisode {
                         title: title.clone(),
@@ -683,7 +683,7 @@ impl TraktConnection {
                         last_watched_at,
                         ..WatchedEpisode::default()
                     };
-                    Some(((link, season, episode), epi))
+                    ((link, season, episode), epi)
                 }
             })
             .collect();

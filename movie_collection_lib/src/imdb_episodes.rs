@@ -242,6 +242,8 @@ impl ImdbEpisodes {
         query.fetch_streaming(&conn).await.map_err(Into::into)
     }
 
+    /// # Errors
+    /// Returns error if db queries fail
     pub async fn get_episode_by_eptitle_season_episode(
         pool: &PgPool,
         eptitle: &str,

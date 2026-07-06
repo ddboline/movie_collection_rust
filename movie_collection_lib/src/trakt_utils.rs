@@ -510,6 +510,8 @@ impl WatchedShow {
         query.execute(&conn).await.map(|_| ()).map_err(Into::into)
     }
 
+    /// # Errors
+    /// Returns error if db queries fail
     pub async fn backfill_show(pool: &PgPool) -> Result<(), Error> {
         let query = query!(
             r#"
