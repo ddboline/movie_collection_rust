@@ -1036,11 +1036,15 @@ pub fn watchlist_body(
 ) -> Result<String, Error> {
     let mut shows: Vec<_> = shows
         .into_iter()
-        .map(|(_, (_, s, source))| WatchListEntry {
-            title: s.title.clone(),
-            link: s.imdb_link.unwrap_or(s.title),
-            source,
+        .filter_map(|(_, (_, s, source))| 
+        s.imdb_link.as_ref().map(|link| {
+            WatchListEntry {
+                title: s.title.clone(),
+                link: link.clone(),
+                source,
+            }
         })
+    )
         .collect();
     shows.sort();
     let query = query.map(Into::into);
