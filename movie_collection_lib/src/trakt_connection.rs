@@ -710,10 +710,9 @@ impl TraktConnection {
                 .await?;
             if new_movies.is_empty() {
                 break;
-            } else {
-                watched_movies.extend(new_movies);
-                page += 1;
             }
+            watched_movies.extend(new_movies);
+            page += 1;
         }
 
         let movie_map: HashSet<WatchedMovie> = watched_movies
