@@ -864,7 +864,7 @@ impl MovieCollection {
                     JOIN imdb_ratings c ON b.show_id=c.index
                     JOIN imdb_episodes d ON c.show = d.show
                     UNION
-                    SELECT link
+                    SELECT imdb_link as link
                     FROM trakt_watchlist
                 )
                 SELECT c.show,
