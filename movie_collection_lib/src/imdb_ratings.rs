@@ -212,10 +212,10 @@ impl ImdbRatings {
     ) -> Result<Vec<StackString>, Error> {
         let query = query!(
             r#"
-                SELECT twm.link
+                SELECT distinct twm.imdb_link
                 FROM trakt_watched_movies twm
-                LEFT JOIN imdb_ratings ir ON ir.link = twm.link
-                WHERE ir.show IS NULL
+                LEFT JOIN imdb_ratings ir ON ir.link = twm.imdb_link
+                WHERE ir.show IS NULL AND twm.imdb_link IS NOT NULL
             "#
         );
         let conn = pool.get().await?;
@@ -230,10 +230,10 @@ impl ImdbRatings {
     ) -> Result<Vec<StackString>, Error> {
         let query = query!(
             r#"
-                SELECT distinct twe.link
-                FROM trakt_watched_episodes twe
-                LEFT JOIN imdb_ratings ir ON ir.link = twe.link
-                WHERE ir.show IS NULL
+                SELECT distinct tws.imdb_link
+                FROM trakt_watched_shows tws
+                LEFT JOIN imdb_ratings ir ON ir.link = tws.imdb_link
+                WHERE ir.show IS NULL AND tws.imdb_link IS NOT NULL
             "#
         );
         let conn = pool.get().await?;
@@ -250,9 +250,9 @@ impl ImdbRatings {
         let mut links = ImdbRatings::get_shows_in_trakt_not_recorded_in_ratings(pool).await?;
         links.extend(ImdbRatings::get_shows_in_trakt_not_in_episodes(pool).await?);
         for link in links {
-            println!("link {link}");
+            debug!("link {link}");
             for result in imdb_conn.get_suggestions(&trakt, &link, None).await? {
-                println!("result {}", result.link);
+                debug!("result {}", result.link);
             }
             if let Some(result) = imdb_conn
                 .get_suggestions(&trakt, &link, None)
@@ -266,7 +266,7 @@ impl ImdbRatings {
                     || result.title.contains("TV Mini-Series")
                     || result.title.contains("TV Mini Series");
 
-                println!("show {show} link {link} title {title} rating {rating} istv {istv}");
+                debug!("show {show} link {link} title {title} rating {rating} istv {istv}");
                 ImdbRatings {
                     show,
                     link,
@@ -287,6 +287,7 @@ impl ImdbRatings {
 #[cfg(test)]
 mod tests {
     use anyhow::Error;
+    use log::debug;
 
     use crate::{config::Config, imdb_ratings::ImdbRatings, pgpool::PgPool};
 
@@ -307,7 +308,7 @@ mod tests {
         let pool = PgPool::new(&config.pgurl)?;
 
         let links = ImdbRatings::get_shows_in_trakt_not_in_episodes(&pool).await?;
-        println!("links {links:?}");
+        debug!("links {links:?}");
 
         ImdbRatings::fill_in_missing_ratings_from_trakt(&pool).await?;
 

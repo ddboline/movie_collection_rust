@@ -237,14 +237,14 @@ impl MusicCollection {
         let results: Result<Vec<_>, Error> = try_join_all(futures).await;
         let results = results?;
         let count = results.iter().filter_map(Option::as_ref).count();
-        println!("new entries {count}");
+        debug!("new entries {count}");
         let music_dict = Arc::try_unwrap(music_dict).unwrap_or_else(|_| HashMap::new());
         let all_entries: Vec<_> = results
             .into_iter()
             .flatten()
             .chain(music_dict.into_values())
             .collect();
-        println!("all entries {}", all_entries.len());
+        debug!("all entries {}", all_entries.len());
         Ok(all_entries)
     }
 }

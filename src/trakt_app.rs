@@ -96,7 +96,10 @@ async fn trakt_app() -> Result<(), Error> {
             )
             .await
             {
-                Ok(()) => println!("success"),
+                Ok(()) => println!(
+                    "success {} {} {}",
+                    episode.show, episode.season, episode.episode
+                ),
                 Err(e) => println!("failure {e:?}"),
             }
             sleep(Duration::from_secs(1)).await;

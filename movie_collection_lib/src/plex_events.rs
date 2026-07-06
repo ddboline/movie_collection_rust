@@ -1011,11 +1011,11 @@ impl PlexMetadata {
     /// Return error if db query fails
     pub async fn fill_plex_metadata(pool: &PgPool, config: &Config) -> Result<(), Error> {
         let bytes_written = Self::fill_plex_metadata_show(pool).await?;
-        println!("update metadata {bytes_written}");
+        debug!("update metadata {bytes_written}");
         let bytes_written = Self::fill_plex_parent_metadata_show(pool).await?;
-        println!("update parent {bytes_written}");
+        debug!("update parent {bytes_written}");
         let bytes_written = Self::fill_plex_grandparent_metadata_show(pool).await?;
-        println!("update grandparent {bytes_written}");
+        debug!("update grandparent {bytes_written}");
         let filenames: Vec<_> = PlexFilename::get_filenames(pool, None, None, None)
             .await?
             .try_collect()
@@ -1028,7 +1028,7 @@ impl PlexMetadata {
                             Self::get_metadata_by_key(config, parent_key).await?;
                         parent_metadata.show.clone_from(&metadata.show);
                         parent_metadata.insert(pool).await?;
-                        println!("insert parent {parent_metadata:?}");
+                        debug!("insert parent {parent_metadata:?}");
                     }
                 }
                 if let Some(grandparent_key) = &metadata.grandparent_key {
@@ -1037,24 +1037,24 @@ impl PlexMetadata {
                             Self::get_metadata_by_key(config, grandparent_key).await?;
                         grandparent_metadata.show.clone_from(&metadata.show);
                         grandparent_metadata.insert(pool).await?;
-                        println!("insert grandparent {grandparent_metadata:?}");
+                        debug!("insert grandparent {grandparent_metadata:?}");
                     }
                 }
                 continue;
             }
             let true_filename = plex_filename.filename.replace("/shares/", "/media/");
             if !config.movie_dirs.is_empty() && !Path::new(&true_filename).exists() {
-                println!("file doesnt exist {true_filename}");
+                debug!("file doesnt exist {true_filename}");
                 plex_filename.delete(pool).await?;
                 continue;
             }
             match Self::get_metadata_by_key(config, &plex_filename.metadata_key).await {
                 Ok(metadata) => {
                     metadata.insert(pool).await?;
-                    println!("insert {metadata:?}");
+                    debug!("insert {metadata:?}");
                 }
                 Err(e) => {
-                    println!(
+                    debug!(
                         "encounterd error {e} key {} filename {}",
                         plex_filename.metadata_key, plex_filename.filename
                     );
@@ -1070,7 +1070,7 @@ impl PlexMetadata {
                     .is_none()
                 {
                     metadata.insert(pool).await?;
-                    println!("insert {metadata:?}");
+                    debug!("insert {metadata:?}");
                 }
                 if let Some(filename) = filename {
                     if PlexFilename::get_by_key(pool, &filename.metadata_key)
@@ -1078,7 +1078,7 @@ impl PlexMetadata {
                         .is_none()
                     {
                         filename.insert(pool).await?;
-                        println!("insert {filename:?}");
+                        debug!("insert {filename:?}");
                     }
                 }
             }
@@ -1169,6 +1169,7 @@ impl PlexMetadata {
 mod tests {
     use anyhow::Error;
     use futures::TryStreamExt;
+    use log::debug;
     use stdout_channel::StdoutChannel;
 
     use crate::{
@@ -1194,7 +1195,7 @@ mod tests {
                     && event.metadata_key != Some("/library/metadata/22897".into())
             })
             .unwrap();
-        println!("{:?}", event.metadata_key);
+        debug!("{:?}", event.metadata_key);
         let filename = event.get_filename(&config).await?;
         assert!(filename.filename.starts_with("/shares/"));
         Ok(())
@@ -1272,7 +1273,7 @@ mod tests {
             .await?
             .try_collect()
             .await?;
-        println!("{}", episodes.len());
+        debug!("{}", episodes.len());
         Ok(())
     }
 }

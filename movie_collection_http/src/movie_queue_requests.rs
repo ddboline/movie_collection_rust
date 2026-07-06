@@ -17,7 +17,7 @@ use movie_collection_lib::{
     parse_imdb::{ParseImdb, ParseImdbOptions},
     pgpool::PgPool,
     trakt_connection::TraktConnection,
-    trakt_utils::{get_watched_shows_db, get_watchlist_shows_db_map, WatchedEpisode},
+    trakt_utils::{get_watched_episodes_db, get_watchlist_shows_db_map, WatchedEpisode},
     tv_show_source::TvShowSource,
 };
 
@@ -97,9 +97,9 @@ pub struct WatchedShowsRequest {
 
 impl WatchedShowsRequest {
     /// # Errors
-    /// Return error if `get_watched_shows_db` fails
+    /// Return error if `get_watched_episodes_db` fails
     pub async fn handle(&self, pool: &PgPool) -> Result<Vec<WatchedEpisode>, Error> {
-        let episodes = get_watched_shows_db(pool, &self.show, Some(self.season))
+        let episodes = get_watched_episodes_db(pool, Some(&self.show), Some(self.season))
             .await?
             .try_collect()
             .await?;

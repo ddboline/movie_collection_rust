@@ -103,6 +103,7 @@ impl TranscodeChannel {
 #[cfg(test)]
 mod tests {
     use anyhow::Error;
+    use log::debug;
     use std::path::Path;
     use stdout_channel::{MockStdout, StdoutChannel};
     use tokio::{
@@ -129,7 +130,7 @@ mod tests {
         let test_queue = "test_queue";
         let channel = TranscodeChannel::open_channel().await?;
         let queue = channel.init(test_queue).await?;
-        println!("{:?}", queue);
+        debug!("{:?}", queue);
         let task: JoinHandle<Result<_, Error>> = spawn(async move {
             let result: TranscodeServiceRequest = channel.get_single_job(test_queue).await?;
             Ok(result)
@@ -155,7 +156,7 @@ mod tests {
         transcode_channel.init(test_queue).await?;
 
         let result = transcode_channel.cleanup(test_queue).await?;
-        println!("{}", result);
+        debug!("{}", result);
         let script_file = job_dir(&service.config)
             .join(&req.prefix)
             .with_extension("json");

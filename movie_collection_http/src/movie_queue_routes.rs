@@ -1735,9 +1735,10 @@ async fn watched_action_http_worker(
             } else {
                 trakt.add_movie_to_watched(imdb_url).await?
             };
+            let imdb_link = imdb_url.into();
             if season != -1 && episode != -1 {
                 WatchedEpisode {
-                    imdb_url: imdb_url.into(),
+                    imdb_link,
                     season,
                     episode,
                     ..WatchedEpisode::default()
@@ -1746,9 +1747,11 @@ async fn watched_action_http_worker(
                 .await?;
             } else {
                 WatchedMovie {
-                    imdb_url: imdb_url.into(),
+                    imdb_link: Some(imdb_link),
                     title: "".into(),
                     last_watched_at: None,
+                    slug: None,
+                    ..WatchedMovie::default()
                 }
                 .insert_movie(&mc.pool)
                 .await?;

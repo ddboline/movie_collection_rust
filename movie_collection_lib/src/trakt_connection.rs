@@ -24,6 +24,7 @@ use crate::{
     date_time_wrapper::DateTimeWrapper,
     trakt_utils::{
         TraktCalEntry, TraktCalEntryList, TraktResult, WatchListShow, WatchedEpisode, WatchedMovie,
+        WatchedShow,
     },
 };
 
@@ -294,15 +295,19 @@ impl TraktConnection {
         let watchlist = results
             .into_iter()
             .filter_map(|r| {
-                let imdb: StackString = r.show.ids.imdb.unwrap_or_else(|| "".into());
+                let slug = r.show.ids.slug;
+                let link = format_sstr!("{}", r.show.ids.trakt);
+                let imdb_link = r.show.ids.imdb;
                 let title = r.show.title;
                 r.show.year.map(|year| {
                     (
-                        imdb.clone(),
+                        link.clone(),
                         WatchListShow {
-                            link: imdb,
+                            link,
+                            imdb_link,
                             title,
                             year,
+                            slug,
                             ..WatchListShow::default()
                         },
                     )
@@ -572,55 +577,116 @@ impl TraktConnection {
 
     /// # Errors
     /// Return error if api call fails
-    pub async fn get_watched_shows(
+    pub async fn get_watched_shows(&self) -> Result<Vec<WatchedShow>, Error> {
+        let mut watched_shows = Vec::new();
+        let mut page = 1;
+        loop {
+            let headers = self.get_rw_headers().await?;
+            let trakt_endpoint = &self.config.trakt_api_endpoint;
+            let url = format_sstr!("{trakt_endpoint}/sync/watched/shows?page={page}");
+            let new_shows: Vec<TraktWatchedShowResponse> = self
+                .client
+                .get(url.as_str())
+                .headers(headers)
+                .send()
+                .await?
+                .error_for_status()?
+                .json()
+                .await?;
+            if new_shows.is_empty() {
+                break;
+            } else {
+                watched_shows.extend(new_shows);
+                page += 1;
+            }
+        }
+        let watched_shows = watched_shows
+            .into_iter()
+            .map(|entry| {
+                let title = entry.show.title;
+                let link = format_sstr!("{}", entry.show.ids.trakt);
+                let imdb_link = entry.show.ids.imdb;
+                let slug = entry
+                    .show
+                    .ids
+                    .slug
+                    .as_ref()
+                    .map_or(StackString::new(), Clone::clone);
+                let last_watched_at = entry.last_watched_at;
+                WatchedShow {
+                    title,
+                    slug,
+                    link,
+                    imdb_link,
+                    last_watched_at,
+                    ..WatchedShow::default()
+                }
+            })
+            .collect();
+        Ok(watched_shows)
+    }
+
+    /// # Errors
+    /// Return error if api call fails
+    pub async fn get_watched_episodes(
         &self,
     ) -> Result<HashMap<(StackString, i32, i32), WatchedEpisode>, Error> {
-        let headers = self.get_rw_headers().await?;
-        let trakt_endpoint = &self.config.trakt_api_endpoint;
-        let url = format_sstr!("{trakt_endpoint}/sync/watched/shows");
-        let watched_episodes: Vec<TraktWatchedShowResponse> = self
-            .client
-            .get(url.as_str())
-            .headers(headers)
-            .send()
-            .await?
-            .error_for_status()?
-            .json()
-            .await?;
+        let mut watched_episodes = Vec::new();
+        let mut page = 1;
+        loop {
+            let headers = self.get_rw_headers().await?;
+            let trakt_endpoint = &self.config.trakt_api_endpoint;
+            let url = format_sstr!("{trakt_endpoint}/sync/watched/episodes?page={page}");
+            let new_episodes: Vec<TraktWatchedEpisodeNew> = self
+                .client
+                .get(url.as_str())
+                .headers(headers)
+                .send()
+                .await?
+                .error_for_status()?
+                .json()
+                .await?;
+            if new_episodes.is_empty() {
+                break;
+            } else {
+                watched_episodes.extend(new_episodes);
+                page += 1;
+            }
+        }
 
         #[allow(clippy::manual_filter_map)]
         let episode_map = watched_episodes
             .into_iter()
-            .filter(|show_entry| show_entry.show.ids.imdb.is_some())
-            .flat_map(|show_entry| {
-                let title = show_entry.show.title.clone();
-                let imdb_url: StackString = show_entry
-                    .show
-                    .ids
-                    .imdb
-                    .as_ref()
-                    .map_or_else(|| "".into(), Clone::clone);
-                show_entry
-                    .seasons
-                    .into_iter()
-                    .flat_map(move |season_entry| {
-                        let season = season_entry.number;
-                        let title = title.clone();
-                        let imdb_url = imdb_url.clone();
-                        season_entry.episodes.into_iter().map(move |episode_entry| {
-                            let episode = episode_entry.number;
-                            let last_watched_at = Some(episode_entry.last_watched_at);
-                            let epi = WatchedEpisode {
-                                title: title.clone(),
-                                imdb_url: imdb_url.clone(),
-                                episode,
-                                season,
-                                last_watched_at,
-                                ..WatchedEpisode::default()
-                            };
-                            ((imdb_url.clone(), season, episode), epi)
-                        })
-                    })
+            .filter_map(|episode_entry| {
+                let last_watched_at = Some(episode_entry.last_watched_at);
+                let title = episode_entry.episode.title.clone();
+                let episode = episode_entry.episode.number;
+                let season = episode_entry.episode.season;
+                let link = format_sstr!("{}", episode_entry.episode.ids.trakt);
+
+                if let Some(imdb_url) = episode_entry.episode.ids.imdb {
+                    let imdb_link = imdb_url.clone();
+                    let epi = WatchedEpisode {
+                        title,
+                        link: link.clone(),
+                        season,
+                        episode,
+                        last_watched_at,
+                        imdb_link,
+                        ..WatchedEpisode::default()
+                    };
+                    Some(((link, season, episode), epi))
+                } else {
+                    let epi = WatchedEpisode {
+                        title: title.clone(),
+                        link: link.clone(),
+                        season,
+                        episode,
+                        last_watched_at,
+                        ..WatchedEpisode::default()
+                    };
+                    Some(((link, season, episode), epi))
+                }
             })
             .collect();
         Ok(episode_map)
@@ -629,31 +695,41 @@ impl TraktConnection {
     /// # Errors
     /// Return error if api call fails
     pub async fn get_watched_movies(&self) -> Result<HashSet<WatchedMovie>, Error> {
-        let headers = self.get_rw_headers().await?;
-        let trakt_endpoint = &self.config.trakt_api_endpoint;
-        let url = format_sstr!("{trakt_endpoint}/sync/watched/movies");
-        let watched_movies: Vec<TraktWatchedMovieResponse> = self
-            .client
-            .get(url.as_str())
-            .headers(headers)
-            .send()
-            .await?
-            .error_for_status()?
-            .json()
-            .await?;
+        let mut watched_movies = Vec::new();
+        let mut page = 1;
+        loop {
+            let headers = self.get_rw_headers().await?;
+            let trakt_endpoint = &self.config.trakt_api_endpoint;
+            let url = format_sstr!("{trakt_endpoint}/sync/watched/movies?page={page}");
+            let new_movies: Vec<TraktWatchedMovieResponse> = self
+                .client
+                .get(url.as_str())
+                .headers(headers)
+                .send()
+                .await?
+                .error_for_status()?
+                .json()
+                .await?;
+            if !new_movies.is_empty() {
+                watched_movies.extend(new_movies);
+                page += 1;
+            } else {
+                break;
+            }
+        }
+
         let movie_map: HashSet<WatchedMovie> = watched_movies
             .into_iter()
             .map(|entry| {
-                let imdb: StackString = entry
-                    .movie
-                    .ids
-                    .imdb
-                    .as_ref()
-                    .map_or_else(|| "".into(), Clone::clone);
+                let slug = entry.movie.ids.slug.as_ref().map(Clone::clone);
+                let link = format_sstr!("{}", entry.movie.ids.trakt);
+                let imdb_link = entry.movie.ids.imdb;
                 WatchedMovie {
                     title: entry.movie.title,
-                    imdb_url: imdb,
+                    link,
+                    imdb_link,
                     last_watched_at: Some(entry.last_watched_at),
+                    slug,
                 }
             })
             .collect();
@@ -722,7 +798,7 @@ impl TraktConnection {
             .await?
             .error_for_status()?;
         Ok(TraktResult {
-            status: "success".into(),
+            status: "success add episode".into(),
         })
     }
 
@@ -758,7 +834,7 @@ impl TraktConnection {
             .await?
             .error_for_status()?;
         Ok(TraktResult {
-            status: "success".into(),
+            status: "success add movie".into(),
         })
     }
 
@@ -790,7 +866,7 @@ impl TraktConnection {
             .await?
             .error_for_status()?;
         Ok(TraktResult {
-            status: "success".into(),
+            status: "success remove episode".into(),
         })
     }
 
@@ -825,7 +901,7 @@ impl TraktConnection {
             .await?
             .error_for_status()?;
         Ok(TraktResult {
-            status: "success".into(),
+            status: "success remove movie".into(),
         })
     }
 }
@@ -871,8 +947,8 @@ impl AccessTokenResponse {
 #[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct TraktIdObject {
     pub trakt: i32,
-    pub imdb: Option<StackString>,
     pub slug: Option<StackString>,
+    pub imdb: Option<StackString>,
     pub tvdb: Option<i32>,
     pub tmdb: Option<i32>,
 }
@@ -917,6 +993,12 @@ pub struct TraktMovieSearchResponse {
 }
 
 #[derive(Serialize, Deserialize, Debug)]
+pub struct TraktWatchedEpisodeNew {
+    pub last_watched_at: DateTimeWrapper,
+    pub episode: TraktEpisodeObject,
+}
+
+#[derive(Serialize, Deserialize, Debug)]
 pub struct TraktWatchedEpisode {
     pub number: i32,
     pub last_watched_at: DateTimeWrapper,
@@ -929,9 +1011,14 @@ pub struct TraktWatchedSeason {
 }
 
 #[derive(Serialize, Deserialize, Debug)]
+pub struct TraktWatchedShowResponseNew {
+    pub show: TraktShowObject,
+    pub last_watched_at: DateTimeWrapper,
+}
+
+#[derive(Serialize, Deserialize, Debug)]
 pub struct TraktWatchedShowResponse {
     pub show: TraktShowObject,
-    pub seasons: Vec<TraktWatchedSeason>,
     pub last_watched_at: DateTimeWrapper,
 }
 
@@ -1010,7 +1097,7 @@ mod tests {
         let conn = TraktConnection::new(config);
         conn.init().await?;
         let result = conn.get_movie_rating("tt0457430").await?;
-        println!("{result:?}");
+        debug!("{result:?}");
         assert!(result.rating > 7.0);
         Ok(())
     }
@@ -1033,7 +1120,7 @@ mod tests {
         let conn = TraktConnection::new(config);
         conn.init().await?;
         let result = conn.get_show_rating("tt0141842").await?;
-        println!("{:?}", result);
+        debug!("{:?}", result);
         assert!(result.rating > 9.0);
         Ok(())
     }
@@ -1136,6 +1223,17 @@ mod tests {
         let conn = TraktConnection::new(config);
         conn.init().await?;
         let result = conn.get_watched_shows().await?;
+        assert!(result.len() > 10);
+        Ok(())
+    }
+
+    #[tokio::test]
+    #[ignore]
+    async fn test_get_watched_episodes() -> Result<(), Error> {
+        let config = Config::with_config()?;
+        let conn = TraktConnection::new(config);
+        conn.init().await?;
+        let result = conn.get_watched_episodes().await?;
         assert!(result.len() > 10);
         Ok(())
     }

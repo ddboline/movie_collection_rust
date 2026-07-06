@@ -110,6 +110,7 @@ impl ImdbEpisodes {
         show: &'a Option<&str>,
         season: &'a Option<i32>,
         episode: &'a Option<i32>,
+        eptitle: &'a Option<&str>,
         timestamp: Option<&'a OffsetDateTime>,
         offset: Option<usize>,
         limit: Option<usize>,
@@ -127,6 +128,10 @@ impl ImdbEpisodes {
         if let Some(episode) = &episode {
             constraints.push("a.episode = $episode");
             query_bindings.push(("episode", episode as Parameter));
+        }
+        if let Some(eptitle) = eptitle {
+            constraints.push("a.eptitle = $eptitle");
+            query_bindings.push(("eptitle", eptitle as Parameter));
         }
         if let Some(timestamp) = timestamp {
             constraints.push("a.last_modified >= $timestamp");
@@ -171,6 +176,7 @@ impl ImdbEpisodes {
             &None,
             &None,
             &None,
+            &None,
             timestamp.as_ref(),
             offset,
             limit,
@@ -199,6 +205,7 @@ impl ImdbEpisodes {
             &show,
             &season,
             &episode,
+            &None,
             timestamp.as_ref(),
             None,
             None,
@@ -226,12 +233,37 @@ impl ImdbEpisodes {
             &show,
             &season,
             &episode,
+            &None,
             None,
             offset,
             limit,
         )?;
         let conn = pool.get().await?;
         query.fetch_streaming(&conn).await.map_err(Into::into)
+    }
+
+    pub async fn get_episode_by_eptitle_season_episode(
+        pool: &PgPool,
+        eptitle: &str,
+        season: i32,
+        episode: i32,
+    ) -> Result<Option<Self>, Error> {
+        let season = Some(season);
+        let episode = Some(episode);
+        let eptitle = Some(eptitle);
+        let query = Self::get_imdb_episodes_query(
+            "a.*, b.title",
+            "",
+            &None,
+            &season,
+            &episode,
+            &eptitle,
+            None,
+            None,
+            Some(1),
+        )?;
+        let conn = pool.get().await?;
+        query.fetch_opt(&conn).await.map_err(Into::into)
     }
 
     /// # Errors
@@ -249,7 +281,7 @@ impl ImdbEpisodes {
                 JOIN imdb_episodes ie ON ie.id = mc.episode_id
                 JOIN imdb_ratings ir ON ir.index = mc.show_id
                 JOIN trakt_watchlist tw ON tw.link = ir.link
-                LEFT JOIN trakt_watched_episodes twe ON twe.link = ir.link AND twe.season = ie.season AND twe.episode = ie.episode
+                LEFT JOIN trakt_watched_episodes twe ON twe.link = ie.epurl AND twe.season = ie.season AND twe.episode = ie.episode
                 WHERE twe.link IS NULL
                 GROUP BY 1,2,3,4,5,6,7,8,9
                 ORDER BY 1,2,3,4,5,6,7,8,9
@@ -395,6 +427,7 @@ impl ImdbSeason {
 mod tests {
     use anyhow::Error;
     use futures::TryStreamExt;
+    use log::debug;
 
     use crate::{
         config::Config,
@@ -422,7 +455,7 @@ mod tests {
         .await?;
         assert_eq!(episodes.len(), 86);
         let episode = episodes.first().unwrap();
-        println!("{episode:?}");
+        debug!("{episode:?}");
         assert_eq!(episode.season, 1);
         assert_eq!(episode.episode, 1);
         let index = episode.get_index(&pool).await?.unwrap();

@@ -2,6 +2,7 @@ use anyhow::{format_err, Error};
 use futures::{future::try_join_all, try_join};
 use itertools::Itertools;
 use jwalk::WalkDir;
+use log::debug;
 use procfs::{process, process::Process};
 use serde::{Deserialize, Serialize};
 use smallvec::{smallvec, SmallVec};
@@ -142,7 +143,7 @@ impl TranscodeServiceRequest {
                     .join("Documents")
                     .join("movies")
                     .join(d);
-                println!("{}", d.to_string_lossy());
+                debug!("{}", d.to_string_lossy());
                 if !d.exists() {
                     return Err(format_err!(
                         "Directory {} does not exist",
@@ -387,7 +388,7 @@ impl TranscodeService {
             spawn(async move { Self::output_to_file(reader, &stderr_path, b'\n').await });
 
         let status = p.wait().await?;
-        println!("Handbrake exited with {status}");
+        debug!("Handbrake exited with {status}");
         stdout_task.await??;
         stderr_task.await??;
 
@@ -878,6 +879,7 @@ pub fn movie_directories(config: &Config) -> Result<Vec<StackString>, Error> {
 #[cfg(test)]
 mod tests {
     use anyhow::Error;
+    use log::debug;
     use stack_string::{format_sstr, StackString};
     use std::{collections::HashSet, fs::create_dir_all, path::Path};
 
@@ -899,7 +901,7 @@ mod tests {
         let p = Path::new("mr_robot_s01_ep01.mp4");
         let d: Option<&Path> = None;
         let payload = TranscodeServiceRequest::create_remcom_request(&config, p, d, false).await?;
-        println!("{:?}", payload);
+        debug!("{:?}", payload);
         assert_eq!(payload.job_type, JobType::Move);
         assert_eq!(&payload.input_path, p);
         Ok(())
@@ -925,7 +927,7 @@ mod tests {
             false,
         )
         .await?;
-        println!("{:?}", payload);
+        debug!("{:?}", payload);
         assert_eq!(
             payload.output_path,
             config
@@ -943,7 +945,7 @@ mod tests {
         create_dir_all(&job_path)?;
         let p = Path::new("mr_robot_s01_ep01.mkv");
         let payload = TranscodeServiceRequest::create_transcode_request(&config, p)?;
-        println!("{:?}", payload);
+        debug!("{:?}", payload);
         assert_eq!(&payload.input_path, p);
         let expected = config
             .home_dir
@@ -959,8 +961,8 @@ mod tests {
     async fn test_transcode_status() -> Result<(), Error> {
         let config = Config::with_config()?;
         let status = transcode_status(&config).await?;
-        println!("{:?}", status);
-        println!("{}", status);
+        debug!("{:?}", status);
+        debug!("{}", status);
         assert!(status.procs.len() >= 1);
         Ok(())
     }
@@ -1001,7 +1003,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_get_last_line() -> Result<(), Error> {
-        println!("{:?}", std::env::current_dir());
+        debug!("{:?}", std::env::current_dir());
         let p = Path::new("../tests/data/fargo_2014_s04_ep02_mp4.out");
         let output = get_last_line(&p).await?;
         assert_eq!(
@@ -1028,7 +1030,7 @@ mod tests {
     #[tokio::test]
     async fn test_get_paths() -> Result<(), Error> {
         let results = get_paths("../tests/data", "out").await?;
-        println!("{:?}", results);
+        debug!("{:?}", results);
         assert!(results.len() > 0);
         Ok(())
     }
@@ -1036,7 +1038,7 @@ mod tests {
     #[tokio::test]
     async fn test_get_upcoming_jobs() -> Result<(), Error> {
         let results = get_upcoming_jobs("../tests/data").await?;
-        println!("{:?}", results);
+        debug!("{:?}", results);
         let prefixes: HashSet<_> = results.iter().map(|r| r.prefix.clone()).collect();
         assert_eq!(results.len(), 2);
         assert!(prefixes.contains("fargo_2014_s04_ep02"));

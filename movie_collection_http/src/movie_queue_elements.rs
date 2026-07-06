@@ -1,6 +1,7 @@
 use anyhow::{format_err, Error};
 use dioxus::prelude::{component, dioxus_elements, rsx, Element, Props, VirtualDom};
 use futures::{future::try_join_all, TryStreamExt};
+use log::debug;
 use rust_decimal_macros::dec;
 use stack_string::{format_sstr, StackString};
 use std::{
@@ -28,7 +29,7 @@ use movie_collection_lib::{
     plex_events::{EventOutput, PlexSectionType},
     trakt_connection::TraktConnection,
     trakt_utils::{
-        get_watched_shows_db, TraktCalEntry, TraktWatchedMovieOutput, TraktWatchedOutput,
+        get_watched_episodes_db, TraktCalEntry, TraktWatchedMovieOutput, TraktWatchedOutput,
         WatchListMap,
     },
     transcode_service::{
@@ -456,7 +457,7 @@ pub fn play_worker_body(
             std::fs::create_dir_all(&partial_path)?;
         }
         let partial_path = partial_path.join(file_name.as_str());
-        println!(
+        debug!(
             "full_path {} partial_path {}",
             full_path.display(),
             partial_path.display()
@@ -754,14 +755,13 @@ pub fn tvshows_body(
         .collect();
     let watchlist: HashSet<_> = show_map
         .into_iter()
-        .map(|(link, (show, s, source))| {
+        .map(|(_, (show, s, source))| {
             let item = ProcessShowItem {
                 show,
-                title: s.title,
-                link: s.link,
+                title: s.title.clone(),
+                link: s.imdb_link.unwrap_or(s.link.clone()),
                 source,
             };
-            debug_assert!(link.as_str() == item.link.as_str());
             item
         })
         .collect();
@@ -1040,8 +1040,8 @@ pub fn watchlist_body(
     let mut shows: Vec<_> = shows
         .into_iter()
         .map(|(_, (_, s, source))| WatchListEntry {
-            title: s.title,
-            link: s.link,
+            title: s.title.clone(),
+            link: s.imdb_link.unwrap_or(s.title),
             source,
         })
         .collect();
@@ -1488,11 +1488,12 @@ pub async fn watch_list_http_body(
         .ok_or_else(|| format_err!("Show Doesn't exist"))?;
 
     let show_str = &show.show;
-    let watched_episodes_db: HashSet<i32> = get_watched_shows_db(pool, show_str, Some(season))
-        .await?
-        .map_ok(|s| s.episode)
-        .try_collect()
-        .await?;
+    let watched_episodes_db: HashSet<i32> =
+        get_watched_episodes_db(pool, Some(show_str), Some(season))
+            .await?
+            .map_ok(|s| s.episode)
+            .try_collect()
+            .await?;
 
     let queue: HashMap<(StackString, i32, i32), _> = mq
         .print_movie_queue(&[show_str.as_str()], None, None, None)
