@@ -756,13 +756,13 @@ pub fn tvshows_body(
     let watchlist: HashSet<_> = show_map
         .into_iter()
         .map(|(_, (show, s, source))| {
-            let item = ProcessShowItem {
+            
+            ProcessShowItem {
                 show,
                 title: s.title.clone(),
                 link: s.imdb_link.unwrap_or(s.link.clone()),
                 source,
-            };
-            item
+            }
         })
         .collect();
 
