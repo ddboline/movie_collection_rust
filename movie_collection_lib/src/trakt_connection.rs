@@ -753,7 +753,12 @@ impl TraktConnection {
         let cal_entries = new_episodes
             .into_iter()
             .map(|entry| {
-                let imdb: StackString = entry.show.ids.imdb.unwrap_or_else(|| "".into());
+                let trakt_id = entry.show.ids.trakt;
+                let imdb: StackString = entry
+                    .show
+                    .ids
+                    .imdb
+                    .unwrap_or_else(|| format_sstr!("{trakt_id}"));
                 TraktCalEntry {
                     ep_link: entry.episode.ids.imdb.clone(),
                     episode: entry.episode.number,
