@@ -4,7 +4,7 @@ use log::{debug, error};
 use reqwest::{Client, Url};
 use select::{document::Document, predicate::Name};
 use serde::Deserialize;
-use stack_string::StackString;
+use stack_string::{format_sstr, StackString};
 use std::{convert::TryFrom, fmt};
 use time::{macros::date, Date, Month};
 
@@ -19,6 +19,7 @@ pub struct ImdbTuple {
     pub link: StackString,
     pub rating: f64,
     pub istv: bool,
+    pub trakt_id: Option<i32>,
 }
 
 impl fmt::Display for ImdbTuple {
@@ -119,12 +120,17 @@ impl ImdbConnection {
             |(
                 TraktShowObject {
                     title,
-                    ids: TraktIdObject { imdb, .. },
+                    ids:
+                        TraktIdObject {
+                            trakt: trakt_id,
+                            imdb,
+                            ..
+                        },
                     ..
                 },
                 istv,
             )| async move {
-                let link = imdb.unwrap_or(StackString::new());
+                let link = imdb.unwrap_or(format_sstr!("{trakt_id}"));
                 let rating = if let Ok(ra) = trakt.get_movie_rating(&link).await {
                     ra.rating
                 } else if let Ok(ra) = trakt.get_show_rating(&link).await {
@@ -137,6 +143,7 @@ impl ImdbConnection {
                     link,
                     rating,
                     istv,
+                    trakt_id: Some(trakt_id),
                 })
             },
         );
@@ -169,12 +176,17 @@ impl ImdbConnection {
             |(
                 TraktShowObject {
                     title,
-                    ids: TraktIdObject { imdb, .. },
+                    ids:
+                        TraktIdObject {
+                            trakt: trakt_id,
+                            imdb,
+                            ..
+                        },
                     ..
                 },
                 istv,
             )| async move {
-                let link = imdb.unwrap_or(StackString::new());
+                let link = imdb.unwrap_or(format_sstr!("{trakt_id}"));
                 let rating = if let Ok(ra) = trakt.get_movie_rating(&link).await {
                     ra.rating
                 } else if let Ok(ra) = trakt.get_show_rating(&link).await {
@@ -187,6 +199,7 @@ impl ImdbConnection {
                     link,
                     rating,
                     istv,
+                    trakt_id: Some(trakt_id),
                 })
             },
         );
@@ -433,6 +446,7 @@ mod tests {
             link: "https://example.com/link".into(),
             rating: 0.85,
             istv: false,
+            trakt_id: None,
         };
         assert_eq!(
             format_sstr!("{t}"),
