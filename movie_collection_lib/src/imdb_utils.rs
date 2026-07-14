@@ -160,7 +160,6 @@ impl ImdbConnection {
     ) -> Result<Vec<ImdbTuple>, Error> {
         let mut results = Vec::new();
 
-        println!("got here {istv:?}");
         if istv.is_none() || istv == Some(false) {
             if let Ok(result) = trakt.search_movie(title).await {
                 results.extend(result.into_iter().map(|s| (s.movie, false)));

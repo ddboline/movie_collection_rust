@@ -7,7 +7,7 @@ info:
     email: ddboline@gmail.com
   license:
     name: ''
-  version: 0.12.40
+  version: 0.12.41
 paths:
   /list/cal:
     get:

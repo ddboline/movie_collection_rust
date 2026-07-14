@@ -651,7 +651,7 @@ impl MovieCollection {
             .collect();
         let collection_map = Arc::new(collection_map?);
 
-        let query = "SELECT show, season, episode from imdb_episodes";
+        let query = "SELECT show, season, episode FROM imdb_episodes";
         let episodes_set: Result<HashSet<(StackString, i32, i32)>, Error> = self
             .pool
             .get()
@@ -860,11 +860,11 @@ impl MovieCollection {
                 WITH active_links AS (
                     SELECT c.link
                     FROM movie_queue a
-                    JOIN movie_collection b ON a.collection_idx=b.idx
-                    JOIN imdb_ratings c ON b.show_id=c.index
+                    JOIN movie_collection b ON a.collection_idx = b.idx
+                    JOIN imdb_ratings c ON b.show_id = c.index
                     JOIN imdb_episodes d ON c.show = d.show
                     UNION
-                    SELECT imdb_link as link
+                    SELECT coalesce(imdb_link, link) as link
                     FROM trakt_watchlist
                 )
                 SELECT c.show,
