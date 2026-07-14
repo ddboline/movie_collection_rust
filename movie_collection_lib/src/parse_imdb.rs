@@ -147,7 +147,7 @@ impl ParseImdb {
         let imdb_conn = ImdbConnection::new();
         let title = opts.show.replace('_', " ");
 
-        let istv = if opts.tv || episodes.is_none() {
+        let istv = if opts.tv || episodes.is_some() {
             Some(true)
         } else {
             None

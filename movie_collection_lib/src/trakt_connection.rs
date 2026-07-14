@@ -326,15 +326,30 @@ impl TraktConnection {
         let headers = self.get_ro_headers()?;
         let trakt_endpoint = &self.config.trakt_api_endpoint;
         let url = format_sstr!("{trakt_endpoint}/search/imdb/{imdb_id}?type=show");
-        self.client
+        let results: Vec<TraktShowSearchResponse> = self
+            .client
             .get(url.as_str())
             .headers(headers)
             .send()
             .await?
             .error_for_status()?
             .json()
-            .await
-            .map_err(Into::into)
+            .await?;
+        if !results.is_empty() {
+            Ok(results)
+        } else {
+            let headers = self.get_ro_headers()?;
+            let url = format_sstr!("{trakt_endpoint}/search/trakt/{imdb_id}?type=show");
+            self.client
+                .get(url.as_str())
+                .headers(headers)
+                .send()
+                .await?
+                .error_for_status()?
+                .json()
+                .await
+                .map_err(Into::into)
+        }
     }
 
     /// # Errors
@@ -1203,6 +1218,15 @@ mod tests {
             .unwrap();
         assert_eq!(top_result.movie.ids.imdb, Some("tt0457430".into()));
         assert_eq!(top_result.movie.year, Some(2006));
+
+        let result = conn.search_movie("bugonia").await?;
+        debug!("{:?}", result);
+        let top_result = result
+            .iter()
+            .filter(|s| &s.movie.title == "Bugonia")
+            .next()
+            .unwrap();
+        assert_eq!(top_result.movie.ids.imdb, Some("tt12300742".into()));
         Ok(())
     }
 
@@ -1215,6 +1239,18 @@ mod tests {
         conn.init().await?;
         let result = conn.get_show_by_imdb_id(imdb_id).await?;
         assert_eq!(result[0].show.title, "Billions");
+        Ok(())
+    }
+
+    #[tokio::test]
+    #[ignore]
+    async fn test_get_show_by_imdb_id_trakt() -> Result<(), Error> {
+        let imdb_id = "320162";
+        let config = Config::with_config()?;
+        let conn = TraktConnection::new(config);
+        conn.init().await?;
+        let result = conn.get_show_by_imdb_id(imdb_id).await?;
+        assert_eq!(result[0].show.title, "The Vampire Lestat");
         Ok(())
     }
 

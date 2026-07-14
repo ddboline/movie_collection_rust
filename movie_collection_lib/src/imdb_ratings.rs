@@ -212,10 +212,10 @@ impl ImdbRatings {
     ) -> Result<Vec<StackString>, Error> {
         let query = query!(
             r#"
-                SELECT distinct twm.imdb_link
+                SELECT distinct COALESCE(twm.imdb_link, twm.link)
                 FROM trakt_watched_movies twm
-                LEFT JOIN imdb_ratings ir ON ir.link = twm.imdb_link
-                WHERE ir.show IS NULL AND twm.imdb_link IS NOT NULL
+                LEFT JOIN imdb_ratings ir ON (ir.link = twm.imdb_link OR ir.link = twm.link)
+                WHERE ir.show IS NULL
             "#
         );
         let conn = pool.get().await?;
@@ -230,10 +230,10 @@ impl ImdbRatings {
     ) -> Result<Vec<StackString>, Error> {
         let query = query!(
             r#"
-                SELECT distinct tws.imdb_link
+                SELECT distinct COALESCE(tws.imdb_link, tws.link)
                 FROM trakt_watched_shows tws
-                LEFT JOIN imdb_ratings ir ON ir.link = tws.imdb_link
-                WHERE ir.show IS NULL AND tws.imdb_link IS NOT NULL
+                LEFT JOIN imdb_ratings ir ON (ir.link = tws.imdb_link OR ir.link = tws.link)
+                WHERE ir.show IS NULL
             "#
         );
         let conn = pool.get().await?;
