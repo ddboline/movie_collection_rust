@@ -7,7 +7,7 @@ info:
     email: ddboline@gmail.com
   license:
     name: ''
-  version: 0.12.30
+  version: 0.12.40
 paths:
   /list/cal:
     get:
@@ -863,6 +863,13 @@ paths:
           - string
           - 'null'
           format: date-time
+      - name: section_type
+        in: query
+        required: false
+        schema:
+          oneOf:
+          - type: 'null'
+          - $ref: '#/components/schemas/PlexSectionType'
       - name: offset
         in: query
         required: false
@@ -1368,6 +1375,13 @@ paths:
           - string
           - 'null'
           format: date-time
+      - name: section_type
+        in: query
+        required: false
+        schema:
+          oneOf:
+          - type: 'null'
+          - $ref: '#/components/schemas/PlexSectionType'
       - name: offset
         in: query
         required: false
@@ -1484,6 +1498,13 @@ paths:
           - string
           - 'null'
           format: date-time
+      - name: section_type
+        in: query
+        required: false
+        schema:
+          oneOf:
+          - type: 'null'
+          - $ref: '#/components/schemas/PlexSectionType'
       - name: offset
         in: query
         required: false
@@ -2367,6 +2388,13 @@ paths:
           - string
           - 'null'
           format: date-time
+      - name: section_type
+        in: query
+        required: false
+        schema:
+          oneOf:
+          - type: 'null'
+          - $ref: '#/components/schemas/PlexSectionType'
       - name: offset
         in: query
         required: false
