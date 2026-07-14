@@ -335,9 +335,7 @@ impl TraktConnection {
             .error_for_status()?
             .json()
             .await?;
-        if !results.is_empty() {
-            Ok(results)
-        } else {
+        if results.is_empty() {
             let headers = self.get_ro_headers()?;
             let url = format_sstr!("{trakt_endpoint}/search/trakt/{imdb_id}?type=show");
             self.client
@@ -349,6 +347,8 @@ impl TraktConnection {
                 .json()
                 .await
                 .map_err(Into::into)
+        } else {
+            Ok(results)
         }
     }
 
