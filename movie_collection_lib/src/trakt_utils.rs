@@ -693,10 +693,10 @@ pub async fn get_watched_episodes_db(
             SELECT twe.title,
                    ir.show,
                    twe.link,
-                   twe.season,
+                   coalesce(twe.imdb_link, twe.link) as imdb_link,
                    twe.episode,
-                   twe.last_watched_at,
-                   twe.imdb_link
+                   twe.season,
+                   twe.last_watched_at
             FROM trakt_watched_episodes twe
             LEFT JOIN imdb_episodes ie ON ie.epurl = twe.imdb_link
             LEFT JOIN imdb_ratings ir ON ie.show = ir.show
@@ -858,7 +858,6 @@ pub async fn sync_trakt_with_db(
     trakt: &TraktConnection,
     mc: &MovieCollection,
 ) -> Result<(), Error> {
-    debug!("start sync_trakt_with_db");
     let watchlist_shows_db = Arc::new(get_watchlist_shows_db(&mc.pool).await?);
     trakt.init().await?;
     debug!("trakt watchlist shows db {}", watchlist_shows_db.len());
@@ -899,11 +898,13 @@ pub async fn sync_trakt_with_db(
     for watched_show in &watched_shows {
         if let Some(watched_show_db) = watched_shows_db.get(&watched_show.link) {
             if watched_show_db.last_watched_at < watched_show.last_watched_at {
+                debug!("update show {watched_show:?}");
                 watched_show.update_show(&mc.pool).await?;
                 mc.stdout
                     .send(format_sstr!("update watched show {watched_show:?}"));
             }
         } else {
+            debug!("insert show {watched_show:?}");
             watched_show.insert_show(&mc.pool).await?;
             mc.stdout
                 .send(format_sstr!("insert watched show {watched_show:?}"));
