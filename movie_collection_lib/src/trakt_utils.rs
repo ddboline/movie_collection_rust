@@ -382,6 +382,7 @@ pub async fn get_watchlist_shows_db_map(
         let conn = pool.get().await?;
         query.fetch_streaming(&conn).await.map_err(Into::into)
     }
+
     let source = source.map(TvShowSource::to_str);
     get_watchlist_shows_db_map_impl(pool, search_query, source, offset, limit)
         .await?
@@ -642,6 +643,23 @@ impl WatchedEpisode {
 
     /// # Errors
     /// Return error if db query fails
+    pub async fn backfill_imdb_link(pool: &PgPool, link: &str, imdb_link: &str) -> Result<u64, Error> {
+        let query = query!(
+            r#"
+                UPDATE trakt_watched_episodes
+                SET imdb_link = $imdb_link
+                WHERE link = $link
+                  AND imdb_link IS NULL
+            "#,
+            link = link,
+            imdb_link = imdb_link,
+        );
+        let conn = pool.get().await?;
+        query.execute(&conn).await.map_err(Into::into)
+    }
+
+    /// # Errors
+    /// Return error if db query fails
     pub async fn delete_episode(&self, pool: &PgPool) -> Result<(), Error> {
         let query = query!(
             r#"
@@ -654,6 +672,15 @@ impl WatchedEpisode {
         );
         let conn = pool.get().await?;
         query.execute(&conn).await.map(|_| ()).map_err(Into::into)
+    }
+
+    /// # Errors
+    /// Return error if db query fails
+    pub async fn get_missing_links(pool: &PgPool) -> Result<Vec<StackString>, Error> {
+        let query = query!("SELECT link FROM trakt_watched_episodes WHERE imdb_link IS NULL");
+        let conn = pool.get().await?;
+        let rows: Vec<_> = query.fetch(&conn).await?;
+        Ok(rows.into_iter().map(|(x,)| x).collect())
     }
 }
 
@@ -857,9 +884,18 @@ pub async fn get_watched_movies_db(
 pub async fn sync_trakt_with_db(
     trakt: &TraktConnection,
     mc: &MovieCollection,
+    full_run: bool,
 ) -> Result<(), Error> {
     let watchlist_shows_db = Arc::new(get_watchlist_shows_db(&mc.pool).await?);
     trakt.init().await?;
+    let activities = trakt.get_last_activities().await?;
+
+    let last_watched_episode = if full_run {
+        None
+    } else {
+        activities.episodes.watched_at
+    };
+
     debug!("trakt watchlist shows db {}", watchlist_shows_db.len());
     let watchlist_shows = trakt.get_watchlist_shows().await?;
     if watchlist_shows.is_empty() {
@@ -919,10 +955,7 @@ pub async fn sync_trakt_with_db(
             .await?;
     debug!("watched_episodes_db {}", watched_episodes_db.len());
     let watched_episodes_db = Arc::new(watched_episodes_db);
-    let watched_episodes = trakt.get_watched_episodes().await?;
-    if watched_episodes.is_empty() {
-        return Ok(());
-    }
+    let watched_episodes = trakt.get_watched_episodes(last_watched_episode).await?;
     debug!("watched_episodes {}", watched_episodes.len());
     for (key, mut episode) in watched_episodes {
         if let Some(episode_db) = watched_episodes_db.get(&key) {
@@ -960,6 +993,19 @@ pub async fn sync_trakt_with_db(
             episode.insert_episode(&mc.pool).await?;
             mc.stdout
                 .send(format_sstr!("insert watched episode {episode}"));
+        }
+    }
+    let missing_links = WatchedEpisode::get_missing_links(&mc.pool).await?;
+    if !missing_links.is_empty() {
+        mc.stdout.send(format_sstr!(
+            "watched episodes with missing links: {}",
+            missing_links.join(", ")
+        ));
+        for link in missing_links {
+            if let Some(imdb_link) = trakt.get_episode_by_trakt_id(&link).await?.into_iter().filter_map(|e| e.show.ids.imdb).next() {
+                WatchedEpisode::backfill_imdb_link(&mc.pool, &link, &imdb_link).await?;
+                mc.stdout.send(format_sstr!("backfilled imdb link for {link} to {imdb_link}"));
+            }
         }
     }
     let watched_movies_db: HashSet<_> =
@@ -1421,6 +1467,19 @@ mod tests {
 
         debug!("{output:#?}");
         assert_eq!(output.len(), 10);
+        Ok(())
+    }
+
+    #[tokio::test]
+    #[ignore]
+    async fn test_trakt_get_missing_links() -> Result<(), Error> {
+        let config = Config::with_config()?;
+        let pool = PgPool::new(&config.pgurl)?;
+
+        let missing_links = crate::trakt_utils::WatchedEpisode::get_missing_links(&pool).await?;
+
+        debug!("{missing_links:#?}");
+        assert_eq!(missing_links.len(), 0);
         Ok(())
     }
 }
