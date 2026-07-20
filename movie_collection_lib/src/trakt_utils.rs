@@ -643,7 +643,11 @@ impl WatchedEpisode {
 
     /// # Errors
     /// Return error if db query fails
-    pub async fn backfill_imdb_link(pool: &PgPool, link: &str, imdb_link: &str) -> Result<u64, Error> {
+    pub async fn backfill_imdb_link(
+        pool: &PgPool,
+        link: &str,
+        imdb_link: &str,
+    ) -> Result<u64, Error> {
         let query = query!(
             r#"
                 UPDATE trakt_watched_episodes
@@ -1002,9 +1006,17 @@ pub async fn sync_trakt_with_db(
             missing_links.join(", ")
         ));
         for link in missing_links {
-            if let Some(imdb_link) = trakt.get_episode_by_trakt_id(&link).await?.into_iter().filter_map(|e| e.show.ids.imdb).next() {
+            if let Some(imdb_link) = trakt
+                .get_episode_by_trakt_id(&link)
+                .await?
+                .into_iter()
+                .filter_map(|e| e.show.ids.imdb)
+                .next()
+            {
                 WatchedEpisode::backfill_imdb_link(&mc.pool, &link, &imdb_link).await?;
-                mc.stdout.send(format_sstr!("backfilled imdb link for {link} to {imdb_link}"));
+                mc.stdout.send(format_sstr!(
+                    "backfilled imdb link for {link} to {imdb_link}"
+                ));
             }
         }
     }

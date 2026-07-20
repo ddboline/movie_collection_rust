@@ -361,11 +361,15 @@ impl TraktConnection {
         let headers = self.get_ro_headers()?;
         let trakt_endpoint = &self.config.trakt_api_endpoint;
         let url = format_sstr!("{trakt_endpoint}/search/trakt/{trakt_id}?type=episode");
-        self.client.get(url.as_str())
+        self.client
+            .get(url.as_str())
             .headers(headers)
             .send()
             .await?
-            .error_for_status()?.json().await.map_err(Into::into)
+            .error_for_status()?
+            .json()
+            .await
+            .map_err(Into::into)
     }
 
     /// # Errors
@@ -946,11 +950,14 @@ impl TraktConnection {
         let headers = self.get_rw_headers().await?;
         let trakt_endpoint = &self.config.trakt_api_endpoint;
         let url = format_sstr!("{trakt_endpoint}/sync/last_activities");
-        self.client.get(url.as_str())
-        .headers(headers)
-        .send()
-        .await?
-        .json().await.map_err(Into::into)
+        self.client
+            .get(url.as_str())
+            .headers(headers)
+            .send()
+            .await?
+            .json()
+            .await
+            .map_err(Into::into)
     }
 }
 
@@ -1337,7 +1344,10 @@ mod tests {
         let result = conn.get_episode_by_trakt_id(trakt_id).await?;
         debug!("result {:?}", result[0]);
         assert_eq!(result[0].show.title.as_str(), "Shark Tank");
-        assert_eq!(result[0].show.ids.imdb.as_ref().unwrap().as_str(), "tt1442550");
+        assert_eq!(
+            result[0].show.ids.imdb.as_ref().unwrap().as_str(),
+            "tt1442550"
+        );
         Ok(())
     }
 
@@ -1401,6 +1411,4 @@ mod tests {
         assert!(result.len() > 1);
         Ok(())
     }
-
-
 }
