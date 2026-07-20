@@ -71,7 +71,7 @@ async fn trakt_app() -> Result<(), Error> {
     let trakt = TraktConnection::new(config.clone());
 
     let result = if do_parse {
-        sync_trakt_with_db(&trakt, &mc).await?;
+        sync_trakt_with_db(&trakt, &mc, false).await?;
         mc.clear_plex_filename_bad_collection_id().await?;
         mc.fix_plex_filename_collection_id().await?;
         ImdbRatings::fill_in_missing_ratings_from_trakt(&pool).await?;
