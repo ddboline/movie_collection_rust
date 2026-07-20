@@ -1009,9 +1009,7 @@ pub async fn sync_trakt_with_db(
             if let Some(imdb_link) = trakt
                 .get_episode_by_trakt_id(&link)
                 .await?
-                .into_iter()
-                .filter_map(|e| e.show.ids.imdb)
-                .next()
+                .into_iter().find_map(|e| e.show.ids.imdb)
             {
                 WatchedEpisode::backfill_imdb_link(&mc.pool, &link, &imdb_link).await?;
                 mc.stdout.send(format_sstr!(

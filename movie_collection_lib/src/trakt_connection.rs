@@ -946,6 +946,8 @@ impl TraktConnection {
         })
     }
 
+    /// # Errors
+    /// Return error if api call fails
     pub async fn get_last_activities(&self) -> Result<TraktActivities, Error> {
         let headers = self.get_rw_headers().await?;
         let trakt_endpoint = &self.config.trakt_api_endpoint;
