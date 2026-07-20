@@ -354,6 +354,22 @@ impl TraktConnection {
 
     /// # Errors
     /// Return error if api call fails
+    pub async fn get_episode_by_trakt_id(
+        &self,
+        trakt_id: &str,
+    ) -> Result<Vec<TraktShowSearchResponse>, Error> {
+        let headers = self.get_ro_headers()?;
+        let trakt_endpoint = &self.config.trakt_api_endpoint;
+        let url = format_sstr!("{trakt_endpoint}/search/trakt/{trakt_id}?type=episode");
+        self.client.get(url.as_str())
+            .headers(headers)
+            .send()
+            .await?
+            .error_for_status()?.json().await.map_err(Into::into)
+    }
+
+    /// # Errors
+    /// Return error if api call fails
     pub async fn search_show(&self, title: &str) -> Result<Vec<TraktShowSearchResponse>, Error> {
         let headers = self.get_ro_headers()?;
         let trakt_endpoint = &self.config.trakt_api_endpoint;
@@ -644,6 +660,7 @@ impl TraktConnection {
     /// Return error if api call fails
     pub async fn get_watched_episodes(
         &self,
+        last_watched_episode: Option<DateTimeWrapper>,
     ) -> Result<HashMap<(StackString, i32, i32), WatchedEpisode>, Error> {
         let mut watched_episodes = Vec::new();
         let mut page = 1;
@@ -651,7 +668,7 @@ impl TraktConnection {
             let headers = self.get_rw_headers().await?;
             let trakt_endpoint = &self.config.trakt_api_endpoint;
             let url = format_sstr!("{trakt_endpoint}/sync/watched/episodes?page={page}");
-            let new_episodes: Vec<TraktWatchedEpisodeNew> = self
+            let mut new_episodes: Vec<TraktWatchedEpisodeNew> = self
                 .client
                 .get(url.as_str())
                 .headers(headers)
@@ -660,6 +677,9 @@ impl TraktConnection {
                 .error_for_status()?
                 .json()
                 .await?;
+            if let Some(last_watched_episode) = last_watched_episode {
+                new_episodes.retain(|e| e.last_watched_at >= last_watched_episode);
+            }
             if new_episodes.is_empty() {
                 break;
             }
@@ -921,6 +941,17 @@ impl TraktConnection {
             status: "success remove movie".into(),
         })
     }
+
+    pub async fn get_last_activities(&self) -> Result<TraktActivities, Error> {
+        let headers = self.get_rw_headers().await?;
+        let trakt_endpoint = &self.config.trakt_api_endpoint;
+        let url = format_sstr!("{trakt_endpoint}/sync/last_activities");
+        self.client.get(url.as_str())
+        .headers(headers)
+        .send()
+        .await?
+        .json().await.map_err(Into::into)
+    }
 }
 
 #[derive(Serialize, Deserialize, Debug)]
@@ -1056,6 +1087,47 @@ pub struct TraktCalendarResponse {
 pub struct TraktRating {
     pub rating: f64,
     pub votes: i32,
+}
+
+#[derive(Serialize, Deserialize, Debug)]
+pub struct TraktActivityDetail {
+    pub reacted_at: Option<DateTimeWrapper>,
+    pub updated_at: Option<DateTimeWrapper>,
+    pub watched_at: Option<DateTimeWrapper>,
+    pub collected_at: Option<DateTimeWrapper>,
+    pub rated_at: Option<DateTimeWrapper>,
+    pub watchlisted_at: Option<DateTimeWrapper>,
+    pub favorited_at: Option<DateTimeWrapper>,
+    pub recommendations_at: Option<DateTimeWrapper>,
+    pub commented_at: Option<DateTimeWrapper>,
+    pub paused_at: Option<DateTimeWrapper>,
+    pub hidden_at: Option<DateTimeWrapper>,
+    pub blocked_at: Option<DateTimeWrapper>,
+    pub settings_at: Option<DateTimeWrapper>,
+    pub requested_at: Option<DateTimeWrapper>,
+    pub dropped_at: Option<DateTimeWrapper>,
+    pub following_at: Option<DateTimeWrapper>,
+    pub liked_at: Option<DateTimeWrapper>,
+    pub pending_at: Option<DateTimeWrapper>,
+    pub followed_at: Option<DateTimeWrapper>,
+}
+
+#[derive(Serialize, Deserialize, Debug)]
+pub struct TraktActivities {
+    pub all: DateTimeWrapper,
+    pub movies: TraktActivityDetail,
+    pub episodes: TraktActivityDetail,
+    pub shows: TraktActivityDetail,
+    pub seasons: TraktActivityDetail,
+    pub comments: TraktActivityDetail,
+    pub lists: TraktActivityDetail,
+    pub watchlist: TraktActivityDetail,
+    pub favorites: TraktActivityDetail,
+    pub recommendations: TraktActivityDetail,
+    pub collaborations: TraktActivityDetail,
+    pub account: TraktActivityDetail,
+    pub saved_filters: TraktActivityDetail,
+    pub notes: TraktActivityDetail,
 }
 
 #[cfg(test)]
@@ -1245,12 +1317,27 @@ mod tests {
     #[tokio::test]
     #[ignore]
     async fn test_get_show_by_imdb_id_trakt() -> Result<(), Error> {
-        let imdb_id = "320162";
+        let imdb_id = "236198";
         let config = Config::with_config()?;
         let conn = TraktConnection::new(config);
         conn.init().await?;
         let result = conn.get_show_by_imdb_id(imdb_id).await?;
+        debug!("result {:?}", result);
         assert_eq!(result[0].show.title, "The Vampire Lestat");
+        Ok(())
+    }
+
+    #[tokio::test]
+    #[ignore]
+    async fn test_get_by_trakt_id() -> Result<(), Error> {
+        let trakt_id = "1756097";
+        let config = Config::with_config()?;
+        let conn = TraktConnection::new(config);
+        conn.init().await?;
+        let result = conn.get_episode_by_trakt_id(trakt_id).await?;
+        debug!("result {:?}", result[0]);
+        assert_eq!(result[0].show.title.as_str(), "Shark Tank");
+        assert_eq!(result[0].show.ids.imdb.as_ref().unwrap().as_str(), "tt1442550");
         Ok(())
     }
 
@@ -1271,8 +1358,22 @@ mod tests {
         let config = Config::with_config()?;
         let conn = TraktConnection::new(config);
         conn.init().await?;
-        let result = conn.get_watched_episodes().await?;
+        let result = conn.get_watched_episodes(None).await?;
         assert!(result.len() > 10);
+        Ok(())
+    }
+
+    #[tokio::test]
+    #[ignore]
+    async fn test_get_last_activities() -> Result<(), Error> {
+        let config = Config::with_config()?;
+        let conn = TraktConnection::new(config);
+        conn.init().await?;
+        let result = conn.get_last_activities().await?;
+        assert!(result.movies.watched_at.is_some());
+        assert!(result.shows.watchlisted_at.is_some());
+        assert!(result.episodes.watched_at.is_some());
+        assert!(result.watchlist.updated_at.is_some());
         Ok(())
     }
 
@@ -1300,4 +1401,6 @@ mod tests {
         assert!(result.len() > 1);
         Ok(())
     }
+
+
 }
