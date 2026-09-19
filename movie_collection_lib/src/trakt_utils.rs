@@ -686,6 +686,15 @@ impl WatchedEpisode {
         let rows: Vec<_> = query.fetch(&conn).await?;
         Ok(rows.into_iter().map(|(x,)| x).collect())
     }
+
+    /// # Errors
+    /// Return error if db query fails
+    pub async fn get_episodes_last_watched_at(pool: &PgPool) -> Result<Option<DateTimeWrapper>, Error> {
+        let query = query!("SELECT max(last_watched_at) FROM trakt_watched_episodes WHERE last_watched_at IS NOT NULL");
+        let conn = pool.get().await?;
+        let last_watched_at = query.fetch_opt(&conn).await?;
+        Ok(last_watched_at.map(|(x,)| x))
+    }
 }
 
 /// # Errors
@@ -892,11 +901,13 @@ pub async fn sync_trakt_with_db(
 ) -> Result<(), Error> {
     let watchlist_shows_db = Arc::new(get_watchlist_shows_db(&mc.pool).await?);
     trakt.init().await?;
-    let activities = trakt.get_last_activities().await?;
 
     let last_watched_episode = if full_run {
         None
+    } else if let Some(watched_at) = WatchedEpisode::get_episodes_last_watched_at(&mc.pool).await? {
+        Some(watched_at)
     } else {
+        let activities = trakt.get_last_activities().await?;
         activities.episodes.watched_at
     };
 
@@ -1459,7 +1470,7 @@ pub async fn get_trakt_watched_movie_output_db(
 
 #[cfg(test)]
 mod tests {
-    use crate::{config::Config, pgpool::PgPool, trakt_utils::get_trakt_watched_output_db};
+    use crate::{config::Config, pgpool::PgPool, trakt_utils::{get_trakt_watched_output_db, WatchedEpisode}};
     use anyhow::Error;
     use futures::TryStreamExt;
     use log::debug;
@@ -1486,10 +1497,23 @@ mod tests {
         let config = Config::with_config()?;
         let pool = PgPool::new(&config.pgurl)?;
 
-        let missing_links = crate::trakt_utils::WatchedEpisode::get_missing_links(&pool).await?;
+        let missing_links = WatchedEpisode::get_missing_links(&pool).await?;
 
         debug!("{missing_links:#?}");
         assert_eq!(missing_links.len(), 0);
+        Ok(())
+    }
+
+    #[tokio::test]
+    #[ignore]
+    async fn test_get_episodes_last_watched_at() -> Result<(), Error> {
+        let config = Config::with_config()?;
+        let pool = PgPool::new(&config.pgurl)?;
+
+        let last_watched_at = WatchedEpisode::get_episodes_last_watched_at(&pool).await?;
+
+        debug!("{last_watched_at:#?}");
+        assert!(last_watched_at.is_some());
         Ok(())
     }
 }

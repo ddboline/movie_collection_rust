@@ -33,6 +33,10 @@ struct TraktAppOpts {
     parse: bool,
 
     #[clap(long, short)]
+    /// Toggle to do a full run
+    full_run: bool,
+
+    #[clap(long, short)]
     /// Optional imdb link
     imdb_link: Option<StackString>,
 
@@ -58,6 +62,7 @@ async fn trakt_app() -> Result<(), Error> {
     let opts = TraktAppOpts::parse();
     let config = Config::with_config()?;
     let do_parse = opts.parse;
+    let full_run = opts.full_run;
     let pool = PgPool::new(&config.pgurl)?;
     let stdout = StdoutChannel::new();
 
@@ -71,7 +76,7 @@ async fn trakt_app() -> Result<(), Error> {
     let trakt = TraktConnection::new(config.clone());
 
     let result = if do_parse {
-        sync_trakt_with_db(&trakt, &mc, false).await?;
+        sync_trakt_with_db(&trakt, &mc, full_run).await?;
         mc.clear_plex_filename_bad_collection_id().await?;
         mc.fix_plex_filename_collection_id().await?;
         ImdbRatings::fill_in_missing_ratings_from_trakt(&pool).await?;
