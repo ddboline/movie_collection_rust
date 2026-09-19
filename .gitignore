@@ -7,3 +7,4 @@ backup.tar.gz
 config.env
 .vscode
 .metals
+temp.sql
