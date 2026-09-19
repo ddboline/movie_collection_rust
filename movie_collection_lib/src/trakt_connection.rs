@@ -1172,7 +1172,7 @@ mod tests {
         let config = Config::with_config()?;
         let conn = TraktConnection::new(config);
         let auth_token = conn.read_auth_token().await?;
-        assert_eq!(auth_token.scope, "public");
+        assert_eq!(auth_token.scope, "public offline_access");
         assert_eq!(auth_token.has_expired(), false);
         Ok(())
     }
@@ -1332,7 +1332,7 @@ mod tests {
         conn.init().await?;
         let result = conn.get_show_by_imdb_id(imdb_id).await?;
         debug!("result {:?}", result);
-        assert_eq!(result[0].show.title, "The Vampire Lestat");
+        assert_eq!(result[0].show.title, "War and Peace");
         Ok(())
     }
 
