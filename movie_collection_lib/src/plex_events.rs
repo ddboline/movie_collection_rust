@@ -912,7 +912,7 @@ impl PlexMetadata {
         let conn: &PgTransaction = &tran;
         let server = self.server.as_ref().ok_or(format_err!("No server found"))?;
 
-        let bytes = match Self::_get_by_key(&conn, &self.metadata_key, &server).await? {
+        let bytes = match Self::_get_by_key(&conn, &self.metadata_key, server).await? {
             Some(_) => self.update_impl(&conn).await?,
             None => self.insert_impl(&conn).await?,
         };
@@ -1044,16 +1044,16 @@ impl PlexMetadata {
         let bytes_written = Self::fill_plex_grandparent_metadata_show(pool).await?;
         debug!("update grandparent {bytes_written}");
         let filenames: Vec<_> =
-            PlexFilename::get_filenames(pool, None, None, None, Some(&server_name))
+            PlexFilename::get_filenames(pool, None, None, None, Some(server_name))
                 .await?
                 .try_collect()
                 .await?;
         for plex_filename in filenames {
             if let Some(metadata) =
-                Self::get_by_key(pool, &plex_filename.metadata_key, &server_name).await?
+                Self::get_by_key(pool, &plex_filename.metadata_key, server_name).await?
             {
                 if let Some(parent_key) = &metadata.parent_key {
-                    if Self::get_by_key(pool, parent_key, &server_name)
+                    if Self::get_by_key(pool, parent_key, server_name)
                         .await?
                         .is_none()
                     {
@@ -1065,7 +1065,7 @@ impl PlexMetadata {
                     }
                 }
                 if let Some(grandparent_key) = &metadata.grandparent_key {
-                    if Self::get_by_key(pool, grandparent_key, &server_name)
+                    if Self::get_by_key(pool, grandparent_key, server_name)
                         .await?
                         .is_none()
                     {
@@ -1100,13 +1100,13 @@ impl PlexMetadata {
                 }
             }
         }
-        let parents: Vec<_> = Self::get_parents(pool, &server_name)
+        let parents: Vec<_> = Self::get_parents(pool, server_name)
             .await?
             .try_collect()
             .await?;
         for parent in parents {
             for (metadata, filename) in parent.get_children(config).await? {
-                if Self::get_by_key(pool, &metadata.metadata_key, &server_name)
+                if Self::get_by_key(pool, &metadata.metadata_key, server_name)
                     .await?
                     .is_none()
                 {
