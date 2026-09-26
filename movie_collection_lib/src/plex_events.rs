@@ -658,10 +658,11 @@ impl PlexFilename {
         C: GenericClient + Sync,
     {
         let query = query!(
-            "INSERT INTO plex_filename (metadata_key, filename)
-            VALUES ($metadata_key, $filename)",
+            "INSERT INTO plex_filename (metadata_key, filename, server)
+            VALUES ($metadata_key, $filename, $server)",
             metadata_key = self.metadata_key,
             filename = self.filename,
+            server = self.server,
         );
         query.execute(&conn).await?;
         Ok(())
@@ -870,9 +871,9 @@ impl PlexMetadata {
         let query = query!(
             r#"
                 INSERT INTO plex_metadata (
-                    metadata_key, object_type, title, parent_key, grandparent_key
+                    metadata_key, object_type, title, parent_key, grandparent_key, server
                 ) VALUES (
-                    $metadata_key, $object_type, $title, $parent_key, $grandparent_key
+                    $metadata_key, $object_type, $title, $parent_key, $grandparent_key, $server
                 )
             "#,
             metadata_key = self.metadata_key,
@@ -880,6 +881,7 @@ impl PlexMetadata {
             title = self.title,
             parent_key = self.parent_key,
             grandparent_key = self.grandparent_key,
+            server = self.server,
         );
         query.execute(&conn).await.map_err(Into::into)
     }
