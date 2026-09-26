@@ -1834,6 +1834,7 @@ fn PlexElement(
             .map_or("", StackString::as_str);
         let filename = event.filename.as_ref().map_or("", StackString::as_str);
         let filestem = filename.split('/').next_back().unwrap_or("");
+        let server_name = event.server.as_ref().map_or("", StackString::as_str);
 
         let mut display_title = StackString::new();
         if let Some(show) = &event.show {
@@ -1894,6 +1895,7 @@ fn PlexElement(
                 td {"{metadata_type}"},
                 td {"{section_title}"},
                 td { {display_element} },
+                td {"{server_name}"},
             }
         }
     });
@@ -1985,6 +1987,7 @@ fn PlexElement(
                     th {"Item Type"},
                     th {"Section"},
                     th {"Title"},
+                    th {"Server"},
                 }
             },
             tbody {
@@ -2029,15 +2032,21 @@ fn PlexDetailElement(
 ) -> Element {
     let local = DateTimeWrapper::local_tz();
     let host = config.plex_host.as_ref();
-    let server = if let Some(server) = config.plex_server.as_ref() {
-        Some(format_sstr!("{server}"))
+    let default_server_name = if let Some(default_server_name) = config.plex_server_name.as_ref() {
+        Some(default_server_name.as_str())
     } else {
         None
     };
-    let server_name = if let Some(server_name) = config.plex_server_name.as_ref() {
-        format_sstr!("{server_name}")
+    let server_name = event.server.as_ref().map_or("", StackString::as_str);
+
+    let server = if let Some(server) = config.plex_server.as_ref() {
+        if default_server_name.is_some() && default_server_name == Some(server_name) {
+            Some(format_sstr!("{server}"))
+        } else {
+            None
+        }
     } else {
-        "".into()
+        None
     };
 
     let id = event.id;
