@@ -189,8 +189,15 @@ impl PlexEvent {
         }
 
         let event_type: Option<StackString> = event_type.map(|s| s.to_str().into());
-        let query =
-            Self::get_plex_event_query("count(*)", "", &start_timestamp, &event_type, None, None, server)?;
+        let query = Self::get_plex_event_query(
+            "count(*)",
+            "",
+            &start_timestamp,
+            &event_type,
+            None,
+            None,
+            server,
+        )?;
         let conn = pool.get().await?;
         let count: Count = query.fetch_one(&conn).await?;
 
@@ -1235,10 +1242,11 @@ mod tests {
     async fn test_get_plex_filename() -> Result<(), Error> {
         let config = Config::with_config()?;
         let pool = PgPool::new(&config.pgurl)?;
-        let events: Vec<_> = PlexEvent::get_events(&pool, None, None, None, None, Some("dilepton-nas"))
-            .await?
-            .try_collect()
-            .await?;
+        let events: Vec<_> =
+            PlexEvent::get_events(&pool, None, None, None, None, Some("dilepton-nas"))
+                .await?
+                .try_collect()
+                .await?;
         let event = events
             .into_iter()
             .find(|event| {
@@ -1291,10 +1299,7 @@ mod tests {
         let metadata = PlexMetadata::get_metadata_by_key(&config, "/library/metadata/6253")
             .await
             .unwrap();
-        assert_eq!(
-            metadata.title.as_str(),
-            "Orders of Magnitude"
-        );
+        assert_eq!(metadata.title.as_str(), "Orders of Magnitude");
         Ok(())
     }
 

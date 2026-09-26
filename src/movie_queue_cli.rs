@@ -287,11 +287,17 @@ impl MovieQueueCli {
                         file.write_all(&v).await?;
                     }
                     "plex_event" => {
-                        let events: Vec<_> =
-                            PlexEvent::get_events(&pool, Some(start_timestamp), None, None, None, Some(default_server_name))
-                                .await?
-                                .try_collect()
-                                .await?;
+                        let events: Vec<_> = PlexEvent::get_events(
+                            &pool,
+                            Some(start_timestamp),
+                            None,
+                            None,
+                            None,
+                            Some(default_server_name),
+                        )
+                        .await?
+                        .try_collect()
+                        .await?;
                         let v = serde_json::to_vec(&events)?;
                         file.write_all(&v).await?;
                     }
@@ -355,11 +361,12 @@ impl MovieQueueCli {
                 migrations::runner().run_async(&mut **conn).await?;
             }
             Self::FillPlex => {
-                let events: Vec<_> = PlexEvent::get_events(&pool, None, None, None, None, Some(default_server_name))
-                    .await?
-                    .try_filter(|event| future::ready(event.metadata_key.is_some()))
-                    .try_collect()
-                    .await?;
+                let events: Vec<_> =
+                    PlexEvent::get_events(&pool, None, None, None, None, Some(default_server_name))
+                        .await?
+                        .try_filter(|event| future::ready(event.metadata_key.is_some()))
+                        .try_collect()
+                        .await?;
                 for event in events {
                     let metadata_key = event.metadata_key.as_ref().expect("Unexpected failure");
                     if PlexFilename::get_by_key(&pool, metadata_key)

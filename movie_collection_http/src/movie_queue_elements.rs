@@ -2029,7 +2029,16 @@ fn PlexDetailElement(
 ) -> Element {
     let local = DateTimeWrapper::local_tz();
     let host = config.plex_host.as_ref();
-    let server = config.plex_server.as_ref();
+    let server = if let Some(server) = config.plex_server.as_ref() {
+        Some(format_sstr!("{server}"))
+    } else {
+        None
+    };
+    let server_name = if let Some(server_name) = config.plex_server_name.as_ref() {
+        format_sstr!("{server_name}")
+    } else {
+        "".into()
+    };
 
     let id = event.id;
     let last_modified = match config.default_time_zone {
@@ -2073,7 +2082,7 @@ fn PlexDetailElement(
         .map_or("".into(), Clone::clone)
         .into();
     let metadata_key = if let (Some(metadata_key), Some(host), Some(server)) =
-        (&event.metadata_key, host, server)
+        (&event.metadata_key, host, &server)
     {
         rsx! {
             a {
@@ -2106,7 +2115,7 @@ fn PlexDetailElement(
             }
         }
     } else if let (Some(metadata_key), Some(host), Some(server)) =
-        (&event.metadata_key, host, server)
+        (&event.metadata_key, host, &server)
     {
         rsx! {
             a {
@@ -2154,6 +2163,10 @@ fn PlexDetailElement(
                 tr {
                     td {"Event"},
                     td {"{event_str}"},
+                },
+                tr {
+                    td {"Server"},
+                    td {"{server_name}"},
                 },
                 tr {
                     td {"Metadata Type"},
