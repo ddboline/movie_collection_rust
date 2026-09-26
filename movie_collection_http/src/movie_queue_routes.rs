@@ -2065,6 +2065,7 @@ async fn plex_filename(
     let total = PlexFilename::get_total(&state.db, start_timestamp, Some(server_name.as_str()))
         .await
         .map_err(Into::<Error>::into)?;
+    println!("total {total}");
     let offset = query.offset.unwrap_or(0);
     let limit = query.limit.unwrap_or(total);
     let pagination = Pagination {

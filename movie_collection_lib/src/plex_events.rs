@@ -568,7 +568,7 @@ impl PlexFilename {
             bindings.push(("start_timestamp", start_timestamp as Parameter));
         }
         if let Some(server) = server {
-            constraints.push(format_sstr!("server = {server}"));
+            constraints.push(format_sstr!("server = '{server}'"));
         }
         let where_str = if constraints.is_empty() {
             "".into()
