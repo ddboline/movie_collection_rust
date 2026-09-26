@@ -64,6 +64,7 @@ pub struct ConfigInner {
     pub plex_token: Option<StackString>,
     pub plex_host: Option<StackString>,
     pub plex_server: Option<StackString>,
+    pub plex_server_name: Option<StackString>,
     pub pyasstosrt_path: Option<PathBuf>,
     #[serde(default = "default_mkvinfo_path")]
     pub mkvinfo_path: PathBuf,

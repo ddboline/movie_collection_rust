@@ -161,6 +161,10 @@ pub async fn movie_queue_body(
 ) -> Result<String, Error> {
     let mock_stdout = MockStdout::new();
     let stdout = StdoutChannel::with_mock_stdout(mock_stdout.clone(), mock_stdout.clone());
+    let server_name = config
+        .plex_server_name
+        .as_ref()
+        .ok_or(format_err!("No Plex server name configured"))?;
 
     let mc = Arc::new(MovieCollection::new(config, pool, &stdout));
 
@@ -192,7 +196,7 @@ pub async fn movie_queue_body(
                     .get_collection_index(&row.path)
                     .await?
                     .unwrap_or_else(Uuid::new_v4);
-                metadata_key = mc.get_plex_metadata_key(idx).await?;
+                metadata_key = mc.get_plex_metadata_key(idx, server_name).await?;
                 collection_idx.replace(idx);
             }
 
@@ -551,6 +555,10 @@ pub async fn find_new_episodes_body(
     let mq = MovieQueueDB::new(config, pool, stdout);
 
     let episodes = mc.get_new_episodes(mindate, maxdate, source).await?;
+    let server_name = config
+        .plex_server_name
+        .as_ref()
+        .ok_or(format_err!("No Plex server name configured"))?;
 
     let shows: HashSet<StackString> = episodes
         .iter()
@@ -575,7 +583,7 @@ pub async fn find_new_episodes_body(
         let movie_queue = mq.print_movie_queue(&[&show], None, None, None).await?;
         for s in movie_queue {
             if let Some(u) = mc.get_collection_index(&s.path).await? {
-                let metadata_key = mc.get_plex_metadata_key(u).await?;
+                let metadata_key = mc.get_plex_metadata_key(u, server_name).await?;
                 let host = config.plex_host.clone();
                 let server = config.plex_server.clone();
                 queue.push((
@@ -1483,6 +1491,10 @@ pub async fn watch_list_http_body(
 ) -> Result<String, Error> {
     let mc = MovieCollection::new(config, pool, stdout);
     let mq = MovieQueueDB::new(config, pool, stdout);
+    let server_name = config
+        .plex_server_name
+        .as_ref()
+        .ok_or(format_err!("No Plex server name configured"))?;
 
     let show = ImdbRatings::get_show_by_link(imdb_url, pool)
         .await?
@@ -1519,7 +1531,7 @@ pub async fn watch_list_http_body(
         if let Some(row) = queue.get(&(show_str.clone(), season, r.episode)) {
             if let Some(index) = mc.get_collection_index(&row.path).await? {
                 collection_idx_map.insert(r.episode, index);
-                if let Some(metadata_key) = mc.get_plex_metadata_key(index).await? {
+                if let Some(metadata_key) = mc.get_plex_metadata_key(index, server_name).await? {
                     collection_metadata_map.insert(index, metadata_key);
                 }
             }

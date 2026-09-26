@@ -385,16 +385,21 @@ impl MovieCollection {
 
     /// # Errors
     /// Returns error if db queries fail
-    pub async fn get_plex_metadata_key(&self, idx: Uuid) -> Result<Option<StackString>, Error> {
+    pub async fn get_plex_metadata_key(
+        &self,
+        idx: Uuid,
+        server_name: &str,
+    ) -> Result<Option<StackString>, Error> {
         let query = query!(
             r#"
                 SELECT metadata_key
                 FROM plex_filename
-                WHERE collection_id = $idx
+                WHERE collection_id = $idx AND server = $server_name
                 ORDER BY last_modified DESC
                 LIMIT 1
             "#,
             idx = idx,
+            server_name = server_name,
         );
         let conn = self.pool.get().await?;
         let id = query.fetch_opt(&conn).await?;
@@ -563,7 +568,7 @@ impl MovieCollection {
                 SET collection_id=(
                     SELECT m.idx
                     FROM movie_collection m
-                    WHERE m.path = replace(plex_filename.filename, '/shares/', '/media/')
+                    WHERE m.path = replace(plex_filename.filename, '/shares/', '/media/dileptonnas/')
                 ),last_modified=now()
                 WHERE collection_id IS NULL
             "#

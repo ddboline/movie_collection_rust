@@ -689,8 +689,13 @@ impl WatchedEpisode {
 
     /// # Errors
     /// Return error if db query fails
-    pub async fn get_episodes_last_watched_at(pool: &PgPool) -> Result<Option<DateTimeWrapper>, Error> {
-        let query = query!("SELECT max(last_watched_at) FROM trakt_watched_episodes WHERE last_watched_at IS NOT NULL");
+    pub async fn get_episodes_last_watched_at(
+        pool: &PgPool,
+    ) -> Result<Option<DateTimeWrapper>, Error> {
+        let query = query!(
+            "SELECT max(last_watched_at) FROM trakt_watched_episodes WHERE last_watched_at IS NOT \
+             NULL"
+        );
         let conn = pool.get().await?;
         let last_watched_at = query.fetch_opt(&conn).await?;
         Ok(last_watched_at.map(|(x,)| x))
@@ -1020,7 +1025,8 @@ pub async fn sync_trakt_with_db(
             if let Some(imdb_link) = trakt
                 .get_episode_by_trakt_id(&link)
                 .await?
-                .into_iter().find_map(|e| e.show.ids.imdb)
+                .into_iter()
+                .find_map(|e| e.show.ids.imdb)
             {
                 WatchedEpisode::backfill_imdb_link(&mc.pool, &link, &imdb_link).await?;
                 mc.stdout.send(format_sstr!(
@@ -1470,7 +1476,11 @@ pub async fn get_trakt_watched_movie_output_db(
 
 #[cfg(test)]
 mod tests {
-    use crate::{config::Config, pgpool::PgPool, trakt_utils::{get_trakt_watched_output_db, WatchedEpisode}};
+    use crate::{
+        config::Config,
+        pgpool::PgPool,
+        trakt_utils::{get_trakt_watched_output_db, WatchedEpisode},
+    };
     use anyhow::Error;
     use futures::TryStreamExt;
     use log::debug;

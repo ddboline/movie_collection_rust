@@ -2055,7 +2055,12 @@ async fn plex_filename(
         .await;
     let Query(query) = query;
     let start_timestamp = query.start_timestamp.map(Into::into);
-    let total = PlexFilename::get_total(&state.db, start_timestamp)
+    let server_name = &state
+        .config
+        .plex_server_name
+        .as_ref()
+        .ok_or(format_err!("Plex server not configured"))?;
+    let total = PlexFilename::get_total(&state.db, start_timestamp, Some(server_name.as_str()))
         .await
         .map_err(Into::<Error>::into)?;
     let offset = query.offset.unwrap_or(0);
@@ -2071,6 +2076,7 @@ async fn plex_filename(
         query.start_timestamp.map(Into::into),
         query.offset,
         query.limit,
+        Some(server_name.as_str()),
     )
     .await
     .map_err(Into::<Error>::into)?

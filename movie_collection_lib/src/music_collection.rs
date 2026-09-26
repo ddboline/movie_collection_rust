@@ -170,7 +170,7 @@ impl MusicCollection {
             SET music_collection_id = (
                 SELECT m.id
                 FROM music_collection m
-                WHERE m.path = replace(plex_filename.filename, '/shares/', '/media/')
+                WHERE m.path = replace(plex_filename.filename, '/documents/', '/media/dileptonnas/')
             ),last_modified=now()
             WHERE music_collection_id IS NULL
         ";

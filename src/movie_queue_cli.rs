@@ -1,10 +1,10 @@
-use anyhow::Error;
+use anyhow::{format_err, Error};
 use clap::Parser;
 use derive_more::{From, Into};
 use futures::{future, future::try_join_all, TryStreamExt};
 use log::error;
 use refinery::embed_migrations;
-use stack_string::StackString;
+use stack_string::{format_sstr, StackString};
 use std::{path::PathBuf, str::FromStr};
 use stdout_channel::StdoutChannel;
 use time::{format_description::well_known::Rfc3339, Duration, OffsetDateTime};
@@ -72,6 +72,10 @@ impl MovieQueueCli {
         let config = Config::with_config()?;
         let pool = PgPool::new(&config.pgurl)?;
         let stdout = StdoutChannel::new();
+        let default_server_name = config
+            .plex_server_name
+            .as_ref()
+            .ok_or(format_err!("Plex server not configured"))?;
 
         match Self::parse() {
             Self::Import { table, filepath } => {
@@ -149,10 +153,18 @@ impl MovieQueueCli {
                         let metadatas: Vec<PlexMetadata> = serde_json::from_slice(&data)?;
                         let futures = metadatas.into_iter().map(|metadata| {
                             let pool = pool.clone();
+                            let server = format_sstr!(
+                                "{}",
+                                metadata.server.as_ref().unwrap_or(default_server_name)
+                            );
                             async move {
-                                if PlexMetadata::get_by_key(&pool, &metadata.metadata_key)
-                                    .await?
-                                    .is_none()
+                                if PlexMetadata::get_by_key(
+                                    &pool,
+                                    &metadata.metadata_key,
+                                    server.as_str(),
+                                )
+                                .await?
+                                .is_none()
                                 {
                                     metadata.insert(&pool).await?;
                                 }
@@ -284,11 +296,16 @@ impl MovieQueueCli {
                         file.write_all(&v).await?;
                     }
                     "plex_filename" => {
-                        let filenames: Vec<_> =
-                            PlexFilename::get_filenames(&pool, Some(start_timestamp), None, None)
-                                .await?
-                                .try_collect()
-                                .await?;
+                        let filenames: Vec<_> = PlexFilename::get_filenames(
+                            &pool,
+                            Some(start_timestamp),
+                            None,
+                            None,
+                            Some(default_server_name),
+                        )
+                        .await?
+                        .try_collect()
+                        .await?;
                         let v = serde_json::to_vec(&filenames)?;
                         file.write_all(&v).await?;
                     }

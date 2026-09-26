@@ -328,6 +328,7 @@ impl PlexEvent {
             .metadata_key
             .as_ref()
             .ok_or_else(|| format_err!("No metadata_key"))?;
+        let server = &self.server;
         let url = format_sstr!("http://{plex_host}:32400{metadata_key}?X-Plex-Token={plex_token}");
         let data = reqwest::get(url.as_str())
             .await?
@@ -340,6 +341,7 @@ impl PlexEvent {
             filename,
             collection_id: None,
             music_collection_id: None,
+            server: Some(server.clone()),
         })
     }
 
@@ -539,6 +541,7 @@ pub struct PlexFilename {
     pub filename: StackString,
     pub collection_id: Option<Uuid>,
     pub music_collection_id: Option<Uuid>,
+    pub server: Option<StackString>,
 }
 
 impl PlexFilename {
@@ -549,12 +552,16 @@ impl PlexFilename {
         start_timestamp: &'a Option<OffsetDateTime>,
         offset: Option<usize>,
         limit: Option<usize>,
+        server: Option<&'a str>,
     ) -> Result<Query<'a>, PqError> {
         let mut constraints = Vec::new();
         let mut bindings = Vec::new();
         if let Some(start_timestamp) = &start_timestamp {
-            constraints.push("last_modified > $start_timestamp");
+            constraints.push(format_sstr!("last_modified > $start_timestamp"));
             bindings.push(("start_timestamp", start_timestamp as Parameter));
+        }
+        if let Some(server) = server {
+            constraints.push(format_sstr!("server = {server}"));
         }
         let where_str = if constraints.is_empty() {
             "".into()
@@ -587,6 +594,7 @@ impl PlexFilename {
         start_timestamp: Option<OffsetDateTime>,
         offset: Option<usize>,
         limit: Option<usize>,
+        server: Option<&str>,
     ) -> Result<impl Stream<Item = Result<Self, PqError>>, Error> {
         let query = Self::get_plex_filenames_query(
             "*",
@@ -594,6 +602,7 @@ impl PlexFilename {
             &start_timestamp,
             offset,
             limit,
+            server,
         )?;
         let conn = pool.get().await?;
         query.fetch_streaming(&conn).await.map_err(Into::into)
@@ -604,13 +613,15 @@ impl PlexFilename {
     pub async fn get_total(
         pool: &PgPool,
         start_timestamp: Option<OffsetDateTime>,
+        server: Option<&str>,
     ) -> Result<usize, Error> {
         #[derive(FromSqlRow)]
         struct Count {
             count: i64,
         }
 
-        let query = Self::get_plex_filenames_query("count(*)", "", &start_timestamp, None, None)?;
+        let query =
+            Self::get_plex_filenames_query("count(*)", "", &start_timestamp, None, None, server)?;
         let conn = pool.get().await?;
         let count: Count = query.fetch_one(&conn).await?;
 
@@ -720,6 +731,7 @@ pub struct PlexMetadata {
     pub parent_key: Option<StackString>,
     pub grandparent_key: Option<StackString>,
     pub show: Option<StackString>,
+    pub server: Option<StackString>,
 }
 
 impl PlexMetadata {
@@ -799,6 +811,7 @@ impl PlexMetadata {
 
     async fn get_parents(
         pool: &PgPool,
+        server: &str,
     ) -> Result<impl Stream<Item = Result<Self, PqError>>, Error> {
         let query = query!(
             r#"
@@ -809,13 +822,16 @@ impl PlexMetadata {
                     FROM plex_metadata
                     WHERE object_type = 'video'
                       AND parent_key IS NOT NULL
+                      AND server = $server
                     UNION
                     SELECT distinct grandparent_key
                     FROM plex_metadata
                     WHERE object_type = 'video'
                       AND grandparent_key IS NOT NULL
-                )
-            "#
+                      AND server = $server
+                ) AND server = $server
+            "#,
+            server = server,
         );
         let conn = pool.get().await?;
         query.fetch_streaming(&conn).await.map_err(Into::into)
@@ -823,18 +839,19 @@ impl PlexMetadata {
 
     /// # Errors
     /// Return error if db query fails
-    pub async fn get_by_key(pool: &PgPool, key: &str) -> Result<Option<Self>, Error> {
+    pub async fn get_by_key(pool: &PgPool, key: &str, server: &str) -> Result<Option<Self>, Error> {
         let conn = pool.get().await?;
-        Self::_get_by_key(&conn, key).await
+        Self::_get_by_key(&conn, key, server).await
     }
 
-    async fn _get_by_key<C>(conn: &C, key: &str) -> Result<Option<Self>, Error>
+    async fn _get_by_key<C>(conn: &C, key: &str, server: &str) -> Result<Option<Self>, Error>
     where
         C: GenericClient + Sync,
     {
         let query = query!(
-            "SELECT * FROM plex_metadata WHERE metadata_key = $key",
+            "SELECT * FROM plex_metadata WHERE metadata_key = $key AND server = $server",
             key = key,
+            server = server,
         );
         query.fetch_opt(&conn).await.map_err(Into::into)
     }
@@ -874,6 +891,7 @@ impl PlexMetadata {
                     show=$show,
                     last_modified=now()
                 WHERE metadata_key=$metadata_key
+                  AND server=$server
             "#,
             metadata_key = self.metadata_key,
             object_type = self.object_type,
@@ -881,6 +899,7 @@ impl PlexMetadata {
             parent_key = self.parent_key,
             grandparent_key = self.grandparent_key,
             show = self.show,
+            server = self.server,
         );
         query.execute(&conn).await.map_err(Into::into)
     }
@@ -891,8 +910,9 @@ impl PlexMetadata {
         let mut conn = pool.get().await?;
         let tran = conn.transaction().await?;
         let conn: &PgTransaction = &tran;
+        let server = self.server.as_ref().ok_or(format_err!("No server found"))?;
 
-        let bytes = match Self::_get_by_key(&conn, &self.metadata_key).await? {
+        let bytes = match Self::_get_by_key(&conn, &self.metadata_key, &server).await? {
             Some(_) => self.update_impl(&conn).await?,
             None => self.insert_impl(&conn).await?,
         };
@@ -954,12 +974,13 @@ impl PlexMetadata {
                     SELECT mc.show
                     FROM plex_filename pf
                     JOIN movie_collection mc ON mc.idx = pf.collection_id
-                    JOIN plex_metadata pm ON pm.metadata_key = pf.metadata_key
+                    JOIN plex_metadata pm ON pm.metadata_key = pf.metadata_key AND pm.server = pf.server
                     JOIN imdb_ratings ir ON ir.show = mc.show
                     WHERE pf.metadata_key = plex_metadata.metadata_key
+                    AND pf.server = plex_metadata.server
                 ),last_modified=now()
                 WHERE show IS NULL
-            "#
+            "#,
         );
         let conn = pool.get().await?;
         query.execute(&conn).await.map_err(Into::into)
@@ -972,15 +993,16 @@ impl PlexMetadata {
                 SET show = (
                     SELECT distinct mc.show
                     FROM plex_metadata pmp
-                    JOIN plex_metadata pm ON pm.parent_key = pmp.metadata_key
-                    JOIN plex_filename pf ON pf.metadata_key = pm.metadata_key
+                    JOIN plex_metadata pm ON pm.parent_key = pmp.metadata_key AND pm.server = pmp.server
+                    JOIN plex_filename pf ON pf.metadata_key = pm.metadata_key AND pf.server = pm.server
                     JOIN movie_collection mc ON mc.idx = pf.collection_id
                     WHERE pmp.metadata_key = plex_metadata.metadata_key
+                    AND pmp.server = plex_metadata.server
                     LIMIT 1
                 ),last_modified=now()
                 WHERE show IS NULL
                 AND object_type = 'directory'
-            "#
+            "#,
         );
         let conn = pool.get().await?;
         query.execute(&conn).await.map_err(Into::into)
@@ -993,15 +1015,16 @@ impl PlexMetadata {
                 SET show = (
                     SELECT distinct mc.show
                     FROM plex_metadata pmgp
-                    JOIN plex_metadata pm ON pm.grandparent_key = pmgp.metadata_key
-                    JOIN plex_filename pf ON pf.metadata_key = pm.metadata_key
+                    JOIN plex_metadata pm ON pm.grandparent_key = pmgp.metadata_key AND pm.server = pmgp.server
+                    JOIN plex_filename pf ON pf.metadata_key = pm.metadata_key AND pf.server = pm.server
                     JOIN movie_collection mc ON mc.idx = pf.collection_id
                     WHERE pmgp.metadata_key = plex_metadata.metadata_key
+                    AND pmgp.server = plex_metadata.server
                     LIMIT 1
                 ),last_modified=now()
                 WHERE show IS NULL
                 AND object_type = 'directory'
-            "#
+            "#,
         );
         let conn = pool.get().await?;
         query.execute(&conn).await.map_err(Into::into)
@@ -1010,20 +1033,30 @@ impl PlexMetadata {
     /// # Errors
     /// Return error if db query fails
     pub async fn fill_plex_metadata(pool: &PgPool, config: &Config) -> Result<(), Error> {
+        let server_name = config
+            .plex_server_name
+            .as_ref()
+            .ok_or(format_err!("Plex server not configured"))?;
         let bytes_written = Self::fill_plex_metadata_show(pool).await?;
         debug!("update metadata {bytes_written}");
         let bytes_written = Self::fill_plex_parent_metadata_show(pool).await?;
         debug!("update parent {bytes_written}");
         let bytes_written = Self::fill_plex_grandparent_metadata_show(pool).await?;
         debug!("update grandparent {bytes_written}");
-        let filenames: Vec<_> = PlexFilename::get_filenames(pool, None, None, None)
-            .await?
-            .try_collect()
-            .await?;
+        let filenames: Vec<_> =
+            PlexFilename::get_filenames(pool, None, None, None, Some(&server_name))
+                .await?
+                .try_collect()
+                .await?;
         for plex_filename in filenames {
-            if let Some(metadata) = Self::get_by_key(pool, &plex_filename.metadata_key).await? {
+            if let Some(metadata) =
+                Self::get_by_key(pool, &plex_filename.metadata_key, &server_name).await?
+            {
                 if let Some(parent_key) = &metadata.parent_key {
-                    if Self::get_by_key(pool, parent_key).await?.is_none() {
+                    if Self::get_by_key(pool, parent_key, &server_name)
+                        .await?
+                        .is_none()
+                    {
                         let mut parent_metadata =
                             Self::get_metadata_by_key(config, parent_key).await?;
                         parent_metadata.show.clone_from(&metadata.show);
@@ -1032,7 +1065,10 @@ impl PlexMetadata {
                     }
                 }
                 if let Some(grandparent_key) = &metadata.grandparent_key {
-                    if Self::get_by_key(pool, grandparent_key).await?.is_none() {
+                    if Self::get_by_key(pool, grandparent_key, &server_name)
+                        .await?
+                        .is_none()
+                    {
                         let mut grandparent_metadata =
                             Self::get_metadata_by_key(config, grandparent_key).await?;
                         grandparent_metadata.show.clone_from(&metadata.show);
@@ -1042,7 +1078,9 @@ impl PlexMetadata {
                 }
                 continue;
             }
-            let true_filename = plex_filename.filename.replace("/shares/", "/media/");
+            let true_filename = plex_filename
+                .filename
+                .replace("/documents/", "/media/dileptonnas/");
             if !config.movie_dirs.is_empty() && !Path::new(&true_filename).exists() {
                 debug!("file doesnt exist {true_filename}");
                 plex_filename.delete(pool).await?;
@@ -1062,10 +1100,13 @@ impl PlexMetadata {
                 }
             }
         }
-        let parents: Vec<_> = Self::get_parents(pool).await?.try_collect().await?;
+        let parents: Vec<_> = Self::get_parents(pool, &server_name)
+            .await?
+            .try_collect()
+            .await?;
         for parent in parents {
             for (metadata, filename) in parent.get_children(config).await? {
-                if Self::get_by_key(pool, &metadata.metadata_key)
+                if Self::get_by_key(pool, &metadata.metadata_key, &server_name)
                     .await?
                     .is_none()
                 {
@@ -1157,6 +1198,7 @@ impl PlexMetadata {
                             filename: f.into(),
                             collection_id: None,
                             music_collection_id: None,
+                            server: plex_metadata.server.clone(),
                         });
                 Ok(Some((plex_metadata, plex_filename)))
             })
