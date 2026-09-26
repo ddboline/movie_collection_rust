@@ -260,6 +260,8 @@ struct _PlexFilenameWrapper {
     collection_id: Option<Uuid>,
     // Music Collection Id
     music_collection_id: Option<Uuid>,
+    /// Server Name
+    server: Option<StackString>,
 }
 
 #[derive(Default, Debug, Serialize, Deserialize, Into, From, Deref)]
@@ -290,6 +292,9 @@ struct _PlexMetadataWrapper {
     // show
     #[schema(inline)]
     show: Option<StackString>,
+    /// server name
+    #[schema(inline)]
+    server: Option<StackString>,
 }
 
 #[derive(Default, Debug, Serialize, Deserialize, Into, From, Deref)]

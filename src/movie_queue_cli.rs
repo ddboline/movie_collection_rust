@@ -288,7 +288,7 @@ impl MovieQueueCli {
                     }
                     "plex_event" => {
                         let events: Vec<_> =
-                            PlexEvent::get_events(&pool, Some(start_timestamp), None, None, None)
+                            PlexEvent::get_events(&pool, Some(start_timestamp), None, None, None, Some(default_server_name))
                                 .await?
                                 .try_collect()
                                 .await?;
@@ -355,7 +355,7 @@ impl MovieQueueCli {
                 migrations::runner().run_async(&mut **conn).await?;
             }
             Self::FillPlex => {
-                let events: Vec<_> = PlexEvent::get_events(&pool, None, None, None, None)
+                let events: Vec<_> = PlexEvent::get_events(&pool, None, None, None, None, Some(default_server_name))
                     .await?
                     .try_filter(|event| future::ready(event.metadata_key.is_some()))
                     .try_collect()

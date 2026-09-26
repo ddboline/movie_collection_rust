@@ -112,16 +112,20 @@ impl PlexEvent {
         event_type: &'a Option<StackString>,
         offset: Option<usize>,
         limit: Option<usize>,
+        server: Option<&'a str>,
     ) -> Result<Query<'a>, PqError> {
         let mut constraints = Vec::new();
         let mut query_bindings = Vec::new();
         if let Some(start_timestamp) = &start_timestamp {
-            constraints.push("last_modified > $start_timestamp");
+            constraints.push(format_sstr!("last_modified > $start_timestamp"));
             query_bindings.push(("start_timestamp", start_timestamp as Parameter));
         }
         if let Some(event_type) = event_type {
-            constraints.push("event = $event");
+            constraints.push(format_sstr!("event = $event"));
             query_bindings.push(("event", event_type as Parameter));
+        }
+        if let Some(server) = server {
+            constraints.push(format_sstr!("server = '{server}'"));
         }
         let where_str = if constraints.is_empty() {
             "".into()
@@ -155,6 +159,7 @@ impl PlexEvent {
         event_type: Option<PlexEventType>,
         offset: Option<usize>,
         limit: Option<usize>,
+        server: Option<&str>,
     ) -> Result<impl Stream<Item = Result<Self, PqError>>, Error> {
         let event_type: Option<StackString> = event_type.map(|s| s.to_str().into());
         let query = Self::get_plex_event_query(
@@ -164,6 +169,7 @@ impl PlexEvent {
             &event_type,
             offset,
             limit,
+            server,
         )?;
         let conn = pool.get().await?;
         query.fetch_streaming(&conn).await.map_err(Into::into)
@@ -175,6 +181,7 @@ impl PlexEvent {
         pool: &PgPool,
         start_timestamp: Option<OffsetDateTime>,
         event_type: Option<PlexEventType>,
+        server: Option<&str>,
     ) -> Result<usize, Error> {
         #[derive(FromSqlRow)]
         struct Count {
@@ -183,7 +190,7 @@ impl PlexEvent {
 
         let event_type: Option<StackString> = event_type.map(|s| s.to_str().into());
         let query =
-            Self::get_plex_event_query("count(*)", "", &start_timestamp, &event_type, None, None)?;
+            Self::get_plex_event_query("count(*)", "", &start_timestamp, &event_type, None, None, server)?;
         let conn = pool.get().await?;
         let count: Count = query.fetch_one(&conn).await?;
 
@@ -1226,7 +1233,7 @@ mod tests {
     async fn test_get_plex_filename() -> Result<(), Error> {
         let config = Config::with_config()?;
         let pool = PgPool::new(&config.pgurl)?;
-        let events: Vec<_> = PlexEvent::get_events(&pool, None, None, None, None)
+        let events: Vec<_> = PlexEvent::get_events(&pool, None, None, None, None, Some("dilepton-nas"))
             .await?
             .try_collect()
             .await?;
@@ -1234,12 +1241,13 @@ mod tests {
             .into_iter()
             .find(|event| {
                 event.metadata_key.is_some()
-                    && event.metadata_key != Some("/library/metadata/22897".into())
+                    && event.metadata_key != Some("/library/metadata/6253".into())
             })
             .unwrap();
         debug!("{:?}", event.metadata_key);
         let filename = event.get_filename(&config).await?;
-        assert!(filename.filename.starts_with("/shares/"));
+        println!("{}", filename.filename);
+        assert!(filename.filename.starts_with("/documents/"));
         Ok(())
     }
 
@@ -1278,12 +1286,12 @@ mod tests {
     #[ignore]
     async fn test_get_metadata_by_key() -> Result<(), Error> {
         let config = Config::with_config()?;
-        let metadata = PlexMetadata::get_metadata_by_key(&config, "/library/metadata/27678")
+        let metadata = PlexMetadata::get_metadata_by_key(&config, "/library/metadata/6253")
             .await
             .unwrap();
         assert_eq!(
             metadata.title.as_str(),
-            "RARBG - Archer.S13E04.WEBRip.x264-ION10"
+            "Orders of Magnitude"
         );
         Ok(())
     }

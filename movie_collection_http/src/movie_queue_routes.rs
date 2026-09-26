@@ -1818,8 +1818,9 @@ async fn plex_events(
     let Query(query) = query;
     let start_timestamp = query.start_timestamp.map(Into::into);
     let event_type = query.event_type.map(Into::into);
+    let server_name = state.config.plex_server_name.as_ref().ok_or(format_err!("Server name not configured"))?;
 
-    let total = PlexEvent::get_total(&state.db, start_timestamp, event_type)
+    let total = PlexEvent::get_total(&state.db, start_timestamp, event_type, Some(server_name))
         .await
         .map_err(Into::<Error>::into)?;
     let offset = query.offset.unwrap_or(0);
@@ -1836,6 +1837,7 @@ async fn plex_events(
         event_type,
         Some(offset),
         Some(limit),
+        Some(server_name),
     )
     .await
     .map_err(Into::<Error>::into)?

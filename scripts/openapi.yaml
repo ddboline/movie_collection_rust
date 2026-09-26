@@ -7,7 +7,7 @@ info:
     email: ddboline@gmail.com
   license:
     name: ''
-  version: 0.12.44
+  version: 0.12.45
 paths:
   /list/cal:
     get:
@@ -3062,6 +3062,11 @@ components:
           - string
           - 'null'
           format: uuid
+        server:
+          oneOf:
+          - type: 'null'
+          - $ref: '#/components/schemas/str'
+            description: Server Name
     PlexFilenameUpdateRequest:
       type: object
       required:
@@ -3090,6 +3095,11 @@ components:
           oneOf:
           - type: 'null'
           - type: string
+        server:
+          oneOf:
+          - type: 'null'
+          - type: string
+          description: server name
         show:
           oneOf:
           - type: 'null'
@@ -3125,3 +3135,5 @@ components:
       - amazon
       - hulu
       - netflix
+    str:
+      type: string
