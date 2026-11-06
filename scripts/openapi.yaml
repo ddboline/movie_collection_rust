@@ -7,7 +7,7 @@ info:
     email: ddboline@gmail.com
   license:
     name: ''
-  version: 0.12.48
+  version: 0.12.49
 paths:
   /list/cal:
     get:
@@ -18,15 +18,15 @@ paths:
         required: false
         schema:
           oneOf:
-          - type: 'null'
           - $ref: '#/components/schemas/TvShowSource'
+          - type: 'null'
       - name: shows
         in: query
         required: false
         schema:
           oneOf:
-          - type: 'null'
           - type: string
+          - type: 'null'
       responses:
         '200':
           description: List Calendar
@@ -116,8 +116,8 @@ paths:
         required: false
         schema:
           oneOf:
-          - type: 'null'
           - type: string
+          - type: 'null'
       - name: offset
         in: query
         required: false
@@ -139,8 +139,8 @@ paths:
         required: false
         schema:
           oneOf:
-          - type: 'null'
           - $ref: '#/components/schemas/OrderBy'
+          - type: 'null'
       responses:
         '200':
           description: Movie Queue
@@ -219,8 +219,8 @@ paths:
         required: false
         schema:
           oneOf:
-          - type: 'null'
           - type: string
+          - type: 'null'
       - name: season
         in: query
         required: false
@@ -868,8 +868,8 @@ paths:
         required: false
         schema:
           oneOf:
-          - type: 'null'
           - $ref: '#/components/schemas/PlexSectionType'
+          - type: 'null'
       - name: offset
         in: query
         required: false
@@ -1037,15 +1037,15 @@ paths:
         required: false
         schema:
           oneOf:
-          - type: 'null'
           - $ref: '#/components/schemas/PlexEventType'
+          - type: 'null'
       - name: section_type
         in: query
         required: false
         schema:
           oneOf:
-          - type: 'null'
           - $ref: '#/components/schemas/PlexSectionType'
+          - type: 'null'
       - name: offset
         in: query
         required: false
@@ -1173,15 +1173,15 @@ paths:
         required: false
         schema:
           oneOf:
-          - type: 'null'
           - $ref: '#/components/schemas/PlexEventType'
+          - type: 'null'
       - name: section_type
         in: query
         required: false
         schema:
           oneOf:
-          - type: 'null'
           - $ref: '#/components/schemas/PlexSectionType'
+          - type: 'null'
       - name: offset
         in: query
         required: false
@@ -1250,15 +1250,15 @@ paths:
         required: false
         schema:
           oneOf:
-          - type: 'null'
           - $ref: '#/components/schemas/PlexEventType'
+          - type: 'null'
       - name: section_type
         in: query
         required: false
         schema:
           oneOf:
-          - type: 'null'
           - $ref: '#/components/schemas/PlexSectionType'
+          - type: 'null'
       - name: offset
         in: query
         required: false
@@ -1380,8 +1380,8 @@ paths:
         required: false
         schema:
           oneOf:
-          - type: 'null'
           - $ref: '#/components/schemas/PlexSectionType'
+          - type: 'null'
       - name: offset
         in: query
         required: false
@@ -1503,8 +1503,8 @@ paths:
         required: false
         schema:
           oneOf:
-          - type: 'null'
           - $ref: '#/components/schemas/PlexSectionType'
+          - type: 'null'
       - name: offset
         in: query
         required: false
@@ -2127,29 +2127,29 @@ paths:
         required: false
         schema:
           oneOf:
-          - type: 'null'
           - type: string
+          - type: 'null'
       - name: source
         in: query
         required: false
         schema:
           oneOf:
-          - type: 'null'
           - $ref: '#/components/schemas/TvShowSource'
+          - type: 'null'
       - name: offset
         in: query
         required: false
         schema:
           oneOf:
-          - type: 'null'
           - type: string
+          - type: 'null'
       - name: limit
         in: query
         required: false
         schema:
           oneOf:
-          - type: 'null'
           - type: string
+          - type: 'null'
       responses:
         '200':
           description: List TvShows
@@ -2301,8 +2301,8 @@ paths:
         required: false
         schema:
           oneOf:
-          - type: 'null'
           - type: string
+          - type: 'null'
       responses:
         '200':
           description: Trakt Callback
@@ -2393,8 +2393,8 @@ paths:
         required: false
         schema:
           oneOf:
-          - type: 'null'
           - $ref: '#/components/schemas/PlexSectionType'
+          - type: 'null'
       - name: offset
         in: query
         required: false
@@ -2617,29 +2617,29 @@ paths:
         required: false
         schema:
           oneOf:
-          - type: 'null'
           - type: string
+          - type: 'null'
       - name: source
         in: query
         required: false
         schema:
           oneOf:
-          - type: 'null'
           - $ref: '#/components/schemas/TvShowSource'
+          - type: 'null'
       - name: offset
         in: query
         required: false
         schema:
           oneOf:
-          - type: 'null'
           - type: string
+          - type: 'null'
       - name: limit
         in: query
         required: false
         schema:
           oneOf:
-          - type: 'null'
           - type: string
+          - type: 'null'
       responses:
         '200':
           description: Trakt Watchlist
@@ -2799,12 +2799,12 @@ components:
           type: string
         source:
           oneOf:
-          - type: 'null'
           - $ref: '#/components/schemas/TvShowSource'
+          - type: 'null'
         title:
           oneOf:
-          - type: 'null'
           - type: string
+          - type: 'null'
     ImdbRatingsUpdateRequest:
       type: object
       required:
@@ -2907,12 +2907,12 @@ components:
       properties:
         album:
           oneOf:
-          - type: 'null'
           - type: string
+          - type: 'null'
         artist:
           oneOf:
-          - type: 'null'
           - type: string
+          - type: 'null'
         id:
           type: string
           format: uuid
@@ -2923,8 +2923,8 @@ components:
           type: string
         title:
           oneOf:
-          - type: 'null'
           - type: string
+          - type: 'null'
     MusicCollectionUpdateRequest:
       type: object
       required:
@@ -2977,8 +2977,8 @@ components:
           type: string
         grandparent_title:
           oneOf:
-          - type: 'null'
           - type: string
+          - type: 'null'
         id:
           type: string
           format: uuid
@@ -2987,28 +2987,28 @@ components:
           format: date-time
         metadata_key:
           oneOf:
-          - type: 'null'
           - type: string
+          - type: 'null'
         metadata_type:
           oneOf:
-          - type: 'null'
           - type: string
+          - type: 'null'
         parent_title:
           oneOf:
-          - type: 'null'
           - type: string
+          - type: 'null'
         player_address:
           type: string
         player_title:
           type: string
         section_title:
           oneOf:
-          - type: 'null'
           - type: string
+          - type: 'null'
         section_type:
           oneOf:
-          - type: 'null'
           - type: string
+          - type: 'null'
         server:
           type: string
         title:
@@ -3064,9 +3064,9 @@ components:
           format: uuid
         server:
           oneOf:
-          - type: 'null'
           - $ref: '#/components/schemas/str'
             description: Server Name
+          - type: 'null'
     PlexFilenameUpdateRequest:
       type: object
       required:
@@ -3085,25 +3085,25 @@ components:
       properties:
         grandparent_key:
           oneOf:
-          - type: 'null'
           - type: string
+          - type: 'null'
         metadata_key:
           type: string
         object_type:
           type: string
         parent_key:
           oneOf:
-          - type: 'null'
           - type: string
+          - type: 'null'
         server:
           oneOf:
-          - type: 'null'
           - type: string
+          - type: 'null'
           description: server name
         show:
           oneOf:
-          - type: 'null'
           - type: string
+          - type: 'null'
         title:
           type: string
     PlexMetadataUpdateRequest:

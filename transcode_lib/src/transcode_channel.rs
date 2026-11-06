@@ -7,6 +7,7 @@ use deadpool_lapin::{
         },
         types::FieldTable,
         BasicProperties, Channel, Queue,
+        ConnectionProperties,
     },
     Config as LapinConfig, Runtime,
 };
@@ -22,30 +23,30 @@ pub struct TranscodeChannel(Channel);
 impl TranscodeChannel {
     pub async fn open_channel() -> Result<Self, Error> {
         let cfg = LapinConfig::default();
-        let pool = cfg.create_pool(Some(Runtime::Tokio1))?;
+        let pool = cfg.create_pool(ConnectionProperties::default, Runtime::Tokio1)?;
         let conn = pool.get().await?;
         conn.create_channel().await.map_err(Into::into).map(Self)
     }
 
     pub async fn init(&self, queue: &str) -> Result<Queue, Error> {
         let queue = self
-            .queue_declare(queue, QueueDeclareOptions::default(), FieldTable::default())
+            .queue_declare(queue.into(), QueueDeclareOptions::default(), FieldTable::default())
             .await?;
         Ok(queue)
     }
 
     pub async fn cleanup(&self, queue: &str) -> Result<u32, Error> {
-        self.queue_purge(queue, QueuePurgeOptions::default())
+        self.queue_purge(queue.into(), QueuePurgeOptions::default())
             .await?;
-        self.queue_delete(queue, QueueDeleteOptions::default())
+        self.queue_delete(queue.into(), QueueDeleteOptions::default())
             .await
             .map_err(Into::into)
     }
 
     pub async fn publish(&self, queue: &str, payload: Vec<u8>) -> Result<(), Error> {
         self.basic_publish(
-            "",
-            queue,
+            "".into(),
+            queue.into(),
             BasicPublishOptions::default(),
             &payload,
             BasicProperties::default(),
@@ -61,8 +62,8 @@ impl TranscodeChannel {
     {
         let mut consumer = self
             .basic_consume(
-                queue,
-                queue,
+                queue.into(),
+                queue.into(),
                 BasicConsumeOptions::default(),
                 FieldTable::default(),
             )
@@ -83,8 +84,8 @@ impl TranscodeChannel {
     pub async fn get_single_job<T: DeserializeOwned>(&self, queue: &str) -> Result<T, Error> {
         let mut consumer = self
             .basic_consume(
-                queue,
-                queue,
+                queue.into(),
+                queue.into(),
                 BasicConsumeOptions::default(),
                 FieldTable::default(),
             )
