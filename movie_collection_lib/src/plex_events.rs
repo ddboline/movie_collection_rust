@@ -1342,7 +1342,7 @@ mod tests {
 
     #[test]
     fn test_extract_webhook_event() -> Result<(), Error> {
-        let data = include_str!("../../tests/data/webhook_event.json");
+        let data = include_str!("../../tests/data/webhook_event.txt");
         let event = PlexEvent::get_from_payload(data.as_bytes()).unwrap();
         assert_eq!(event.grandparent_title, Some("Connections".into()));
         Ok(())
