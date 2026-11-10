@@ -11,7 +11,6 @@ use stack_string::{format_sstr, StackString};
 use std::{
     convert::{TryFrom, TryInto},
     fmt,
-    net::Ipv4Addr,
     path::Path,
     str::FromStr,
 };
@@ -52,13 +51,18 @@ impl TryFrom<WebhookPayload> for PlexEvent {
                 .unwrap_or(datetime!(1970-01-01 00:00:00 +00:00))
         }
         let event = item.event.to_str().into();
-        let player_address = StackString::from_display(item.player.public_address);
+        let player_address = if let Some(player) = &item.player {
+            StackString::from_display(player.public_address.as_str())
+        } else { StackString::new() };
+        let player_title = if let Some(player) = &item.player {
+            StackString::from_display(player.title.as_str())
+        } else { StackString::new() };
         let payload = Self {
             id: Uuid::new_v4(),
             event,
             account: item.account.title,
             server: item.server.title,
-            player_title: item.player.title,
+            player_title,
             player_address,
             title: item.metadata.title,
             parent_title: item.metadata.parent_title,
@@ -386,7 +390,7 @@ pub struct Server {
 pub struct Player {
     pub local: bool,
     #[serde(alias = "publicAddress")]
-    pub public_address: Ipv4Addr,
+    pub public_address: StackString,
     pub title: StackString,
     pub uuid: StackString,
 }
@@ -546,7 +550,7 @@ pub struct WebhookPayload {
     #[serde(alias = "Server")]
     pub server: Server,
     #[serde(alias = "Player")]
-    pub player: Player,
+    pub player: Option<Player>,
     #[serde(alias = "Metadata")]
     pub metadata: Metadata,
 }
@@ -1333,6 +1337,14 @@ mod tests {
             .try_collect()
             .await?;
         debug!("{}", episodes.len());
+        Ok(())
+    }
+
+    #[test]
+    fn test_extract_webhook_event() -> Result<(), Error> {
+        let data = include_str!("../../tests/data/webhook_event.json");
+        let event = PlexEvent::get_from_payload(data.as_bytes()).unwrap();
+        assert_eq!(event.grandparent_title, Some("Connections".into()));
         Ok(())
     }
 }
