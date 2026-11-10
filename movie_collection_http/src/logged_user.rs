@@ -114,6 +114,7 @@ impl LoggedUser {
         Ok(())
     }
 
+    #[must_use]
     pub fn store_url_task(
         self,
         client: &Client,
