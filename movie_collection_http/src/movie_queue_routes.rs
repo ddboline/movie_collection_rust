@@ -118,9 +118,7 @@ async fn movie_queue(
     query: Query<FullQueueRequest>,
 ) -> WarpResult<MovieQueueResponse> {
     let Query(query) = query;
-    let task = user
-        .store_url_task(state.trakt.get_client(), &state.config, "/list/full_queue")
-        .await;
+    let task = user.store_url_task(state.trakt.get_client(), &state.config, "/list/full_queue");
     let mut patterns = Vec::new();
     if let Some(q) = &query.q {
         patterns.push(q.clone());
@@ -158,9 +156,7 @@ async fn movie_queue_show(
 ) -> WarpResult<MovieQueueResponse> {
     let Path(path) = path;
     let url = format_sstr!("/list/queue/{path}");
-    let task = user
-        .store_url_task(state.trakt.get_client(), &state.config, &url)
-        .await;
+    let task = user.store_url_task(state.trakt.get_client(), &state.config, &url);
     let patterns = vec![path];
 
     let req = MovieQueueRequest {
@@ -203,9 +199,7 @@ async fn movie_queue_delete(
 ) -> WarpResult<DeleteMovieQueueResponse> {
     let Path(path) = path;
     let url = format_sstr!("/list/delete/{path}");
-    let task = user
-        .store_url_task(state.trakt.get_client(), &state.config, &url)
-        .await;
+    let task = user.store_url_task(state.trakt.get_client(), &state.config, &url);
     let mock_stdout = MockStdout::new();
     let stdout = StdoutChannel::with_mock_stdout(mock_stdout.clone(), mock_stdout.clone());
 
@@ -281,9 +275,7 @@ async fn movie_queue_transcode(
 ) -> WarpResult<TranscodeQueueResponse> {
     let Path(path) = path;
     let url = format_sstr!("/list/transcode/queue/{path}");
-    let task = user
-        .store_url_task(state.trakt.get_client(), &state.config, &url)
-        .await;
+    let task = user.store_url_task(state.trakt.get_client(), &state.config, &url);
     let patterns = vec![path];
 
     let req = MovieQueueRequest {
@@ -313,9 +305,7 @@ async fn movie_queue_transcode_directory(
     let Path((directory, file)) = paths;
 
     let url = format_sstr!("/list/transcode/queue/{directory}/{file}");
-    let task = user
-        .store_url_task(state.trakt.get_client(), &state.config, &url)
-        .await;
+    let task = user.store_url_task(state.trakt.get_client(), &state.config, &url);
     let patterns = vec![file];
 
     let req = MovieQueueRequest {
@@ -351,9 +341,7 @@ async fn movie_queue_play(
         .await
         .map_err(Into::<Error>::into)?;
     let url = format_sstr!("/list/play/{idx}");
-    let task = user
-        .store_url_task(state.trakt.get_client(), &state.config, &url)
-        .await;
+    let task = user.store_url_task(state.trakt.get_client(), &state.config, &url);
 
     let mock_stdout = MockStdout::new();
     let stdout = StdoutChannel::with_mock_stdout(mock_stdout.clone(), mock_stdout);
@@ -385,9 +373,7 @@ async fn imdb_show(
 ) -> WarpResult<ListImdbResponse> {
     let Path(show) = show;
     let url = format_sstr!("/list/imdb/{show}");
-    let task = user
-        .store_url_task(state.trakt.get_client(), &state.config, &url)
-        .await;
+    let task = user.store_url_task(state.trakt.get_client(), &state.config, &url);
     let Query(query) = query;
     let req = ImdbShowRequest { show, query };
     let body = req.process(&state.db, &state.config, &state.trakt).await?;
@@ -424,9 +410,7 @@ async fn find_new_episodes(
 ) -> WarpResult<ListCalendarResponse> {
     let Query(query) = query;
 
-    let task = user
-        .store_url_task(state.trakt.get_client(), &state.config, "/list/cal")
-        .await;
+    let task = user.store_url_task(state.trakt.get_client(), &state.config, "/list/cal");
 
     let mock_stdout = MockStdout::new();
     let stdout = StdoutChannel::with_mock_stdout(mock_stdout.clone(), mock_stdout);
@@ -507,13 +491,11 @@ async fn imdb_episodes_route(
     let limit = query.limit.unwrap_or(10);
     let start_timestamp: Option<OffsetDateTime> = query.start_timestamp.map(Into::into);
 
-    let task = user
-        .store_url_task(
-            state.trakt.get_client(),
-            &state.config,
-            "/list/imdb_episodes",
-        )
-        .await;
+    let task = user.store_url_task(
+        state.trakt.get_client(),
+        &state.config,
+        "/list/imdb_episodes",
+    );
 
     let total = ImdbEpisodes::get_total(&state.db, start_timestamp, None, None, None)
         .await
@@ -561,13 +543,11 @@ async fn imdb_episodes_update(
     episodes: Json<ImdbEpisodesUpdateRequest>,
 ) -> WarpResult<ImdbEpisodesUpdateResponse> {
     let Json(episodes) = episodes;
-    let task = user
-        .store_url_task(
-            state.trakt.get_client(),
-            &state.config,
-            "/list/imdb_episodes",
-        )
-        .await;
+    let task = user.store_url_task(
+        state.trakt.get_client(),
+        &state.config,
+        "/list/imdb_episodes",
+    );
     episodes.run_update(&state.db).await?;
     task.await.ok();
     Ok(HtmlBase::new("Success").into())
@@ -608,13 +588,11 @@ async fn imdb_ratings_route(
 ) -> WarpResult<ListImdbShowsResponse> {
     let Query(query) = query;
 
-    let task = user
-        .store_url_task(
-            state.trakt.get_client(),
-            &state.config,
-            "/list/imdb_ratings",
-        )
-        .await;
+    let task = user.store_url_task(
+        state.trakt.get_client(),
+        &state.config,
+        "/list/imdb_ratings",
+    );
     let start_timestamp = query.start_timestamp.map(Into::into);
     let total = ImdbRatings::get_total(&state.db, start_timestamp)
         .await
@@ -664,13 +642,11 @@ async fn imdb_ratings_update(
     shows: Json<ImdbRatingsUpdateRequest>,
 ) -> WarpResult<UpdateImdbShowsResponse> {
     let Json(shows) = shows;
-    let task = user
-        .store_url_task(
-            state.trakt.get_client(),
-            &state.config,
-            "/list/imdb_ratings",
-        )
-        .await;
+    let task = user.store_url_task(
+        state.trakt.get_client(),
+        &state.config,
+        "/list/imdb_ratings",
+    );
     shows.run_update(&state.db).await?;
     task.await.ok();
     Ok(HtmlBase::new("Success").into())
@@ -693,13 +669,11 @@ async fn imdb_ratings_set_source(
     state: State<Arc<AppState>>,
 ) -> WarpResult<ImdbSetSourceResponse> {
     let Query(query) = query;
-    let task = user
-        .store_url_task(
-            state.trakt.get_client(),
-            &state.config,
-            "/list/imdb_ratings/set_source",
-        )
-        .await;
+    let task = user.store_url_task(
+        state.trakt.get_client(),
+        &state.config,
+        "/list/imdb_ratings/set_source",
+    );
     query.set_source(&state.db).await?;
     task.await.ok();
     Ok(HtmlBase::new("Success").into())
@@ -730,9 +704,7 @@ async fn movie_queue_route(
 ) -> WarpResult<ListMovieQueueResponse> {
     let Query(query) = query;
 
-    let task = user
-        .store_url_task(state.trakt.get_client(), &state.config, "/list/movie_queue")
-        .await;
+    let task = user.store_url_task(state.trakt.get_client(), &state.config, "/list/movie_queue");
     let (total, data) = query.get_queue(&state.db, &state.config).await?;
     let offset = query.offset.unwrap_or(0);
     let limit = query.limit.unwrap_or(total);
@@ -767,9 +739,7 @@ async fn movie_queue_update(
     queue: Json<MovieQueueUpdateRequest>,
 ) -> WarpResult<UpdateMovieQueueResponse> {
     let Json(queue) = queue;
-    let task = user
-        .store_url_task(state.trakt.get_client(), &state.config, "/list/movie_queue")
-        .await;
+    let task = user.store_url_task(state.trakt.get_client(), &state.config, "/list/movie_queue");
     queue.run_update(&state.db, &state.config).await?;
     task.await.ok();
     Ok(HtmlBase::new("Success").into())
@@ -798,9 +768,7 @@ async fn movie_collection_route(
     user: LoggedUser,
     state: State<Arc<AppState>>,
 ) -> WarpResult<ListMovieCollectionResponse> {
-    let task = user
-        .store_url_task(state.trakt.get_client(), &state.config, "/list/movie_queue")
-        .await;
+    let task = user.store_url_task(state.trakt.get_client(), &state.config, "/list/movie_queue");
     let Query(query) = query;
     let (total, data) = query.get_collection(&state.db, &state.config).await?;
     let offset = query.offset.unwrap_or(0);
@@ -836,13 +804,11 @@ async fn movie_collection_update(
     collection: Json<MovieCollectionUpdateRequest>,
 ) -> WarpResult<UpdateMovieCollectionResponse> {
     let Json(collection) = collection;
-    let task = user
-        .store_url_task(
-            state.trakt.get_client(),
-            &state.config,
-            "/list/movie_collection",
-        )
-        .await;
+    let task = user.store_url_task(
+        state.trakt.get_client(),
+        &state.config,
+        "/list/movie_collection",
+    );
     collection.run_update(&state.db, &state.config).await?;
     task.await.ok();
     Ok(HtmlBase::new("Success").into())
@@ -865,13 +831,11 @@ async fn last_modified_route(
     state: State<Arc<AppState>>,
     user: LoggedUser,
 ) -> WarpResult<ListLastModifiedResponse> {
-    let task = user
-        .store_url_task(
-            state.trakt.get_client(),
-            &state.config,
-            "/list/last_modified",
-        )
-        .await;
+    let task = user.store_url_task(
+        state.trakt.get_client(),
+        &state.config,
+        "/list/last_modified",
+    );
     let last_modified: Vec<_> = LastModifiedResponse::get_last_modified(&state.db)
         .await
         .map_err(Into::<Error>::into)?
@@ -953,9 +917,7 @@ async fn tvshows(
     query: Query<TraktWatchlistRequest>,
 ) -> WarpResult<ListTvShowsResponse> {
     let Query(query) = query;
-    let task = user
-        .store_url_task(state.trakt.get_client(), &state.config, "/list/tvshows")
-        .await;
+    let task = user.store_url_task(state.trakt.get_client(), &state.config, "/list/tvshows");
     let mock_stdout = MockStdout::new();
     let stdout = StdoutChannel::with_mock_stdout(mock_stdout.clone(), mock_stdout.clone());
 
@@ -1019,13 +981,11 @@ async fn movie_queue_transcode_status(
     user: LoggedUser,
     state: State<Arc<AppState>>,
 ) -> WarpResult<TranscodeStatusResponse> {
-    let url_task = user
-        .store_url_task(
-            state.trakt.get_client(),
-            &state.config,
-            "/list/transcode/status",
-        )
-        .await;
+    let url_task = user.store_url_task(
+        state.trakt.get_client(),
+        &state.config,
+        "/list/transcode/status",
+    );
     let body = if dvdrip_dir(&state.config).exists() {
         let status = transcode_status(&state.config)
             .await
@@ -1113,9 +1073,7 @@ async fn movie_queue_transcode_file(
 ) -> WarpResult<TranscodeFileResponse> {
     let Path(filename) = filename;
     let url = format_sstr!("/list/transcode/file/{filename}");
-    let task = user
-        .store_url_task(state.trakt.get_client(), &state.config, &url)
-        .await;
+    let task = user.store_url_task(state.trakt.get_client(), &state.config, &url);
     let mock_stdout = MockStdout::new();
     let stdout = StdoutChannel::with_mock_stdout(mock_stdout.clone(), mock_stdout.clone());
 
@@ -1158,9 +1116,7 @@ async fn movie_queue_remcom_file(
 ) -> WarpResult<TranscodeFileResponse> {
     let Path(filename) = filename;
     let url = format_sstr!("/list/transcode/remcom/file/{filename}");
-    let task = user
-        .store_url_task(state.trakt.get_client(), &state.config, &url)
-        .await;
+    let task = user.store_url_task(state.trakt.get_client(), &state.config, &url);
     let mock_stdout = MockStdout::new();
     let stdout = StdoutChannel::with_mock_stdout(mock_stdout.clone(), mock_stdout.clone());
 
@@ -1213,9 +1169,7 @@ async fn movie_queue_remcom_directory_file(
 ) -> WarpResult<TranscodeFileResponse> {
     let Path((directory, filename)) = paths;
     let url = format_sstr!("/list/transcode/remcom/directory/{directory}/{filename}");
-    let task = user
-        .store_url_task(state.trakt.get_client(), &state.config, &url)
-        .await;
+    let task = user.store_url_task(state.trakt.get_client(), &state.config, &url);
     let mock_stdout = MockStdout::new();
     let stdout = StdoutChannel::with_mock_stdout(mock_stdout.clone(), mock_stdout.clone());
 
@@ -1269,9 +1223,7 @@ async fn movie_queue_transcode_cleanup(
 ) -> WarpResult<CleanupTranscodeFileResponse> {
     let Path(path) = path;
     let url = format_sstr!("/list/transcode/cleanup/{path}");
-    let task = user
-        .store_url_task(state.trakt.get_client(), &state.config, &url)
-        .await;
+    let task = user.store_url_task(state.trakt.get_client(), &state.config, &url);
     let movie_path = state
         .config
         .home_dir
@@ -1317,9 +1269,7 @@ async fn trakt_watchlist(
     query: Query<TraktWatchlistRequest>,
 ) -> WarpResult<TraktWatchlistResponse> {
     let Query(query) = query;
-    let task = user
-        .store_url_task(state.trakt.get_client(), &state.config, "/trakt/watchlist")
-        .await;
+    let task = user.store_url_task(state.trakt.get_client(), &state.config, "/trakt/watchlist");
     let shows = get_watchlist_shows_db_map(
         &state.db,
         query.query.as_ref().map(StackString::as_str),
@@ -1391,9 +1341,7 @@ async fn trakt_watchlist_action(
 ) -> WarpResult<TraktWatchlistActionResponse> {
     let Path((action, show)) = paths;
     let url = format_sstr!("/trakt/watchlist/{action}/{show}");
-    let task = user
-        .store_url_task(state.trakt.get_client(), &state.config, &url)
-        .await;
+    let task = user.store_url_task(state.trakt.get_client(), &state.config, &url);
     let mock_stdout = MockStdout::new();
     let stdout = StdoutChannel::with_mock_stdout(mock_stdout.clone(), mock_stdout.clone());
     let mc = MovieCollection::new(&state.config, &state.db, &stdout);
@@ -1419,9 +1367,7 @@ async fn trakt_watched_most_recent(
     query: Query<PlexFilenameRequest>,
 ) -> WarpResult<TraktWatchedResponse> {
     let url = "/trakt/watched/list";
-    let task = user
-        .store_url_task(state.trakt.get_client(), &state.config, url)
-        .await;
+    let task = user.store_url_task(state.trakt.get_client(), &state.config, url);
     let Query(query) = query;
 
     let section: Option<PlexSectionType> = query.section_type.map(Into::into);
@@ -1487,9 +1433,7 @@ async fn trakt_watched_seasons(
 ) -> WarpResult<TraktWatchlistShowListResponse> {
     let Path(imdb_url) = imdb_url;
     let url = format_sstr!("/trakt/watched/list/{imdb_url}");
-    let task = user
-        .store_url_task(state.trakt.get_client(), &state.config, &url)
-        .await;
+    let task = user.store_url_task(state.trakt.get_client(), &state.config, &url);
     let show_opt = ImdbRatings::get_show_by_link(&imdb_url, &state.db)
         .await
         .map(|s| s.map(|sh| (imdb_url, sh)))
@@ -1528,9 +1472,7 @@ async fn trakt_watched_list(
 ) -> WarpResult<TraktWatchlistShowSeasonResponse> {
     let Path((imdb_url, season)) = paths;
     let url = format_sstr!("/trakt/watched/list/{imdb_url}/{season}");
-    let task = user
-        .store_url_task(state.trakt.get_client(), &state.config, &url)
-        .await;
+    let task = user.store_url_task(state.trakt.get_client(), &state.config, &url);
     let mock_stdout = MockStdout::new();
     let stdout = StdoutChannel::with_mock_stdout(mock_stdout.clone(), mock_stdout.clone());
 
@@ -1569,9 +1511,7 @@ async fn trakt_watched_action(
 ) -> WarpResult<TraktWatchlistEpisodeActionResponse> {
     let Path((action, imdb_url, season, episode)) = paths;
     let url = format_sstr!("/trakt/watched/{action}/{imdb_url}/{season}/{episode}");
-    let task = user
-        .store_url_task(state.trakt.get_client(), &state.config, &url)
-        .await;
+    let task = user.store_url_task(state.trakt.get_client(), &state.config, &url);
     let mock_stdout = MockStdout::new();
     let stdout = StdoutChannel::with_mock_stdout(mock_stdout.clone(), mock_stdout.clone());
 
@@ -1600,9 +1540,7 @@ async fn trakt_cal(
     user: LoggedUser,
     state: State<Arc<AppState>>,
 ) -> WarpResult<TraktCalendarResponse> {
-    let task = user
-        .store_url_task(state.trakt.get_client(), &state.config, "/trakt/cal")
-        .await;
+    let task = user.store_url_task(state.trakt.get_client(), &state.config, "/trakt/cal");
     let body = trakt_cal_http_body(&state.db, &state.trakt)
         .await
         .map_err(Into::<Error>::into)?
@@ -1621,9 +1559,7 @@ async fn trakt_auth_url(
     user: LoggedUser,
     state: State<Arc<AppState>>,
 ) -> WarpResult<TraktAuthUrlResponse> {
-    let task = user
-        .store_url_task(state.trakt.get_client(), &state.config, "/trakt/auth_url")
-        .await;
+    let task = user.store_url_task(state.trakt.get_client(), &state.config, "/trakt/auth_url");
     let url = state
         .trakt
         .get_auth_url()
@@ -1662,9 +1598,7 @@ async fn trakt_callback(
     user: LoggedUser,
     state: State<Arc<AppState>>,
 ) -> WarpResult<TraktCallbackResponse> {
-    let task = user
-        .store_url_task(state.trakt.get_client(), &state.config, "/trakt/callback")
-        .await;
+    let task = user.store_url_task(state.trakt.get_client(), &state.config, "/trakt/callback");
     let Query(query) = query;
     state
         .trakt
@@ -1696,13 +1630,11 @@ async fn refresh_auth(
     user: LoggedUser,
     state: State<Arc<AppState>>,
 ) -> WarpResult<TraktRefreshAuthResponse> {
-    let task = user
-        .store_url_task(
-            state.trakt.get_client(),
-            &state.config,
-            "/trakt/refresh_auth",
-        )
-        .await;
+    let task = user.store_url_task(
+        state.trakt.get_client(),
+        &state.config,
+        "/trakt/refresh_auth",
+    );
     let access_token = state.trakt.read_auth_token().await?;
     state
         .trakt
@@ -1808,13 +1740,11 @@ async fn plex_events(
     state: State<Arc<AppState>>,
     user: LoggedUser,
 ) -> WarpResult<PlexEventResponse> {
-    let task = user
-        .store_url_task(
-            state.trakt.get_client(),
-            &state.config,
-            "/list/movie_collection",
-        )
-        .await;
+    let task = user.store_url_task(
+        state.trakt.get_client(),
+        &state.config,
+        "/list/movie_collection",
+    );
     let Query(query) = query;
     let start_timestamp = query.start_timestamp.map(Into::into);
     let event_type = query.event_type.map(Into::into);
@@ -1879,9 +1809,7 @@ async fn plex_events_update(
     user: LoggedUser,
     payload: Json<PlexEventUpdateRequest>,
 ) -> WarpResult<PlexEventUpdateResponse> {
-    let task = user
-        .store_url_task(state.trakt.get_client(), &state.config, "/list/plex_event")
-        .await;
+    let task = user.store_url_task(state.trakt.get_client(), &state.config, "/list/plex_event");
     let Json(payload) = payload;
     for event in payload.events {
         let event: PlexEvent = event.into();
@@ -1969,9 +1897,7 @@ async fn plex_list(
     state: State<Arc<AppState>>,
     query: Query<PlexEventRequest>,
 ) -> WarpResult<PlexEventList> {
-    let task = user
-        .store_url_task(state.trakt.get_client(), &state.config, "/list/plex")
-        .await;
+    let task = user.store_url_task(state.trakt.get_client(), &state.config, "/list/plex");
     let Query(query) = query;
     let section_type = query.section_type.map(Into::into);
     let events = PlexEvent::get_plex_events(
@@ -2012,9 +1938,7 @@ async fn plex_detail(
     let Path(id) = id;
     let Query(query) = query;
     let url = format_sstr!("/list/plex/{id}");
-    let task = user
-        .store_url_task(state.trakt.get_client(), &state.config, &url)
-        .await;
+    let task = user.store_url_task(state.trakt.get_client(), &state.config, &url);
     let body = if let Some(event) = PlexEvent::get_event_by_id(&state.db, id)
         .await
         .map_err(Into::<Error>::into)?
@@ -2052,13 +1976,11 @@ async fn plex_filename(
     state: State<Arc<AppState>>,
     user: LoggedUser,
 ) -> WarpResult<PlexFilenameResponse> {
-    let task = user
-        .store_url_task(
-            state.trakt.get_client(),
-            &state.config,
-            "/list/plex_filename",
-        )
-        .await;
+    let task = user.store_url_task(
+        state.trakt.get_client(),
+        &state.config,
+        "/list/plex_filename",
+    );
     let Query(query) = query;
     let start_timestamp = query.start_timestamp.map(Into::into);
     let server_name = &state
@@ -2121,13 +2043,11 @@ async fn plex_filename_update(
     user: LoggedUser,
     payload: Json<PlexFilenameUpdateRequest>,
 ) -> WarpResult<PlexFilenameUpdateResponse> {
-    let task = user
-        .store_url_task(
-            state.trakt.get_client(),
-            &state.config,
-            "/list/plex_filename",
-        )
-        .await;
+    let task = user.store_url_task(
+        state.trakt.get_client(),
+        &state.config,
+        "/list/plex_filename",
+    );
     let Json(payload) = payload;
     for filename in payload.filenames {
         let filename: PlexFilename = filename.into();
@@ -2163,13 +2083,11 @@ async fn plex_metadata(
     state: State<Arc<AppState>>,
     user: LoggedUser,
 ) -> WarpResult<PlexMetadataResponse> {
-    let task = user
-        .store_url_task(
-            state.trakt.get_client(),
-            &state.config,
-            "/list/plex_metadata",
-        )
-        .await;
+    let task = user.store_url_task(
+        state.trakt.get_client(),
+        &state.config,
+        "/list/plex_metadata",
+    );
     let Query(query) = query;
     let start_timestamp = query.start_timestamp.map(Into::into);
     let total = PlexMetadata::get_total(&state.db, start_timestamp)
@@ -2220,13 +2138,11 @@ async fn plex_metadata_update(
     user: LoggedUser,
     payload: Json<PlexMetadataUpdateRequest>,
 ) -> WarpResult<PlexMetadataUpdateResponse> {
-    let task = user
-        .store_url_task(
-            state.trakt.get_client(),
-            &state.config,
-            "/list/plex_metadata",
-        )
-        .await;
+    let task = user.store_url_task(
+        state.trakt.get_client(),
+        &state.config,
+        "/list/plex_metadata",
+    );
     let Json(payload) = payload;
     for metadata in payload.entries {
         let metadata: PlexMetadata = metadata.into();
@@ -2262,13 +2178,11 @@ async fn music_collection(
     state: State<Arc<AppState>>,
     user: LoggedUser,
 ) -> WarpResult<MusicCollectionResponse> {
-    let task = user
-        .store_url_task(
-            state.trakt.get_client(),
-            &state.config,
-            "/list/music_collection",
-        )
-        .await;
+    let task = user.store_url_task(
+        state.trakt.get_client(),
+        &state.config,
+        "/list/music_collection",
+    );
     let Query(query) = query;
     let start_timestamp = query.start_timestamp.map(Into::into);
     let total = MusicCollection::get_count(&state.db, start_timestamp)
@@ -2318,13 +2232,11 @@ async fn music_collection_update(
     user: LoggedUser,
     payload: Json<MusicCollectionUpdateRequest>,
 ) -> WarpResult<MusicCollectionUpdateResponse> {
-    let task = user
-        .store_url_task(
-            state.trakt.get_client(),
-            &state.config,
-            "/list/music_collection",
-        )
-        .await;
+    let task = user.store_url_task(
+        state.trakt.get_client(),
+        &state.config,
+        "/list/music_collection",
+    );
     let Json(payload) = payload;
     for entry in payload.entries {
         if MusicCollection::get_by_id(&state.db, entry.id)
@@ -2366,9 +2278,7 @@ async fn movie_queue_extract_subtitle(
 ) -> WarpResult<ExtractSubtitlesResponse> {
     let Path((filename, index, suffix)) = paths;
     let url = format_sstr!("/list/transcode/subtitle/{filename}/{index}/{suffix}");
-    let task = user
-        .store_url_task(state.trakt.get_client(), &state.config, &url)
-        .await;
+    let task = user.store_url_task(state.trakt.get_client(), &state.config, &url);
 
     let input_path = state
         .config

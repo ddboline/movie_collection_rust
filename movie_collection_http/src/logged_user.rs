@@ -114,7 +114,7 @@ impl LoggedUser {
         Ok(())
     }
 
-    pub async fn store_url_task(
+    pub fn store_url_task(
         self,
         client: &Client,
         config: &Config,

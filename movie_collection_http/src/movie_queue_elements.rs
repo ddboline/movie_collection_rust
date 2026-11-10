@@ -1850,8 +1850,7 @@ fn PlexElement(
         }
         let display_element = if let Some((show_url, season)) = event
             .show_url
-            .as_ref()
-            .and_then(|u| event.season.map(|s| (u, s)))
+            .as_ref().zip(event.season)
         {
             rsx! {
                 a {
@@ -2105,10 +2104,8 @@ fn PlexDetailElement(
             { metadata_title }
         }
     };
-    let display_element = if let Some((show_url, season)) = event
-        .show_url
-        .as_ref()
-        .and_then(|u| event.season.map(|s| (u, s)))
+    let display_element = if let Some((show_url, season)) =
+        event.show_url.as_ref().zip(event.season)
     {
         rsx! {
             a {

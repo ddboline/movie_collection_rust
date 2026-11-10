@@ -6,8 +6,7 @@ use deadpool_lapin::{
             QueueDeleteOptions, QueuePurgeOptions,
         },
         types::FieldTable,
-        BasicProperties, Channel, Queue,
-        ConnectionProperties,
+        BasicProperties, Channel, ConnectionProperties, Queue,
     },
     Config as LapinConfig, Runtime,
 };
@@ -30,7 +29,11 @@ impl TranscodeChannel {
 
     pub async fn init(&self, queue: &str) -> Result<Queue, Error> {
         let queue = self
-            .queue_declare(queue.into(), QueueDeclareOptions::default(), FieldTable::default())
+            .queue_declare(
+                queue.into(),
+                QueueDeclareOptions::default(),
+                FieldTable::default(),
+            )
             .await?;
         Ok(queue)
     }
