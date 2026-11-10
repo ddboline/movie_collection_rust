@@ -11,6 +11,7 @@
 #![allow(clippy::ignored_unit_patterns)]
 #![allow(clippy::similar_names)]
 #![allow(clippy::needless_for_each)]
+#![allow(clippy::unused_async_trait_impl)]
 
 pub mod errors;
 pub mod graphql;
